@@ -23,7 +23,7 @@ jobs:
       - name: Set up Android SDK
         uses: android-actions/setup-android@v3
 
-      - name: Make gradlew executable   # 👈 Add this step here
+      - name: Make gradlew executable
         run: chmod +x ./gradlew
 
       - name: Build Release AAB
