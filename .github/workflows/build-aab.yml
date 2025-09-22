@@ -7,7 +7,6 @@ on:
 
 jobs:
   build:
-    name: Build AAB
     runs-on: ubuntu-latest
 
     steps:
@@ -28,9 +27,11 @@ jobs:
         target: android-34
         ndk: 25.2.9519653
 
+    - name: Make gradlew executable
+      run: chmod +x gradlew
+
     - name: Build Release AAB
-      run: |
-        ./gradlew bundleRelease
+      run: ./gradlew bundleRelease
 
     - name: Upload Unsigned AAB
       uses: actions/upload-artifact@v4
