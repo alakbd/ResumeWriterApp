@@ -20,39 +20,33 @@ jobs:
           java-version: '17'
           distribution: 'temurin'
 
-      - name: Setup Android SDK
+      - name: Set up Android SDK
         uses: android-actions/setup-android@v3
 
-      - name: Validate and Fix Gradle Wrapper
+      - name: Install Gradle
         run: |
-          # Check if we have valid Gradle wrapper files
-          if [ ! -f "gradle/wrapper/gradle-wrapper.jar" ] || [ ! -s "gradle/wrapper/gradle-wrapper.jar" ]; then
-            echo "Gradle wrapper JAR is missing or empty, downloading..."
-            mkdir -p gradle/wrapper
-            curl -L https://github.com/gradle/gradle/raw/master/gradle/wrapper/gradle-wrapper.jar -o gradle/wrapper/gradle-wrapper.jar
-          fi
-          
-          # Ensure gradlew script exists
-          if [ ! -f "gradlew" ]; then
-            echo "gradlew script missing, creating..."
-            curl -L https://raw.githubusercontent.com/gradle/gradle/master/gradlew -o gradlew
-          fi
-          
-          chmod +x ./gradlew
+          # Install Gradle to regenerate wrapper if needed
+          sudo apt update
+          sudo apt install -y gradle
 
-      - name: Cache Gradle packages
-        uses: actions/cache@v3
-        with:
-          path: |
-            ~/.gradle/caches
-            ~/.gradle/wrapper
-          key: ${{ runner.os }}-gradle-${{ hashFiles('**/*.gradle*', '**/gradle-wrapper.properties') }}
-          restore-keys: |
-            ${{ runner.os }}-gradle-
-
-      - name: Build with Gradle
+      - name: Regenerate Gradle Wrapper
         run: |
-          ./gradlew clean bundleRelease --no-daemon --stacktrace
+          # Remove corrupted files
+          rm -f gradlew gradlew.bat
+          rm -rf gradle/wrapper
+          
+          # Regenerate wrapper
+          gradle wrapper --gradle-version=8.5 --distribution-type=bin
+          
+          # Verify regeneration
+          ls -la gradlew
+          ls -la gradle/wrapper/
+
+      - name: Make gradlew executable
+        run: chmod +x ./gradlew
+
+      - name: Build Release AAB
+        run: ./gradlew clean bundleRelease --no-daemon --stacktrace
 
       - name: Upload AAB
         uses: actions/upload-artifact@v4
