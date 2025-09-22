@@ -1,0 +1,39 @@
+name: Build Android AAB
+
+on:
+  push:
+    branches:
+      - main
+
+jobs:
+  build:
+    name: Build AAB
+    runs-on: ubuntu-latest
+
+    steps:
+    - name: Checkout code
+      uses: actions/checkout@v3
+
+    - name: Set up JDK 17
+      uses: actions/setup-java@v3
+      with:
+        distribution: 'temurin'
+        java-version: 17
+
+    - name: Download Android SDK
+      uses: android-actions/setup-android@v2
+      with:
+        api-level: 34
+        build-tools: 34.0.0
+        target: android-34
+        ndk: 25.2.9519653
+
+    - name: Build AAB
+      run: |
+        ./gradlew bundleRelease
+
+    - name: Upload AAB
+      uses: actions/upload-artifact@v3
+      with:
+        name: ResumeWriterApp-AAB
+        path: app/build/outputs/bundle/release/app-release.aab
