@@ -1,4 +1,4 @@
-name: Build Android AAB
+name: Build Android AAB (Unsigned)
 
 on:
   push:
@@ -28,12 +28,13 @@ jobs:
         target: android-34
         ndk: 25.2.9519653
 
-    - name: Build AAB
+    - name: Build Release AAB
       run: |
         ./gradlew bundleRelease
 
-    - name: Upload AAB
-      uses: actions/upload-artifact@v3
+    - name: Upload Unsigned AAB
+      uses: actions/upload-artifact@v4
       with:
-        name: ResumeWriterApp-AAB
+        name: ResumeWriterApp-Unsigned-AAB
         path: app/build/outputs/bundle/release/app-release.aab
+        if-no-files-found: error
