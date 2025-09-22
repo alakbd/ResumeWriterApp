@@ -2,14 +2,13 @@
 buildscript {
     repositories {
         google()       // Required for the Android Gradle Plugin
-        mavenCentral() // Required for the Kotlin Gradle Plugin and other libraries
+        mavenCentral() // Required for the Kotlin Gradle Plugin
     }
     dependencies {
-        classpath 'com.android.tools.build:gradle:8.2.2'
-        classpath "org.jetbrains.kotlin:kotlin-gradle-plugin:1.9.22"
+        classpath 'com.android.tools.build:gradle:8.2.2'  // Android Gradle Plugin
+        classpath "org.jetbrains.kotlin:kotlin-gradle-plugin:1.9.22" // Kotlin Plugin
     }
 }
-
 allprojects {
     repositories {
         google()
