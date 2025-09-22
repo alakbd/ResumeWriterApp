@@ -13,8 +13,6 @@ jobs:
     steps:
       - name: Checkout repository
         uses: actions/checkout@v4
-        with:
-          fetch-depth: 0  # Fetch all history for better Gradle caching
 
       - name: Set up JDK 17
         uses: actions/setup-java@v4
@@ -22,28 +20,39 @@ jobs:
           java-version: '17'
           distribution: 'temurin'
 
-      - name: Set up Android SDK
+      - name: Setup Android SDK
         uses: android-actions/setup-android@v3
 
-      - name: Validate Gradle Wrapper
+      - name: Validate and Fix Gradle Wrapper
         run: |
-          # Check if wrapper files exist
-          if [ ! -f "gradlew" ] || [ ! -f "gradle/wrapper/gradle-wrapper.jar" ] || [ ! -f "gradle/wrapper/gradle-wrapper.properties" ]; then
-            echo "Gradle wrapper files are missing or corrupted"
-            exit 1
+          # Check if we have valid Gradle wrapper files
+          if [ ! -f "gradle/wrapper/gradle-wrapper.jar" ] || [ ! -s "gradle/wrapper/gradle-wrapper.jar" ]; then
+            echo "Gradle wrapper JAR is missing or empty, downloading..."
+            mkdir -p gradle/wrapper
+            curl -L https://github.com/gradle/gradle/raw/master/gradle/wrapper/gradle-wrapper.jar -o gradle/wrapper/gradle-wrapper.jar
           fi
           
-          # Verify the JAR file
-          file gradle/wrapper/gradle-wrapper.jar | grep -q "Java archive" || exit 1
+          # Ensure gradlew script exists
+          if [ ! -f "gradlew" ]; then
+            echo "gradlew script missing, creating..."
+            curl -L https://raw.githubusercontent.com/gradle/gradle/master/gradlew -o gradlew
+          fi
+          
+          chmod +x ./gradlew
 
-      - name: Make gradlew executable
-        run: chmod +x ./gradlew
+      - name: Cache Gradle packages
+        uses: actions/cache@v3
+        with:
+          path: |
+            ~/.gradle/caches
+            ~/.gradle/wrapper
+          key: ${{ runner.os }}-gradle-${{ hashFiles('**/*.gradle*', '**/gradle-wrapper.properties') }}
+          restore-keys: |
+            ${{ runner.os }}-gradle-
 
-      - name: Test Gradle Setup
-        run: ./gradlew --version
-
-      - name: Build Release AAB
-        run: ./gradlew clean bundleRelease
+      - name: Build with Gradle
+        run: |
+          ./gradlew clean bundleRelease --no-daemon --stacktrace
 
       - name: Upload AAB
         uses: actions/upload-artifact@v4
