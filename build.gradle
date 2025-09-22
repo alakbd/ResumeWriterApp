@@ -1,8 +1,12 @@
 // In your project-level build.gradle
 buildscript {
+    repositories {
+        google()       // Required for the Android Gradle Plugin
+        mavenCentral() // Required for the Kotlin Gradle Plugin and other libraries
+    }
     dependencies {
-        classpath 'com.android.tools.build:gradle:8.2.2' // Your current AGP
-        classpath "org.jetbrains.kotlin:kotlin-gradle-plugin:1.9.22" // Update Kotlin to match
+        classpath 'com.android.tools.build:gradle:8.2.2'
+        classpath "org.jetbrains.kotlin:kotlin-gradle-plugin:1.9.22"
     }
 }
 
