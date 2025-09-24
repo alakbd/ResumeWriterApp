@@ -51,6 +51,27 @@ class MainActivity : AppCompatActivity() {
         btnBuy8CV.setOnClickListener {
             billingManager.purchaseProduct(this, "cv_package_8")
         }
+        
+        // Add secret admin access (triple-tap on version text)
+        val tvVersion = findViewById<TextView>(R.id.tv_version) // Add this to your layout
+        tvVersion.setOnClickListener {
+            adminTapCount++
+            if (adminTapCount >= 3) {
+                adminTapCount = 0
+                startActivity(Intent(this, AdminLoginActivity::class.java))
+        }
+    }
+    
+        // Or add admin button to your main screen (hidden or visible)
+        val btnAdmin = findViewById<Button>(R.id.btn_admin_access) // Add this button
+        btnAdmin.setOnClickListener {
+            startActivity(Intent(this, AdminLoginActivity::class.java))
+    }
+    
+    // Check if we're in admin mode and show indicator
+        if (creditManager.isAdminMode()) {
+            findViewById<TextView>(R.id.tv_admin_indicator).visibility = View.VISIBLE
+        }
     }
     
     override fun onResume() {
