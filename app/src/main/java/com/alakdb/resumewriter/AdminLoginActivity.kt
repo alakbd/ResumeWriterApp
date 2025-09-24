@@ -1,4 +1,4 @@
-package com.example.resumewriter  // Use YOUR package name
+package com.alakdb.resumewriter  // Use YOUR package name
 
 import android.content.Intent
 import android.os.Bundle
