@@ -10,7 +10,8 @@ import androidx.lifecycle.LifecycleOwner
 import android.view.View
 import android.content.Intent
 import com.example.resumewriter.databinding.ActivityMainBinding // ✅ Auto-generated from activity_main.xml
-
+import com.google.firebase.auth.FirebaseAuth
+import com.google.firebase.firestore.FirebaseFirestore
 
 
 
