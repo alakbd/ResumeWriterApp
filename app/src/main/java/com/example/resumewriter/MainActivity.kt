@@ -1,37 +1,31 @@
 package com.example.resumewriter
 
-import androidx.appcompat.app.AppCompatActivity
-import android.os.Bundle
-import android.widget.Button
-import android.widget.TextView
-import android.widget.Toast
-import androidx.lifecycle.DefaultLifecycleObserver
-import androidx.lifecycle.LifecycleOwner
-import android.view.View
 import android.content.Intent
-import com.example.resumewriter.databinding.ActivityMainBinding // ✅ Auto-generated from activity_main.xml
+import android.os.Bundle
+import android.view.View
+import android.widget.Toast
+import androidx.appcompat.app.AppCompatActivity
+import com.example.resumewriter.databinding.ActivityMainBinding
 import com.google.firebase.auth.FirebaseAuth
 import com.google.firebase.firestore.FirebaseFirestore
 
-
-
-
 class MainActivity : AppCompatActivity() {
-    
+
     private lateinit var userManager: UserManager
     private lateinit var billingManager: BillingManager
     private lateinit var creditManager: CreditManager
     private lateinit var binding: ActivityMainBinding
 
-    private var adminTapCount = 0 // ✅ Declare it
+    private var adminTapCount = 0
 
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
 
-        // ✅ Initialize ViewBinding
+        // Initialize ViewBinding
         binding = ActivityMainBinding.inflate(layoutInflater)
         setContentView(binding.root)
 
+        // Initialize managers
         initializeManagers()
         setupUI()
         updateCreditDisplay()
@@ -39,26 +33,15 @@ class MainActivity : AppCompatActivity() {
         // Initialize Firebase and check user registration
         userManager = UserManager(this)
         if (!userManager.isUserRegistered()) {
-            // Show registration screen or auto-register
             startActivity(Intent(this, UserRegistrationActivity::class.java))
             finish()
             return
-    }
-        setContentView(R.layout.activity_main)
-        // ... rest of your existing code ...
-        
-        // Sync with Firebase when app starts
+        }
+
+        // Sync credits with Firebase server
         syncWithFirebase()
     }
 
-    private fun syncWithFirebase() {
-        userManager.syncCreditsWithServer { success ->
-            if (success) {
-                updateCreditDisplay()
-            }
-        }
-    }
-}
     private fun initializeManagers() {
         creditManager = CreditManager(this)
         billingManager = BillingManager(this, creditManager)
@@ -66,20 +49,11 @@ class MainActivity : AppCompatActivity() {
     }
 
     private fun setupUI() {
-        // ✅ Use binding instead of findViewById
-        binding.btnGenerateCv.setOnClickListener {
-            generateCV()
-        }
+        binding.btnGenerateCv.setOnClickListener { generateCV() }
+        binding.btnBuy3Cv.setOnClickListener { billingManager.purchaseProduct(this, "cv_package_3") }
+        binding.btnBuy8Cv.setOnClickListener { billingManager.purchaseProduct(this, "cv_package_8") }
 
-        binding.btnBuy3Cv.setOnClickListener {
-            billingManager.purchaseProduct(this, "cv_package_3")
-        }
-
-        binding.btnBuy8Cv.setOnClickListener {
-            billingManager.purchaseProduct(this, "cv_package_8")
-        }
-
-        // ✅ Secret admin access (triple-tap on version text)
+        // Secret admin access (triple-tap on version)
         binding.tvVersion.setOnClickListener {
             adminTapCount++
             if (adminTapCount >= 3) {
@@ -88,20 +62,21 @@ class MainActivity : AppCompatActivity() {
             }
         }
 
-        // ✅ Admin button
+        // Admin button
         binding.btnAdminAccess.setOnClickListener {
             startActivity(Intent(this, AdminLoginActivity::class.java))
         }
 
-        // ✅ Show admin indicator if needed
+        // Admin indicator
         if (creditManager.isAdminMode()) {
             binding.tvAdminIndicator.visibility = View.VISIBLE
         }
     }
 
-    override fun onResume() {
-        super.onResume()
-        updateCreditDisplay()
+    private fun syncWithFirebase() {
+        userManager.syncCreditsWithServer { success ->
+            if (success) updateCreditDisplay()
+        }
     }
 
     private fun generateCV() {
