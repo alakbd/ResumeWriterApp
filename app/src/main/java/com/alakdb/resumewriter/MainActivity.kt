@@ -1,15 +1,15 @@
-package com.example.resumewriter
+package com.alakdb.resumewriter
 
 import android.content.Intent
 import android.os.Bundle
 import android.view.View
 import android.widget.Toast
 import androidx.appcompat.app.AppCompatActivity
-import com.example.resumewriter.databinding.ActivityMainBinding
+import com.alakdb.resumewriter.databinding.ActivityMainBinding
 import com.google.firebase.auth.FirebaseAuth
 import android.content.SharedPreferences
 import com.google.firebase.firestore.FirebaseFirestore
-import com.example.resumewriter.UserManager
+import com.alakdb.resumewriter.UserManager
 
 
 class MainActivity : AppCompatActivity() {
