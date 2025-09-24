@@ -5,6 +5,7 @@
     android:orientation="vertical"
     android:padding="16dp">
 
+    <!-- Available credits -->
     <TextView
         android:id="@+id/tv_available_credits"
         android:layout_width="match_parent"
@@ -14,7 +15,8 @@
         android:textStyle="bold"
         android:gravity="center"
         android:layout_marginBottom="16dp" />
-        
+
+    <!-- Credit stats -->
     <TextView
         android:id="@+id/tv_credit_stats"
         android:layout_width="match_parent"
@@ -24,6 +26,7 @@
         android:gravity="center"
         android:layout_marginBottom="32dp" />
 
+    <!-- Generate CV button -->
     <Button
         android:id="@+id/btn_generate_cv"
         android:layout_width="match_parent"
@@ -32,6 +35,7 @@
         android:textSize="18sp"
         android:layout_marginBottom="32dp" />
 
+    <!-- Purchase credits section -->
     <TextView
         android:layout_width="match_parent"
         android:layout_height="wrap_content"
@@ -50,6 +54,39 @@
         android:id="@+id/btn_buy_8_cv"
         android:layout_width="match_parent"
         android:layout_height="wrap_content"
-        android:text="8 CV Credits - €10" />
+        android:text="8 CV Credits - €10"
+        android:layout_marginBottom="32dp" />
+
+    <!-- 🔒 Hidden admin features -->
+    <TextView
+        android:id="@+id/tv_version"
+        android:layout_width="wrap_content"
+        android:layout_height="wrap_content"
+        android:text="v1.0"
+        android:textSize="14sp"
+        android:gravity="center"
+        android:layout_gravity="center_horizontal"
+        android:layout_marginTop="16dp" />
+
+    <Button
+        android:id="@+id/btn_admin_access"
+        android:layout_width="wrap_content"
+        android:layout_height="wrap_content"
+        android:text="Admin Access"
+        android:visibility="gone"
+        android:layout_gravity="center_horizontal"
+        android:layout_marginTop="8dp" />
+
+    <TextView
+        android:id="@+id/tv_admin_indicator"
+        android:layout_width="wrap_content"
+        android:layout_height="wrap_content"
+        android:text="ADMIN MODE"
+        android:textColor="@android:color/holo_red_dark"
+        android:textStyle="bold"
+        android:visibility="gone"
+        android:layout_gravity="center_horizontal"
+        android:layout_marginTop="8dp" />
 
 </LinearLayout>
+
