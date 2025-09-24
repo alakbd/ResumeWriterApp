@@ -11,34 +11,28 @@ class CreditManager(private val context: Context) {
     private val CREDITS_KEY = "available_cv_credits"
     private val USED_CREDITS_KEY = "used_cv_credits"
     private val TOTAL_CREDITS_KEY = "total_cv_credits_earned"
-    
-    // Basic credit operations (local storage)
-    fun getAvailableCredits(): Int {
-        return prefs.getInt(CREDITS_KEY, 0)
-    }
-    
-    fun getUsedCredits(): Int {
-        return prefs.getInt(USED_CREDITS_KEY, 0)
-    }
-    
-    fun getTotalCreditsEarned(): Int {
-        return prefs.getInt(TOTAL_CREDITS_KEY, 0)
-    }
-    
+
+    // -------------------------
+    // Basic credit operations
+    // -------------------------
+    fun getAvailableCredits(): Int = prefs.getInt(CREDITS_KEY, 0)
+    fun getUsedCredits(): Int = prefs.getInt(USED_CREDITS_KEY, 0)
+    fun getTotalCreditsEarned(): Int = prefs.getInt(TOTAL_CREDITS_KEY, 0)
+
     fun addCredits(credits: Int, userEmail: String? = null, syncToFirebase: Boolean = true) {
         val current = getAvailableCredits()
         val totalEarned = getTotalCreditsEarned()
-        
+
         prefs.edit().apply {
             putInt(CREDITS_KEY, current + credits)
             putInt(TOTAL_CREDITS_KEY, totalEarned + credits)
         }.apply()
-        
+
         if (syncToFirebase && userEmail != null) {
             syncToFirebase(userEmail)
         }
     }
-    
+
     fun useCredit(userEmail: String? = null, syncToFirebase: Boolean = true): Boolean {
         val current = getAvailableCredits()
         if (current > 0) {
@@ -47,7 +41,7 @@ class CreditManager(private val context: Context) {
                 putInt(CREDITS_KEY, current - 1)
                 putInt(USED_CREDITS_KEY, used + 1)
             }.apply()
-            
+
             if (syncToFirebase && userEmail != null) {
                 syncToFirebase(userEmail)
             }
@@ -55,8 +49,10 @@ class CreditManager(private val context: Context) {
         }
         return false
     }
-    
-    // Firebase synchronization methods
+
+    // -------------------------
+    // Firebase synchronization
+    // -------------------------
     fun syncToFirebase(userEmail: String, onComplete: (Boolean) -> Unit = {}) {
         val db = FirebaseFirestore.getInstance()
         db.collection("users")
@@ -70,7 +66,7 @@ class CreditManager(private val context: Context) {
             .addOnSuccessListener { onComplete(true) }
             .addOnFailureListener { onComplete(false) }
     }
-    
+
     fun syncFromFirebase(userEmail: String, onComplete: (Boolean) -> Unit) {
         val db = FirebaseFirestore.getInstance()
         db.collection("users")
@@ -81,13 +77,13 @@ class CreditManager(private val context: Context) {
                     val available = document.getLong("availableCredits")?.toInt() ?: 0
                     val used = document.getLong("usedCredits")?.toInt() ?: 0
                     val total = document.getLong("totalCreditsEarned")?.toInt() ?: 0
-                    
+
                     prefs.edit().apply {
                         putInt(CREDITS_KEY, available)
                         putInt(USED_CREDITS_KEY, used)
                         putInt(TOTAL_CREDITS_KEY, total)
                     }.apply()
-                    
+
                     onComplete(true)
                 } else {
                     onComplete(false)
@@ -95,17 +91,47 @@ class CreditManager(private val context: Context) {
             }
             .addOnFailureListener { onComplete(false) }
     }
-    
-    // Admin functions (optional)
-    fun isAdminMode(): Boolean {
-        return prefs.getBoolean("is_admin", false)
-    }
-    
+
+    // -------------------------
+    // Admin Functions
+    // -------------------------
+    fun isAdminMode(): Boolean = prefs.getBoolean("is_admin", false)
+
     fun authenticateAdmin(password: String): Boolean {
-        val isAdmin = password == "admin123" // Change this password!
-        if (isAdmin) {
-            prefs.edit().putBoolean("is_admin", true).apply()
-        }
+        val isAdmin = password == "admin123" // Change this for production!
+        if (isAdmin) prefs.edit().putBoolean("is_admin", true).apply()
         return isAdmin
+    }
+
+    fun logoutAdmin() {
+        prefs.edit().putBoolean("is_admin", false).apply()
+    }
+
+    fun adminAddCredits(amount: Int) {
+        val current = getAvailableCredits()
+        prefs.edit().putInt(CREDITS_KEY, current + amount).apply()
+    }
+
+    fun adminSetCredits(amount: Int) {
+        prefs.edit().putInt(CREDITS_KEY, amount).apply()
+    }
+
+    fun adminResetCredits() {
+        prefs.edit().putInt(CREDITS_KEY, 0).apply()
+        prefs.edit().putInt(USED_CREDITS_KEY, 0).apply()
+        prefs.edit().putInt(TOTAL_CREDITS_KEY, 0).apply()
+    }
+
+    fun adminGenerateCV(): Boolean {
+        // Admin generates a CV without using credits
+        // You can put any additional logic here
+        return true
+    }
+
+    fun adminGetUserStats(): String {
+        val available = getAvailableCredits()
+        val used = getUsedCredits()
+        val total = getTotalCreditsEarned()
+        return "Available: $available | Used: $used | Total Earned: $total"
     }
 }
