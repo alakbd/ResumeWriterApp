@@ -7,99 +7,90 @@ import android.widget.Toast
 import androidx.appcompat.app.AppCompatActivity
 import com.example.resumewriter.databinding.ActivityMainBinding
 import com.google.firebase.auth.FirebaseAuth
+import android.content.SharedPreferences
 import com.google.firebase.firestore.FirebaseFirestore
 
-class MainActivity : AppCompatActivity() {
+class UserManager(private val context: Context) {
 
-    private lateinit var userManager: UserManager
-    private lateinit var billingManager: BillingManager
-    private lateinit var creditManager: CreditManager
-    private lateinit var binding: ActivityMainBinding
+    private val prefs: SharedPreferences =
+        context.getSharedPreferences("user_prefs", Context.MODE_PRIVATE)
+    private val db: FirebaseFirestore = FirebaseFirestore.getInstance()
 
-    private var adminTapCount = 0
+    companion object {
+        const val USER_EMAIL_KEY = "user_email"
+        const val USER_ID_KEY = "user_id"
+        const val IS_REGISTERED_KEY = "is_registered"
+    }
 
-    override fun onCreate(savedInstanceState: Bundle?) {
-        super.onCreate(savedInstanceState)
+    // Check if user is registered locally
+    fun isUserRegistered(): Boolean {
+        return prefs.getBoolean(IS_REGISTERED_KEY, false)
+    }
 
-        // Initialize ViewBinding
-        binding = ActivityMainBinding.inflate(layoutInflater)
-        setContentView(binding.root)
+    // Get current user's email
+    fun getCurrentUserEmail(): String? {
+        return prefs.getString(USER_EMAIL_KEY, null)
+    }
 
-        // Initialize managers
-        initializeManagers()
-        setupUI()
-        updateCreditDisplay()
+    // Register a new user
+    fun registerUser(email: String, onComplete: (Boolean, String?) -> Unit) {
+        val userId = generateUserId(email)
 
-        // Initialize Firebase and check user registration
-        userManager = UserManager(this)
-        if (!userManager.isUserRegistered()) {
-            startActivity(Intent(this, UserRegistrationActivity::class.java))
-            finish()
+        val userData = hashMapOf(
+            "email" to email,
+            "availableCredits" to 0,
+            "usedCredits" to 0,
+            "totalCreditsEarned" to 0,
+            "deviceId" to android.provider.Settings.Secure.getString(
+                context.contentResolver,
+                android.provider.Settings.Secure.ANDROID_ID
+            ),
+            "createdAt" to System.currentTimeMillis(),
+            "lastActive" to System.currentTimeMillis()
+        )
+
+        db.collection("users")
+            .document(email)
+            .set(userData)
+            .addOnSuccessListener {
+                prefs.edit().apply {
+                    putString(USER_EMAIL_KEY, email)
+                    putString(USER_ID_KEY, userId)
+                    putBoolean(IS_REGISTERED_KEY, true)
+                }.apply()
+                onComplete(true, null)
+            }
+            .addOnFailureListener { e ->
+                onComplete(false, e.message)
+            }
+    }
+
+    // Sync local credits with Firebase
+    fun syncCreditsWithServer(onComplete: (Boolean) -> Unit) {
+        val email = getCurrentUserEmail()
+        if (email == null) {
+            onComplete(false)
             return
         }
 
-        // Sync credits with Firebase server
-        syncWithFirebase()
+        val creditManager = CreditManager(context)
+        val dbRef = db.collection("users").document(email)
+
+        // Update Firebase with local credit values
+        val updates = hashMapOf(
+            "availableCredits" to creditManager.getAvailableCredits(),
+            "usedCredits" to creditManager.getUsedCredits(),
+            "totalCreditsEarned" to creditManager.getTotalCreditsEarned(),
+            "lastUpdated" to System.currentTimeMillis()
+        )
+
+        dbRef.update(updates as Map<String, Any>)
+            .addOnSuccessListener { onComplete(true) }
+            .addOnFailureListener { onComplete(false) }
     }
 
-    private fun initializeManagers() {
-        creditManager = CreditManager(this)
-        billingManager = BillingManager(this, creditManager)
-        billingManager.initializeBilling()
-    }
-
-    private fun setupUI() {
-        binding.btnGenerateCv.setOnClickListener { generateCV() }
-        binding.btnBuy3Cv.setOnClickListener { billingManager.purchaseProduct(this, "cv_package_3") }
-        binding.btnBuy8Cv.setOnClickListener { billingManager.purchaseProduct(this, "cv_package_8") }
-
-        // Secret admin access (triple-tap on version)
-        binding.tvVersion.setOnClickListener {
-            adminTapCount++
-            if (adminTapCount >= 3) {
-                adminTapCount = 0
-                startActivity(Intent(this, AdminLoginActivity::class.java))
-            }
-        }
-
-        // Admin button
-        binding.btnAdminAccess.setOnClickListener {
-            startActivity(Intent(this, AdminLoginActivity::class.java))
-        }
-
-        // Admin indicator
-        if (creditManager.isAdminMode()) {
-            binding.tvAdminIndicator.visibility = View.VISIBLE
-        }
-    }
-
-    private fun syncWithFirebase() {
-        userManager.syncCreditsWithServer { success ->
-            if (success) updateCreditDisplay()
-        }
-    }
-
-    private fun generateCV() {
-        if (creditManager.useCredit()) {
-            showMessage("CV generated successfully!")
-            updateCreditDisplay()
-        } else {
-            showMessage("Not enough credits! Please purchase more.")
-        }
-    }
-
-    private fun updateCreditDisplay() {
-        val available = creditManager.getAvailableCredits()
-        val used = creditManager.getUsedCredits()
-        val totalEarned = creditManager.getTotalCreditsEarned()
-
-        binding.tvAvailableCredits.text = "Available CV Credits: $available"
-        binding.tvCreditStats.text = "Used: $used | Total Earned: $totalEarned"
-
-        binding.btnGenerateCv.isEnabled = available > 0
-    }
-
-    private fun showMessage(message: String) {
-        Toast.makeText(this, message, Toast.LENGTH_SHORT).show()
+    // Generate a unique user ID (simple hash of email + timestamp)
+    private fun generateUserId(email: String): String {
+        return "${email.hashCode()}_${System.currentTimeMillis()}"
     }
 }
