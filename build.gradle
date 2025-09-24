@@ -1,23 +1,15 @@
 // In your project-level build.gradle
+// Top-level build file where you can add configuration options common to all sub-projects/modules.
 buildscript {
-    repositories {
-        google()  // ← Make sure this is FIRST
-        mavenCentral()
-    }
     dependencies {
         classpath 'com.android.tools.build:gradle:8.2.2'
         classpath "org.jetbrains.kotlin:kotlin-gradle-plugin:1.9.22"
-        classpath 'com.google.gms:google-services:4.4.0' // The Google Services plugin
+        classpath 'com.google.gms:google-services:4.4.0' // If you use Firebase
     }
 }
-
-allprojects {
-    repositories {
-        google()  // ← Add this here too
-        mavenCentral()
-    }
-}
-
-task clean(type: Delete) {
+// Remove the 'allprojects' block entirely if it only contains repository
+tasks.register('clean', Delete) {
     delete rootProject.buildDir
 }
+
+
