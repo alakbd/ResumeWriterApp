@@ -4,10 +4,10 @@ buildscript {
     dependencies {
         classpath 'com.android.tools.build:gradle:8.2.2'
         classpath "org.jetbrains.kotlin:kotlin-gradle-plugin:1.9.22"
-        classpath 'com.google.gms:google-services:4.4.0' // If you use Firebase
+        classpath 'com.google.gms:google-services:4.4.0'
     }
 }
-// Remove the 'allprojects' block entirely if it only contains repository
+
 tasks.register('clean', Delete) {
     delete rootProject.buildDir
 }
