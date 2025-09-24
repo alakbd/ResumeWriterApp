@@ -1,4 +1,4 @@
-package com.example.resumewriter
+package com.alakdb.resumewriter
 
 import android.content.Context
 import android.content.SharedPreferences
