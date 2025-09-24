@@ -1,5 +1,5 @@
 
-package com.example.resumewriter
+package com.alakdb.resumewriter
 
 import android.os.Bundle
 import android.widget.Button
