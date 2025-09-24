@@ -1,4 +1,3 @@
-package com.example.resumewriter
 
 package com.example.resumewriter
 
