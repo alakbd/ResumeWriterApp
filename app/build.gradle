@@ -6,6 +6,7 @@ plugins {
 }
 
 android {
+    namespace "com.example.resumewriter"   // ✅ Add this line
     compileSdk 34
     
     defaultConfig {
