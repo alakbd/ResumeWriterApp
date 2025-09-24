@@ -16,7 +16,8 @@ import com.example.resumewriter.databinding.ActivityMainBinding // ✅ Auto-gene
 
 
 class MainActivity : AppCompatActivity() {
-
+    
+    private lateinit var userManager: UserManager
     private lateinit var billingManager: BillingManager
     private lateinit var creditManager: CreditManager
     private lateinit var binding: ActivityMainBinding
@@ -33,8 +34,30 @@ class MainActivity : AppCompatActivity() {
         initializeManagers()
         setupUI()
         updateCreditDisplay()
+
+        // Initialize Firebase and check user registration
+        userManager = UserManager(this)
+        if (!userManager.isUserRegistered()) {
+            // Show registration screen or auto-register
+            startActivity(Intent(this, UserRegistrationActivity::class.java))
+            finish()
+            return
+    }
+        setContentView(R.layout.activity_main)
+        // ... rest of your existing code ...
+        
+        // Sync with Firebase when app starts
+        syncWithFirebase()
     }
 
+    private fun syncWithFirebase() {
+        userManager.syncCreditsWithServer { success ->
+            if (success) {
+                updateCreditDisplay()
+            }
+        }
+    }
+}
     private fun initializeManagers() {
         creditManager = CreditManager(this)
         billingManager = BillingManager(this, creditManager)
