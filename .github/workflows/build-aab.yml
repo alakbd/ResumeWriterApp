@@ -33,7 +33,11 @@ jobs:
 
       # ✅ Add this step to create google-services.json from GitHub Secret
       - name: Create google-services.json
-        run: echo "${{ secrets.GOOGLE_SERVICES_JSON }}" > app/google-services.json
+        run: |
+          cat <<EOF > app/google-services.json
+          ${{ secrets.GOOGLE_SERVICES_JSON }}
+          EOF
+
 
       - name: Build with Gradle
         run: ./gradlew clean bundleRelease
