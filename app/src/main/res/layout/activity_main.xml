@@ -1,11 +1,55 @@
 <?xml version="1.0" encoding="utf-8"?>
 <LinearLayout xmlns:android="http://schemas.android.com/apk/res/android"
-    android:orientation="vertical"
     android:layout_width="match_parent"
-    android:layout_height="match_parent">
+    android:layout_height="match_parent"
+    android:orientation="vertical"
+    android:padding="16dp">
 
-    <WebView
-        android:id="@+id/webview"
+    <TextView
+        android:id="@+id/tv_available_credits"
         android:layout_width="match_parent"
-        android:layout_height="match_parent"/>
+        android:layout_height="wrap_content"
+        android:text="Available CV Credits: 0"
+        android:textSize="24sp"
+        android:textStyle="bold"
+        android:gravity="center"
+        android:layout_marginBottom="16dp" />
+        
+    <TextView
+        android:id="@+id/tv_credit_stats"
+        android:layout_width="match_parent"
+        android:layout_height="wrap_content"
+        android:text="Used: 0 | Total Earned: 0"
+        android:textSize="16sp"
+        android:gravity="center"
+        android:layout_marginBottom="32dp" />
+
+    <Button
+        android:id="@+id/btn_generate_cv"
+        android:layout_width="match_parent"
+        android:layout_height="wrap_content"
+        android:text="Generate CV (1 Credit)"
+        android:textSize="18sp"
+        android:layout_marginBottom="32dp" />
+
+    <TextView
+        android:layout_width="match_parent"
+        android:layout_height="wrap_content"
+        android:text="Purchase More Credits:"
+        android:textSize="18sp"
+        android:layout_marginBottom="16dp" />
+
+    <Button
+        android:id="@+id/btn_buy_3_cv"
+        android:layout_width="match_parent"
+        android:layout_height="wrap_content"
+        android:text="3 CV Credits - €5"
+        android:layout_marginBottom="8dp" />
+
+    <Button
+        android:id="@+id/btn_buy_8_cv"
+        android:layout_width="match_parent"
+        android:layout_height="wrap_content"
+        android:text="8 CV Credits - €10" />
+
 </LinearLayout>
