@@ -9,88 +9,37 @@ import com.example.resumewriter.databinding.ActivityMainBinding
 import com.google.firebase.auth.FirebaseAuth
 import android.content.SharedPreferences
 import com.google.firebase.firestore.FirebaseFirestore
+import com.example.resumewriter.UserManager
 
-class UserManager(private val context: Context) {
 
-    private val prefs: SharedPreferences =
-        context.getSharedPreferences("user_prefs", Context.MODE_PRIVATE)
-    private val db: FirebaseFirestore = FirebaseFirestore.getInstance()
+class MainActivity : AppCompatActivity() {
 
-    companion object {
-        const val USER_EMAIL_KEY = "user_email"
-        const val USER_ID_KEY = "user_id"
-        const val IS_REGISTERED_KEY = "is_registered"
-    }
+    private lateinit var userManager: UserManager
+    private lateinit var billingManager: BillingManager
+    private lateinit var creditManager: CreditManager
+    private lateinit var binding: ActivityMainBinding
 
-    // Check if user is registered locally
-    fun isUserRegistered(): Boolean {
-        return prefs.getBoolean(IS_REGISTERED_KEY, false)
-    }
+    private var adminTapCount = 0
 
-    // Get current user's email
-    fun getCurrentUserEmail(): String? {
-        return prefs.getString(USER_EMAIL_KEY, null)
-    }
+    override fun onCreate(savedInstanceState: Bundle?) {
+        super.onCreate(savedInstanceState)
+        binding = ActivityMainBinding.inflate(layoutInflater)
+        setContentView(binding.root)
 
-    // Register a new user
-    fun registerUser(email: String, onComplete: (Boolean, String?) -> Unit) {
-        val userId = generateUserId(email)
+        // Initialize managers
+        initializeManagers()
+        setupUI()
+        updateCreditDisplay()
 
-        val userData = hashMapOf(
-            "email" to email,
-            "availableCredits" to 0,
-            "usedCredits" to 0,
-            "totalCreditsEarned" to 0,
-            "deviceId" to android.provider.Settings.Secure.getString(
-                context.contentResolver,
-                android.provider.Settings.Secure.ANDROID_ID
-            ),
-            "createdAt" to System.currentTimeMillis(),
-            "lastActive" to System.currentTimeMillis()
-        )
-
-        db.collection("users")
-            .document(email)
-            .set(userData)
-            .addOnSuccessListener {
-                prefs.edit().apply {
-                    putString(USER_EMAIL_KEY, email)
-                    putString(USER_ID_KEY, userId)
-                    putBoolean(IS_REGISTERED_KEY, true)
-                }.apply()
-                onComplete(true, null)
-            }
-            .addOnFailureListener { e ->
-                onComplete(false, e.message)
-            }
-    }
-
-    // Sync local credits with Firebase
-    fun syncCreditsWithServer(onComplete: (Boolean) -> Unit) {
-        val email = getCurrentUserEmail()
-        if (email == null) {
-            onComplete(false)
+        userManager = UserManager(this)
+        if (!userManager.isUserRegistered()) {
+            startActivity(Intent(this, UserRegistrationActivity::class.java))
+            finish()
             return
         }
 
-        val creditManager = CreditManager(context)
-        val dbRef = db.collection("users").document(email)
-
-        // Update Firebase with local credit values
-        val updates = hashMapOf(
-            "availableCredits" to creditManager.getAvailableCredits(),
-            "usedCredits" to creditManager.getUsedCredits(),
-            "totalCreditsEarned" to creditManager.getTotalCreditsEarned(),
-            "lastUpdated" to System.currentTimeMillis()
-        )
-
-        dbRef.update(updates as Map<String, Any>)
-            .addOnSuccessListener { onComplete(true) }
-            .addOnFailureListener { onComplete(false) }
+        syncWithFirebase()
     }
 
-    // Generate a unique user ID (simple hash of email + timestamp)
-    private fun generateUserId(email: String): String {
-        return "${email.hashCode()}_${System.currentTimeMillis()}"
-    }
+    // ... rest of MainActivity code ...
 }
