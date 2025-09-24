@@ -1,6 +1,6 @@
 pluginManagement {
     repositories {
-        google()  // Add this line first
+        google()  // For plugins
         mavenCentral()
         gradlePluginPortal()
     }
@@ -8,10 +8,9 @@ pluginManagement {
 dependencyResolutionManagement {
     repositoriesMode.set(RepositoriesMode.FAIL_ON_PROJECT_REPOS)
     repositories {
-        google() // Add this line here as well
+        google()  // For library dependencies (like the Billing client)
         mavenCentral()
     }
 }
-
 rootProject.name = "ResumeWriterApp"
 include ':app'
