@@ -31,6 +31,10 @@ jobs:
       - name: Make gradlew executable
         run: chmod +x ./gradlew
 
+      # ✅ Add this step to create google-services.json from GitHub Secret
+      - name: Create google-services.json
+        run: echo "${{ secrets.GOOGLE_SERVICES_JSON }}" > app/google-services.json
+
       - name: Build with Gradle
         run: ./gradlew clean bundleRelease
 
