@@ -9,103 +9,97 @@ import androidx.lifecycle.DefaultLifecycleObserver
 import androidx.lifecycle.LifecycleOwner
 import android.view.View
 import android.content.Intent
+import com.example.resumewriter.databinding.ActivityMainBinding // ✅ Auto-generated from activity_main.xml
 
 
 
 
 
 class MainActivity : AppCompatActivity() {
+
     private lateinit var billingManager: BillingManager
     private lateinit var creditManager: CreditManager
-    
-    private lateinit var tvCreditStats: TextView
-    private lateinit var tvAvailableCredits: TextView
-    private lateinit var btnGenerateCV: Button
-    private lateinit var btnBuy3CV: Button
-    private lateinit var btnBuy8CV: Button
-    
+    private lateinit var binding: ActivityMainBinding
+
+    private var adminTapCount = 0 // ✅ Declare it
+
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
-        setContentView(R.layout.activity_main)
-        
+
+        // ✅ Initialize ViewBinding
+        binding = ActivityMainBinding.inflate(layoutInflater)
+        setContentView(binding.root)
+
         initializeManagers()
         setupUI()
         updateCreditDisplay()
     }
-    
+
     private fun initializeManagers() {
         creditManager = CreditManager(this)
         billingManager = BillingManager(this, creditManager)
         billingManager.initializeBilling()
     }
-    
+
     private fun setupUI() {
-        tvCreditStats = findViewById(R.id.tv_credit_stats)
-        tvAvailableCredits = findViewById(R.id.tv_available_credits)
-        btnGenerateCV = findViewById(R.id.btn_generate_cv)
-        btnBuy3CV = findViewById(R.id.btn_buy_3_cv)
-        btnBuy8CV = findViewById(R.id.btn_buy_8_cv)
-        
-        btnGenerateCV.setOnClickListener {
+        // ✅ Use binding instead of findViewById
+        binding.btnGenerateCv.setOnClickListener {
             generateCV()
         }
-        
-        btnBuy3CV.setOnClickListener {
+
+        binding.btnBuy3Cv.setOnClickListener {
             billingManager.purchaseProduct(this, "cv_package_3")
         }
-        
-        btnBuy8CV.setOnClickListener {
+
+        binding.btnBuy8Cv.setOnClickListener {
             billingManager.purchaseProduct(this, "cv_package_8")
         }
-        
-        // Add secret admin access (triple-tap on version text)
-        val tvVersion = findViewById<TextView>(R.id.tv_version) // Add this to your layout
-        tvVersion.setOnClickListener {
+
+        // ✅ Secret admin access (triple-tap on version text)
+        binding.tvVersion.setOnClickListener {
             adminTapCount++
             if (adminTapCount >= 3) {
                 adminTapCount = 0
                 startActivity(Intent(this, AdminLoginActivity::class.java))
+            }
         }
-    }
-    
-        // Or add admin button to your main screen (hidden or visible)
-        val btnAdmin = findViewById<Button>(R.id.btn_admin_access) // Add this button
-        btnAdmin.setOnClickListener {
+
+        // ✅ Admin button
+        binding.btnAdminAccess.setOnClickListener {
             startActivity(Intent(this, AdminLoginActivity::class.java))
-    }
-    
-    // Check if we're in admin mode and show indicator
+        }
+
+        // ✅ Show admin indicator if needed
         if (creditManager.isAdminMode()) {
-            findViewById<TextView>(R.id.tv_admin_indicator).visibility = View.VISIBLE
+            binding.tvAdminIndicator.visibility = View.VISIBLE
         }
     }
-    
+
     override fun onResume() {
         super.onResume()
         updateCreditDisplay()
     }
-    
+
     private fun generateCV() {
         if (creditManager.useCredit()) {
-            // Your existing CV generation code here
             showMessage("CV generated successfully!")
             updateCreditDisplay()
         } else {
             showMessage("Not enough credits! Please purchase more.")
         }
     }
-    
+
     private fun updateCreditDisplay() {
         val available = creditManager.getAvailableCredits()
         val used = creditManager.getUsedCredits()
         val totalEarned = creditManager.getTotalCreditsEarned()
-        
-        tvAvailableCredits.text = "Available CV Credits: $available"
-        tvCreditStats.text = "Used: $used | Total Earned: $totalEarned"
-        
-        btnGenerateCV.isEnabled = available > 0
+
+        binding.tvAvailableCredits.text = "Available CV Credits: $available"
+        binding.tvCreditStats.text = "Used: $used | Total Earned: $totalEarned"
+
+        binding.btnGenerateCv.isEnabled = available > 0
     }
-    
+
     private fun showMessage(message: String) {
         Toast.makeText(this, message, Toast.LENGTH_SHORT).show()
     }
