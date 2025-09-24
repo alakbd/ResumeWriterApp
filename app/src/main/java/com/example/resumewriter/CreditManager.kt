@@ -11,6 +11,35 @@ class CreditManager(private val context: Context) {
     private val TOTAL_CREDITS_KEY = "total_cv_credits_earned"
     private val IS_ADMIN_KEY = "is_admin_user"
     
+    // ADD THESE NEW METHODS FOR FIREBASE SYNC:
+    fun syncToServer(available: Int, used: Int, totalEarned: Int, onComplete: (Boolean) -> Unit = {}) {
+        val userManager = UserManager(context)
+        val userEmail = userManager.getCurrentUserEmail() ?: run {
+            onComplete(false)
+            return
+        }
+        
+        val db = FirebaseFirestore.getInstance()
+        db.collection("users")
+            .document(userEmail)
+            .update(
+                "availableCredits", available,
+                "usedCredits", used,
+                "totalCreditsEarned", totalEarned,
+                "lastUpdated", System.currentTimeMillis()
+            )
+            .addOnSuccessListener { onComplete(true) }
+            .addOnFailureListener { onComplete(false) }
+    }
+    
+    fun syncFromServer(available: Int, used: Int, totalEarned: Int) {
+        prefs.edit().apply {
+            putInt(CREDITS_KEY, available)
+            putInt(USED_CREDITS_KEY, used)
+            putInt(TOTAL_CREDITS_KEY, totalEarned)
+        }.apply()
+    }
+    
     // Admin password (change this to something secure)
     private val ADMIN_PASSWORD = "admin123" // TODO: Change this!
     
