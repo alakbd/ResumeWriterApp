@@ -1,17 +1,85 @@
 package com.example.resumewriter
 
-import android.os.Bundle
-import android.webkit.WebView
-import android.webkit.WebViewClient
 import androidx.appcompat.app.AppCompatActivity
+import android.os.Bundle
+import android.widget.Button
+import android.widget.TextView
+import android.widget.Toast
+import androidx.lifecycle.DefaultLifecycleObserver
+import androidx.lifecycle.LifecycleOwner
 
 class MainActivity : AppCompatActivity() {
+    private lateinit var billingManager: BillingManager
+    private lateinit var creditManager: CreditManager
+    
+    private lateinit var tvCreditStats: TextView
+    private lateinit var tvAvailableCredits: TextView
+    private lateinit var btnGenerateCV: Button
+    private lateinit var btnBuy3CV: Button
+    private lateinit var btnBuy8CV: Button
+    
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
-        val webView = WebView(this)
-        webView.webViewClient = WebViewClient()
-        webView.settings.javaScriptEnabled = true
-        webView.loadUrl("https://resume-writer-04uv.onrender.com/")
-        setContentView(webView)
+        setContentView(R.layout.activity_main)
+        
+        initializeManagers()
+        setupUI()
+        updateCreditDisplay()
+    }
+    
+    private fun initializeManagers() {
+        creditManager = CreditManager(this)
+        billingManager = BillingManager(this, creditManager)
+        billingManager.initializeBilling()
+    }
+    
+    private fun setupUI() {
+        tvCreditStats = findViewById(R.id.tv_credit_stats)
+        tvAvailableCredits = findViewById(R.id.tv_available_credits)
+        btnGenerateCV = findViewById(R.id.btn_generate_cv)
+        btnBuy3CV = findViewById(R.id.btn_buy_3_cv)
+        btnBuy8CV = findViewById(R.id.btn_buy_8_cv)
+        
+        btnGenerateCV.setOnClickListener {
+            generateCV()
+        }
+        
+        btnBuy3CV.setOnClickListener {
+            billingManager.purchaseProduct(this, "cv_package_3")
+        }
+        
+        btnBuy8CV.setOnClickListener {
+            billingManager.purchaseProduct(this, "cv_package_8")
+        }
+    }
+    
+    override fun onResume() {
+        super.onResume()
+        updateCreditDisplay()
+    }
+    
+    private fun generateCV() {
+        if (creditManager.useCredit()) {
+            // Your existing CV generation code here
+            showMessage("CV generated successfully!")
+            updateCreditDisplay()
+        } else {
+            showMessage("Not enough credits! Please purchase more.")
+        }
+    }
+    
+    private fun updateCreditDisplay() {
+        val available = creditManager.getAvailableCredits()
+        val used = creditManager.getUsedCredits()
+        val totalEarned = creditManager.getTotalCreditsEarned()
+        
+        tvAvailableCredits.text = "Available CV Credits: $available"
+        tvCreditStats.text = "Used: $used | Total Earned: $totalEarned"
+        
+        btnGenerateCV.isEnabled = available > 0
+    }
+    
+    private fun showMessage(message: String) {
+        Toast.makeText(this, message, Toast.LENGTH_SHORT).show()
     }
 }
