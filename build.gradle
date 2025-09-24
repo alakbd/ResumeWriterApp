@@ -1,17 +1,18 @@
 // In your project-level build.gradle
 buildscript {
     repositories {
-        google()       // Required for the Android Gradle Plugin
-        mavenCentral() // Required for the Kotlin Gradle Plugin
+        google()  // ← Make sure this is FIRST
+        mavenCentral()
     }
     dependencies {
-        classpath 'com.android.tools.build:gradle:8.2.2'  // Android Gradle Plugin
-        classpath "org.jetbrains.kotlin:kotlin-gradle-plugin:1.9.22" // Kotlin Plugin
+        classpath 'com.android.tools.build:gradle:8.2.2'
+        classpath "org.jetbrains.kotlin:kotlin-gradle-plugin:1.9.22"
     }
 }
+
 allprojects {
     repositories {
-        google()
+        google()  // ← Add this here too
         mavenCentral()
     }
 }
