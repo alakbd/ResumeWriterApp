@@ -7,6 +7,12 @@ import android.widget.TextView
 import android.widget.Toast
 import androidx.lifecycle.DefaultLifecycleObserver
 import androidx.lifecycle.LifecycleOwner
+import android.view.View
+import android.content.Intent
+
+
+
+
 
 class MainActivity : AppCompatActivity() {
     private lateinit var billingManager: BillingManager
