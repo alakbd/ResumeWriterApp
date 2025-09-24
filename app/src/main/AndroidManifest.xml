@@ -1,5 +1,5 @@
-<manifest xmlns:android="http://schemas.android.com/apk/res/android"
-    package="com.example.resumewriter">
+<manifest xmlns:android="http://schemas.android.com/apk/res/android">
+    
 
     <!-- Internet permission since your app loads web content -->
     <uses-permission android:name="android.permission.INTERNET" />
