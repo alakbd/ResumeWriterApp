@@ -3,6 +3,8 @@ package com.example.resumewriter
 import com.example.resumewriter.BuildConfig
 import android.content.Context
 import android.content.SharedPreferences
+import com.google.firebase.firestore.FirebaseFirestore
+import com.google.firebase.auth.FirebaseAuth
 
 class CreditManager(private val context: Context) {
     private val prefs: SharedPreferences = context.getSharedPreferences("cv_credits_prefs", Context.MODE_PRIVATE)
