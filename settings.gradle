@@ -1,17 +1,18 @@
 pluginManagement {
     repositories {
-        google()  // For Android Gradle Plugin and Google Services Plugin
-        mavenCentral() // For Kotlin Gradle Plugin
+        google()
+        mavenCentral()
         gradlePluginPortal()
     }
 }
+
 dependencyResolutionManagement {
-    repositoriesMode.set(RepositoriesMode.FAIL_ON_PROJECT_REPOS)
+    repositoriesMode.set(RepositoriesMode.PREFER_SETTINGS)
     repositories {
-        google() // For Android libraries
-        mavenCentral() // For Kotlin and other dependencies
+        google()
+        mavenCentral()
     }
 }
 
 rootProject.name = "ResumeWriterApp"
-include ':app'
+include(":app")
