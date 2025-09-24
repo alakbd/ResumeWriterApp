@@ -40,11 +40,11 @@ dependencies {
     implementation 'com.google.android.material:material:1.10.0'
     implementation 'androidx.constraintlayout:constraintlayout:2.1.4'
     
-    // Billing dependencies
-    implementation 'com.android.billingclient:billing:6.1.1'
-    implementation 'com.android.billingclient:billing-ktx:6.1.1'
+    // ✅ CORRECT VERSIONS - Use one of these:
+    implementation 'com.android.billingclient:billing:6.2.0'
+    implementation 'com.android.billingclient:billing-ktx:6.2.0'
     
-    // Firebase dependencies (if you're adding Firebase)
+    // Firebase dependencies
     implementation 'com.google.firebase:firebase-firestore:24.9.1'
     implementation 'com.google.firebase:firebase-auth:22.3.0'
 }
