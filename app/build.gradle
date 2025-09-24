@@ -7,14 +7,14 @@ plugins {
 
 android {
     namespace "com.alakdb.resumewriter"   // ✅ Add this line
-    compileSdk 34
+    compileSdk 35
     
     defaultConfig {
         applicationId "com.alakdb.resumewriter"
         minSdk 21
-        targetSdk 34
-        versionCode 2 // <--- incremented
-        versionName "1.1" // <--- optional, just for display
+        targetSdk 35
+        versionCode 3 // <--- incremented
+        versionName "1.2" // <--- optional, just for display
     }
 
     buildFeatures {
