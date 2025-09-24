@@ -1,5 +1,6 @@
 package com.example.resumewriter
 
+import com.example.resumewriter.BuildConfig
 import android.content.Context
 import android.content.SharedPreferences
 
