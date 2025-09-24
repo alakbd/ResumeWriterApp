@@ -1,6 +1,6 @@
-package com.example.resumewriter
+package com.alakdb.resumewriter
 
-import com.example.resumewriter.BuildConfig
+import com.alakdb.resumewriter.BuildConfig
 import android.content.Context
 import android.content.SharedPreferences
 import com.google.firebase.firestore.FirebaseFirestore
