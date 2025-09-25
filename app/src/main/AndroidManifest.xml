@@ -10,6 +10,11 @@
         android:supportsRtl="true"
         android:theme="@style/Theme.AppCompat.Light.NoActionBar">
 
+        <!-- Add your other activities here -->
+        <activity
+        android:name=".UserRegistrationActivity"
+        android:exported="false" /> 
+
         <!-- Main entry activity -->
         <activity
             android:name=".MainActivity"
