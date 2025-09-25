@@ -6,8 +6,10 @@
 
     <application
         android:allowBackup="true"
-        android:label="ResumeWriter"
+        android:label="@string/Resume Boost"
         android:supportsRtl="true"
+        android:icon="@mipmap/ic_launcher"
+        android:roundIcon="@mipmap/ic_launcher_round"
         android:theme="@style/Theme.AppCompat.Light.NoActionBar">
 
         <!-- Add your other activities here -->
