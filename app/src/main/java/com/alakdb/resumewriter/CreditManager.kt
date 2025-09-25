@@ -93,18 +93,15 @@ class CreditManager(private val context: Context) {
     }
 
     // -------------------------
-    // Admin Functions
+    // // Admin Functions (Firebase-based)
     // -------------------------
-    fun isAdminMode(): Boolean = prefs.getBoolean("is_admin", false)
-
-    fun authenticateAdmin(password: String): Boolean {
-        val isAdmin = password == "admin123" // Change this for production!
-        if (isAdmin) prefs.edit().putBoolean("is_admin", true).apply()
-        return isAdmin
+    fun isAdminMode(): Boolean {
+        val user = FirebaseAuth.getInstance().currentUser
+        return user?.email == "alakbd2009@gmail.com" // <-- admin email
     }
 
     fun logoutAdmin() {
-        prefs.edit().putBoolean("is_admin", false).apply()
+         FirebaseAuth.getInstance().signOut()
     }
 
     fun adminAddCredits(amount: Int) {
