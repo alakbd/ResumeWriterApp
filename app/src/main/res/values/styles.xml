@@ -1,0 +1,5 @@
+<resources>
+    <style name="Theme.ResumeBoost" parent="Theme.MaterialComponents.DayNight.NoActionBar">
+        <!-- Customize your theme colors here if you want -->
+    </style>
+</resources>
