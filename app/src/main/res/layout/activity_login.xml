@@ -28,6 +28,13 @@
         android:text="Login"/>
 
     <Button
+    android:id="@+id/btn_forgot_password"   \\forgot-Password
+    android:layout_width="match_parent"
+    android:layout_height="wrap_content"
+    android:text="Forgot Password?"
+    android:layout_marginTop="12dp"/>
+
+    <Button
         android:id="@+id/btn_go_to_register"
         android:layout_width="match_parent"
         android:layout_height="wrap_content"
