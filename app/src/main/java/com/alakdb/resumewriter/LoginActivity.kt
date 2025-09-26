@@ -11,6 +11,8 @@ import com.google.firebase.auth.FirebaseAuth
 class LoginActivity : AppCompatActivity() {
 
     private lateinit var auth: FirebaseAuth
+    private lateinit var btnForgotPassword: Button
+
 
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
@@ -43,6 +45,25 @@ class LoginActivity : AppCompatActivity() {
                     }
                 }
         }
+        btnForgotPassword = findViewById(R.id.btn_forgot_password)
+
+        btnForgotPassword.setOnClickListener {
+            val email = etEmail.text.toString().trim()
+
+            if (email.isEmpty()) {
+                showMessage("Enter your email to reset password")
+                return@setOnClickListener
+            }
+
+            auth.sendPasswordResetEmail(email)
+                .addOnCompleteListener { task ->
+                    if (task.isSuccessful) {
+                        showMessage("Password reset email sent to $email")
+                    } else {
+                        showMessage("Error: ${task.exception?.message}")
+            }
+        }
+}
 
         btnGoToRegister.setOnClickListener {
             startActivity(Intent(this, UserRegistrationActivity::class.java))
