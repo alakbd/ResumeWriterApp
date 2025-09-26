@@ -34,21 +34,21 @@ class MainActivity : AppCompatActivity() {
         setupUI()
         updateCreditDisplay()
 
-        // Check if user is registered
-        if (!userManager.isUserRegistered()) {
-        // User not registered → go to registration
-        startActivity(Intent(this, UserRegistrationActivity::class.java))
-        finish()
-        return
-    } else {
-        // User marked as registered but maybe not logged in → go to Login
+        // --------------------------
+        // Check registration / login
+        // --------------------------
         val currentUser = FirebaseAuth.getInstance().currentUser
-        if (currentUser == null) {
+        if (!userManager.isUserRegistered()) {
+            // User not registered → go to registration
+            startActivity(Intent(this, UserRegistrationActivity::class.java))
+            finish()
+            return
+        } else if (currentUser == null) {
+            // Registered but not logged in → go to Login
             startActivity(Intent(this, LoginActivity::class.java))
             finish()
             return
-    }
-}
+        }
 
         // Sync credits with Firebase server
         syncWithFirebase()
