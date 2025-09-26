@@ -20,8 +20,15 @@ class UserManager(private val context: Context) {
     fun registerUser(email: String, password: String, onComplete: (Boolean, String?) -> Unit) {
     FirebaseAuth.getInstance()
         .createUserWithEmailAndPassword(email, password)
-        .addOnSuccessListener { authResult ->
-            val uid = authResult.user?.uid ?: return@addOnSuccessListener
+        .addOnCompleteListener { task ->
+            if (task.isSuccessful) {
+                val uid = task.result?.user?.uid ?: return@addOnCompleteListener
+                 // your Firestore saving code here
+                onComplete(true, null)
+            } else {
+                onComplete(false, task.exception?.message)
+            }
+        }
 
             val userData = hashMapOf(
                 "email" to email,
