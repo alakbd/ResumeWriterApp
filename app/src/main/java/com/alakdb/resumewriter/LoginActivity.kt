@@ -11,7 +11,7 @@ import com.google.firebase.auth.FirebaseAuth
 class LoginActivity : AppCompatActivity() {
 
     private lateinit var auth: FirebaseAuth
-    private lateinit var btnForgotPassword: Button
+  
 
 
     override fun onCreate(savedInstanceState: Bundle?) {
