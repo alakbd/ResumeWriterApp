@@ -36,7 +36,7 @@ class UserManager(private val context: Context) {
             )
 
             db.collection("users")
-                .document(uid) // safer to use UID instead of raw email
+                .document(uid) // Use UID instead of email
                 .set(userData)
                 .addOnSuccessListener {
                     prefs.edit().apply {
