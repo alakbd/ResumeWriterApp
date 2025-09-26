@@ -7,6 +7,7 @@ import android.widget.Toast
 import androidx.appcompat.app.AppCompatActivity
 import com.alakdb.resumewriter.databinding.ActivityMainBinding
 import com.google.firebase.auth.FirebaseAuth
+import com.alakdb.resumewriter.LoginActivity
 
 class MainActivity : AppCompatActivity() {
 
