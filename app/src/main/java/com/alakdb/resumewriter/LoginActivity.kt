@@ -24,6 +24,8 @@ class LoginActivity : AppCompatActivity() {
         val etPassword = findViewById<EditText>(R.id.et_login_password)
         val btnLogin = findViewById<Button>(R.id.btn_login)
         val btnGoToRegister = findViewById<Button>(R.id.btn_go_to_register)
+        val btnForgotPassword = findViewById(R.id.btn_forgot_password)
+
 
         btnLogin.setOnClickListener {
             val email = etEmail.text.toString().trim()
@@ -45,8 +47,8 @@ class LoginActivity : AppCompatActivity() {
                     }
                 }
         }
-        btnForgotPassword = findViewById(R.id.btn_forgot_password)
-
+        
+        // Handle forgot password
         btnForgotPassword.setOnClickListener {
             val email = etEmail.text.toString().trim()
 
