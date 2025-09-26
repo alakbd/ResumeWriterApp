@@ -15,37 +15,43 @@ class UserManager(private val context: Context) {
     }
 
     // Register a new user
-    fun registerUser(email: String, onComplete: (Boolean, String?) -> Unit) {
-        val userId = generateUserId(email)
+    fun registerUser(email: String, password: String, onComplete: (Boolean, String?) -> Unit) {
+    FirebaseAuth.getInstance()
+        .createUserWithEmailAndPassword(email, password)
+        .addOnSuccessListener { authResult ->
+            val uid = authResult.user?.uid ?: return@addOnSuccessListener
 
-        val userData = hashMapOf(
-            "email" to email,
-            "availableCredits" to 0,
-            "usedCredits" to 0,
-            "totalCreditsEarned" to 0,
-            "deviceId" to android.provider.Settings.Secure.getString(
-                context.contentResolver,
-                android.provider.Settings.Secure.ANDROID_ID
-            ),
-            "createdAt" to System.currentTimeMillis(),
-            "lastActive" to System.currentTimeMillis()
-        )
+            val userData = hashMapOf(
+                "email" to email,
+                "uid" to uid,
+                "availableCredits" to 0,
+                "usedCredits" to 0,
+                "totalCreditsEarned" to 0,
+                "deviceId" to android.provider.Settings.Secure.getString(
+                    context.contentResolver,
+                    android.provider.Settings.Secure.ANDROID_ID
+                ),
+                "createdAt" to System.currentTimeMillis(),
+                "lastActive" to System.currentTimeMillis()
+            )
 
-        db.collection("users")
-            .document(email)
-            .set(userData)
-            .addOnSuccessListener {
-                prefs.edit().apply {
-                    putString(USER_EMAIL_KEY, email)
-                    putString(USER_ID_KEY, userId)
-                    putBoolean(IS_REGISTERED_KEY, true)
-                }.apply()
-                onComplete(true, null)
-            }
-            .addOnFailureListener { e ->
-                onComplete(false, e.message)
-            }
-    }
+            db.collection("users")
+                .document(uid) // safer to use UID instead of raw email
+                .set(userData)
+                .addOnSuccessListener {
+                    prefs.edit().apply {
+                        putString(USER_EMAIL_KEY, email)
+                        putString(USER_ID_KEY, uid)
+                        putBoolean(IS_REGISTERED_KEY, true)
+                    }.apply()
+                    onComplete(true, null)
+                }
+                .addOnFailureListener { e -> onComplete(false, e.message) }
+        }
+        .addOnFailureListener { e ->
+            onComplete(false, e.message)
+        }
+}
 
     // Check if user is already registered
     fun isUserRegistered(): Boolean {
