@@ -36,10 +36,19 @@ class MainActivity : AppCompatActivity() {
 
         // Check if user is registered
         if (!userManager.isUserRegistered()) {
-            startActivity(Intent(this, UserRegistrationActivity::class.java))
+        // User not registered → go to registration
+        startActivity(Intent(this, UserRegistrationActivity::class.java))
+        finish()
+        return
+    } else {
+        // User marked as registered but maybe not logged in → go to Login
+        val currentUser = FirebaseAuth.getInstance().currentUser
+        if (currentUser == null) {
+            startActivity(Intent(this, LoginActivity::class.java))
             finish()
             return
-        }
+    }
+}
 
         // Sync credits with Firebase server
         syncWithFirebase()
