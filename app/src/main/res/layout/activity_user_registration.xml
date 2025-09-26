@@ -14,6 +14,8 @@
         android:textStyle="bold"
         android:layout_marginBottom="32dp"/>
 
+    <!-- Email input -->
+
     <EditText
         android:id="@+id/et_email"
         android:layout_width="match_parent"
@@ -21,6 +23,16 @@
         android:hint="Enter your email"
         android:inputType="textEmailAddress"
         android:layout_marginBottom="24dp"/>
+    
+    <!-- Password input -->
+    <EditText
+        android:id="@+id/et_password"
+        android:layout_width="match_parent"
+        android:layout_height="wrap_content"
+        android:hint="Enter your password"
+        android:inputType="textPassword"
+        android:layout_marginBottom="24dp"/>
+
 
     <Button
         android:id="@+id/btn_register"
