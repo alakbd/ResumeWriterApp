@@ -11,9 +11,10 @@ import com.google.firebase.auth.AuthResult
 import com.google.android.gms.tasks.Task
 
 
-private lateinit var auth: FirebaseAuth
+    private lateinit var auth: FirebaseAuth
     private lateinit var btnForgotPassword: Button
-
+    class LoginActivity: AppCompatActivity() {
+        
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
         setContentView(R.layout.activity_login)
@@ -39,7 +40,7 @@ private lateinit var auth: FirebaseAuth
                 .addOnCompleteListener { task: Task<AuthResult> ->
                     if (task.isSuccessful) {
                         showMessage("Login successful!")
-                        startActivity(Intent(this, MainActivity::class.java))
+                        startActivity(Intent(this@LoginActivity, MainActivity::class.java))
                         finish()
                     } else {
                         showMessage("Login failed: ${task.exception?.message}")
@@ -73,4 +74,5 @@ private lateinit var auth: FirebaseAuth
     private fun showMessage(msg: String) {
         Toast.makeText(this, msg, Toast.LENGTH_SHORT).show()
     }
+}
 }
