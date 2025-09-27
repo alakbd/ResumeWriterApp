@@ -1,47 +1,58 @@
-<LinearLayout
+<?xml version="1.0" encoding="utf-8"?>
+<ScrollView
     xmlns:android="http://schemas.android.com/apk/res/android"
     android:layout_width="match_parent"
     android:layout_height="match_parent"
-    android:orientation="vertical"
-    android:padding="16dp">
+    android:fillViewport="true">
 
-    <EditText
-        android:id="@+id/et_login_email"
+    <LinearLayout
         android:layout_width="match_parent"
         android:layout_height="wrap_content"
-        android:hint="Email"
-        android:inputType="textEmailAddress"
-        android:layout_marginBottom="12dp"/>
+        android:orientation="vertical"
+        android:padding="24dp"
+        android:gravity="center_horizontal">
 
-    <EditText
-        android:id="@+id/et_login_password"
-        android:layout_width="match_parent"
-        android:layout_height="wrap_content"
-        android:hint="Password"
-        android:inputType="textPassword"
-        android:layout_marginBottom="16dp"/>
+        <!-- Title -->
+        <TextView
+            style="@style/TitleText"
+            android:text="Login"
+            android:layout_marginBottom="32dp"/>
 
-    <Button
-        android:id="@+id/btn_login"
-        android:layout_width="match_parent"
-        android:layout_height="wrap_content"
-        android:text="Login"/>
+        <!-- Email -->
+        <EditText
+            style="@style/AppEditText"
+            android:id="@+id/et_login_email"
+            android:hint="Email"
+            android:layout_marginBottom="16dp"/>
 
-    <!-- Forgot Password -->
-    <Button
-        android:id="@+id/btn_forgot_password"
-        android:layout_width="match_parent"
-        android:layout_height="wrap_content"
-        android:text="Forgot Password?"
-        android:layout_marginTop="16dp"/>
-    
-    <!-- Go to Register -->
-    <Button
-        android:id="@+id/btn_go_to_register"
-        android:layout_width="match_parent"
-        android:layout_height="wrap_content"
-        android:text="Go to Register"
-        android:layout_marginTop="12dp"/>
+        <!-- Password -->
+        <EditText
+            style="@style/AppEditText"
+            android:id="@+id/et_login_password"
+            android:hint="Password"
+            android:inputType="textPassword"
+            android:layout_marginBottom="24dp"/>
 
-        
-</LinearLayout>
+        <!-- Login Button -->
+        <Button
+            style="@style/PrimaryButton"
+            android:id="@+id/btn_login"
+            android:text="Login"
+            android:layout_marginBottom="12dp"/>
+
+        <!-- Forgot Password -->
+        <Button
+            style="@style/SecondaryButton"
+            android:id="@+id/btn_forgot_password"
+            android:text="Forgot Password?"
+            android:layout_marginBottom="12dp"/>
+
+        <!-- Go to Register -->
+        <Button
+            style="@style/SecondaryButton"
+            android:id="@+id/btn_go_to_register"
+            android:text="Go to Register"/>
+
+    </LinearLayout>
+</ScrollView>
+
