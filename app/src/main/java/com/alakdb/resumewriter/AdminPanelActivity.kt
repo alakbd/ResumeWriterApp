@@ -4,6 +4,7 @@ import android.os.Bundle
 import android.widget.ArrayAdapter
 import android.widget.Toast
 import androidx.appcompat.app.AlertDialog
+import android.widget.AdapterView
 import androidx.appcompat.app.AppCompatActivity
 import com.alakdb.resumewriter.databinding.ActivityAdminPanelBinding
 import com.google.firebase.firestore.ktx.firestore
@@ -34,24 +35,35 @@ class AdminPanelActivity : AppCompatActivity() {
     }
 
     private fun setupUI() {
-        binding.btnAdminAdd10.setOnClickListener { modifyUserCredits(10, "add") }
-        binding.btnAdminAdd50.setOnClickListener { modifyUserCredits(50, "add") }
-        binding.btnAdminSet100.setOnClickListener { modifyUserCredits(100, "set") }
-        binding.btnAdminReset.setOnClickListener { modifyUserCredits(0, "reset") }
-        binding.btnAdminGenerateFree.setOnClickListener { generateFreeCV() }
-        binding.btnAdminStats.setOnClickListener { showUserStats() }
-        binding.btnAdminLogout.setOnClickListener { logoutAdmin() }
+    val btnAdd10 = findViewById<Button>(R.id.btn_admin_add_10)
+    val btnAdd50 = findViewById<Button>(R.id.btn_admin_add_50)
+    val btnSet100 = findViewById<Button>(R.id.btn_admin_set_100)
+    val btnReset = findViewById<Button>(R.id.btn_admin_reset)
+    val btnGenerateFree = findViewById<Button>(R.id.btn_admin_generate_free)
+    val btnUserStats = findViewById<Button>(R.id.btn_admin_stats)
+    val btnLogout = findViewById<Button>(R.id.btn_admin_logout)
 
-        // User selection spinner
-        binding.spUserSelector.onItemSelectedListener = 
-            android.widget.AdapterView.OnItemSelectedListener { parent, _, position, _ ->
-                if (position > 0) {
-                    val selected = parent.getItemAtPosition(position).toString()
-                    selectedUserEmail = selected
-                    loadUserData(selected)
-                }
+    // User selection spinner - CORRECTED
+    binding.spUserSelector.onItemSelectedListener = object : AdapterView.OnItemSelectedListener {
+        override fun onItemSelected(parent: AdapterView<*>, view: View?, position: Int, id: Long) {
+            if (position > 0) {
+                val selected = parent.getItemAtPosition(position).toString()
+                selectedUserEmail = selected
+                loadUserData(selectedUserEmail)
             }
+        }
+
+        override fun onNothingSelected(parent: AdapterView<*>) {
+            // Handle no selection
+        }
     }
+
+    // Rest of your button click listeners...
+    btnAdd10.setOnClickListener {
+        // your existing code
+    }
+    // ... other button listeners
+}
 
     private fun loadUsers() {
         db.collection("users").get()
