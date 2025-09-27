@@ -1,79 +1,74 @@
 <?xml version="1.0" encoding="utf-8"?>
-<ScrollView xmlns:android="http://schemas.android.com/apk/res/android"
+<ScrollView
+    xmlns:android="http://schemas.android.com/apk/res/android"
     android:layout_width="match_parent"
-    android:layout_height="match_parent">
+    android:layout_height="match_parent"
+    android:fillViewport="true">
 
     <LinearLayout
         android:layout_width="match_parent"
         android:layout_height="wrap_content"
         android:orientation="vertical"
-        android:padding="16dp">
+        android:padding="24dp">
 
+        <!-- Title -->
         <TextView
-            android:layout_width="match_parent"
-            android:layout_height="wrap_content"
+            style="@style/TitleText"
             android:text="Admin Panel"
-            android:textSize="24sp"
-            android:gravity="center"
-            android:layout_marginBottom="16dp" />
+            android:layout_marginBottom="24dp"/>
 
+        <!-- Stats -->
         <TextView
             android:id="@+id/tv_admin_stats"
             android:layout_width="match_parent"
             android:layout_height="wrap_content"
             android:text="User Stats..."
-            android:background="#f0f0f0"
-            android:padding="8dp"
-            android:layout_marginBottom="16dp" />
+            android:background="@color/surface"
+            android:padding="12dp"
+            android:elevation="2dp"
+            android:layout_marginBottom="24dp"/>
 
+        <!-- Admin Buttons -->
         <Button
+            style="@style/PrimaryButton"
             android:id="@+id/btn_admin_add_10"
-            android:layout_width="match_parent"
-            android:layout_height="wrap_content"
             android:text="Add 10 Credits"
-            android:layout_marginBottom="8dp" />
+            android:layout_marginBottom="12dp"/>
 
         <Button
+            style="@style/PrimaryButton"
             android:id="@+id/btn_admin_add_50"
-            android:layout_width="match_parent"
-            android:layout_height="wrap_content"
             android:text="Add 50 Credits"
-            android:layout_marginBottom="8dp" />
+            android:layout_marginBottom="12dp"/>
 
         <Button
+            style="@style/PrimaryButton"
             android:id="@+id/btn_admin_set_100"
-            android:layout_width="match_parent"
-            android:layout_height="wrap_content"
             android:text="Set Credits to 100"
-            android:layout_marginBottom="8dp" />
+            android:layout_marginBottom="12dp"/>
 
         <Button
+            style="@style/AdminButtonOrange"
             android:id="@+id/btn_admin_reset"
-            android:layout_width="match_parent"
-            android:layout_height="wrap_content"
             android:text="Reset All Credits"
-            android:layout_marginBottom="8dp" />
+            android:layout_marginBottom="12dp"/>
 
         <Button
+            style="@style/AdminButtonGreen"
             android:id="@+id/btn_admin_generate_free"
-            android:layout_width="match_parent"
-            android:layout_height="wrap_content"
             android:text="Generate CV (Free)"
-            android:layout_marginBottom="8dp" />
+            android:layout_marginBottom="12dp"/>
 
         <Button
+            style="@style/PrimaryButton"
             android:id="@+id/btn_admin_stats"
-            android:layout_width="match_parent"
-            android:layout_height="wrap_content"
             android:text="Show User Stats"
-            android:layout_marginBottom="8dp" />
+            android:layout_marginBottom="12dp"/>
 
         <Button
+            style="@style/AdminButtonRed"
             android:id="@+id/btn_admin_logout"
-            android:layout_width="match_parent"
-            android:layout_height="wrap_content"
-            android:text="Logout Admin"
-            android:backgroundTint="#ff4444" />
+            android:text="Logout Admin"/>
 
     </LinearLayout>
 </ScrollView>
