@@ -45,6 +45,7 @@ class CreditManager(private val context: Context) {
         syncCreditsToFirebase(newCredits, getUsedCredits(), onComplete)
     }
 
+    // REPLACE your current syncWithFirebase function with this:
     fun syncWithFirebase(onComplete: (Boolean, Int?) -> Unit) {
         val user = auth.currentUser
         if (user == null) {
@@ -52,24 +53,30 @@ class CreditManager(private val context: Context) {
             return
         }
 
-        db.collection("users").document(user.uid)
-            .get()
-            .addOnSuccessListener { document ->
-                if (document.exists()) {
-                    val available = document.getLong("availableCredits")?.toInt() ?: 0
-                    val used = document.getLong("usedCredits")?.toInt() ?: 0
-                    val total = document.getLong("totalCreditsEarned")?.toInt() ?: 0
-                    
-                    updateLocalCredits(available, used, total)
-                    onComplete(true, available)
-                } else {
-                    onComplete(false, null)
-                }
-            }
-            .addOnFailureListener {
+    db.collection("users").document(user.uid)
+        .get()
+        .addOnSuccessListener { document ->
+            if (document.exists()) {
+                val available = document.getLong("availableCredits")?.toInt() ?: 0
+                val used = document.getLong("usedCredits")?.toInt() ?: 0
+                val total = document.getLong("totalCreditsEarned")?.toInt() ?: 0
+                
+                // Update local storage
+                val editor = prefs.edit()
+                editor.putInt(AVAILABLE_CREDITS_KEY, available)
+                editor.putInt(USED_CREDITS_KEY, used)
+                editor.putInt(TOTAL_CREDITS_KEY, total)
+                editor.apply()
+                
+                onComplete(true, available)
+            } else {
                 onComplete(false, null)
             }
-    }
+        }
+        .addOnFailureListener {
+            onComplete(false, null)
+        }
+}
 
     fun isAdminMode(): Boolean {
         val user = auth.currentUser
