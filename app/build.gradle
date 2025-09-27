@@ -13,8 +13,8 @@ android {
         applicationId "com.alakdb.resumewriter"
         minSdk 21
         targetSdk 35
-        versionCode 5 // <--- incremented
-        versionName "1.4" // <--- optional, just for display
+        versionCode 6 // <--- incremented
+        versionName "1.5" // <--- optional, just for display
     }
 
     buildFeatures {
