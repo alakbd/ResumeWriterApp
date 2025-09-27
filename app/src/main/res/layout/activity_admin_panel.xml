@@ -1,74 +1,171 @@
 <?xml version="1.0" encoding="utf-8"?>
-<ScrollView
-    xmlns:android="http://schemas.android.com/apk/res/android"
+<ScrollView xmlns:android="http://schemas.android.com/apk/res/android"
     android:layout_width="match_parent"
     android:layout_height="match_parent"
-    android:fillViewport="true">
+    android:fillViewport="true"
+    android:padding="16dp">
 
     <LinearLayout
         android:layout_width="match_parent"
         android:layout_height="wrap_content"
-        android:orientation="vertical"
-        android:padding="24dp">
+        android:orientation="vertical">
 
-        <!-- Title -->
+        <!-- Admin Header -->
         <TextView
-            style="@style/TitleText"
+            android:layout_width="match_parent"
+            android:layout_height="wrap_content"
             android:text="Admin Panel"
-            android:layout_marginBottom="24dp"/>
+            android:textSize="24sp"
+            android:textStyle="bold"
+            android:gravity="center"
+            android:layout_marginBottom="24dp" />
 
-        <!-- Stats -->
+        <!-- User Selection Section -->
+        <TextView
+            android:layout_width="match_parent"
+            android:layout_height="wrap_content"
+            android:text="Select User:"
+            android:textSize="16sp"
+            android:textStyle="bold"
+            android:layout_marginBottom="8dp" />
+
+        <Spinner
+            android:id="@+id/sp_user_selector"
+            android:layout_width="match_parent"
+            android:layout_height="wrap_content"
+            android:layout_marginBottom="16dp" />
+
+        <!-- Manual Email Input -->
+        <LinearLayout
+            android:layout_width="match_parent"
+            android:layout_height="wrap_content"
+            android:orientation="horizontal"
+            android:layout_marginBottom="16dp">
+
+            <EditText
+                android:id="@+id/et_manual_email"
+                android:layout_width="0dp"
+                android:layout_height="wrap_content"
+                android:layout_weight="1"
+                android:hint="Or enter email manually"
+                android:inputType="textEmailAddress" />
+
+            <Button
+                android:id="@+id/btn_load_user"
+                android:layout_width="wrap_content"
+                android:layout_height="wrap_content"
+                android:text="Load" />
+        </LinearLayout>
+
+        <!-- User Info Display -->
+        <TextView
+            android:id="@+id/tv_user_email"
+            android:layout_width="match_parent"
+            android:layout_height="wrap_content"
+            android:text="User: Not selected"
+            android:textSize="14sp"
+            android:layout_marginBottom="8dp" />
+
+        <TextView
+            android:id="@+id/tv_available_credits"
+            android:layout_width="match_parent"
+            android:layout_height="wrap_content"
+            android:text="Available: 0"
+            android:textSize="14sp"
+            android:layout_marginBottom="4dp" />
+
+        <TextView
+            android:id="@+id/tv_used_credits"
+            android:layout_width="match_parent"
+            android:layout_height="wrap_content"
+            android:text="Used: 0"
+            android:textSize="14sp"
+            android:layout_marginBottom="4dp" />
+
+        <TextView
+            android:id="@+id/tv_total_credits"
+            android:layout_width="match_parent"
+            android:layout_height="wrap_content"
+            android:text="Total Earned: 0"
+            android:textSize="14sp"
+            android:layout_marginBottom="24dp" />
+
+        <!-- Admin Controls Section -->
+        <TextView
+            android:layout_width="match_parent"
+            android:layout_height="wrap_content"
+            android:text="Credit Management:"
+            android:textSize="16sp"
+            android:textStyle="bold"
+            android:layout_marginBottom="8dp" />
+
+        <!-- Add Credits Buttons -->
+        <Button
+            android:id="@+id/btn_admin_add_10"
+            android:layout_width="match_parent"
+            android:layout_height="wrap_content"
+            android:text="Add 10 Credits"
+            android:layout_marginBottom="8dp" />
+
+        <Button
+            android:id="@+id/btn_admin_add_50"
+            android:layout_width="match_parent"
+            android:layout_height="wrap_content"
+            android:text="Add 50 Credits"
+            android:layout_marginBottom="8dp" />
+
+        <!-- Set Credits Button -->
+        <Button
+            android:id="@+id/btn_admin_set_100"
+            android:layout_width="match_parent"
+            android:layout_height="wrap_content"
+            android:text="Set Credits to 100"
+            android:layout_marginBottom="8dp" />
+
+        <!-- Reset Credits Button -->
+        <Button
+            android:id="@+id/btn_admin_reset"
+            android:layout_width="match_parent"
+            android:layout_height="wrap_content"
+            android:text="Reset Credits to 0"
+            android:layout_marginBottom="8dp" />
+
+        <!-- Generate CV Button -->
+        <Button
+            android:id="@+id/btn_admin_generate_free"
+            android:layout_width="match_parent"
+            android:layout_height="wrap_content"
+            android:text="Generate Free CV"
+            android:layout_marginBottom="8dp" />
+
+        <!-- User Stats Button -->
+        <Button
+            android:id="@+id/btn_admin_stats"
+            android:layout_width="match_parent"
+            android:layout_height="wrap_content"
+            android:text="Show User Statistics"
+            android:layout_marginBottom="8dp" />
+
+        <!-- Admin Stats Display -->
         <TextView
             android:id="@+id/tv_admin_stats"
             android:layout_width="match_parent"
             android:layout_height="wrap_content"
-            android:text="User Stats..."
-            android:background="@color/surface"
-            android:padding="12dp"
-            android:elevation="2dp"
-            android:layout_marginBottom="24dp"/>
+            android:text="Admin Mode Active"
+            android:textSize="14sp"
+            android:gravity="center"
+            android:layout_marginBottom="24dp"
+            android:padding="8dp"
+            android:background="#f0f0f0" />
 
-        <!-- Admin Buttons -->
+        <!-- Logout Button -->
         <Button
-            style="@style/PrimaryButton"
-            android:id="@+id/btn_admin_add_10"
-            android:text="Add 10 Credits"
-            android:layout_marginBottom="12dp"/>
-
-        <Button
-            style="@style/PrimaryButton"
-            android:id="@+id/btn_admin_add_50"
-            android:text="Add 50 Credits"
-            android:layout_marginBottom="12dp"/>
-
-        <Button
-            style="@style/PrimaryButton"
-            android:id="@+id/btn_admin_set_100"
-            android:text="Set Credits to 100"
-            android:layout_marginBottom="12dp"/>
-
-        <Button
-            style="@style/AdminButtonOrange"
-            android:id="@+id/btn_admin_reset"
-            android:text="Reset All Credits"
-            android:layout_marginBottom="12dp"/>
-
-        <Button
-            style="@style/AdminButtonGreen"
-            android:id="@+id/btn_admin_generate_free"
-            android:text="Generate CV (Free)"
-            android:layout_marginBottom="12dp"/>
-
-        <Button
-            style="@style/PrimaryButton"
-            android:id="@+id/btn_admin_stats"
-            android:text="Show User Stats"
-            android:layout_marginBottom="12dp"/>
-
-        <Button
-            style="@style/AdminButtonRed"
             android:id="@+id/btn_admin_logout"
-            android:text="Logout Admin"/>
+            android:layout_width="match_parent"
+            android:layout_height="wrap_content"
+            android:text="Logout Admin"
+            android:backgroundTint="#FF0000"
+            android:textColor="#FFFFFF" />
 
     </LinearLayout>
 </ScrollView>
