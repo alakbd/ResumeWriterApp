@@ -14,66 +14,101 @@
 
         <!-- Available Credits -->
         <TextView
-            style="@style/TitleText"
+            android:layout_width="match_parent"
+            android:layout_height="wrap_content"
             android:id="@+id/tv_available_credits"
             android:text="Available CV Credits: 0"
+            android:textSize="20sp"
+            android:textStyle="bold"
+            android:gravity="center"
             android:layout_marginBottom="16dp"/>
 
         <!-- Credit Stats -->
         <TextView
-            style="@style/SubTitleText"
+            android:layout_width="match_parent"
+            android:layout_height="wrap_content"
             android:id="@+id/tv_credit_stats"
             android:text="Used: 0 | Total Earned: 0"
+            android:textSize="16sp"
+            android:gravity="center"
             android:layout_marginBottom="32dp"/>
 
         <!-- Generate CV Button -->
         <Button
-            style="@style/PrimaryButton"
+            android:layout_width="match_parent"
+            android:layout_height="wrap_content"
             android:id="@+id/btn_generate_cv"
             android:text="Generate CV (1 Credit)"
+            android:textSize="16sp"
             android:layout_marginBottom="32dp"/>
 
         <!-- Purchase Section -->
         <TextView
-            style="@style/SubTitleText"
+            android:layout_width="match_parent"
+            android:layout_height="wrap_content"
             android:text="Purchase More Credits:"
+            android:textSize="16sp"
+            android:gravity="center"
             android:layout_marginBottom="16dp"/>
 
         <Button
-            style="@style/SecondaryButton"
+            android:layout_width="match_parent"
+            android:layout_height="wrap_content"
             android:id="@+id/btn_buy_3_cv"
             android:text="3 CV Credits - €5"
+            android:textSize="16sp"
             android:layout_marginBottom="12dp"/>
 
         <Button
-            style="@style/SecondaryButton"
+            android:layout_width="match_parent"
+            android:layout_height="wrap_content"
             android:id="@+id/btn_buy_8_cv"
             android:text="8 CV Credits - €10"
             android:layout_marginBottom="32dp"/>
 
+        <!-- Refresh Button -->
+        <Button
+            android:layout_width="wrap_content"
+            android:layout_height="wrap_content"
+            android:id="@+id/btn_refresh"
+            android:text="Refresh"
+            android:layout_marginBottom="16dp"/>
+
+        <!-- Logout Button -->
+        <Button
+            android:layout_width="wrap_content"
+            android:layout_height="wrap_content"
+            android:id="@+id/btn_logout"
+            android:text="Logout"
+            android:backgroundTint="#FF0000"
+            android:textColor="#FFFFFF"
+            android:layout_marginBottom="32dp"/>
+
         <!-- Hidden Admin -->
         <TextView
+            android:layout_width="wrap_content"
+            android:layout_height="wrap_content"
             android:id="@+id/tv_version"
             android:text="v1.0"
             android:textSize="14sp"
-            android:layout_gravity="center_horizontal"
             android:layout_marginTop="16dp"/>
 
         <Button
-            style="@style/PrimaryButton"
+            android:layout_width="wrap_content"
+            android:layout_height="wrap_content"
             android:id="@+id/btn_admin_access"
             android:text="Admin Access"
             android:visibility="gone"
-            android:layout_gravity="center_horizontal"
             android:layout_marginTop="12dp"/>
 
         <TextView
+            android:layout_width="wrap_content"
+            android:layout_height="wrap_content"
             android:id="@+id/tv_admin_indicator"
             android:text="ADMIN MODE"
-            android:textColor="@color/admin_red"
+            android:textColor="#FF0000"
             android:textStyle="bold"
             android:visibility="gone"
-            android:layout_gravity="center_horizontal"
             android:layout_marginTop="8dp"/>
 
     </LinearLayout>
