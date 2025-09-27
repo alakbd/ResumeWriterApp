@@ -1,0 +1,21 @@
+<resources>
+    <!-- Primary Colors -->
+    <color name="primary">#6200EE</color>           <!-- Purple primary (main buttons) -->
+    <color name="primary_variant">#3700B3</color>
+    <color name="secondary">#03DAC6</color>         <!-- Accent color -->
+    <color name="secondary_variant">#018786</color>
+
+    <!-- Background / Text -->
+    <color name="background">#FFFFFF</color>
+    <color name="surface">#F5F5F5</color>
+    <color name="on_primary">#FFFFFF</color>       <!-- Text on primary buttons -->
+    <color name="on_secondary">#000000</color>
+    <color name="text_primary">#212121</color>
+    <color name="text_secondary">#757575</color>
+
+    <!-- Admin colors -->
+    <color name="admin_red">#F44336</color>
+    <color name="admin_orange">#FFA500</color>
+    <color name="admin_green">#4CAF50</color>
+    <color name="admin_blue">#2196F3</color>
+</resources>
