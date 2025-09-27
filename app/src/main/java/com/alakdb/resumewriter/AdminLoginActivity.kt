@@ -1,62 +1,76 @@
-package com.alakdb.resumewriter  // Use YOUR package name
+package com.alakdb.resumewriter
 
 import android.content.Intent
 import android.os.Bundle
-import android.widget.Button
-import android.widget.EditText
 import android.widget.Toast
 import androidx.appcompat.app.AppCompatActivity
 import com.alakdb.resumewriter.databinding.ActivityAdminLoginBinding
 import com.google.firebase.auth.FirebaseAuth
 
 class AdminLoginActivity : AppCompatActivity() {
-
-    private lateinit var creditManager: CreditManager
+    private lateinit var binding: ActivityAdminLoginBinding
+    private lateinit var auth: FirebaseAuth
 
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
-        setContentView(R.layout.activity_admin_login)
+        binding = ActivityAdminLoginBinding.inflate(layoutInflater)
+        setContentView(binding.root)
 
-        creditManager = CreditManager(this)
+        auth = FirebaseAuth.getInstance()
 
-        val etPassword = findViewById<EditText>(R.id.et_admin_password)
-        val etEmail = findViewById<EditText>(R.id.et_admin_email) // new email input field
-        val btnLogin = findViewById<Button>(R.id.btn_admin_login)
-        val btnBack = findViewById<Button>(R.id.btn_back_to_main)
+        binding.btnAdminLogin.setOnClickListener {
+            val email = binding.etAdminEmail.text.toString().trim()
+            val password = binding.etAdminPassword.text.toString().trim()
 
-        // Login button
-        btnLogin.setOnClickListener {
-            val email = etEmail.text.toString().trim()
-            val password = etPassword.text.toString().trim()
-
-            if(email.isEmpty() || password.isEmpty()) {
-                showMessage("Enter email and password")
-                return@setOnClickListener
+            if (validateInput(email, password)) {
+                attemptAdminLogin(email, password)
             }
-
-            FirebaseAuth.getInstance()
-                .signInWithEmailAndPassword(email, password)
-                .addOnCompleteListener { task ->
-                    if(task.isSuccessful) {
-                        val user = FirebaseAuth.getInstance().currentUser
-                        if(user?.email == "alakbd2009@gmail.com") { // <-- your admin email
-                            showMessage("Admin access granted!")
-                            startActivity(Intent(this, AdminPanelActivity::class.java))
-                            finish()
-                        } else {
-                            showMessage("Not authorized")
-                            FirebaseAuth.getInstance().signOut()
-                        }
-                    } else {
-                        showMessage("Login failed: ${task.exception?.message}")
-                    }
-                }
         }
 
-        // Back button
-        btnBack.setOnClickListener {
+        binding.btnBackToMain.setOnClickListener {
             finish()
         }
+    }
+
+    private fun validateInput(email: String, password: String): Boolean {
+        if (email.isEmpty()) {
+            binding.etAdminEmail.error = "Admin email required"
+            return false
+        }
+
+        if (password.isEmpty()) {
+            binding.etAdminPassword.error = "Password required"
+            return false
+        }
+
+        return true
+    }
+
+    private fun attemptAdminLogin(email: String, password: String) {
+        binding.btnAdminLogin.isEnabled = false
+        binding.btnAdminLogin.text = "Authenticating..."
+
+        auth.signInWithEmailAndPassword(email, password)
+            .addOnCompleteListener { task ->
+                binding.btnAdminLogin.isEnabled = true
+                binding.btnAdminLogin.text = "Login"
+
+                if (task.isSuccessful) {
+                    val user = auth.currentUser
+                    val adminEmails = listOf("alakbd2009@gmail.com", "admin@resumewriter.com")
+                    
+                    if (user != null && adminEmails.contains(user.email)) {
+                        showMessage("Admin access granted!")
+                        startActivity(Intent(this, AdminPanelActivity::class.java))
+                        finish()
+                    } else {
+                        showMessage("Access denied: Not an admin account")
+                        auth.signOut()
+                    }
+                } else {
+                    showMessage("Login failed: ${task.exception?.message}")
+                }
+            }
     }
 
     private fun showMessage(message: String) {
