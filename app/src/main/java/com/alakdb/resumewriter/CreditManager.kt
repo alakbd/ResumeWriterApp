@@ -1,134 +1,146 @@
 package com.alakdb.resumewriter
 
-import com.alakdb.resumewriter.BuildConfig
 import android.content.Context
 import android.content.SharedPreferences
-import com.google.firebase.firestore.FirebaseFirestore
 import com.google.firebase.auth.FirebaseAuth
+import com.google.firebase.firestore.FirebaseFirestore
+import com.google.firebase.firestore.FieldValue
 
 class CreditManager(private val context: Context) {
-    private val prefs: SharedPreferences = context.getSharedPreferences("cv_credits_prefs", Context.MODE_PRIVATE)
-    private val CREDITS_KEY = "available_cv_credits"
-    private val USED_CREDITS_KEY = "used_cv_credits"
-    private val TOTAL_CREDITS_KEY = "total_cv_credits_earned"
+    private val prefs: SharedPreferences = context.getSharedPreferences("credit_prefs", Context.MODE_PRIVATE)
+    private val auth: FirebaseAuth = FirebaseAuth.getInstance()
+    private val db: FirebaseFirestore = FirebaseFirestore.getInstance()
 
-    // -------------------------
-    // Basic credit operations
-    // -------------------------
-    fun getAvailableCredits(): Int = prefs.getInt(CREDITS_KEY, 0)
+    companion object {
+        private const val AVAILABLE_CREDITS_KEY = "available_credits"
+        private const val USED_CREDITS_KEY = "used_credits"
+        private const val TOTAL_CREDITS_KEY = "total_credits"
+    }
+
+    fun getAvailableCredits(): Int = prefs.getInt(AVAILABLE_CREDITS_KEY, 0)
     fun getUsedCredits(): Int = prefs.getInt(USED_CREDITS_KEY, 0)
-    fun getTotalCreditsEarned(): Int = prefs.getInt(TOTAL_CREDITS_KEY, 0)
+    fun getTotalCredits(): Int = prefs.getInt(TOTAL_CREDITS_KEY, 0)
 
-    fun addCredits(credits: Int, userEmail: String? = null, syncToFirebase: Boolean = true) {
-        val current = getAvailableCredits()
-        val totalEarned = getTotalCreditsEarned()
-
-        prefs.edit().apply {
-            putInt(CREDITS_KEY, current + credits)
-            putInt(TOTAL_CREDITS_KEY, totalEarned + credits)
-        }.apply()
-
-        if (syncToFirebase && userEmail != null) {
-            syncToFirebase(userEmail)
+    fun useCredit(onComplete: (Boolean) -> Unit = {}) {
+        val currentCredits = getAvailableCredits()
+        if (currentCredits > 0) {
+            val newCredits = currentCredits - 1
+            val newUsed = getUsedCredits() + 1
+            
+            // Update locally first for immediate feedback
+            updateLocalCredits(newCredits, newUsed, getTotalCredits())
+            
+            // Sync with Firebase
+            syncCreditsToFirebase(newCredits, newUsed, onComplete)
+        } else {
+            onComplete(false)
         }
     }
 
-    fun useCredit(userEmail: String? = null, syncToFirebase: Boolean = true): Boolean {
-        val current = getAvailableCredits()
-        if (current > 0) {
-            val used = getUsedCredits()
-            prefs.edit().apply {
-                putInt(CREDITS_KEY, current - 1)
-                putInt(USED_CREDITS_KEY, used + 1)
-            }.apply()
+    fun addCredits(amount: Int, onComplete: (Boolean) -> Unit = {}) {
+        val newCredits = getAvailableCredits() + amount
+        val newTotal = getTotalCredits() + amount
+        
+        updateLocalCredits(newCredits, getUsedCredits(), newTotal)
+        syncCreditsToFirebase(newCredits, getUsedCredits(), onComplete)
+    }
 
-            if (syncToFirebase && userEmail != null) {
-                syncToFirebase(userEmail)
-            }
-            return true
+    fun syncWithFirebase(onComplete: (Boolean, Int?) -> Unit) {
+        val user = auth.currentUser
+        if (user == null) {
+            onComplete(false, null)
+            return
         }
-        return false
-    }
 
-    // -------------------------
-    // Firebase synchronization
-    // -------------------------
-    fun syncToFirebase(userEmail: String, onComplete: (Boolean) -> Unit = {}) {
-        val db = FirebaseFirestore.getInstance()
-        db.collection("users")
-            .document(userEmail)
-            .update(
-                "availableCredits", getAvailableCredits(),
-                "usedCredits", getUsedCredits(),
-                "totalCreditsEarned", getTotalCreditsEarned(),
-                "lastUpdated", System.currentTimeMillis()
-            )
-            .addOnSuccessListener { onComplete(true) }
-            .addOnFailureListener { onComplete(false) }
-    }
-
-    fun syncFromFirebase(userEmail: String, onComplete: (Boolean) -> Unit) {
-        val db = FirebaseFirestore.getInstance()
-        db.collection("users")
-            .document(userEmail)
+        db.collection("users").document(user.uid)
             .get()
             .addOnSuccessListener { document ->
                 if (document.exists()) {
                     val available = document.getLong("availableCredits")?.toInt() ?: 0
                     val used = document.getLong("usedCredits")?.toInt() ?: 0
                     val total = document.getLong("totalCreditsEarned")?.toInt() ?: 0
-
-                    prefs.edit().apply {
-                        putInt(CREDITS_KEY, available)
-                        putInt(USED_CREDITS_KEY, used)
-                        putInt(TOTAL_CREDITS_KEY, total)
-                    }.apply()
-
-                    onComplete(true)
+                    
+                    updateLocalCredits(available, used, total)
+                    onComplete(true, available)
                 } else {
-                    onComplete(false)
+                    onComplete(false, null)
                 }
             }
-            .addOnFailureListener { onComplete(false) }
+            .addOnFailureListener {
+                onComplete(false, null)
+            }
     }
 
-    // -------------------------
-    // // Admin Functions (Firebase-based)
-    // -------------------------
     fun isAdminMode(): Boolean {
-        val user = FirebaseAuth.getInstance().currentUser
-        return user?.email == "alakbd2009@gmail.com" // <-- admin email
+        val user = auth.currentUser
+        val adminEmails = listOf("alakbd2009@gmail.com", "admin@resumewriter.com")
+        return user?.email?.let { adminEmails.contains(it) } ?: false
     }
 
-    fun logoutAdmin() {
-         FirebaseAuth.getInstance().signOut()
+    // Admin functions
+    fun adminAddCreditsToUser(userId: String, amount: Int, onComplete: (Boolean) -> Unit) {
+        db.collection("users").document(userId).update(
+            mapOf(
+                "availableCredits" to FieldValue.increment(amount.toLong()),
+                "totalCreditsEarned" to FieldValue.increment(amount.toLong()),
+                "lastUpdated" to System.currentTimeMillis()
+            )
+        ).addOnCompleteListener { task ->
+            onComplete(task.isSuccessful)
+        }
     }
 
-    fun adminAddCredits(amount: Int) {
-        val current = getAvailableCredits()
-        prefs.edit().putInt(CREDITS_KEY, current + amount).apply()
+    fun adminSetUserCredits(userId: String, amount: Int, onComplete: (Boolean) -> Unit) {
+        db.collection("users").document(userId).update(
+            mapOf(
+                "availableCredits" to amount,
+                "totalCreditsEarned" to amount,
+                "lastUpdated" to System.currentTimeMillis()
+            )
+        ).addOnCompleteListener { task ->
+            onComplete(task.isSuccessful)
+        }
     }
 
-    fun adminSetCredits(amount: Int) {
-        prefs.edit().putInt(CREDITS_KEY, amount).apply()
+    fun adminResetUserCredits(userId: String, onComplete: (Boolean) -> Unit) {
+        db.collection("users").document(userId).update(
+            mapOf(
+                "availableCredits" to 0,
+                "usedCredits" to 0,
+                "totalCreditsEarned" to 0,
+                "lastUpdated" to System.currentTimeMillis()
+            )
+        ).addOnCompleteListener { task ->
+            onComplete(task.isSuccessful)
+        }
     }
 
-    fun adminResetCredits() {
-        prefs.edit().putInt(CREDITS_KEY, 0).apply()
-        prefs.edit().putInt(USED_CREDITS_KEY, 0).apply()
-        prefs.edit().putInt(TOTAL_CREDITS_KEY, 0).apply()
+    private fun updateLocalCredits(available: Int, used: Int, total: Int) {
+        prefs.edit().apply {
+            putInt(AVAILABLE_CREDITS_KEY, available)
+            putInt(USED_CREDITS_KEY, used)
+            putInt(TOTAL_CREDITS_KEY, total)
+            apply()
+        }
     }
 
-    fun adminGenerateCV(): Boolean {
-        // Admin generates a CV without using credits
-        // You can put any additional logic here
-        return true
-    }
+    private fun syncCreditsToFirebase(available: Int, used: Int, onComplete: (Boolean) -> Unit) {
+        val user = auth.currentUser
+        if (user == null) {
+            onComplete(false)
+            return
+        }
 
-    fun adminGetUserStats(): String {
-        val available = getAvailableCredits()
-        val used = getUsedCredits()
-        val total = getTotalCreditsEarned()
-        return "Available: $available | Used: $used | Total Earned: $total"
+        db.collection("users").document(user.uid).update(
+            mapOf(
+                "availableCredits" to available,
+                "usedCredits" to used,
+                "totalCreditsEarned" to getTotalCredits(),
+                "lastUpdated" to System.currentTimeMillis(),
+                "lastActive" to System.currentTimeMillis()
+            )
+        ).addOnCompleteListener { task ->
+            onComplete(task.isSuccessful)
+        }
     }
 }
