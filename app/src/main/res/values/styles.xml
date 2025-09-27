@@ -44,17 +44,26 @@
         <item name="android:textSize">16sp</item>
     </style>
 
+
     <!-- Admin Buttons -->
-    <style name="AdminButtonRed">
-        <item name="android:layout_height">50dp</item>
-        <item name="android:backgroundTint">@color/admin_red</item>
-        <item name="android:textColor">@color/on_primary</item>
-        <item name="android:textSize">16sp</item>
-    </style>
-    <style name="AdminButtonGreen">
-        <item name="android:layout_height">50dp</item>
-        <item name="android:backgroundTint">@color/admin_green</item>
-        <item name="android:textColor">@color/on_primary</item>
-        <item name="android:textSize">16sp</item>
-    </style>
+<style name="AdminButtonRed">
+    <item name="android:layout_height">@dimen/button_height</item>
+    <item name="android:backgroundTint">@color/admin_red</item>
+    <item name="android:textColor">@color/on_primary</item>
+    <item name="android:textSize">@dimen/text_medium</item>
+</style>
+
+<style name="AdminButtonGreen">
+    <item name="android:layout_height">@dimen/button_height</item>
+    <item name="android:backgroundTint">@color/admin_green</item>
+    <item name="android:textColor">@color/on_primary</item>
+    <item name="android:textSize">@dimen/text_medium</item>
+</style>
+
+<style name="AdminButtonOrange">
+    <item name="android:layout_height">@dimen/button_height</item>
+    <item name="android:backgroundTint">#FFA500</item> <!-- Orange color -->
+    <item name="android:textColor">@color/on_primary</item>
+    <item name="android:textSize">@dimen/text_medium</item>
+</style>
 </resources>
