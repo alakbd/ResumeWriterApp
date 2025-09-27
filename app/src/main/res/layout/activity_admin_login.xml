@@ -9,21 +9,31 @@
         android:layout_width="match_parent"
         android:layout_height="wrap_content"
         android:orientation="vertical"
-        android:padding="24dp"
+        android:padding="@dimen/padding_large"
         android:gravity="center_horizontal">
 
         <!-- Title -->
         <TextView
             style="@style/TitleText"
             android:text="Admin Login"
-            android:layout_marginBottom="32dp"/>
+            android:layout_marginBottom="@dimen/margin_large"/>
+
+        <!-- Benefit / Info Text -->
+        <TextView
+            android:layout_width="match_parent"
+            android:layout_height="wrap_content"
+            android:text="This app helps job seekers create professional CVs quickly and track their usage credits. Admins can monitor users and manage credits."
+            android:textSize="@dimen/text_small"
+            android:textColor="@color/text_secondary"
+            android:gravity="center"
+            android:layout_marginBottom="@dimen/margin_large"/>
 
         <!-- Email -->
         <EditText
             style="@style/AppEditText"
             android:id="@+id/et_admin_email"
             android:hint="Enter admin email"
-            android:layout_marginBottom="16dp"/>
+            android:layout_marginBottom="@dimen/margin_medium"/>
 
         <!-- Password -->
         <EditText
@@ -31,14 +41,14 @@
             android:id="@+id/et_admin_password"
             android:hint="Enter admin password"
             android:inputType="textPassword"
-            android:layout_marginBottom="24dp"/>
+            android:layout_marginBottom="@dimen/margin_large"/>
 
         <!-- Login Button -->
         <Button
             style="@style/PrimaryButton"
             android:id="@+id/btn_admin_login"
             android:text="Login as Admin"
-            android:layout_marginBottom="12dp"/>
+            android:layout_marginBottom="@dimen/margin_medium"/>
 
         <!-- Back Button -->
         <Button
