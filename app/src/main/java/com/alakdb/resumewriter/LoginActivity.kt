@@ -6,73 +6,92 @@ import android.widget.Button
 import android.widget.EditText
 import android.widget.Toast
 import androidx.appcompat.app.AppCompatActivity
-import com.google.firebase.auth.FirebaseAuth
-import com.google.firebase.auth.AuthResult
-import com.google.android.gms.tasks.Task
+import com.alakdb.resumewriter.databinding.ActivityLoginBinding
 
+class LoginActivity : AppCompatActivity() {
+    private lateinit var binding: ActivityLoginBinding
+    private lateinit var userManager: UserManager
 
-    private lateinit var auth: FirebaseAuth
-    private lateinit var btnForgotPassword: Button
-    class LoginActivity: AppCompatActivity() {
-        
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
-        setContentView(R.layout.activity_login)
+        binding = ActivityLoginBinding.inflate(layoutInflater)
+        setContentView(binding.root)
 
-        auth = FirebaseAuth.getInstance()
+        userManager = UserManager(this)
 
-        val etEmail = findViewById<EditText>(R.id.et_login_email)
-        val etPassword = findViewById<EditText>(R.id.et_login_password)
-        val btnLogin = findViewById<Button>(R.id.btn_login)
-        val btnGoToRegister = findViewById<Button>(R.id.btn_go_to_register)
-        btnForgotPassword = findViewById(R.id.btn_forgot_password)
-
-        btnLogin.setOnClickListener {
-            val email = etEmail.text.toString().trim()
-            val password = etPassword.text.toString().trim()
-
-            if (email.isEmpty() || password.isEmpty()) {
-                showMessage("Enter email and password")
-                return@setOnClickListener
-            }
-
-            auth.signInWithEmailAndPassword(email, password)
-                .addOnCompleteListener { task: Task<AuthResult> ->
-                    if (task.isSuccessful) {
-                        showMessage("Login successful!")
-                        startActivity(Intent(this@LoginActivity, MainActivity::class.java))
-                        finish()
-                    } else {
-                        showMessage("Login failed: ${task.exception?.message}")
-                    }
-                }
+        // Check if already logged in
+        if (userManager.isUserLoggedIn()) {
+            startActivity(Intent(this, MainActivity::class.java))
+            finish()
+            return
         }
 
-        btnForgotPassword.setOnClickListener {
-            val email = etEmail.text.toString().trim()
+        setupClickListeners()
+    }
+
+    private fun setupClickListeners() {
+        binding.btnLogin.setOnClickListener {
+            val email = binding.etLoginEmail.text.toString().trim()
+            val password = binding.etLoginPassword.text.toString().trim()
+
+            if (validateInput(email, password)) {
+                attemptLogin(email, password)
+            }
+        }
+
+        binding.btnForgotPassword.setOnClickListener {
+            val email = binding.etLoginEmail.text.toString().trim()
             if (email.isEmpty()) {
-                showMessage("Enter your email to reset password")
-                return@setOnClickListener
+                showMessage("Please enter your email first")
+            } else {
+                showMessage("Password reset feature coming soon")
             }
-
-            auth.sendPasswordResetEmail(email)
-                .addOnCompleteListener { task: Task<Void> ->
-                    if (task.isSuccessful) {
-                        showMessage("Password reset email sent to $email")
-                    } else {
-                        showMessage("Error: ${task.exception?.message}")
-                    }
-                }
         }
 
-        btnGoToRegister.setOnClickListener {
+        binding.btnGoToRegister.setOnClickListener {
             startActivity(Intent(this, UserRegistrationActivity::class.java))
             finish()
         }
     }
 
-    private fun showMessage(msg: String) {
-        Toast.makeText(this, msg, Toast.LENGTH_SHORT).show()
+    private fun validateInput(email: String, password: String): Boolean {
+        if (email.isEmpty()) {
+            binding.etLoginEmail.error = "Email is required"
+            return false
+        }
+
+        if (password.isEmpty()) {
+            binding.etLoginPassword.error = "Password is required"
+            return false
+        }
+
+        if (!android.util.Patterns.EMAIL_ADDRESS.matcher(email).matches()) {
+            binding.etLoginEmail.error = "Enter a valid email address"
+            return false
+        }
+
+        return true
+    }
+
+    private fun attemptLogin(email: String, password: String) {
+        binding.btnLogin.isEnabled = false
+        binding.btnLogin.text = "Logging in..."
+
+        userManager.loginUser(email, password) { success, error ->
+            binding.btnLogin.isEnabled = true
+            binding.btnLogin.text = "Login"
+
+            if (success) {
+                showMessage("Login successful!")
+                startActivity(Intent(this@LoginActivity, MainActivity::class.java))
+                finish()
+            } else {
+                showMessage(error ?: "Login failed")
+            }
+        }
+    }
+
+    private fun showMessage(message: String) {
+        Toast.makeText(this, message, Toast.LENGTH_SHORT).show()
     }
 }
-
