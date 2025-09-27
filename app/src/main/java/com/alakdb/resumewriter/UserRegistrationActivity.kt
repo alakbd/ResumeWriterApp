@@ -1,22 +1,17 @@
 package com.alakdb.resumewriter
 
+import android.content.Intent
 import android.os.Bundle
-import android.widget.Button
-import android.widget.EditText
 import android.widget.Toast
 import androidx.appcompat.app.AppCompatActivity
 import com.alakdb.resumewriter.databinding.ActivityUserRegistrationBinding
-import android.content.Intent
-import com.alakdb.resumewriter.MainActivity
 
 class UserRegistrationActivity : AppCompatActivity() {
-
     private lateinit var binding: ActivityUserRegistrationBinding
     private lateinit var userManager: UserManager
 
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
-
         binding = ActivityUserRegistrationBinding.inflate(layoutInflater)
         setContentView(binding.root)
 
@@ -25,20 +20,57 @@ class UserRegistrationActivity : AppCompatActivity() {
         binding.btnRegister.setOnClickListener {
             val email = binding.etEmail.text.toString().trim()
             val password = binding.etPassword.text.toString().trim()
+            val confirmPassword = binding.etConfirmPassword.text.toString().trim()
 
-            if (email.isEmpty() || password.isEmpty()) {
-                showMessage("Please enter email and password.")
-                return@setOnClickListener
+            if (validateInput(email, password, confirmPassword)) {
+                attemptRegistration(email, password)
             }
+        }
 
-            userManager.registerUser(email, password) { success, error ->
-                if (success) {
-                    showMessage("Registration successful!")
-                    startActivity(Intent(this, MainActivity::class.java))
-                    finish()
-                } else {
-                    showMessage("Registration failed: ${error ?: "Unknown error"}")
-                }
+        binding.btnGoToLogin.setOnClickListener {
+            startActivity(Intent(this, LoginActivity::class.java))
+            finish()
+        }
+    }
+
+    private fun validateInput(email: String, password: String, confirmPassword: String): Boolean {
+        if (email.isEmpty()) {
+            binding.etEmail.error = "Email is required"
+            return false
+        }
+
+        if (!android.util.Patterns.EMAIL_ADDRESS.matcher(email).matches()) {
+            binding.etEmail.error = "Enter a valid email address"
+            return false
+        }
+
+        if (password.length < 6) {
+            binding.etPassword.error = "Password must be at least 6 characters"
+            return false
+        }
+
+        if (password != confirmPassword) {
+            binding.etConfirmPassword.error = "Passwords do not match"
+            return false
+        }
+
+        return true
+    }
+
+    private fun attemptRegistration(email: String, password: String) {
+        binding.btnRegister.isEnabled = false
+        binding.btnRegister.text = "Registering..."
+
+        userManager.registerUser(email, password) { success, error ->
+            binding.btnRegister.isEnabled = true
+            binding.btnRegister.text = "Register"
+
+            if (success) {
+                showMessage("Registration successful! Please log in.")
+                startActivity(Intent(this@UserRegistrationActivity, LoginActivity::class.java))
+                finish()
+            } else {
+                showMessage(error ?: "Registration failed")
             }
         }
     }
