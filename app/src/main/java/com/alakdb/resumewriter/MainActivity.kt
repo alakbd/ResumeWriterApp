@@ -2,7 +2,7 @@ package com.alakdb.resumewriter
 
 import android.content.Intent
 import android.os.Bundle
-import android.widget.Toast
+import androidx.appcompat.app.AlertDialog
 import androidx.appcompat.app.AppCompatActivity
 import com.alakdb.resumewriter.databinding.ActivityMainBinding
 import com.google.firebase.auth.FirebaseAuth
@@ -23,9 +23,7 @@ class MainActivity : AppCompatActivity() {
         setContentView(binding.root)
 
         // Initialize managers
-        userManager = UserManager(this)
-        creditManager = CreditManager(this)
-        billingManager = BillingManager(this, creditManager)
+        initializeManagers()
 
         // Check authentication first
         if (!checkAuthentication()) {
@@ -35,10 +33,14 @@ class MainActivity : AppCompatActivity() {
         initializeApp()
     }
 
+    private fun initializeManagers() {
+        userManager = UserManager(this)
+        creditManager = CreditManager(this)
+        billingManager = BillingManager(this, creditManager)
+    }
+
     private fun checkAuthentication(): Boolean {
-        val currentUser = FirebaseAuth.getInstance().currentUser
-        
-        if (currentUser == null || !userManager.isUserLoggedIn()) {
+        if (!userManager.isUserLoggedIn()) {
             // User not logged in, redirect to login
             startActivity(Intent(this, LoginActivity::class.java))
             finish()
@@ -49,36 +51,19 @@ class MainActivity : AppCompatActivity() {
     }
 
     private fun initializeApp() {
+        setupClickListeners()
         initializeBilling()
-        setupUI()
         loadUserData()
         updateAdminIndicator()
     }
 
-    private fun initializeBilling() {
-        billingManager.initializeBilling { success, message ->
-            isBillingInitialized = success
-            if (success) {
-                showMessage("Store ready")
-                updateProductPrices()
-            } else {
-                showMessage("Store temporarily unavailable")
-                // Disable purchase buttons but keep the app functional
-                binding.btnBuy3Cv.isEnabled = false
-                binding.btnBuy8Cv.isEnabled = false
-                binding.btnBuy3Cv.text = "Store Unavailable"
-                binding.btnBuy8Cv.text = "Store Unavailable"
-            }
-        }
-    }
-
-    private fun setupUI() {
-        // CV Generation
+    private fun setupClickListeners() {
+        // Generate CV Button
         binding.btnGenerateCv.setOnClickListener {
             generateCV()
         }
 
-        // Purchase Buttons with proper error handling
+        // Purchase Buttons
         binding.btnBuy3Cv.setOnClickListener {
             if (isBillingInitialized) {
                 purchaseProduct("cv_package_3")
@@ -95,74 +80,89 @@ class MainActivity : AppCompatActivity() {
             }
         }
 
-        // Admin Access - Triple tap on version text
+        // Admin Access - Triple tap on version text (hidden feature)
         binding.tvVersion.setOnClickListener {
-            adminTapCount++
-            if (adminTapCount >= 3) {
-                adminTapCount = 0
-                navigateToAdmin()
-            }
+            handleAdminTap()
         }
 
         // Admin Access - Direct button
         binding.btnAdminAccess.setOnClickListener {
             navigateToAdmin()
         }
-
-        // Logout button
-        binding.btnLogout.setOnClickListener {
-            logoutUser()
-        }
-
-        // Refresh button
-        binding.btnRefresh.setOnClickListener {
-            refreshUserData()
-        }
     }
 
-    private fun loadUserData() {
-        showLoadingState(true)
+    private fun handleAdminTap() {
+        adminTapCount++
         
-        creditManager.syncWithFirebase { success, credits ->
-            showLoadingState(false)
-            
+        // Show tap feedback (optional)
+        when (adminTapCount) {
+            1 -> binding.tvVersion.text = "v1.0 (1/3)"
+            2 -> binding.tvVersion.text = "v1.0 (2/3)"
+            3 -> {
+                adminTapCount = 0
+                binding.tvVersion.text = "v1.0"
+                navigateToAdmin()
+            }
+        }
+        
+        // Reset counter after 2 seconds
+        binding.tvVersion.postDelayed({
+            if (adminTapCount > 0 && adminTapCount < 3) {
+                adminTapCount = 0
+                binding.tvVersion.text = "v1.0"
+            }
+        }, 2000)
+    }
+
+    private fun initializeBilling() {
+        billingManager.initializeBilling { success, message ->
+            isBillingInitialized = success
             if (success) {
-                updateCreditDisplay()
-                if (credits != null) {
-                    showMessage("Data synchronized successfully")
-                }
+                showMessage("Store ready")
+                updateProductPrices()
             } else {
-                showMessage("Using local data - sync failed")
-                updateCreditDisplay() // Still show local data
+                showMessage("Store temporarily unavailable")
+                // Update button texts to show unavailable state
+                binding.btnBuy3Cv.text = "3 CV Credits - Unavailable"
+                binding.btnBuy8Cv.text = "8 CV Credits - Unavailable"
+                binding.btnBuy3Cv.isEnabled = false
+                binding.btnBuy8Cv.isEnabled = false
             }
         }
     }
 
-    private fun refreshUserData() {
-        binding.btnRefresh.isEnabled = false
+    private fun loadUserData() {
+        // Show initial loading state
+        binding.btnGenerateCv.isEnabled = false
+        binding.btnGenerateCv.text = "Loading..."
+        
         creditManager.syncWithFirebase { success, credits ->
-            binding.btnRefresh.isEnabled = true
             if (success) {
                 updateCreditDisplay()
-                showMessage("Data refreshed successfully")
+                showMessage("Data synchronized")
             } else {
-                showMessage("Refresh failed - using current data")
+                // Still show local data even if sync fails
+                updateCreditDisplay()
+                showMessage("Using local data")
             }
         }
     }
 
     private fun generateCV() {
-        if (creditManager.getAvailableCredits() <= 0) {
+        val availableCredits = creditManager.getAvailableCredits()
+        
+        if (availableCredits <= 0) {
             showMessage("Not enough credits! Please purchase more.")
             return
         }
 
+        // Show loading state
         binding.btnGenerateCv.isEnabled = false
-        binding.btnGenerateCv.text = "Generating..."
+        binding.btnGenerateCv.text = "Generating CV..."
 
         creditManager.useCredit { success ->
-            binding.btnGenerateCv.isEnabled = true
-            binding.btnGenerateCv.text = "Generate CV"
+            // Restore button state
+            updateGenerateButton()
             
             if (success) {
                 showMessage("CV generated successfully!")
@@ -178,7 +178,7 @@ class MainActivity : AppCompatActivity() {
 
     private fun purchaseProduct(productId: String) {
         if (!isBillingInitialized) {
-            showMessage("Billing not initialized. Please try again.")
+            showMessage("Billing not ready. Please try again later.")
             return
         }
 
@@ -213,14 +213,10 @@ class MainActivity : AppCompatActivity() {
     }
 
     private fun updatePurchaseButtons() {
-        binding.btnBuy3Cv.isEnabled = isBillingInitialized
-        binding.btnBuy8Cv.isEnabled = isBillingInitialized
-        
         if (isBillingInitialized) {
+            binding.btnBuy3Cv.isEnabled = true
+            binding.btnBuy8Cv.isEnabled = true
             updateProductPrices()
-        } else {
-            binding.btnBuy3Cv.text = "Store Unavailable"
-            binding.btnBuy8Cv.text = "Store Unavailable"
         }
     }
 
@@ -228,8 +224,31 @@ class MainActivity : AppCompatActivity() {
         val price3 = billingManager.getProductPrice("cv_package_3")
         val price8 = billingManager.getProductPrice("cv_package_8")
         
-        binding.btnBuy3Cv.text = "Buy 3 CVs - $price3"
-        binding.btnBuy8Cv.text = "Buy 8 CVs - $price8"
+        // Use default prices if billing not available
+        val displayPrice3 = if (price3 != "Not available") price3 else "€5"
+        val displayPrice8 = if (price8 != "Not available") price8 else "€10"
+        
+        binding.btnBuy3Cv.text = "3 CV Credits - $displayPrice3"
+        binding.btnBuy8Cv.text = "8 CV Credits - $displayPrice8"
+    }
+
+    private fun updateCreditDisplay() {
+        val available = creditManager.getAvailableCredits()
+        val used = creditManager.getUsedCredits()
+        val total = creditManager.getTotalCredits()
+
+        // Update credit displays
+        binding.tvAvailableCredits.text = "Available CV Credits: $available"
+        binding.tvCreditStats.text = "Used: $used | Total Earned: $total"
+        
+        // Update generate button state
+        updateGenerateButton()
+    }
+
+    private fun updateGenerateButton() {
+        val available = creditManager.getAvailableCredits()
+        binding.btnGenerateCv.isEnabled = available > 0
+        binding.btnGenerateCv.text = if (available > 0) "Generate CV (1 Credit)" else "No Credits Available"
     }
 
     private fun navigateToAdmin() {
@@ -242,39 +261,10 @@ class MainActivity : AppCompatActivity() {
         }
     }
 
-    private fun logoutUser() {
-        AlertDialog.Builder(this)
-            .setTitle("Logout")
-            .setMessage("Are you sure you want to logout?")
-            .setPositiveButton("Yes") { _, _ ->
-                userManager.logout()
-                showMessage("Logged out successfully")
-                startActivity(Intent(this, LoginActivity::class.java))
-                finish()
-            }
-            .setNegativeButton("Cancel", null)
-            .show()
-    }
-
-    private fun updateCreditDisplay() {
-        val available = creditManager.getAvailableCredits()
-        val used = creditManager.getUsedCredits()
-        val total = creditManager.getTotalCredits()
-
-        binding.tvAvailableCredits.text = "Available CV Credits: $available"
-        binding.tvCreditStats.text = "Used: $used | Total Earned: $total"
-        
-        // Enable/disable generate button based on credits
-        binding.btnGenerateCv.isEnabled = available > 0
-        binding.btnGenerateCv.text = if (available > 0) "Generate CV" else "No Credits Available"
-        
-        // Update user email display
-        val userEmail = userManager.getCurrentUserEmail() ?: "Unknown"
-        binding.tvUserWelcome.text = "Welcome, ${userEmail.substringBefore("@")}"
-    }
-
     private fun updateAdminIndicator() {
-        if (creditManager.isAdminMode()) {
+        val isAdmin = creditManager.isAdminMode()
+        
+        if (isAdmin) {
             binding.tvAdminIndicator.visibility = android.view.View.VISIBLE
             binding.btnAdminAccess.visibility = android.view.View.VISIBLE
         } else {
@@ -283,18 +273,20 @@ class MainActivity : AppCompatActivity() {
         }
     }
 
-    private fun showLoadingState(show: Boolean) {
-        binding.progressBar.visibility = if (show) android.view.View.VISIBLE else android.view.View.GONE
-        binding.btnRefresh.isEnabled = !show
-    }
-
     private fun showMessage(message: String) {
-        Toast.makeText(this, message, Toast.LENGTH_SHORT).show()
+        android.widget.Toast.makeText(this, message, android.widget.Toast.LENGTH_SHORT).show()
     }
 
-    override fun onDestroy() {
-        super.onDestroy()
-        billingManager.destroy()
+    override fun onBackPressed() {
+        AlertDialog.Builder(this)
+            .setTitle("Exit App")
+            .setMessage("Are you sure you want to exit?")
+            .setPositiveButton("Exit") { _, _ ->
+                // Properly finish the activity
+                finishAffinity()
+            }
+            .setNegativeButton("Cancel", null)
+            .show()
     }
 
     override fun onResume() {
@@ -302,6 +294,15 @@ class MainActivity : AppCompatActivity() {
         // Refresh data when returning to the app
         if (::creditManager.isInitialized) {
             updateCreditDisplay()
+            updateAdminIndicator()
+        }
+    }
+
+    override fun onDestroy() {
+        super.onDestroy()
+        // Clean up billing resources
+        if (::billingManager.isInitialized) {
+            billingManager.destroy()
         }
     }
 }
