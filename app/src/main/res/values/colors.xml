@@ -12,6 +12,7 @@
     <color name="on_secondary">#000000</color>
     <color name="text_primary">#212121</color>
     <color name="text_secondary">#757575</color>
+    <color name="gray">#9E9E9E</color>
 
     <!-- Admin colors -->
     <color name="admin_red">#F44336</color>
