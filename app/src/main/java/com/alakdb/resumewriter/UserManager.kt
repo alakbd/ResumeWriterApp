@@ -109,6 +109,11 @@ class UserManager(private val context: Context) {
         auth.signOut()
         prefs.edit().clear().apply()
     }
+    fun logoutUser() {
+        val prefs = context.getSharedPreferences("user_prefs", Context.MODE_PRIVATE)
+        prefs.edit().clear().apply()  // clears all saved login data
+    }
+
 
     fun syncUserCredits(onComplete: (Boolean, Int?) -> Unit) {
         val userId = getCurrentUserId()
