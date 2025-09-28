@@ -15,8 +15,10 @@ class CreditManager(private val context: Context) {
         private const val AVAILABLE_CREDITS_KEY = "available_credits"
         private const val USED_CREDITS_KEY = "used_credits"
         private const val TOTAL_CREDITS_KEY = "total_credits"
+        private const val ADMIN_MODE_KEY = "admin_mode"
     }
 
+    // Credits getters
     fun getAvailableCredits(): Int = prefs.getInt(AVAILABLE_CREDITS_KEY, 0)
     fun getUsedCredits(): Int = prefs.getInt(USED_CREDITS_KEY, 0)
     fun getTotalCredits(): Int = prefs.getInt(TOTAL_CREDITS_KEY, 0)
@@ -26,11 +28,7 @@ class CreditManager(private val context: Context) {
         if (currentCredits > 0) {
             val newCredits = currentCredits - 1
             val newUsed = getUsedCredits() + 1
-            
-            // Update locally first for immediate feedback
             updateLocalCredits(newCredits, newUsed, getTotalCredits())
-            
-            // Sync with Firebase
             syncCreditsToFirebase(newCredits, newUsed, onComplete)
         } else {
             onComplete(false)
@@ -40,12 +38,10 @@ class CreditManager(private val context: Context) {
     fun addCredits(amount: Int, onComplete: (Boolean) -> Unit = {}) {
         val newCredits = getAvailableCredits() + amount
         val newTotal = getTotalCredits() + amount
-        
         updateLocalCredits(newCredits, getUsedCredits(), newTotal)
         syncCreditsToFirebase(newCredits, getUsedCredits(), onComplete)
     }
 
-    // REPLACE your current syncWithFirebase function with this:
     fun syncWithFirebase(onComplete: (Boolean, Int?) -> Unit) {
         val user = auth.currentUser
         if (user == null) {
@@ -53,35 +49,45 @@ class CreditManager(private val context: Context) {
             return
         }
 
-    db.collection("users").document(user.uid)
-        .get()
-        .addOnSuccessListener { document ->
-            if (document.exists()) {
-                val available = document.getLong("availableCredits")?.toInt() ?: 0
-                val used = document.getLong("usedCredits")?.toInt() ?: 0
-                val total = document.getLong("totalCreditsEarned")?.toInt() ?: 0
-                
-                // Update local storage
-                val editor = prefs.edit()
-                editor.putInt(AVAILABLE_CREDITS_KEY, available)
-                editor.putInt(USED_CREDITS_KEY, used)
-                editor.putInt(TOTAL_CREDITS_KEY, total)
-                editor.apply()
-                
-                onComplete(true, available)
-            } else {
+        db.collection("users").document(user.uid)
+            .get()
+            .addOnSuccessListener { document ->
+                if (document.exists()) {
+                    val available = document.getLong("availableCredits")?.toInt() ?: 0
+                    val used = document.getLong("usedCredits")?.toInt() ?: 0
+                    val total = document.getLong("totalCreditsEarned")?.toInt() ?: 0
+
+                    val editor = prefs.edit()
+                    editor.putInt(AVAILABLE_CREDITS_KEY, available)
+                    editor.putInt(USED_CREDITS_KEY, used)
+                    editor.putInt(TOTAL_CREDITS_KEY, total)
+                    editor.apply()
+
+                    onComplete(true, available)
+                } else {
+                    onComplete(false, null)
+                }
+            }
+            .addOnFailureListener {
                 onComplete(false, null)
             }
-        }
-        .addOnFailureListener {
-            onComplete(false, null)
-        }
-}
+    }
 
+    // Admin mode handling
     fun isAdminMode(): Boolean {
-        val user = auth.currentUser
+        return prefs.getBoolean(ADMIN_MODE_KEY, false)
+    }
+
+    fun setAdminMode(enabled: Boolean) {
+        prefs.edit().putBoolean(ADMIN_MODE_KEY, enabled).apply()
+    }
+
+    fun loginAsAdmin(email: String): Boolean {
         val adminEmails = listOf("alakbd2009@gmail.com", "admin@resumewriter.com")
-        return user?.email?.let { adminEmails.contains(it) } ?: false
+        return if (adminEmails.contains(email)) {
+            setAdminMode(true)
+            true
+        } else false
     }
 
     // Admin functions
@@ -92,9 +98,7 @@ class CreditManager(private val context: Context) {
                 "totalCreditsEarned" to FieldValue.increment(amount.toLong()),
                 "lastUpdated" to System.currentTimeMillis()
             )
-        ).addOnCompleteListener { task ->
-            onComplete(task.isSuccessful)
-        }
+        ).addOnCompleteListener { task -> onComplete(task.isSuccessful) }
     }
 
     fun adminSetUserCredits(userId: String, amount: Int, onComplete: (Boolean) -> Unit) {
@@ -104,9 +108,7 @@ class CreditManager(private val context: Context) {
                 "totalCreditsEarned" to amount,
                 "lastUpdated" to System.currentTimeMillis()
             )
-        ).addOnCompleteListener { task ->
-            onComplete(task.isSuccessful)
-        }
+        ).addOnCompleteListener { task -> onComplete(task.isSuccessful) }
     }
 
     fun adminResetUserCredits(userId: String, onComplete: (Boolean) -> Unit) {
@@ -117,9 +119,7 @@ class CreditManager(private val context: Context) {
                 "totalCreditsEarned" to 0,
                 "lastUpdated" to System.currentTimeMillis()
             )
-        ).addOnCompleteListener { task ->
-            onComplete(task.isSuccessful)
-        }
+        ).addOnCompleteListener { task -> onComplete(task.isSuccessful) }
     }
 
     private fun updateLocalCredits(available: Int, used: Int, total: Int) {
@@ -146,8 +146,6 @@ class CreditManager(private val context: Context) {
                 "lastUpdated" to System.currentTimeMillis(),
                 "lastActive" to System.currentTimeMillis()
             )
-        ).addOnCompleteListener { task ->
-            onComplete(task.isSuccessful)
-        }
+        ).addOnCompleteListener { task -> onComplete(task.isSuccessful) }
     }
 }
