@@ -2,10 +2,10 @@
 <resources>
 
    <!-- App Base Theme -->
-<style name="Base.Theme.ResumeWriterApp" parent="Theme.Material3.DayNight">
+<style name="Base.Theme.ResumeWriterApp" parent="Theme.Material3.DayNight.NoActionBar">
     <!-- Brand colors -->
     <item name="colorPrimary">#2196F3</item>
-    <item name="colorPrimaryVariant">#1976D2</item>
+    <item name="colorPrimaryContainer">#BBDEFB</item>
     <item name="colorOnPrimary">#FFFFFF</item>
 
     <!-- Secondary (success green) -->
@@ -14,9 +14,6 @@
 
     <!-- Backgrounds -->
     <item name="android:colorBackground">#FFFFFF</item>
-    <item name="colorOnBackground">#000000</item>
-
-    <!-- Surfaces (cards, dialogs, etc.) -->
     <item name="colorSurface">#FFFFFF</item>
     <item name="colorOnSurface">#000000</item>
 
@@ -55,13 +52,18 @@
 </style>
 
 <!-- EditText Style -->
-<style name="AppEditText" parent="Widget.Material3.TextInputEditText.OutlinedBox">
+<style name="AppEditText">
     <item name="android:textColor">#000000</item>
     <item name="android:textColorHint">@color/gray</item>
     <item name="android:textSize">16sp</item>
     <item name="android:padding">12dp</item>
 </style>
 
+<!-- Optional: TextInputLayout Style -->
+<style name="AppTextInputLayout" parent="Widget.Material3.TextInputLayout.OutlinedBox">
+    <item name="boxStrokeColor">@color/gray</item>
+    <item name="hintTextColor">@color/gray</item>
+</style>
 
 </resources>
 
