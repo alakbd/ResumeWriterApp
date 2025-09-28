@@ -31,15 +31,21 @@ jobs:
       - name: Make gradlew executable
         run: chmod +x ./gradlew
 
-      # ✅ Add this step to create google-services.json from GitHub Secret
+      - name: Cache Gradle dependencies
+        uses: actions/cache@v3
+        with:
+          path: |
+            ~/.gradle/caches
+            ~/.gradle/wrapper/
+          key: gradle-${{ runner.os }}-${{ hashFiles('**/*.gradle*', '**/gradle-wrapper.properties') }}
+
       - name: Create google-services.json
         run: |
           cat <<EOF > app/google-services.json
           ${{ secrets.GOOGLE_SERVICES_JSON }}
           EOF
 
-
-      - name: Build with Gradle
+      - name: Clean & Build AAB
         run: ./gradlew clean bundleRelease
 
       - name: Upload AAB
