@@ -42,6 +42,8 @@
         
         <!-- Password -->
         <EditText
+            android:layout_width="match_parent"
+            android:layout_height="wrap_content"
             style="@style/AppEditText"
             android:id="@+id/et_admin_password"
             android:hint="Enter admin password"
@@ -50,16 +52,21 @@
 
         <!-- Login Button -->
         <Button
+            android:layout_width="match_parent"
+            android:layout_height="wrap_content"
             style="@style/PrimaryButton"
             android:id="@+id/btn_admin_login"
             android:text="Login as Admin"
             android:layout_marginBottom="@dimen/margin_medium"/>
 
-        <!-- Back Button -->
+            <!-- Back Button -->
         <Button
+            android:layout_width="match_parent"
+            android:layout_height="wrap_content"
             style="@style/SecondaryButton"
             android:id="@+id/btn_back_to_main"
             android:text="Back to App"/>
+
 
     </LinearLayout>
 </ScrollView>
