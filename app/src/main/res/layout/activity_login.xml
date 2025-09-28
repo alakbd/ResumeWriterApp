@@ -21,14 +21,14 @@
         <!-- Email -->
         <EditText
             style="@style/AppEditText"
-            android:id="@+id/et_login_email"
+            android:id="@+id/etLoginEmail"
             android:hint="Email"
             android:layout_marginBottom="16dp"/>
 
         <!-- Password -->
         <EditText
             style="@style/AppEditText"
-            android:id="@+id/et_login_password"
+            android:id="@+id/etLoginPassword"
             android:hint="Password"
             android:inputType="textPassword"
             android:layout_marginBottom="24dp"/>
@@ -36,23 +36,22 @@
         <!-- Login Button -->
         <Button
             style="@style/PrimaryButton"
-            android:id="@+id/btn_login"
+            android:id="@+id/btnLogin"
             android:text="Login"
             android:layout_marginBottom="12dp"/>
 
         <!-- Forgot Password -->
         <Button
             style="@style/SecondaryButton"
-            android:id="@+id/btn_forgot_password"
+            android:id="@+id/btnForgotPassword"
             android:text="Forgot Password?"
             android:layout_marginBottom="12dp"/>
 
         <!-- Go to Register -->
         <Button
             style="@style/SecondaryButton"
-            android:id="@+id/btn_go_to_register"
+            android:id="@+id/btnGoToRegister"
             android:text="Go to Register"/>
 
     </LinearLayout>
 </ScrollView>
-
