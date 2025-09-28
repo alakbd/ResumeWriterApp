@@ -188,6 +188,9 @@ class AdminPanelActivity : AppCompatActivity() {
     }
 
     private fun logoutAdmin() {
+        // Properly clear admin mode
+        creditManager.setAdminMode(false
+                                   
         // Sign out from Firebase Auth
         FirebaseAuth.getInstance().signOut()
 
