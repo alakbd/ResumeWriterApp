@@ -81,7 +81,10 @@ class LoginActivity : AppCompatActivity() {
         return true
     }
 
-    
+    private fun sendPasswordResetEmail(email: String) {
+    // TODO: Implement actual password reset logic
+    Toast.makeText(this, "Password reset link sent to $email (feature coming soon)", Toast.LENGTH_SHORT).show()
+}
 
     private fun attemptLogin(email: String, password: String) {
         binding.btnLogin.isEnabled = false
