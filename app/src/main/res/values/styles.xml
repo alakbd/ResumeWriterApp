@@ -1,5 +1,6 @@
-<!-- res/values/styles.xml -->
+<?xml version="1.0" encoding="utf-8"?>
 <resources>
+
     <!-- Base application theme -->
     <style name="Base.Theme.ResumeWriterApp" parent="Theme.Material3.DayNight">
         <item name="colorPrimary">#2196F3</item>
@@ -10,16 +11,12 @@
 
     <!-- Button Styles -->
     <style name="PrimaryButton" parent="Widget.Material3.Button">
-        <item name="android:layout_width">match_parent</item>
-        <item name="android:layout_height">wrap_content</item>
         <item name="android:textSize">16sp</item>
         <item name="android:backgroundTint">#2196F3</item>
         <item name="android:textColor">#FFFFFF</item>
     </style>
 
     <style name="SecondaryButton" parent="Widget.Material3.Button">
-        <item name="android:layout_width">match_parent</item>
-        <item name="android:layout_height">wrap_content</item>
         <item name="android:textSize">16sp</item>
         <item name="android:backgroundTint">#4CAF50</item>
         <item name="android:textColor">#FFFFFF</item>
@@ -27,26 +24,22 @@
 
     <!-- Text Styles -->
     <style name="TitleText">
-        <item name="android:layout_width">match_parent</item>
-        <item name="android:layout_height">wrap_content</item>
         <item name="android:textSize">20sp</item>
         <item name="android:textStyle">bold</item>
         <item name="android:gravity">center</item>
     </style>
 
     <style name="SubTitleText">
-        <item name="android:layout_width">match_parent</item>
-        <item name="android:layout_height">wrap_content</item>
         <item name="android:textSize">16sp</item>
         <item name="android:gravity">center</item>
     </style>
 
     <!-- EditText Style -->
     <style name="AppEditText" parent="Widget.Material3.TextInputEditText.OutlinedBox">
-        <item name="android:layout_width">match_parent</item>
-        <item name="android:layout_height">wrap_content</item>
         <item name="android:textColor">#000000</item>
         <item name="android:textSize">16sp</item>
         <item name="android:padding">12dp</item>
     </style>
+
 </resources>
+
