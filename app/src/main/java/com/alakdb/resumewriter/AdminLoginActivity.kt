@@ -60,6 +60,9 @@ class AdminLoginActivity : AppCompatActivity() {
                     val adminEmails = listOf("alakbd2009@gmail.com", "admin@resumewriter.com")
                     
                     if (user != null && adminEmails.contains(user.email)) {
+                        // ✅ Mark admin mode ON
+                        creditManager.setAdminMode(true)
+                        
                         showMessage("Admin access granted!")
                         startActivity(Intent(this, AdminPanelActivity::class.java))
                         finish()
