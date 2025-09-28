@@ -188,10 +188,7 @@ class AdminPanelActivity : AppCompatActivity() {
     }
 
     private fun logoutAdmin() {
-        // Properly clear admin mode
-        creditManager.setAdminMode(false)
-
-        // Sign out from Firebase Auth (optional if you manage admin session)
+        // Sign out from Firebase Auth
         FirebaseAuth.getInstance().signOut()
 
         showMessage("Admin logged out")
@@ -202,6 +199,7 @@ class AdminPanelActivity : AppCompatActivity() {
         startActivity(intent)
         finish()
     }
+
 
     private fun updateUserDisplay(available: Int, used: Int, total: Int) {
         binding.tvUserEmail.text = "User: $selectedUserEmail"
