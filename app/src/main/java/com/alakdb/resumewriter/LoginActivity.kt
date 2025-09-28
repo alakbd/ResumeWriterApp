@@ -41,15 +41,15 @@ class LoginActivity : AppCompatActivity() {
 
         binding.btnForgotPassword.setOnClickListener {
             val email = binding.etLoginEmail.text.toString().trim()
-            if (email.isEmpty()) {
-                showMessage("Please enter your email first")
-            } else (!android.util.Patterns.EMAIL_ADDRESS.matcher(email).matches()) {
-                 binding.etLoginEmail.error = "Enter a valid email address"
-            } else {
-                sendPasswordResetEmail(email)
+            when {
+                email.isEmpty() -> showMessage("Please enter your email first")
+                !android.util.Patterns.EMAIL_ADDRESS.matcher(email).matches() ->
+                    binding.etLoginEmail.error = "Enter a valid email address"
+                else -> sendPasswordResetEmail(email)
             }
         }
-
+    
+        // Go to registration page
         binding.btnGoToRegister.setOnClickListener {
             startActivity(Intent(this, UserRegistrationActivity::class.java))
             finish()
