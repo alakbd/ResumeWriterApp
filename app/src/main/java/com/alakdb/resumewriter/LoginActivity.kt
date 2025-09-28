@@ -72,8 +72,16 @@ class LoginActivity : AppCompatActivity() {
             return false
         }
 
+        // Check if password is empty
+        if (password.isEmpty()) {
+            binding.etLoginPassword.error = "Password is required"
+            return false
+    }
+
         return true
     }
+
+    
 
     private fun attemptLogin(email: String, password: String) {
         binding.btnLogin.isEnabled = false
