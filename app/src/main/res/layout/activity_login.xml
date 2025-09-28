@@ -14,12 +14,16 @@
 
         <!-- Title -->
         <TextView
+            android:layout_width="match_parent"
+            android:layout_height="wrap_content"
             style="@style/TitleText"
             android:text="Login"
             android:layout_marginBottom="32dp"/>
 
         <!-- Email -->
         <EditText
+            android:layout_width="match_parent"
+            android:layout_height="wrap_content"
             style="@style/AppEditText"
             android:id="@+id/etLoginEmail"
             android:hint="Email"
@@ -27,6 +31,8 @@
 
         <!-- Password -->
         <EditText
+            android:layout_width="match_parent"
+            android:layout_height="wrap_content"
             style="@style/AppEditText"
             android:id="@+id/etLoginPassword"
             android:hint="Password"
@@ -35,6 +41,8 @@
 
         <!-- Login Button -->
         <Button
+            android:layout_width="match_parent"
+            android:layout_height="wrap_content"
             style="@style/PrimaryButton"
             android:id="@+id/btnLogin"
             android:text="Login"
@@ -42,6 +50,8 @@
 
         <!-- Forgot Password -->
         <Button
+            android:layout_width="match_parent"
+            android:layout_height="wrap_content"
             style="@style/SecondaryButton"
             android:id="@+id/btnForgotPassword"
             android:text="Forgot Password?"
@@ -49,6 +59,8 @@
 
         <!-- Go to Register -->
         <Button
+            android:layout_width="match_parent"
+            android:layout_height="wrap_content"
             style="@style/SecondaryButton"
             android:id="@+id/btnGoToRegister"
             android:text="Go to Register"/>
