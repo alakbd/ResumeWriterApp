@@ -10,13 +10,16 @@ import com.google.firebase.auth.FirebaseAuth
 class AdminLoginActivity : AppCompatActivity() {
     private lateinit var binding: ActivityAdminLoginBinding
     private lateinit var auth: FirebaseAuth
+    private lateinit var creditManager: CreditManager  // <-- Add this
+    // other declarations...
 
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
         binding = ActivityAdminLoginBinding.inflate(layoutInflater)
         setContentView(binding.root)
-
+        
         auth = FirebaseAuth.getInstance()
+        creditManager = CreditManager(this)
 
         binding.btnAdminLogin.setOnClickListener {
             val email = binding.etAdminEmail.text.toString().trim()
