@@ -24,23 +24,24 @@
         </activity>
         
         <!-- Add LoginActivity -->
+        
         <activity
             android:name=".LoginActivity"
-            android:exported="false" />
+            android:exported="true" />
 
         
         <!-- Add the missing admin activities -->
         <activity
             android:name=".AdminPanelActivity"
-            android:exported="false" />
+            android:exported="true" />
         
         <activity
             android:name=".AdminLoginActivity"
-            android:exported="false" />
+            android:exported="true" />
         
         <activity
             android:name=".UserRegistrationActivity"
-            android:exported="false" />
+            android:exported="true" />
         
     </application>
 </manifest>
