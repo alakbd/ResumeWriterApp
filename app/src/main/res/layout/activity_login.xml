@@ -32,13 +32,12 @@
             android:layout_marginBottom="24dp"/>
 
         <!-- Email -->
-        <com.google.android.material.textfield.TextInputEditText
+       <com.google.android.material.textfield.TextInputEditText
             style="@style/AppEditText"
             android:id="@+id/etLoginEmail"
             android:layout_width="match_parent"
             android:layout_height="wrap_content"
             android:hint="Email"
-            app:hintTextColor="@color/gray"
             android:layout_marginBottom="16dp"/>
 
         <!-- Password -->
