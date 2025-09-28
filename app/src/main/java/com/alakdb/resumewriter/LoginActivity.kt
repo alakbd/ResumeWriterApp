@@ -43,8 +43,10 @@ class LoginActivity : AppCompatActivity() {
             val email = binding.etLoginEmail.text.toString().trim()
             if (email.isEmpty()) {
                 showMessage("Please enter your email first")
+            } else (!android.util.Patterns.EMAIL_ADDRESS.matcher(email).matches()) {
+                 binding.etLoginEmail.error = "Enter a valid email address"
             } else {
-                showMessage("Password reset feature coming soon")
+                sendPasswordResetEmail(email)
             }
         }
 
