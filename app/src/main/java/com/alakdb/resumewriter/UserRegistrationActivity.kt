@@ -67,8 +67,10 @@ class UserRegistrationActivity : AppCompatActivity() {
 
             if (success) {
                 showMessage("Registration successful! Please log in.")
-                startActivity(Intent(this@UserRegistrationActivity, LoginActivity::class.java))
-                finish()
+                val intent = Intent(this, LoginActivity::class.java)
+                intent.flags = Intent.FLAG_ACTIVITY_CLEAR_TOP or Intent.FLAG_ACTIVITY_NEW_TASK
+                startActivity(intent)
+                finish() // close registration screen
             } else {
                 showMessage(error ?: "Registration failed")
             }
