@@ -89,7 +89,38 @@ class MainActivity : AppCompatActivity() {
         binding.btnAdminAccess.setOnClickListener {
             navigateToAdmin()
         }
+        
+        // ✅ Logout Button
+        binding.btnLogout.setOnClickListener {
+            userManager.logout()
+            val intent = Intent(this, LoginActivity::class.java)
+            intent.flags = Intent.FLAG_ACTIVITY_CLEAR_TOP or Intent.FLAG_ACTIVITY_NEW_TASK
+            startActivity(intent)
+            finish()
+        }
+
+            // Refresh Button
+        binding.btnRefresh.setOnClickListener {
+            // Show loading state
+            binding.btnRefresh.isEnabled = false
+            binding.btnRefresh.text = "Refreshing..."
+
+                // Sync data again
+        creditManager.syncWithFirebase { success, credits ->
+            binding.btnRefresh.isEnabled = true
+            binding.btnRefresh.text = "Refresh"
+
+        if (success) {
+            updateCreditDisplay()
+            showMessage("Data refreshed successfully!")
+        } else {
+            updateCreditDisplay()
+            showMessage("Failed to refresh. Using local data.")
+            }
+        }    
     }
+
+}
 
     private fun handleAdminTap() {
         adminTapCount++
