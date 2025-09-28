@@ -1,19 +1,18 @@
 package com.alakdb.resumewriter
 
+import android.content.Intent
 import android.os.Bundle
 import android.widget.ArrayAdapter
-import android.widget.Toast
-import androidx.appcompat.app.AlertDialog
 import android.widget.AdapterView
 import android.widget.Button
 import android.view.View
-import android.widget.Spinner
-import android.widget.TextView
+import android.widget.Toast
+import androidx.appcompat.app.AlertDialog
 import androidx.appcompat.app.AppCompatActivity
 import com.alakdb.resumewriter.databinding.ActivityAdminPanelBinding
 import com.google.firebase.firestore.ktx.firestore
 import com.google.firebase.ktx.Firebase
-
+import com.google.firebase.auth.FirebaseAuth
 
 class AdminPanelActivity : AppCompatActivity() {
     private lateinit var binding: ActivityAdminPanelBinding
@@ -29,6 +28,7 @@ class AdminPanelActivity : AppCompatActivity() {
 
         creditManager = CreditManager(this)
 
+        // Check admin access
         if (!creditManager.isAdminMode()) {
             showMessage("Admin access required!")
             finish()
@@ -40,35 +40,36 @@ class AdminPanelActivity : AppCompatActivity() {
     }
 
     private fun setupUI() {
-    val btnAdd10 = findViewById<Button>(R.id.btn_admin_add_10)
-    val btnAdd50 = findViewById<Button>(R.id.btn_admin_add_50)
-    val btnSet100 = findViewById<Button>(R.id.btn_admin_set_100)
-    val btnReset = findViewById<Button>(R.id.btn_admin_reset)
-    val btnGenerateFree = findViewById<Button>(R.id.btn_admin_generate_free)
-    val btnUserStats = findViewById<Button>(R.id.btn_admin_stats)
-    val btnLogout = findViewById<Button>(R.id.btn_admin_logout)
+        val btnAdd10 = findViewById<Button>(R.id.btn_admin_add_10)
+        val btnAdd50 = findViewById<Button>(R.id.btn_admin_add_50)
+        val btnSet100 = findViewById<Button>(R.id.btn_admin_set_100)
+        val btnReset = findViewById<Button>(R.id.btn_admin_reset)
+        val btnGenerateFree = findViewById<Button>(R.id.btn_admin_generate_free)
+        val btnUserStats = findViewById<Button>(R.id.btn_admin_stats)
+        val btnLogout = findViewById<Button>(R.id.btn_admin_logout)
 
-    // User selection spinner - CORRECTED
-    binding.spUserSelector.onItemSelectedListener = object : AdapterView.OnItemSelectedListener {
-        override fun onItemSelected(parent: AdapterView<*>, view: View?, position: Int, id: Long) {
-            if (position > 0) {
-                val selected = parent.getItemAtPosition(position).toString()
-                selectedUserEmail = selected
-                loadUserData(selectedUserEmail)
+        // User selection spinner
+        binding.spUserSelector.onItemSelectedListener = object : AdapterView.OnItemSelectedListener {
+            override fun onItemSelected(parent: AdapterView<*>, view: View?, position: Int, id: Long) {
+                if (position > 0) {
+                    val selected = parent.getItemAtPosition(position).toString()
+                    selectedUserEmail = selected
+                    loadUserData(selectedUserEmail)
+                }
             }
+
+            override fun onNothingSelected(parent: AdapterView<*>) {}
         }
 
-        override fun onNothingSelected(parent: AdapterView<*>) {
-            // Handle no selection
-        }
+        // Button click listeners
+        btnAdd10.setOnClickListener { modifyUserCredits(10, "add") }
+        btnAdd50.setOnClickListener { modifyUserCredits(50, "add") }
+        btnSet100.setOnClickListener { modifyUserCredits(100, "set") }
+        btnReset.setOnClickListener { modifyUserCredits(0, "reset") }
+        btnGenerateFree.setOnClickListener { generateFreeCV() }
+        btnUserStats.setOnClickListener { showUserStats() }
+        btnLogout.setOnClickListener { logoutAdmin() }
     }
-
-    // Rest of your button click listeners...
-    btnAdd10.setOnClickListener {
-        // your existing code
-    }
-    // ... other button listeners
-}
 
     private fun loadUsers() {
         db.collection("users").get()
@@ -98,7 +99,7 @@ class AdminPanelActivity : AppCompatActivity() {
 
                 val document = documents.documents[0]
                 selectedUserId = document.id
-                
+
                 val available = document.getLong("availableCredits") ?: 0
                 val used = document.getLong("usedCredits") ?: 0
                 val total = document.getLong("totalCreditsEarned") ?: 0
@@ -187,9 +188,18 @@ class AdminPanelActivity : AppCompatActivity() {
     }
 
     private fun logoutAdmin() {
-        creditManager.isAdminMode() // This will be handled by auth signout
-        com.google.firebase.auth.FirebaseAuth.getInstance().signOut()
+        // Properly clear admin mode
+        creditManager.setAdminMode(false)
+
+        // Sign out from Firebase Auth (optional if you manage admin session)
+        FirebaseAuth.getInstance().signOut()
+
         showMessage("Admin logged out")
+
+        // Return to MainActivity
+        val intent = Intent(this, MainActivity::class.java)
+        intent.flags = Intent.FLAG_ACTIVITY_CLEAR_TOP or Intent.FLAG_ACTIVITY_NEW_TASK
+        startActivity(intent)
         finish()
     }
 
@@ -204,5 +214,3 @@ class AdminPanelActivity : AppCompatActivity() {
         Toast.makeText(this, message, Toast.LENGTH_SHORT).show()
     }
 }
-
-       
