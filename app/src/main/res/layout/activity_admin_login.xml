@@ -14,9 +14,12 @@
 
         <!-- Title -->
         <TextView
+            android:layout_width="match_parent"
+            android:layout_height="wrap_content"
             style="@style/TitleText"
             android:text="Admin Login"
             android:layout_marginBottom="@dimen/margin_large"/>
+
 
         <!-- Benefit / Info Text -->
         <TextView
@@ -30,11 +33,13 @@
 
         <!-- Email -->
         <EditText
+            android:layout_width="match_parent"
+            android:layout_height="wrap_content"
             style="@style/AppEditText"
             android:id="@+id/et_admin_email"
             android:hint="Enter admin email"
             android:layout_marginBottom="@dimen/margin_medium"/>
-
+        
         <!-- Password -->
         <EditText
             style="@style/AppEditText"
