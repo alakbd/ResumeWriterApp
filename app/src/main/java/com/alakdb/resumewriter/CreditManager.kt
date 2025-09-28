@@ -74,13 +74,15 @@ class CreditManager(private val context: Context) {
     }
 
     // Admin mode handling
+    fun setAdminMode(isAdmin: Boolean) {
+        prefs.edit().putBoolean("is_admin_mode", isAdmin).apply()
+    }
+    
     fun isAdminMode(): Boolean {
-        return prefs.getBoolean(ADMIN_MODE_KEY, false)
+       return prefs.getBoolean("is_admin_mode", false) ||
+              auth.currentUser?.email?.let { it in listOf("alakbd2009@gmail.com", "admin@resumewriter.com") } == true
     }
 
-    fun setAdminMode(enabled: Boolean) {
-        prefs.edit().putBoolean(ADMIN_MODE_KEY, enabled).apply()
-    }
 
     fun loginAsAdmin(email: String): Boolean {
         val adminEmails = listOf("alakbd2009@gmail.com", "admin@resumewriter.com")
