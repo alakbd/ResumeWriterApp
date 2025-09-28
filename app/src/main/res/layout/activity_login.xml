@@ -3,7 +3,8 @@
     xmlns:android="http://schemas.android.com/apk/res/android"
     android:layout_width="match_parent"
     android:layout_height="match_parent"
-    android:fillViewport="true">
+    android:fillViewport="true"
+    android:background="#F5F5F5">
 
     <LinearLayout
         android:layout_width="match_parent"
@@ -18,7 +19,17 @@
             android:layout_height="wrap_content"
             style="@style/TitleText"
             android:text="Login"
-            android:layout_marginBottom="32dp"/>
+            android:layout_marginBottom="16dp"/>
+
+        <!-- Informational Text -->
+        <TextView
+            android:layout_width="match_parent"
+            android:layout_height="wrap_content"
+            android:text="Welcome to ResumeWriter! Enhance your chances of landing a job by creating professional CVs quickly and managing your application credits efficiently."
+            android:textColor="#333333"
+            android:textSize="16sp"
+            android:gravity="center"
+            android:layout_marginBottom="24dp"/>
 
         <!-- Email -->
         <EditText
