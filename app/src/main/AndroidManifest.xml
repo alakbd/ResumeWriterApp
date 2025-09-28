@@ -28,10 +28,19 @@
             android:name=".LoginActivity"
             android:exported="false" />
 
-        <!-- Add your other activities here -->
+        
+        <!-- Add the missing admin activities -->
+        <activity
+            android:name=".AdminPanelActivity"
+            android:exported="false" />
+        
+        <activity
+            android:name=".AdminLoginActivity"
+            android:exported="false" />
+        
         <activity
             android:name=".UserRegistrationActivity"
-            android:exported="false" /> 
+            android:exported="false" />
         
     </application>
 </manifest>
