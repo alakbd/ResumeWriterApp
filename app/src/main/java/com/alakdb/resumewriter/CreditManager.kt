@@ -7,7 +7,8 @@ import com.google.firebase.firestore.FirebaseFirestore
 import com.google.firebase.firestore.FieldValue
 
 class CreditManager(private val context: Context) {
-    private val prefs: SharedPreferences = context.getSharedPreferences("credit_prefs", Context.MODE_PRIVATE)
+    private val prefs: SharedPreferences =
+        context.getSharedPreferences("credit_prefs", Context.MODE_PRIVATE)
     private val auth: FirebaseAuth = FirebaseAuth.getInstance()
     private val db: FirebaseFirestore = FirebaseFirestore.getInstance()
 
@@ -18,11 +19,16 @@ class CreditManager(private val context: Context) {
         private const val ADMIN_MODE_KEY = "admin_mode"
     }
 
+    // -----------------------
     // Credits getters
+    // -----------------------
     fun getAvailableCredits(): Int = prefs.getInt(AVAILABLE_CREDITS_KEY, 0)
     fun getUsedCredits(): Int = prefs.getInt(USED_CREDITS_KEY, 0)
     fun getTotalCredits(): Int = prefs.getInt(TOTAL_CREDITS_KEY, 0)
 
+    // -----------------------
+    // Credit operations
+    // -----------------------
     fun useCredit(onComplete: (Boolean) -> Unit = {}) {
         val currentCredits = getAvailableCredits()
         if (currentCredits > 0) {
@@ -42,6 +48,10 @@ class CreditManager(private val context: Context) {
         syncCreditsToFirebase(newCredits, getUsedCredits(), onComplete)
     }
 
+    /**
+     * Sync local values from Firestore (users collection).
+     * onComplete(success, availableCredits)
+     */
     fun syncWithFirebase(onComplete: (Boolean, Int?) -> Unit) {
         val user = auth.currentUser
         if (user == null) {
@@ -73,17 +83,29 @@ class CreditManager(private val context: Context) {
             }
     }
 
+    // -----------------------
     // Admin mode handling
+    // -----------------------
+    /**
+     * Persist admin mode flag. Use this from AdminLoginActivity on successful admin auth,
+     * and call setAdminMode(false) on logout.
+     */
     fun setAdminMode(isAdmin: Boolean) {
-        prefs.edit().putBoolean("is_admin_mode", isAdmin).apply()
+        prefs.edit().putBoolean(ADMIN_MODE_KEY, isAdmin).apply()
     }
-    
+
+    /**
+     * Returns true only when the explicit admin flag is set.
+     * (No implicit Firebase-email auto-grant here — keep admin sessions explicit.)
+     */
     fun isAdminMode(): Boolean {
-       return prefs.getBoolean("is_admin_mode", false) ||
-              auth.currentUser?.email?.let { it in listOf("alakbd2009@gmail.com", "admin@resumewriter.com") } == true
+        return prefs.getBoolean(ADMIN_MODE_KEY, false)
     }
 
-
+    /**
+     * Convenience helper: mark admin if the email is in your hardcoded admin list.
+     * Call this from your login flow if you prefer a single-line check.
+     */
     fun loginAsAdmin(email: String): Boolean {
         val adminEmails = listOf("alakbd2009@gmail.com", "admin@resumewriter.com")
         return if (adminEmails.contains(email)) {
@@ -92,7 +114,9 @@ class CreditManager(private val context: Context) {
         } else false
     }
 
-    // Admin functions
+    // -----------------------
+    // Admin Firestore operations
+    // -----------------------
     fun adminAddCreditsToUser(userId: String, amount: Int, onComplete: (Boolean) -> Unit) {
         db.collection("users").document(userId).update(
             mapOf(
@@ -124,6 +148,9 @@ class CreditManager(private val context: Context) {
         ).addOnCompleteListener { task -> onComplete(task.isSuccessful) }
     }
 
+    // -----------------------
+    // Internal helpers
+    // -----------------------
     private fun updateLocalCredits(available: Int, used: Int, total: Int) {
         prefs.edit().apply {
             putInt(AVAILABLE_CREDITS_KEY, available)
