@@ -66,11 +66,31 @@ class UserRegistrationActivity : AppCompatActivity() {
             binding.btnRegister.text = "Register"
 
             if (success) {
-                showMessage("Registration successful! Please log in.")
-                val intent = Intent(this, LoginActivity::class.java)
-                intent.flags = Intent.FLAG_ACTIVITY_CLEAR_TOP or Intent.FLAG_ACTIVITY_NEW_TASK
-                startActivity(intent)
-                finish() // close registration screen
+                // Save user profile in Firestore
+                val userId = FirebaseAuth.getInstance().currentUser?.uid
+                val userMap = hashMapOf(
+                    "email" to email,
+                    "availableCredits" to 0,
+                    "usedCredits" to 0,
+                    "totalCreditsEarned" to 0,
+                    "createdAt" to System.currentTimeMillis()
+                )
+                
+                if (userId != null) {
+                    Firebase.firestore.collection("users").document(userId)
+                        .set(userMap)
+                        .addOnSuccessListener {
+                            showMessage("Registration successful! Please log in.")
+                            val intent = Intent(this, LoginActivity::class.java)
+                            intent.flags =
+                                Intent.FLAG_ACTIVITY_CLEAR_TOP or Intent.FLAG_ACTIVITY_NEW_TASK
+                            startActivity(intent)
+                            finish() // close registration screen
+                        }
+                           .addOnFailureListener {
+                                showMessage("Failed to save user profile: ${it.message}")
+                            }
+                }
             } else {
                 showMessage(error ?: "Registration failed")
             }
