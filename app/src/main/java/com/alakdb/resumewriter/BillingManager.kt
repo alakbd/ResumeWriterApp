@@ -99,7 +99,7 @@ class BillingManager(private val context: Context, private val creditManager: Cr
         billingClient.queryProductDetailsAsync(params) { billingResult, productDetailsList ->
             when (billingResult.responseCode) {
                 BillingClient.BillingResponseCode.OK -> {
-                    productDetails = productDetailsList ?: emptyList()
+                    productDetails = productDetailsList
                     Log.i(TAG, "Loaded ${productDetails.size} products")
                     
                     if (productDetails.isEmpty()) {
