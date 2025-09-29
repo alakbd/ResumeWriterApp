@@ -146,7 +146,7 @@ class MainActivity : AppCompatActivity() {
     }
 
     private fun initializeBilling() {
-        billingManager.initializeBilling { success, message ->
+        billingManager.initializeBilling { success, _ ->
             isBillingInitialized = success
             if (success) {
                 showMessage("Store ready")
@@ -167,7 +167,7 @@ class MainActivity : AppCompatActivity() {
         binding.btnGenerateCv.isEnabled = false
         binding.btnGenerateCv.text = "Loading..."
         
-        creditManager.syncWithFirebase { success, credits ->
+        creditManager.syncWithFirebase { success, _ -> ... }
             if (success) {
                 updateCreditDisplay()
                 showMessage("Data synchronized")
