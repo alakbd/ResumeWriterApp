@@ -5,6 +5,9 @@ import android.os.Bundle
 import android.widget.Toast
 import androidx.appcompat.app.AppCompatActivity
 import com.alakdb.resumewriter.databinding.ActivityUserRegistrationBinding
+import com.google.firebase.auth.FirebaseAuth
+import com.google.firebase.firestore.ktx.firestore
+import com.google.firebase.ktx.Firebase
 
 class UserRegistrationActivity : AppCompatActivity() {
     private lateinit var binding: ActivityUserRegistrationBinding
@@ -87,8 +90,8 @@ class UserRegistrationActivity : AppCompatActivity() {
                             startActivity(intent)
                             finish() // close registration screen
                         }
-                           .addOnFailureListener {
-                                showMessage("Failed to save user profile: ${it.message}")
+                           .addOnFailureListener { e ->
+                                showMessage("Failed to save user profile: ${e.message}")
                             }
                 }
             } else {
