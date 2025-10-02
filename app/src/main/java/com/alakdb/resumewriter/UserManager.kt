@@ -93,6 +93,28 @@ class UserManager(private val context: Context) {
             }
     }
 
+    fun registerUser(email: String, password: String, onComplete: (Boolean, String?) -> Unit) {
+    auth.createUserWithEmailAndPassword(email, password)
+        .addOnCompleteListener { task ->
+            if (task.isSuccessful) {
+                val user = auth.currentUser
+                if (user != null) {
+                    saveUserDataLocally(user.email ?: "", user.uid)
+                    onComplete(true, null)
+                } else {
+                    onComplete(false, "Registration failed: No user data returned")
+                }
+            } else {
+                val error = when (task.exception) {
+                    is FirebaseAuthUserCollisionException -> "Email is already in use"
+                    is FirebaseAuthWeakPasswordException -> "Password is too weak"
+                    else -> "Registration failed: ${task.exception?.message}"
+                }
+                onComplete(false, error)
+            }
+        }
+}
+    
     fun isUserLoggedIn(): Boolean {
         return auth.currentUser != null && prefs.getBoolean(IS_REGISTERED_KEY, false)
     }
