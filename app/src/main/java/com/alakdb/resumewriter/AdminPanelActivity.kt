@@ -48,18 +48,7 @@ class AdminPanelActivity : AppCompatActivity() {
         val btnUserStats = findViewById<Button>(R.id.btn_admin_stats)
         val btnLogout = findViewById<Button>(R.id.btn_admin_logout)
 
-        // User selection spinner
-        binding.spUserSelector.onItemSelectedListener = object : AdapterView.OnItemSelectedListener {
-            override fun onItemSelected(parent: AdapterView<*>, view: View?, position: Int, id: Long) {
-                if (position > 0) {
-                    val selected = parent.getItemAtPosition(position).toString()
-                    selectedUserEmail = selected
-                    loadUserData(selectedUserEmail)
-                }
-            }
-
-            override fun onNothingSelected(parent: AdapterView<*>) {}
-        }
+    
 
         // Button click listeners
         btnAdd10.setOnClickListener { modifyUserCredits(10, "add") }
@@ -72,33 +61,67 @@ class AdminPanelActivity : AppCompatActivity() {
     }
 
     private fun loadUsers() {
-        db.collection("users").get()
-            .addOnSuccessListener { documents ->
-                val users = mutableListOf("Select a user...")
-                documents.forEach { document ->
-                    document.getString("email")?.let { email ->
-                        users.add(email)
-                    }
-                }
-                val adapter = ArrayAdapter(this, android.R.layout.simple_spinner_item, users)
-                adapter.setDropDownViewResource(android.R.layout.simple_spinner_dropdown_item)
-                binding.spUserSelector.adapter = adapter
+    db.collection("users").get()
+        .addOnSuccessListener { documents ->
+            // Pair of (docId, email)
+            val usersList = mutableListOf<Pair<String, String>>()
+            usersList.add("" to "Select a user...") // default item
+
+            for (doc in documents) {
+                val email = doc.getString("email") ?: continue
+                usersList.add(doc.id to email)
+            }
+
+            val adapter = ArrayAdapter(
+                this,
+                android.R.layout.simple_spinner_item,
+                usersList.map { it.second } // Display email
+            )
+            adapter.setDropDownViewResource(android.R.layout.simple_spinner_dropdown_item)
+            binding.spUserSelector.adapter = adapter
+            
             }
             .addOnFailureListener { showMessage("Failed to load users") }
-    }
 
-    private fun loadUserData(email: String) {
-        db.collection("users")
-            .whereEqualTo("email", email)
-            .get()
-            .addOnSuccessListener { documents ->
-                if (documents.isEmpty) {
-                    showMessage("User not found")
-                    return@addOnSuccessListener
+            // Handle selection
+            binding.spUserSelector.onItemSelectedListener = object : AdapterView.OnItemSelectedListener {
+                override fun onItemSelected(
+                    parent: AdapterView<*>,
+                    view: View?,
+                    position: Int,
+                    id: Long
+                ) {
+                    if (position == 0) {
+                        // Default "Select a user..."
+                        selectedUserId = ""
+                        selectedUserEmail = ""
+                        updateUserDisplay(0,0,0)
+                        return
+                    }
+
+                    val selectedPair = usersList[position]
+                    selectedUserId = selectedPair.first
+                    selectedUserEmail = selectedPair.second
+
+                    loadUserDataById(selectedUserId)
                 }
 
-                val document = documents.documents[0]
-                selectedUserId = document.id
+                override fun onNothingSelected(parent: AdapterView<*>) {}
+            }
+
+        }
+        .addOnFailureListener {
+            showMessage("Failed to load users")
+        }
+    }
+
+    private fun loadUserDataById(userId: String) {
+    db.collection("users").document(userId).get()
+        .addOnSuccessListener { document ->
+            if (!document.exists()) {
+                showMessage("User not found")
+                return@addOnSuccessListener
+            }
 
                 val available = document.getLong("availableCredits") ?: 0
                 val used = document.getLong("usedCredits") ?: 0
@@ -215,3 +238,4 @@ class AdminPanelActivity : AppCompatActivity() {
         Toast.makeText(this, message, Toast.LENGTH_SHORT).show()
     }
 }
+
