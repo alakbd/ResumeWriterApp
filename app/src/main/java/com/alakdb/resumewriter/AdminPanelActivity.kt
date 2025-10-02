@@ -91,6 +91,52 @@ class AdminPanelActivity : AppCompatActivity() {
             .addOnFailureListener { showMessage("Failed to load users") }
     }
 
+    private fun loadAdminStats() {
+    db.collection("users").get()
+        .addOnSuccessListener { documents ->
+            val totalUsers = documents.size()
+            var totalCredits = 0L
+            var totalCVs = 0L
+            val dailyCount = mutableMapOf<String, Int>()
+            val monthlyCount = mutableMapOf<String, Int>()
+
+            val dayFormat = java.text.SimpleDateFormat("yyyy-MM-dd")
+            val monthFormat = java.text.SimpleDateFormat("yyyy-MM")
+
+            for (doc in documents) {
+                totalCredits += doc.getLong("totalCreditsEarned") ?: 0
+                totalCVs += doc.getLong("cvGenerated") ?: 0  // NEW: count CVs
+
+                val createdAt = doc.getLong("createdAt")
+                if (createdAt != null) {
+                    val date = java.util.Date(createdAt)
+                    val dayKey = dayFormat.format(date)
+                    val monthKey = monthFormat.format(date)
+
+                    dailyCount[dayKey] = dailyCount.getOrDefault(dayKey, 0) + 1
+                    monthlyCount[monthKey] = monthlyCount.getOrDefault(monthKey, 0) + 1
+                }
+            }
+
+            val today = dayFormat.format(java.util.Date())
+            val thisMonth = monthFormat.format(java.util.Date())
+
+            val statsText = """
+                Total Users: $totalUsers
+                Total Credits Earned: $totalCredits
+                Total CVs Generated: $totalCVs
+                Users Joined Today: ${dailyCount.getOrDefault(today, 0)}
+                Users Joined This Month: ${monthlyCount.getOrDefault(thisMonth, 0)}
+            """.trimIndent()
+
+            binding.tvAdminStats.text = statsText
+        }
+        .addOnFailureListener {
+            showMessage("Failed to load admin stats")
+        }
+}
+
+
     private fun setupManualEmailLoad() {
         binding.btnLoadUser.setOnClickListener {
             val emailInput = binding.etManualEmail.text.toString().trim()
@@ -165,44 +211,58 @@ class AdminPanelActivity : AppCompatActivity() {
     }
 
     private fun modifyUserCredits(amount: Int, operation: String) {
-        if (selectedUserId.isEmpty()) {
-            showMessage("Please select a user first")
-            return
-        }
-
-        when (operation) {
-            "add" -> creditManager.adminAddCreditsToUser(selectedUserId, amount) { success ->
-                if (success) showMessage("Added $amount credits to $selectedUserEmail")
-                else showMessage("Failed to add credits")
-                loadUserDataById(selectedUserId)
-            }
-            "set" -> creditManager.adminSetUserCredits(selectedUserId, amount) { success ->
-                if (success) showMessage("Set credits to $amount for $selectedUserEmail")
-                else showMessage("Failed to set credits")
-                loadUserDataById(selectedUserId)
-            }
-            "reset" -> creditManager.adminResetUserCredits(selectedUserId) { success ->
-                if (success) showMessage("Reset credits for $selectedUserEmail")
-                else showMessage("Failed to reset credits")
-                loadUserDataById(selectedUserId)
-            }
-        }
+    if (selectedUserId.isEmpty()) {
+        showMessage("Please select a user first")
+        return
     }
 
-    private fun generateFreeCV() {
-        if (selectedUserId.isEmpty()) {
-            showMessage("Please select a user first")
-            return
+    when (operation) {
+        "add" -> creditManager.adminAddCreditsToUser(selectedUserId, amount) { success ->
+            if (success) {
+                showMessage("Added $amount credits to $selectedUserEmail")
+                loadUserDataById(selectedUserId)
+                loadAdminStats()  // 🔹 refresh stats
+            } else showMessage("Failed to add credits")
         }
-
-        db.collection("users").document(selectedUserId).update(
-            "usedCredits", com.google.firebase.firestore.FieldValue.increment(1),
-            "lastUpdated", System.currentTimeMillis()
-        ).addOnSuccessListener {
-            showMessage("Free CV generated for $selectedUserEmail")
-            loadUserDataById(selectedUserId)
-        }.addOnFailureListener { showMessage("Failed to generate CV") }
+        "set" -> creditManager.adminSetUserCredits(selectedUserId, amount) { success ->
+            if (success) {
+                showMessage("Set credits to $amount for $selectedUserEmail")
+                loadUserDataById(selectedUserId)
+                loadAdminStats()  // 🔹 refresh stats
+            } else showMessage("Failed to set credits")
+        }
+        "reset" -> creditManager.adminResetUserCredits(selectedUserId) { success ->
+            if (success) {
+                showMessage("Reset credits for $selectedUserEmail")
+                loadUserDataById(selectedUserId)
+                loadAdminStats()  // 🔹 refresh stats
+            } else showMessage("Failed to reset credits")
+        }
     }
+}
+
+private fun generateFreeCV() {
+    if (selectedUserId.isEmpty()) {
+        showMessage("Please select a user first")
+        return
+    }
+
+    db.collection("users").document(selectedUserId).update(
+        "usedCredits", com.google.firebase.firestore.FieldValue.increment(1),
+        "cvGenerated", com.google.firebase.firestore.FieldValue.increment(1),
+        "lastUpdated", System.currentTimeMillis()
+    ).addOnSuccessListener {
+        showMessage("Free CV generated for $selectedUserEmail")
+        loadUserDataById(selectedUserId)
+        loadAdminStats()  // 🔹 refresh stats
+    }.addOnFailureListener {
+        showMessage("Failed to generate CV")
+    }
+}
+
+// Also call after loading users on startup:
+loadUsers()
+loadAdminStats()
 
     private fun showUserStats() {
         if (selectedUserId.isEmpty()) {
