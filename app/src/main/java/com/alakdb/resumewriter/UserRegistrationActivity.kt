@@ -64,7 +64,7 @@ class UserRegistrationActivity : AppCompatActivity() {
     binding.btnRegister.isEnabled = false
     binding.btnRegister.text = "Registering..."
 
-    userManager.registerUser(email, password) { success, error ->
+    userManager.registerUser(email, password) { success: Boolean, error: String? ->
         if (!success) {
             // Restore button state on error
             binding.btnRegister.isEnabled = true
