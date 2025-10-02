@@ -47,10 +47,6 @@ class UserRegistrationActivity : AppCompatActivity() {
             return false
         }
 
-        if (password.length < 6) {
-            binding.etPassword.error = "Password must be at least 6 characters"
-            return false
-        }
 
         if (password != confirmPassword) {
             binding.etConfirmPassword.error = "Passwords do not match"
