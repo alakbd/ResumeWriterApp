@@ -82,9 +82,16 @@ class LoginActivity : AppCompatActivity() {
     }
 
     private fun sendPasswordResetEmail(email: String) {
-    // TODO: Implement actual password reset logic
-    Toast.makeText(this, "Password reset link sent to $email (feature coming soon)", Toast.LENGTH_SHORT).show()
+    FirebaseAuth.getInstance().sendPasswordResetEmail(email)
+        .addOnCompleteListener { task ->
+            if (task.isSuccessful) {
+                Toast.makeText(this, "Password reset link sent to $email", Toast.LENGTH_LONG).show()
+            } else {
+                Toast.makeText(this, "Error: ${task.exception?.message}", Toast.LENGTH_LONG).show()
+            }
+        }
 }
+
 
     private fun attemptLogin(email: String, password: String) {
         binding.btnLogin.isEnabled = false
