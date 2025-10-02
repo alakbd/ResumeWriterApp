@@ -60,45 +60,55 @@ class UserRegistrationActivity : AppCompatActivity() {
         return true
     }
 
-    private fun attemptRegistration(email: String, password: String) {
-        binding.btnRegister.isEnabled = false
-        binding.btnRegister.text = "Registering..."
+   private fun attemptRegistration(email: String, password: String) {
+    binding.btnRegister.isEnabled = false
+    binding.btnRegister.text = "Registering..."
 
-        userManager.registerUser(email, password) { success, error ->
+    userManager.registerUser(email, password) { success, error ->
+        if (!success) {
+            // Restore button state on error
             binding.btnRegister.isEnabled = true
             binding.btnRegister.text = "Register"
-
-            if (success) {
-                // Save user profile in Firestore
-                val userId = FirebaseAuth.getInstance().currentUser?.uid
-                val userMap = hashMapOf(
-                    "email" to email,
-                    "availableCredits" to 0,
-                    "usedCredits" to 0,
-                    "totalCreditsEarned" to 0,
-                    "createdAt" to System.currentTimeMillis()
-                )
-                
-                if (userId != null) {
-                    Firebase.firestore.collection("users").document(userId)
-                        .set(userMap)
-                        .addOnSuccessListener {
-                            showMessage("Registration successful! Please log in.")
-                            val intent = Intent(this, LoginActivity::class.java)
-                            intent.flags =
-                                Intent.FLAG_ACTIVITY_CLEAR_TOP or Intent.FLAG_ACTIVITY_NEW_TASK
-                            startActivity(intent)
-                            finish() // close registration screen
-                        }
-                           .addOnFailureListener { e ->
-                                showMessage("Failed to save user profile: ${e.message}")
-                            }
-                }
-            } else {
-                showMessage(error ?: "Registration failed")
-            }
+            showMessage(error ?: "Registration failed")
+            return@registerUser
         }
+
+        // At this point, registration succeeded
+        val user = FirebaseAuth.getInstance().currentUser
+        if (user == null) {
+            binding.btnRegister.isEnabled = true
+            binding.btnRegister.text = "Register"
+            showMessage("Registration succeeded but user data not ready. Try login.")
+            return@registerUser
+        }
+
+        val userMap = hashMapOf(
+            "email" to email,
+            "availableCredits" to 0,
+            "usedCredits" to 0,
+            "totalCreditsEarned" to 0,
+            "createdAt" to System.currentTimeMillis()
+        )
+
+        Firebase.firestore.collection("users").document(user.uid)
+            .set(userMap)
+            .addOnSuccessListener {
+                binding.btnRegister.isEnabled = true
+                binding.btnRegister.text = "Register"
+                showMessage("Registration successful! Please log in.")
+
+                val intent = Intent(this, LoginActivity::class.java)
+                intent.flags = Intent.FLAG_ACTIVITY_CLEAR_TOP or Intent.FLAG_ACTIVITY_NEW_TASK
+                startActivity(intent)
+                finish()
+            }
+            .addOnFailureListener { e ->
+                binding.btnRegister.isEnabled = true
+                binding.btnRegister.text = "Register"
+                showMessage("Failed to save user profile: ${e.message}")
+            }
     }
+}
 
     private fun showMessage(message: String) {
         Toast.makeText(this, message, Toast.LENGTH_SHORT).show()
