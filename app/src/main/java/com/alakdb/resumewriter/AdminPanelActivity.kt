@@ -4,16 +4,13 @@ import android.content.Intent
 import android.os.Bundle
 import android.widget.ArrayAdapter
 import android.widget.AdapterView
-import android.widget.Button
-import android.view.View
-import android.widget.EditText
 import android.widget.Toast
 import androidx.appcompat.app.AlertDialog
 import androidx.appcompat.app.AppCompatActivity
 import com.alakdb.resumewriter.databinding.ActivityAdminPanelBinding
+import com.google.firebase.auth.FirebaseAuth
 import com.google.firebase.firestore.ktx.firestore
 import com.google.firebase.ktx.Firebase
-import com.google.firebase.auth.FirebaseAuth
 
 class AdminPanelActivity : AppCompatActivity() {
     private lateinit var binding: ActivityAdminPanelBinding
@@ -22,7 +19,7 @@ class AdminPanelActivity : AppCompatActivity() {
     private var selectedUserId: String = ""
     private var selectedUserEmail: String = ""
 
-    // Users list accessible everywhere
+    // Master list of users (docId, email)
     private val usersList = mutableListOf<Pair<String, String>>()
 
     override fun onCreate(savedInstanceState: Bundle?) {
@@ -32,7 +29,6 @@ class AdminPanelActivity : AppCompatActivity() {
 
         creditManager = CreditManager(this)
 
-        // Check admin access
         if (!creditManager.isAdminMode()) {
             showMessage("Admin access required!")
             finish()
@@ -41,7 +37,7 @@ class AdminPanelActivity : AppCompatActivity() {
 
         setupUI()
         loadUsers()
-        setupManualLoad()
+        setupManualEmailLoad()
     }
 
     private fun setupUI() {
@@ -52,13 +48,32 @@ class AdminPanelActivity : AppCompatActivity() {
         binding.btnAdminGenerateFree.setOnClickListener { generateFreeCV() }
         binding.btnAdminStats.setOnClickListener { showUserStats() }
         binding.btnAdminLogout.setOnClickListener { logoutAdmin() }
+
+        binding.spUserSelector.onItemSelectedListener = object : AdapterView.OnItemSelectedListener {
+            override fun onItemSelected(
+                parent: AdapterView<*>,
+                view: android.view.View?,
+                position: Int,
+                id: Long
+            ) {
+                if (position == 0) {
+                    clearSelection()
+                    return
+                }
+
+                val selectedPair = usersList[position]
+                selectUser(selectedPair.first, selectedPair.second)
+            }
+
+            override fun onNothingSelected(parent: AdapterView<*>) {}
+        }
     }
 
     private fun loadUsers() {
         db.collection("users").get()
             .addOnSuccessListener { documents ->
                 usersList.clear()
-                usersList.add("" to "Select a user...") // default item
+                usersList.add("" to "Select a user...") // default
 
                 for (doc in documents) {
                     val email = doc.getString("email") ?: continue
@@ -74,33 +89,9 @@ class AdminPanelActivity : AppCompatActivity() {
                 binding.spUserSelector.adapter = adapter
             }
             .addOnFailureListener { showMessage("Failed to load users") }
-
-        // Spinner selection
-        binding.spUserSelector.onItemSelectedListener = object : AdapterView.OnItemSelectedListener {
-            override fun onItemSelected(
-                parent: AdapterView<*>,
-                view: View?,
-                position: Int,
-                id: Long
-            ) {
-                if (position == 0) {
-                    selectedUserId = ""
-                    selectedUserEmail = ""
-                    updateUserDisplay(0, 0, 0)
-                    return
-                }
-
-                val selectedPair = usersList[position]
-                selectedUserId = selectedPair.first
-                selectedUserEmail = selectedPair.second
-                loadUserDataById(selectedUserId)
-            }
-
-            override fun onNothingSelected(parent: AdapterView<*>) {}
-        }
     }
 
-    private fun setupManualLoad() {
+    private fun setupManualEmailLoad() {
         binding.btnLoadUser.setOnClickListener {
             val emailInput = binding.etManualEmail.text.toString().trim()
             if (emailInput.isEmpty()) {
@@ -108,44 +99,67 @@ class AdminPanelActivity : AppCompatActivity() {
                 return@setOnClickListener
             }
 
-            // Search for user by email
-            db.collection("users").whereEqualTo("email", emailInput).get()
-                .addOnSuccessListener { documents ->
-                    if (documents.isEmpty) {
-                        showMessage("User not found")
-                        return@addOnSuccessListener
+            // Check if email exists in usersList first
+            val match = usersList.find { it.second.equals(emailInput, ignoreCase = true) }
+            if (match != null) {
+                selectUser(match.first, match.second)
+                // Update spinner selection
+                val index = usersList.indexOf(match)
+                binding.spUserSelector.setSelection(index)
+            } else {
+                // Fetch from Firestore if not in list
+                db.collection("users").whereEqualTo("email", emailInput).get()
+                    .addOnSuccessListener { documents ->
+                        if (documents.isEmpty) {
+                            showMessage("User not found")
+                            return@addOnSuccessListener
+                        }
+                        val doc = documents.documents[0]
+                        val userId = doc.id
+                        val userEmail = doc.getString("email") ?: ""
+                        // Add to usersList
+                        usersList.add(userId to userEmail)
+                        val adapter = ArrayAdapter(
+                            this,
+                            android.R.layout.simple_spinner_item,
+                            usersList.map { it.second }
+                        )
+                        adapter.setDropDownViewResource(android.R.layout.simple_spinner_dropdown_item)
+                        binding.spUserSelector.adapter = adapter
+
+                        selectUser(userId, userEmail)
+                        binding.spUserSelector.setSelection(usersList.size - 1)
                     }
-
-                    val doc = documents.documents[0]
-                    selectedUserId = doc.id
-                    selectedUserEmail = doc.getString("email") ?: ""
-                    updateUserDisplay(
-                        (doc.getLong("availableCredits") ?: 0).toInt(),
-                        (doc.getLong("usedCredits") ?: 0).toInt(),
-                        (doc.getLong("totalCreditsEarned") ?: 0).toInt()
-                    )
-
-                    // Update spinner to match selection if exists
-                    val index = usersList.indexOfFirst { it.first == selectedUserId }
-                    if (index >= 0) binding.spUserSelector.setSelection(index)
-                }
-                .addOnFailureListener { showMessage("Failed to load user") }
+                    .addOnFailureListener { showMessage("Failed to load user") }
+            }
         }
+    }
+
+    private fun selectUser(userId: String, userEmail: String) {
+        selectedUserId = userId
+        selectedUserEmail = userEmail
+        loadUserDataById(userId)
+        binding.etManualEmail.setText(userEmail)
+    }
+
+    private fun clearSelection() {
+        selectedUserId = ""
+        selectedUserEmail = ""
+        binding.etManualEmail.setText("")
+        updateUserDisplay(0, 0, 0)
     }
 
     private fun loadUserDataById(userId: String) {
         db.collection("users").document(userId).get()
-            .addOnSuccessListener { document ->
-                if (!document.exists()) {
+            .addOnSuccessListener { doc ->
+                if (!doc.exists()) {
                     showMessage("User not found")
                     return@addOnSuccessListener
                 }
-
-                val available = document.getLong("availableCredits") ?: 0
-                val used = document.getLong("usedCredits") ?: 0
-                val total = document.getLong("totalCreditsEarned") ?: 0
-
-                updateUserDisplay(available.toInt(), used.toInt(), total.toInt())
+                val available = doc.getLong("availableCredits")?.toInt() ?: 0
+                val used = doc.getLong("usedCredits")?.toInt() ?: 0
+                val total = doc.getLong("totalCreditsEarned")?.toInt() ?: 0
+                updateUserDisplay(available, used, total)
             }
             .addOnFailureListener { showMessage("Failed to load user data") }
     }
@@ -158,22 +172,19 @@ class AdminPanelActivity : AppCompatActivity() {
 
         when (operation) {
             "add" -> creditManager.adminAddCreditsToUser(selectedUserId, amount) { success ->
-                if (success) {
-                    showMessage("Added $amount credits to $selectedUserEmail")
-                    loadUserDataById(selectedUserId)
-                } else showMessage("Failed to add credits")
+                if (success) showMessage("Added $amount credits to $selectedUserEmail")
+                else showMessage("Failed to add credits")
+                loadUserDataById(selectedUserId)
             }
             "set" -> creditManager.adminSetUserCredits(selectedUserId, amount) { success ->
-                if (success) {
-                    showMessage("Set credits to $amount for $selectedUserEmail")
-                    loadUserDataById(selectedUserId)
-                } else showMessage("Failed to set credits")
+                if (success) showMessage("Set credits to $amount for $selectedUserEmail")
+                else showMessage("Failed to set credits")
+                loadUserDataById(selectedUserId)
             }
             "reset" -> creditManager.adminResetUserCredits(selectedUserId) { success ->
-                if (success) {
-                    showMessage("Reset credits for $selectedUserEmail")
-                    loadUserDataById(selectedUserId)
-                } else showMessage("Failed to reset credits")
+                if (success) showMessage("Reset credits for $selectedUserEmail")
+                else showMessage("Failed to reset credits")
+                loadUserDataById(selectedUserId)
             }
         }
     }
@@ -200,17 +211,16 @@ class AdminPanelActivity : AppCompatActivity() {
         }
 
         db.collection("users").document(selectedUserId).get()
-            .addOnSuccessListener { document ->
-                if (document.exists()) {
+            .addOnSuccessListener { doc ->
+                if (doc.exists()) {
                     val stats = """
-                        Email: ${document.getString("email")}
-                        Available Credits: ${document.getLong("availableCredits") ?: 0}
-                        Used Credits: ${document.getLong("usedCredits") ?: 0}
-                        Total Credits: ${document.getLong("totalCreditsEarned") ?: 0}
-                        Created: ${document.getLong("createdAt")?.let { 
+                        Email: ${doc.getString("email")}
+                        Available Credits: ${doc.getLong("availableCredits") ?: 0}
+                        Used Credits: ${doc.getLong("usedCredits") ?: 0}
+                        Total Credits: ${doc.getLong("totalCreditsEarned") ?: 0}
+                        Created: ${doc.getLong("createdAt")?.let { 
                             java.text.SimpleDateFormat("MMM dd, yyyy").format(it) } ?: "Unknown"}
                     """.trimIndent()
-
                     AlertDialog.Builder(this)
                         .setTitle("User Statistics")
                         .setMessage(stats)
@@ -224,7 +234,6 @@ class AdminPanelActivity : AppCompatActivity() {
         creditManager.setAdminMode(false)
         FirebaseAuth.getInstance().signOut()
         showMessage("Admin logged out")
-
         val intent = Intent(this, MainActivity::class.java)
         intent.flags = Intent.FLAG_ACTIVITY_CLEAR_TOP or Intent.FLAG_ACTIVITY_NEW_TASK
         startActivity(intent)
@@ -242,4 +251,3 @@ class AdminPanelActivity : AppCompatActivity() {
         Toast.makeText(this, message, Toast.LENGTH_SHORT).show()
     }
 }
-
