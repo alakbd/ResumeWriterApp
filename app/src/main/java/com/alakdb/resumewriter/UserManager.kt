@@ -7,9 +7,12 @@ import com.google.firebase.firestore.FirebaseFirestore
 import com.google.firebase.auth.FirebaseAuthInvalidCredentialsException
 import com.google.firebase.auth.FirebaseAuthInvalidUserException
 import com.google.firebase.auth.FirebaseAuthUserCollisionException
+import com.google.firebase.auth.FirebaseAuthWeakPasswordException
 
 class UserManager(private val context: Context) {
-    private val prefs: SharedPreferences = context.getSharedPreferences("user_prefs", Context.MODE_PRIVATE)
+
+    private val prefs: SharedPreferences =
+        context.getSharedPreferences("user_prefs", Context.MODE_PRIVATE)
     private val auth: FirebaseAuth = FirebaseAuth.getInstance()
     private val db: FirebaseFirestore = FirebaseFirestore.getInstance()
 
@@ -19,7 +22,12 @@ class UserManager(private val context: Context) {
         private const val IS_REGISTERED_KEY = "is_registered"
     }
 
-    fun registerUser(email: String, password: String, onComplete: (Boolean, String?) -> Unit) {
+    /** Register a new user */
+    fun registerUser(
+        email: String,
+        password: String,
+        onComplete: (Boolean, String?) -> Unit
+    ) {
         if (password.length < 6) {
             onComplete(false, "Password must be at least 6 characters")
             return
@@ -64,6 +72,7 @@ class UserManager(private val context: Context) {
                     val error = when (task.exception) {
                         is FirebaseAuthUserCollisionException -> "This email is already registered"
                         is FirebaseAuthInvalidCredentialsException -> "Invalid email format"
+                        is FirebaseAuthWeakPasswordException -> "Password is too weak"
                         else -> "Registration failed: ${task.exception?.message}"
                     }
                     onComplete(false, error)
@@ -71,7 +80,12 @@ class UserManager(private val context: Context) {
             }
     }
 
-    fun loginUser(email: String, password: String, onComplete: (Boolean, String?) -> Unit) {
+    /** Login existing user */
+    fun loginUser(
+        email: String,
+        password: String,
+        onComplete: (Boolean, String?) -> Unit
+    ) {
         auth.signInWithEmailAndPassword(email, password)
             .addOnCompleteListener { task ->
                 if (task.isSuccessful) {
@@ -93,54 +107,32 @@ class UserManager(private val context: Context) {
             }
     }
 
-    fun registerUser(email: String, password: String, onComplete: (Boolean, String?) -> Unit) {
-    auth.createUserWithEmailAndPassword(email, password)
-        .addOnCompleteListener { task ->
-            if (task.isSuccessful) {
-                val user = auth.currentUser
-                if (user != null) {
-                    saveUserDataLocally(user.email ?: "", user.uid)
-                    onComplete(true, null)
-                } else {
-                    onComplete(false, "Registration failed: No user data returned")
-                }
-            } else {
-                val error = when (task.exception) {
-                    is FirebaseAuthUserCollisionException -> "Email is already in use"
-                    is FirebaseAuthWeakPasswordException -> "Password is too weak"
-                    else -> "Registration failed: ${task.exception?.message}"
-                }
-                onComplete(false, error)
-            }
-        }
-}
-    
+    /** Check if user is logged in */
     fun isUserLoggedIn(): Boolean {
         return auth.currentUser != null && prefs.getBoolean(IS_REGISTERED_KEY, false)
     }
 
+    /** Get current user email */
     fun getCurrentUserEmail(): String? {
         return prefs.getString(USER_EMAIL_KEY, null)
     }
 
+    /** Get current user ID */
     fun getCurrentUserId(): String? {
         return prefs.getString(USER_ID_KEY, null)
     }
 
+    /** Logout user */
     fun logout() {
         auth.signOut()
         prefs.edit().clear().apply()
     }
-    fun logoutUser() {
-        val prefs = context.getSharedPreferences("user_prefs", Context.MODE_PRIVATE)
-        prefs.edit().clear().apply()  // clears all saved login data
-    }
 
-
+    /** Sync user credits from Firestore */
     fun syncUserCredits(onComplete: (Boolean, Int?) -> Unit) {
         val userId = getCurrentUserId()
         val user = auth.currentUser
-        
+
         if (userId == null || user == null) {
             onComplete(false, null)
             return
@@ -163,6 +155,7 @@ class UserManager(private val context: Context) {
             }
     }
 
+    /** Save user data locally in SharedPreferences */
     private fun saveUserDataLocally(email: String, uid: String) {
         prefs.edit().apply {
             putString(USER_EMAIL_KEY, email)
