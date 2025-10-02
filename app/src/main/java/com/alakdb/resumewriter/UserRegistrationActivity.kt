@@ -80,9 +80,9 @@ class UserRegistrationActivity : AppCompatActivity() {
 
         val userMap = hashMapOf(
             "email" to email,
-            "availableCredits" to 0,
+            "availableCredits" to 3,   // ✅ give 3 free credits
             "usedCredits" to 0,
-            "totalCreditsEarned" to 0,
+            "totalCreditsEarned" to 3, // ✅ track that 3 were earned
             "createdAt" to System.currentTimeMillis()
         )
 
