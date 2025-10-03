@@ -20,4 +20,7 @@
     <color name="admin_orange">#FFA500</color>
     <color name="admin_green">#4CAF50</color>
     <color name="admin_blue">#2196F3</color>
+    <!-- Your Block Button colors -->
+    <color name="block_red">#FF5722</color>
+    <color name="unblock_green">#4CAF50</color>
 </resources>
