@@ -38,6 +38,7 @@ class AdminPanelActivity : AppCompatActivity() {
         setupUI()
         loadUsers()
         setupManualEmailLoad()
+        loadAdminStats()
     }
 
     private fun setupUI() {
@@ -264,10 +265,6 @@ private fun generateFreeCV() {
         showMessage("Failed to generate CV")
     }
 }
-
-// Also call after loading users on startup:
-loadUsers()
-loadAdminStats()
 
     private fun showUserStats() {
         if (selectedUserId.isEmpty()) {
