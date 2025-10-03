@@ -89,8 +89,11 @@ class AdminPanelActivity : AppCompatActivity() {
                 adapter.setDropDownViewResource(android.R.layout.simple_spinner_dropdown_item)
                 binding.spUserSelector.adapter = adapter
             }
-            .addOnFailureListener { showMessage("Failed to load users") }
-    }
+            .addOnFailureListener { e ->
+                Log.e("AdminPanel", "Firestore error: ${e.message}")
+                showMessage("Failed to load users")
+            }
+        }
 
     private fun loadAdminStats() {
     db.collection("users").get()
