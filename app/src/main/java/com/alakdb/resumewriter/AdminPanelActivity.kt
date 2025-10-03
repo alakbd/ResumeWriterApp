@@ -19,6 +19,7 @@ class AdminPanelActivity : AppCompatActivity() {
     private val db = Firebase.firestore
     private var selectedUserId: String = ""
     private var selectedUserEmail: String = ""
+    private var isUserBlocked: Boolean = false
 
     // Master list of users (docId, email)
     private val usersList = mutableListOf<Pair<String, String>>()
@@ -50,6 +51,7 @@ class AdminPanelActivity : AppCompatActivity() {
         binding.btnAdminGenerateFree.setOnClickListener { generateFreeCV() }
         binding.btnAdminStats.setOnClickListener { showUserStats() }
         binding.btnAdminLogout.setOnClickListener { logoutAdmin() }
+        binding.btnBlockUser.setOnClickListener { toggleUserBlockStatus() }
 
         binding.spUserSelector.onItemSelectedListener = object : AdapterView.OnItemSelectedListener {
             override fun onItemSelected(
@@ -132,6 +134,7 @@ class AdminPanelActivity : AppCompatActivity() {
                 val totalUsers = documents.size()
                 var totalCredits = 0L
                 var totalCVs = 0L
+                var blockedUsers = 0L
                 val dailyCount = mutableMapOf<String, Int>()
                 val monthlyCount = mutableMapOf<String, Int>()
 
@@ -141,6 +144,11 @@ class AdminPanelActivity : AppCompatActivity() {
                 for (doc in documents) {
                     totalCredits += doc.getLong("totalCreditsEarned") ?: 0
                     totalCVs += doc.getLong("usedCredits") ?: 0
+                    
+                    // Count blocked users
+                    if (doc.getBoolean("isBlocked") == true) {
+                        blockedUsers++
+                    }
 
                     val createdAt = doc.getLong("createdAt")
                     if (createdAt != null) {
@@ -162,6 +170,7 @@ class AdminPanelActivity : AppCompatActivity() {
 
                 binding.tvUserStats.text = """
                     Total Users: $totalUsers
+                    Blocked Users: $blockedUsers
                     Joined Today: ${dailyCount.getOrDefault(today, 0)}
                     Joined This Month: ${monthlyCount.getOrDefault(thisMonth, 0)}
                 """.trimIndent()
@@ -247,9 +256,11 @@ class AdminPanelActivity : AppCompatActivity() {
     private fun clearSelection() {
         selectedUserId = ""
         selectedUserEmail = ""
+        isUserBlocked = false
         binding.etManualEmail.setText("")
         updateUserDisplay(0, 0, 0)
         binding.tvUserEmail.text = "User: Not selected"
+        updateBlockButtonUI(false)
     }
 
     private fun loadUserDataById(userId: String) {
@@ -263,7 +274,11 @@ class AdminPanelActivity : AppCompatActivity() {
                 val available = doc.getLong("availableCredits")?.toInt() ?: 0
                 val used = doc.getLong("usedCredits")?.toInt() ?: 0
                 val total = doc.getLong("totalCreditsEarned")?.toInt() ?: 0
+                val blocked = doc.getBoolean("isBlocked") ?: false
+                
+                isUserBlocked = blocked
                 updateUserDisplay(available, used, total)
+                updateBlockButtonUI(blocked)
             }
             .addOnFailureListener { e ->
                 showMessage("Failed to load user data: ${e.message}")
@@ -271,9 +286,78 @@ class AdminPanelActivity : AppCompatActivity() {
             }
     }
 
+    private fun toggleUserBlockStatus() {
+        if (selectedUserId.isEmpty()) {
+            showMessage("Please select a user first")
+            return
+        }
+
+        val newBlockStatus = !isUserBlocked
+        val action = if (newBlockStatus) "block" else "unblock"
+        
+        AlertDialog.Builder(this)
+            .setTitle(if (newBlockStatus) "Block User" else "Unblock User")
+            .setMessage("Are you sure you want to ${action} $selectedUserEmail?")
+            .setPositiveButton("Yes") { dialog, which ->
+                performBlockUser(newBlockStatus)
+            }
+            .setNegativeButton("Cancel", null)
+            .show()
+    }
+
+    private fun performBlockUser(block: Boolean) {
+        val updates = hashMapOf<String, Any>(
+            "isBlocked" to block,
+            "lastUpdated" to System.currentTimeMillis()
+        )
+
+        db.collection("users").document(selectedUserId)
+            .update(updates)
+            .addOnSuccessListener {
+                isUserBlocked = block
+                updateBlockButtonUI(block)
+                showMessage("User ${if (block) "blocked" else "unblocked"} successfully")
+                loadAdminStats() // Refresh stats to update blocked user count
+                
+                // Log the action
+                Log.d("AdminPanel", "User ${if (block) "blocked" else "unblocked"}: $selectedUserEmail")
+            }
+            .addOnFailureListener { e ->
+                showMessage("Failed to ${if (block) "block" else "unblock"} user: ${e.message}")
+                Log.e("AdminPanel", "Error updating block status", e)
+            }
+    }
+
+    private fun updateBlockButtonUI(isBlocked: Boolean) {
+        if (isBlocked) {
+            binding.btnBlockUser.text = "Unblock User"
+            binding.btnBlockUser.backgroundTint = getColorStateList(android.R.color.holo_green_light)
+        } else {
+            binding.btnBlockUser.text = "Block User"
+            binding.btnBlockUser.backgroundTint = getColorStateList(android.R.color.holo_red_light)
+        }
+        
+        // Enable/disable other buttons based on block status
+        val isEnabled = !isBlocked
+        binding.btnAdminAdd10.isEnabled = isEnabled
+        binding.btnAdminAdd50.isEnabled = isEnabled
+        binding.btnAdminSet100.isEnabled = isEnabled
+        binding.btnAdminReset.isEnabled = isEnabled
+        binding.btnAdminGenerateFree.isEnabled = isEnabled
+        
+        if (isBlocked) {
+            showMessage("User is blocked - credit operations disabled")
+        }
+    }
+
     private fun modifyUserCredits(amount: Int, operation: String) {
         if (selectedUserId.isEmpty()) {
             showMessage("Please select a user first")
+            return
+        }
+
+        if (isUserBlocked) {
+            showMessage("Cannot modify credits for blocked user")
             return
         }
 
@@ -308,6 +392,11 @@ class AdminPanelActivity : AppCompatActivity() {
             return
         }
 
+        if (isUserBlocked) {
+            showMessage("Cannot generate CV for blocked user")
+            return
+        }
+
         db.collection("users").document(selectedUserId).update(
             "usedCredits", com.google.firebase.firestore.FieldValue.increment(1),
             "cvGenerated", com.google.firebase.firestore.FieldValue.increment(1),
@@ -330,11 +419,13 @@ class AdminPanelActivity : AppCompatActivity() {
         db.collection("users").document(selectedUserId).get()
             .addOnSuccessListener { doc ->
                 if (doc.exists()) {
+                    val blockedStatus = if (doc.getBoolean("isBlocked") == true) "Yes" else "No"
                     val stats = """
                         Email: ${doc.getString("email")}
                         Available Credits: ${doc.getLong("availableCredits") ?: 0}
                         Used Credits: ${doc.getLong("usedCredits") ?: 0}
                         Total Credits: ${doc.getLong("totalCreditsEarned") ?: 0}
+                        Blocked: $blockedStatus
                         Created: ${doc.getLong("createdAt")?.let { 
                             java.text.SimpleDateFormat("MMM dd, yyyy", java.util.Locale.getDefault()).format(it) } ?: "Unknown"}
                     """.trimIndent()
@@ -363,7 +454,7 @@ class AdminPanelActivity : AppCompatActivity() {
     }
 
     private fun updateUserDisplay(available: Int, used: Int, total: Int) {
-        binding.tvUserEmail.text = "User: $selectedUserEmail"
+        binding.tvUserEmail.text = "User: $selectedUserEmail ${if (isUserBlocked) "(BLOCKED)" else ""}"
         binding.tvAvailableCredits.text = "Available: $available"
         binding.tvUsedCredits.text = "Used: $used"
         binding.tvTotalCredits.text = "Total: $total"
