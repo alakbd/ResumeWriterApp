@@ -146,17 +146,45 @@
             android:text="Show User Statistics"
             android:layout_marginBottom="8dp" />
 
-        <!-- Admin Stats Display -->
+        <!-- Admin Statistics Section -->
         <TextView
-            android:id="@+id/tv_admin_stats"
             android:layout_width="match_parent"
             android:layout_height="wrap_content"
-            android:text="Admin Mode Active"
+            android:text="Admin Statistics"
+            android:textSize="16sp"
+            android:textStyle="bold"
+            android:layout_marginTop="24dp"
+            android:layout_marginBottom="8dp" />
+
+        <TextView
+            android:id="@+id/tv_user_stats"
+            android:layout_width="match_parent"
+            android:layout_height="wrap_content"
+            android:text="Users: Loading..."
             android:textSize="14sp"
-            android:gravity="center"
+            android:layout_marginBottom="8dp"
+            android:padding="8dp"
+            android:background="#e0f7fa" />
+
+        <TextView
+            android:id="@+id/tv_credit_stats"
+            android:layout_width="match_parent"
+            android:layout_height="wrap_content"
+            android:text="Credits: Loading..."
+            android:textSize="14sp"
+            android:layout_marginBottom="8dp"
+            android:padding="8dp"
+            android:background="#fff3e0" />
+
+        <TextView
+            android:id="@+id/tv_cv_stats"
+            android:layout_width="match_parent"
+            android:layout_height="wrap_content"
+            android:text="CVs Generated: Loading..."
+            android:textSize="14sp"
             android:layout_marginBottom="24dp"
             android:padding="8dp"
-            android:background="#f0f0f0" />
+            android:background="#f3e5f5" />
 
         <!-- Logout Button -->
         <Button
