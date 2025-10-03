@@ -88,7 +88,7 @@ class AdminPanelActivity : AppCompatActivity() {
     private fun loadUsers() {
         binding.tvUserStats.text = "Users: Loading..."
         
-        db.collection("users").get()
+        db.collection("users").get(Source.SERVER)
             .addOnSuccessListener { documents ->
                 usersList.clear()
                 
