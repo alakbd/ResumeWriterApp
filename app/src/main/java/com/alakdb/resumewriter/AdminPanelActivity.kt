@@ -60,11 +60,15 @@ class AdminPanelActivity : AppCompatActivity() {
             ) {
                 if (position == 0) {
                     clearSelection()
+                    Log.d("AdminPanel", "No user selected (spinner default)")
                     return
                 }
 
                 val selectedPair = usersList[position]
-                selectUser(selectedPair.first, selectedPair.second)
+                val userId = selectedPair.first
+                val userEmail = selectedPair.second
+                Log.d("AdminPanel", "Spinner selected: $userEmail / $userId") // 🔹 log selection
+                selectUser(userId, userEmail)
             }
 
             override fun onNothingSelected(parent: AdapterView<*>) {}
@@ -91,7 +95,7 @@ class AdminPanelActivity : AppCompatActivity() {
                 binding.spUserSelector.adapter = adapter
             }
             .addOnFailureListener { e ->
-                Log.e("AdminPanel", "Firestore error: ${e.message}")
+                Log.e("AdminPanel", "Firestore error: ${e.message}", e)
                 showMessage("Failed to load users")
             }
         }
@@ -194,8 +198,14 @@ class AdminPanelActivity : AppCompatActivity() {
     private fun selectUser(userId: String, userEmail: String) {
         selectedUserId = userId
         selectedUserEmail = userEmail
+        Log.d("AdminPanel", "Selected user: $selectedUserEmail / $selectedUserId")
         loadUserDataById(userId)
-        binding.etManualEmail.setText(userEmail)
+        // Update UI
+        binding.etManualEmail.setText(userEmail)  // 🔹 keep manual email in sync
+        
+        // Optional: update spinner selection to match
+        val index = usersList.indexOfFirst { it.first == userId }
+        if (index != -1) binding.spUserSelector.setSelection(index)
     }
 
     private fun clearSelection() {
