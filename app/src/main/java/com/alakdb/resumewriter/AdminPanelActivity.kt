@@ -105,7 +105,7 @@ class AdminPanelActivity : AppCompatActivity() {
 
             for (doc in documents) {
                 totalCredits += doc.getLong("totalCreditsEarned") ?: 0
-                totalCVs += doc.getLong("cvGenerated") ?: 0  // NEW: count CVs
+                totalCVs += doc.getLong("usedCredits") ?: 0  // CVs generated counted as usedCredits
 
                 val createdAt = doc.getLong("createdAt")
                 if (createdAt != null) {
@@ -121,20 +121,25 @@ class AdminPanelActivity : AppCompatActivity() {
             val today = dayFormat.format(java.util.Date())
             val thisMonth = monthFormat.format(java.util.Date())
 
-            val statsText = """
+            binding.tvUserStats.text = """
                 Total Users: $totalUsers
-                Total Credits Earned: $totalCredits
-                Total CVs Generated: $totalCVs
-                Users Joined Today: ${dailyCount.getOrDefault(today, 0)}
-                Users Joined This Month: ${monthlyCount.getOrDefault(thisMonth, 0)}
+                Joined Today: ${dailyCount.getOrDefault(today, 0)}
+                Joined This Month: ${monthlyCount.getOrDefault(thisMonth, 0)}
             """.trimIndent()
 
-            binding.tvAdminStats.text = statsText
+            binding.tvCreditStats.text = """
+                Total Credits Earned: $totalCredits
+            """.trimIndent()
+
+            binding.tvCvStats.text = """
+                Total CVs Generated: $totalCVs
+            """.trimIndent()
         }
         .addOnFailureListener {
             showMessage("Failed to load admin stats")
         }
 }
+
 
 
     private fun setupManualEmailLoad() {
