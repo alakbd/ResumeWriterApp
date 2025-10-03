@@ -1,4 +1,4 @@
-package com.yourapp.activities
+package com.alakdb.resumewriter
 
 import android.os.Bundle
 import android.webkit.JavascriptInterface
@@ -7,13 +7,12 @@ import android.webkit.WebViewClient
 import android.widget.Button
 import android.widget.Toast
 import androidx.appcompat.app.AppCompatActivity
-import com.yourapp.R
-import com.yourapp.managers.CreditManager
 
 class CvWebViewActivity : AppCompatActivity() {
 
     private lateinit var webView: WebView
     private lateinit var generateResumeButton: Button
+    private lateinit var creditManager: CreditManager
 
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
@@ -21,6 +20,7 @@ class CvWebViewActivity : AppCompatActivity() {
 
         webView = findViewById(R.id.webView)
         generateResumeButton = findViewById(R.id.generateResumeButton)
+        creditManager = CreditManager(this)
 
         // WebView settings
         val settings = webView.settings
@@ -29,10 +29,9 @@ class CvWebViewActivity : AppCompatActivity() {
         settings.setSupportZoom(false)
         settings.displayZoomControls = false
 
-        // Add JS bridge
+        // JS interface
         webView.addJavascriptInterface(AndroidBridge(), "AndroidApp")
 
-        // WebViewClient to hide Tailor Resume button
         webView.webViewClient = object : WebViewClient() {
             override fun onPageFinished(view: WebView?, url: String?) {
                 super.onPageFinished(view, url)
@@ -41,42 +40,46 @@ class CvWebViewActivity : AppCompatActivity() {
                     "document.querySelector('#tailorResumeButton').style.display='none';",
                     null
                 )
-                // Optional: hide other elements if needed (instructions sidebar)
-                // webView.evaluateJavascript("document.querySelector('.sidebar-instructions').style.display='none';", null)
             }
         }
 
-        // Load the site using BuildConfig (Render link hidden from users)
+        // Load backend URL (from build.gradle)
         webView.loadUrl(BuildConfig.API_BASE_URL)
 
-        // Single Generate Resume button
+        // Generate Resume button logic
         generateResumeButton.setOnClickListener {
-            if (CreditManager.hasCredits(this)) {
-                // Deduct credit
-                CreditManager.useCredit(this)
-
-                // Trigger hidden Tailor Resume button in WebView
-                webView.evaluateJavascript(
-                    "document.querySelector('#tailorResumeButton').click();", null
-                )
+            // Check available credits
+            if (creditManager.getAvailableCredits() > 0) {
+                // Deduct a credit asynchronously
+                creditManager.useCredit { success ->
+                    if (success) {
+                        // Trigger hidden Tailor Resume button only after credit is deducted
+                        webView.evaluateJavascript(
+                            "document.querySelector('#tailorResumeButton').click();", null
+                        )
+                    } else {
+                        Toast.makeText(
+                            this,
+                            "Error using credit. Please try again.",
+                            Toast.LENGTH_LONG
+                        ).show()
+                    }
+                }
             } else {
-                Toast.makeText(this, "Not enough credits. Please top up!", Toast.LENGTH_LONG).show()
+                Toast.makeText(this, "Not enough credits. Please top up!", Toast.LENGTH_LONG)
+                    .show()
             }
         }
     }
 
-    // JS interface for site → Android communication
+    // JS interface to communicate with the site (optional)
     inner class AndroidBridge {
         @JavascriptInterface
         fun notifyResumeGenerated() {
             runOnUiThread {
-                Toast.makeText(this@CvWebViewActivity, "Resume Generated!", Toast.LENGTH_SHORT).show()
+                Toast.makeText(this@CvWebViewActivity, "Resume Generated!", Toast.LENGTH_SHORT)
+                    .show()
             }
-        }
-
-        @JavascriptInterface
-        fun getCredits(): Int {
-            return CreditManager.getCredits(this@CvWebViewActivity)
         }
     }
 }
