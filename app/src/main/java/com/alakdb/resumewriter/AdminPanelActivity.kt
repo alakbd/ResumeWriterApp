@@ -64,92 +64,124 @@ class AdminPanelActivity : AppCompatActivity() {
                     return
                 }
 
-                val selectedPair = usersList[position]
-                val userId = selectedPair.first
-                val userEmail = selectedPair.second
-                Log.d("AdminPanel", "Spinner selected: $userEmail / $userId") // 🔹 log selection
-                selectUser(userId, userEmail)
+                // Fix: Check bounds before accessing
+                if (position > 0 && position - 1 < usersList.size) {
+                    val selectedPair = usersList[position - 1] // Adjust for "Select a user..." at index 0
+                    val userId = selectedPair.first
+                    val userEmail = selectedPair.second
+                    Log.d("AdminPanel", "Spinner selected: $userEmail / $userId")
+                    selectUser(userId, userEmail)
+                } else {
+                    clearSelection()
+                    Log.e("AdminPanel", "Invalid spinner position: $position")
+                }
             }
 
-            override fun onNothingSelected(parent: AdapterView<*>) {}
+            override fun onNothingSelected(parent: AdapterView<*>) {
+                clearSelection()
+            }
         }
     }
 
     private fun loadUsers() {
+        binding.tvUserStats.text = "Users: Loading..."
+        
         db.collection("users").get()
             .addOnSuccessListener { documents ->
                 usersList.clear()
-                usersList.add("" to "Select a user...") // default
-
+                
+                // Add default option first
+                val defaultOption = "" to "Select a user..."
+                
                 for (doc in documents) {
-                    val email = doc.getString("email") ?: continue
+                    val email = doc.getString("email") ?: "Unknown Email"
                     usersList.add(doc.id to email)
                 }
+
+                // Create adapter with default option + users
+                val displayList = mutableListOf<String>()
+                displayList.add(defaultOption.second)
+                displayList.addAll(usersList.map { it.second })
 
                 val adapter = ArrayAdapter(
                     this,
                     android.R.layout.simple_spinner_item,
-                    usersList.map { it.second }
+                    displayList
                 )
                 adapter.setDropDownViewResource(android.R.layout.simple_spinner_dropdown_item)
                 binding.spUserSelector.adapter = adapter
+                
+                if (usersList.isEmpty()) {
+                    showMessage("No users found in database")
+                }
             }
             .addOnFailureListener { e ->
                 Log.e("AdminPanel", "Firestore error: ${e.message}", e)
-                showMessage("Failed to load users")
+                showMessage("Failed to load users: ${e.message}")
+                binding.tvUserStats.text = "Users: Failed to load"
             }
-        }
+    }
 
     private fun loadAdminStats() {
-    db.collection("users").get()
-        .addOnSuccessListener { documents ->
-            val totalUsers = documents.size()
-            var totalCredits = 0L
-            var totalCVs = 0L
-            val dailyCount = mutableMapOf<String, Int>()
-            val monthlyCount = mutableMapOf<String, Int>()
+        binding.tvUserStats.text = "Users: Loading..."
+        binding.tvCreditStats.text = "Credits: Loading..."
+        binding.tvCvStats.text = "CVs Generated: Loading..."
 
-            val dayFormat = java.text.SimpleDateFormat("yyyy-MM-dd")
-            val monthFormat = java.text.SimpleDateFormat("yyyy-MM")
+        db.collection("users").get()
+            .addOnSuccessListener { documents ->
+                val totalUsers = documents.size()
+                var totalCredits = 0L
+                var totalCVs = 0L
+                val dailyCount = mutableMapOf<String, Int>()
+                val monthlyCount = mutableMapOf<String, Int>()
 
-            for (doc in documents) {
-                totalCredits += doc.getLong("totalCreditsEarned") ?: 0
-                totalCVs += doc.getLong("usedCredits") ?: 0  // CVs generated counted as usedCredits
+                val dayFormat = java.text.SimpleDateFormat("yyyy-MM-dd", java.util.Locale.getDefault())
+                val monthFormat = java.text.SimpleDateFormat("yyyy-MM", java.util.Locale.getDefault())
 
-                val createdAt = doc.getLong("createdAt")
-                if (createdAt != null) {
-                    val date = java.util.Date(createdAt)
-                    val dayKey = dayFormat.format(date)
-                    val monthKey = monthFormat.format(date)
+                for (doc in documents) {
+                    totalCredits += doc.getLong("totalCreditsEarned") ?: 0
+                    totalCVs += doc.getLong("usedCredits") ?: 0
 
-                    dailyCount[dayKey] = dailyCount.getOrDefault(dayKey, 0) + 1
-                    monthlyCount[monthKey] = monthlyCount.getOrDefault(monthKey, 0) + 1
+                    val createdAt = doc.getLong("createdAt")
+                    if (createdAt != null) {
+                        try {
+                            val date = java.util.Date(createdAt)
+                            val dayKey = dayFormat.format(date)
+                            val monthKey = monthFormat.format(date)
+
+                            dailyCount[dayKey] = dailyCount.getOrDefault(dayKey, 0) + 1
+                            monthlyCount[monthKey] = monthlyCount.getOrDefault(monthKey, 0) + 1
+                        } catch (e: Exception) {
+                            Log.e("AdminPanel", "Error parsing date for user ${doc.id}", e)
+                        }
+                    }
                 }
+
+                val today = dayFormat.format(java.util.Date())
+                val thisMonth = monthFormat.format(java.util.Date())
+
+                binding.tvUserStats.text = """
+                    Total Users: $totalUsers
+                    Joined Today: ${dailyCount.getOrDefault(today, 0)}
+                    Joined This Month: ${monthlyCount.getOrDefault(thisMonth, 0)}
+                """.trimIndent()
+
+                binding.tvCreditStats.text = """
+                    Total Credits Earned: $totalCredits
+                """.trimIndent()
+
+                binding.tvCvStats.text = """
+                    Total CVs Generated: $totalCVs
+                """.trimIndent()
             }
-
-            val today = dayFormat.format(java.util.Date())
-            val thisMonth = monthFormat.format(java.util.Date())
-
-            binding.tvUserStats.text = """
-                Total Users: $totalUsers
-                Joined Today: ${dailyCount.getOrDefault(today, 0)}
-                Joined This Month: ${monthlyCount.getOrDefault(thisMonth, 0)}
-            """.trimIndent()
-
-            binding.tvCreditStats.text = """
-                Total Credits Earned: $totalCredits
-            """.trimIndent()
-
-            binding.tvCvStats.text = """
-                Total CVs Generated: $totalCVs
-            """.trimIndent()
-        }
-        .addOnFailureListener {
-            showMessage("Failed to load admin stats")
-        }
-}
-
-
+            .addOnFailureListener { e ->
+                Log.e("AdminPanel", "Failed to load admin stats: ${e.message}", e)
+                showMessage("Failed to load admin stats: ${e.message}")
+                binding.tvUserStats.text = "Users: Error loading"
+                binding.tvCreditStats.text = "Credits: Error loading"
+                binding.tvCvStats.text = "CVs Generated: Error loading"
+            }
+    }
 
     private fun setupManualEmailLoad() {
         binding.btnLoadUser.setOnClickListener {
@@ -163,9 +195,11 @@ class AdminPanelActivity : AppCompatActivity() {
             val match = usersList.find { it.second.equals(emailInput, ignoreCase = true) }
             if (match != null) {
                 selectUser(match.first, match.second)
-                // Update spinner selection
-                val index = usersList.indexOf(match)
-                binding.spUserSelector.setSelection(index)
+                // Update spinner selection (add 1 for the default option)
+                val index = usersList.indexOf(match) + 1
+                if (index < binding.spUserSelector.count) {
+                    binding.spUserSelector.setSelection(index)
+                }
             } else {
                 // Fetch from Firestore if not in list
                 db.collection("users").whereEqualTo("email", emailInput).get()
@@ -176,21 +210,28 @@ class AdminPanelActivity : AppCompatActivity() {
                         }
                         val doc = documents.documents[0]
                         val userId = doc.id
-                        val userEmail = doc.getString("email") ?: ""
-                        // Add to usersList
+                        val userEmail = doc.getString("email") ?: emailInput
+                        
+                        // Add to usersList and refresh spinner
                         usersList.add(userId to userEmail)
+                        val displayList = mutableListOf<String>()
+                        displayList.add("Select a user...")
+                        displayList.addAll(usersList.map { it.second })
+                        
                         val adapter = ArrayAdapter(
                             this,
                             android.R.layout.simple_spinner_item,
-                            usersList.map { it.second }
+                            displayList
                         )
                         adapter.setDropDownViewResource(android.R.layout.simple_spinner_dropdown_item)
                         binding.spUserSelector.adapter = adapter
 
                         selectUser(userId, userEmail)
-                        binding.spUserSelector.setSelection(usersList.size - 1)
+                        binding.spUserSelector.setSelection(usersList.size) // Last position
                     }
-                    .addOnFailureListener { showMessage("Failed to load user") }
+                    .addOnFailureListener { e -> 
+                        showMessage("Failed to load user: ${e.message}")
+                    }
             }
         }
     }
@@ -200,12 +241,7 @@ class AdminPanelActivity : AppCompatActivity() {
         selectedUserEmail = userEmail
         Log.d("AdminPanel", "Selected user: $selectedUserEmail / $selectedUserId")
         loadUserDataById(userId)
-        // Update UI
-        binding.etManualEmail.setText(userEmail)  // 🔹 keep manual email in sync
-        
-        // Optional: update spinner selection to match
-        val index = usersList.indexOfFirst { it.first == userId }
-        if (index != -1) binding.spUserSelector.setSelection(index)
+        binding.etManualEmail.setText(userEmail)
     }
 
     private fun clearSelection() {
@@ -213,13 +249,15 @@ class AdminPanelActivity : AppCompatActivity() {
         selectedUserEmail = ""
         binding.etManualEmail.setText("")
         updateUserDisplay(0, 0, 0)
+        binding.tvUserEmail.text = "User: Not selected"
     }
 
     private fun loadUserDataById(userId: String) {
         db.collection("users").document(userId).get()
             .addOnSuccessListener { doc ->
                 if (!doc.exists()) {
-                    showMessage("User not found")
+                    showMessage("User document not found")
+                    clearSelection()
                     return@addOnSuccessListener
                 }
                 val available = doc.getLong("availableCredits")?.toInt() ?: 0
@@ -227,58 +265,61 @@ class AdminPanelActivity : AppCompatActivity() {
                 val total = doc.getLong("totalCreditsEarned")?.toInt() ?: 0
                 updateUserDisplay(available, used, total)
             }
-            .addOnFailureListener { showMessage("Failed to load user data") }
+            .addOnFailureListener { e ->
+                showMessage("Failed to load user data: ${e.message}")
+                clearSelection()
+            }
     }
 
     private fun modifyUserCredits(amount: Int, operation: String) {
-    if (selectedUserId.isEmpty()) {
-        showMessage("Please select a user first")
-        return
+        if (selectedUserId.isEmpty()) {
+            showMessage("Please select a user first")
+            return
+        }
+
+        when (operation) {
+            "add" -> creditManager.adminAddCreditsToUser(selectedUserId, amount) { success ->
+                if (success) {
+                    showMessage("Added $amount credits to $selectedUserEmail")
+                    loadUserDataById(selectedUserId)
+                    loadAdminStats()
+                } else showMessage("Failed to add credits")
+            }
+            "set" -> creditManager.adminSetUserCredits(selectedUserId, amount) { success ->
+                if (success) {
+                    showMessage("Set credits to $amount for $selectedUserEmail")
+                    loadUserDataById(selectedUserId)
+                    loadAdminStats()
+                } else showMessage("Failed to set credits")
+            }
+            "reset" -> creditManager.adminResetUserCredits(selectedUserId) { success ->
+                if (success) {
+                    showMessage("Reset credits for $selectedUserEmail")
+                    loadUserDataById(selectedUserId)
+                    loadAdminStats()
+                } else showMessage("Failed to reset credits")
+            }
+        }
     }
 
-    when (operation) {
-        "add" -> creditManager.adminAddCreditsToUser(selectedUserId, amount) { success ->
-            if (success) {
-                showMessage("Added $amount credits to $selectedUserEmail")
-                loadUserDataById(selectedUserId)
-                loadAdminStats()  // 🔹 refresh stats
-            } else showMessage("Failed to add credits")
+    private fun generateFreeCV() {
+        if (selectedUserId.isEmpty()) {
+            showMessage("Please select a user first")
+            return
         }
-        "set" -> creditManager.adminSetUserCredits(selectedUserId, amount) { success ->
-            if (success) {
-                showMessage("Set credits to $amount for $selectedUserEmail")
-                loadUserDataById(selectedUserId)
-                loadAdminStats()  // 🔹 refresh stats
-            } else showMessage("Failed to set credits")
-        }
-        "reset" -> creditManager.adminResetUserCredits(selectedUserId) { success ->
-            if (success) {
-                showMessage("Reset credits for $selectedUserEmail")
-                loadUserDataById(selectedUserId)
-                loadAdminStats()  // 🔹 refresh stats
-            } else showMessage("Failed to reset credits")
-        }
-    }
-}
 
-private fun generateFreeCV() {
-    if (selectedUserId.isEmpty()) {
-        showMessage("Please select a user first")
-        return
+        db.collection("users").document(selectedUserId).update(
+            "usedCredits", com.google.firebase.firestore.FieldValue.increment(1),
+            "cvGenerated", com.google.firebase.firestore.FieldValue.increment(1),
+            "lastUpdated", System.currentTimeMillis()
+        ).addOnSuccessListener {
+            showMessage("Free CV generated for $selectedUserEmail")
+            loadUserDataById(selectedUserId)
+            loadAdminStats()
+        }.addOnFailureListener { e ->
+            showMessage("Failed to generate CV: ${e.message}")
+        }
     }
-
-    db.collection("users").document(selectedUserId).update(
-        "usedCredits", com.google.firebase.firestore.FieldValue.increment(1),
-        "cvGenerated", com.google.firebase.firestore.FieldValue.increment(1),
-        "lastUpdated", System.currentTimeMillis()
-    ).addOnSuccessListener {
-        showMessage("Free CV generated for $selectedUserEmail")
-        loadUserDataById(selectedUserId)
-        loadAdminStats()  // 🔹 refresh stats
-    }.addOnFailureListener {
-        showMessage("Failed to generate CV")
-    }
-}
 
     private fun showUserStats() {
         if (selectedUserId.isEmpty()) {
@@ -295,14 +336,19 @@ private fun generateFreeCV() {
                         Used Credits: ${doc.getLong("usedCredits") ?: 0}
                         Total Credits: ${doc.getLong("totalCreditsEarned") ?: 0}
                         Created: ${doc.getLong("createdAt")?.let { 
-                            java.text.SimpleDateFormat("MMM dd, yyyy").format(it) } ?: "Unknown"}
+                            java.text.SimpleDateFormat("MMM dd, yyyy", java.util.Locale.getDefault()).format(it) } ?: "Unknown"}
                     """.trimIndent()
                     AlertDialog.Builder(this)
                         .setTitle("User Statistics")
                         .setMessage(stats)
                         .setPositiveButton("OK", null)
                         .show()
+                } else {
+                    showMessage("User document not found")
                 }
+            }
+            .addOnFailureListener { e ->
+                showMessage("Failed to load user stats: ${e.message}")
             }
     }
 
@@ -325,5 +371,6 @@ private fun generateFreeCV() {
 
     private fun showMessage(message: String) {
         Toast.makeText(this, message, Toast.LENGTH_SHORT).show()
+        Log.d("AdminPanel", message)
     }
 }
