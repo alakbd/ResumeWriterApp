@@ -15,6 +15,7 @@ android {
         targetSdk 34
         versionCode 6 // <--- incremented
         versionName "1.5" // <--- optional, just for display
+        buildConfigField "String", "API_BASE_URL", "\"https://resume-writer-04uv.onrender.com/\""
     }
 
     buildFeatures {
