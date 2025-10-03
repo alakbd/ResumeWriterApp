@@ -329,26 +329,26 @@ class AdminPanelActivity : AppCompatActivity() {
     }
 
     private fun updateBlockButtonUI(isBlocked: Boolean) {
-        if (isBlocked) {
-            binding.btnBlockUser.text = "Unblock User"
-            binding.btnBlockUser.backgroundTint = getColorStateList(android.R.color.holo_green_light)
-        } else {
-            binding.btnBlockUser.text = "Block User"
-            binding.btnBlockUser.backgroundTint = getColorStateList(android.R.color.holo_red_light)
-        }
-        
-        // Enable/disable other buttons based on block status
+    if (isBlocked) {
+        binding.btnBlockUser.text = "Unblock User"
+        binding.btnBlockUser.setBackgroundColor(ContextCompat.getColor(this, R.color.unblock_green))
+    } else {
+        binding.btnBlockUser.text = "Block User"
+        binding.btnBlockUser.setBackgroundColor(ContextCompat.getColor(this, R.color.block_red))
+    }
+    
+    // Enable/disable other buttons based on block status
         val isEnabled = !isBlocked
         binding.btnAdminAdd10.isEnabled = isEnabled
         binding.btnAdminAdd50.isEnabled = isEnabled
         binding.btnAdminSet100.isEnabled = isEnabled
         binding.btnAdminReset.isEnabled = isEnabled
         binding.btnAdminGenerateFree.isEnabled = isEnabled
-        
+    
         if (isBlocked) {
             showMessage("User is blocked - credit operations disabled")
-        }
     }
+}
 
     private fun modifyUserCredits(amount: Int, operation: String) {
         if (selectedUserId.isEmpty()) {
