@@ -48,7 +48,8 @@
                 android:layout_height="wrap_content"
                 android:layout_weight="1"
                 android:hint="Or enter email manually"
-                android:inputType="textEmailAddress" />
+                android:inputType="textEmailAddress"
+                android:layout_marginEnd="8dp" />
 
             <Button
                 android:id="@+id/btn_load_user"
@@ -88,7 +89,7 @@
             android:layout_height="wrap_content"
             android:text="Total Earned: 0"
             android:textSize="14sp"
-            android:layout_marginBottom="8dp" />
+            android:layout_marginBottom="16dp" />
 
         <!-- Block / Unblock User -->
         <Button
