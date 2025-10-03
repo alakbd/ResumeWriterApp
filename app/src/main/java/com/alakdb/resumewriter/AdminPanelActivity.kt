@@ -329,12 +329,12 @@ class AdminPanelActivity : AppCompatActivity() {
     }
 
     private fun updateBlockButtonUI(isBlocked: Boolean) {
-    if (isBlocked) {
+        if (isBlocked) {
         binding.btnBlockUser.text = "Unblock User"
-        binding.btnBlockUser.setBackgroundColor(ContextCompat.getColor(this, R.color.unblock_green))
+        binding.btnBlockUser.setBackgroundColor(resources.getColor(R.color.colorUnblockGreen, null))
     } else {
         binding.btnBlockUser.text = "Block User"
-        binding.btnBlockUser.setBackgroundColor(ContextCompat.getColor(this, R.color.block_red))
+        binding.btnBlockUser.setBackgroundColor(resources.getColor(R.color.colorBlockRed, null))
     }
     
     // Enable/disable other buttons based on block status
@@ -346,7 +346,7 @@ class AdminPanelActivity : AppCompatActivity() {
         binding.btnAdminGenerateFree.isEnabled = isEnabled
     
         if (isBlocked) {
-            showMessage("User is blocked - credit operations disabled")
+        showMessage("User is blocked - credit operations disabled")
     }
 }
 
