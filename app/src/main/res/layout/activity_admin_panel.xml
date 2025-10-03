@@ -88,7 +88,17 @@
             android:layout_height="wrap_content"
             android:text="Total Earned: 0"
             android:textSize="14sp"
-            android:layout_marginBottom="24dp" />
+            android:layout_marginBottom="8dp" />
+
+        <!-- Block / Unblock User -->
+        <Button
+            android:id="@+id/btn_block_user"
+            android:layout_width="match_parent"
+            android:layout_height="wrap_content"
+            android:text="Block User"
+            android:layout_marginBottom="16dp"
+            android:backgroundTint="#FF5722"
+            android:textColor="#FFFFFF" />
 
         <!-- Admin Controls Section -->
         <TextView
