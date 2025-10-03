@@ -298,7 +298,7 @@ class AdminPanelActivity : AppCompatActivity() {
         AlertDialog.Builder(this)
             .setTitle(if (newBlockStatus) "Block User" else "Unblock User")
             .setMessage("Are you sure you want to ${action} $selectedUserEmail?")
-            .setPositiveButton("Yes") { dialog, which ->
+            .setPositiveButton("Yes") { _, _ ->
                 performBlockUser(newBlockStatus)
             }
             .setNegativeButton("Cancel", null)
