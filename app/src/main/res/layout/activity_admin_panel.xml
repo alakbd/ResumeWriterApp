@@ -206,5 +206,12 @@
             android:backgroundTint="#FF0000"
             android:textColor="#FFFFFF" />
 
+        <Button
+            android:id="@+id/btn_refresh_users"
+            android:layout_width="wrap_content"
+            android:layout_height="wrap_content"
+            android:text="Refresh Users"
+            android:layout_margin="8dp" />
+
     </LinearLayout>
 </ScrollView>
