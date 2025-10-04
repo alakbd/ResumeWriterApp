@@ -100,7 +100,7 @@ class CvWebViewActivity : AppCompatActivity() {
         }
 
         // ✅ Load your backend (Streamlit site)
-        webView.loadUrl(BuildConfig.API_BASE_URL)
+        webView.loadUrl("${BuildConfig.API_BASE_URL}?fromApp=true")
     }
 
     inner class AndroidBridge {
