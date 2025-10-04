@@ -146,6 +146,7 @@ class CvWebViewActivity : AppCompatActivity() {
                     "✅ Resume generated successfully!",
                     Toast.LENGTH_SHORT
                 ).show()
+                creditUsed = false // ✅ Allow next generation to use a credit
             }
         }
     }
