@@ -6,15 +6,15 @@ import android.content.Intent
 import android.net.Uri
 import android.os.Bundle
 import android.os.Environment
+import android.view.View
 import android.webkit.*
-import android.widget.Button
 import android.widget.Toast
 import androidx.appcompat.app.AppCompatActivity
+import com.alakdb.resumewriter.databinding.ActivityCvWebviewBinding
 
 class CvWebViewActivity : AppCompatActivity() {
 
-    private lateinit var webView: WebView
-    private lateinit var generateResumeButton: Button
+    private lateinit var binding: ActivityCvWebviewBinding
     private lateinit var creditManager: CreditManager
 
     private val FILE_CHOOSER_REQUEST_CODE = 1001
@@ -22,72 +22,68 @@ class CvWebViewActivity : AppCompatActivity() {
 
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
-        setContentView(R.layout.activity_cv_webview)
+        binding = ActivityCvWebviewBinding.inflate(layoutInflater)
+        setContentView(binding.root)
 
-        webView = findViewById(R.id.webView)
-        generateResumeButton = findViewById(R.id.generateResumeButton)
         creditManager = CreditManager(this)
 
-        // WebView settings
-        val settings = webView.settings
-        settings.javaScriptEnabled = true
-        settings.domStorageEnabled = true
-        settings.allowFileAccess = true
-        settings.allowContentAccess = true
-        settings.setSupportZoom(false)
-        settings.displayZoomControls = false
+        val webView = binding.webView
+        val generateResumeButton = binding.generateResumeButton
+        val progressBar = binding.progressBar
 
-        // JS bridge (optional, to notify app from webpage)
+        // WebView settings
+        webView.settings.apply {
+            javaScriptEnabled = true
+            domStorageEnabled = true
+            allowFileAccess = true
+            allowContentAccess = true
+            setSupportZoom(false)
+            displayZoomControls = false
+        }
+
         webView.addJavascriptInterface(AndroidBridge(), "AndroidApp")
 
-        // Handle navigation + JS injection
         webView.webViewClient = object : WebViewClient() {
             override fun onPageFinished(view: WebView?, url: String?) {
                 super.onPageFinished(view, url)
-                // Hide Tailor Resume button (uses aria-label)
                 webView.evaluateJavascript(
                     """
                     (function() {
                         var btn = document.querySelector('button[aria-label="Tailor Resume"]');
                         if(btn) { btn.style.display = 'none'; }
                     })();
-                    """
-                , null)
+                    """.trimIndent(), null
+                )
             }
         }
 
         webView.webChromeClient = object : WebChromeClient() {
+            override fun onProgressChanged(view: WebView?, newProgress: Int) {
+                if (newProgress < 100) {
+                    progressBar.visibility = View.VISIBLE
+                    progressBar.progress = newProgress
+                } else {
+                    progressBar.visibility = View.GONE
+                }
+            }
 
-    // Progress bar updates
-    override fun onProgressChanged(view: WebView?, newProgress: Int) {
-        if (newProgress < 100) {
-            progressBar.visibility = View.VISIBLE
-            progressBar.progress = newProgress
-        } else {
-            progressBar.visibility = View.GONE
+            override fun onShowFileChooser(
+                webView: WebView?,
+                filePathCallback: ValueCallback<Array<Uri>>?,
+                fileChooserParams: FileChooserParams?
+            ): Boolean {
+                this@CvWebViewActivity.filePathCallback = filePathCallback
+                val intent = fileChooserParams?.createIntent() ?: return false
+                return try {
+                    startActivityForResult(intent, FILE_CHOOSER_REQUEST_CODE)
+                    true
+                } catch (e: Exception) {
+                    this@CvWebViewActivity.filePathCallback = null
+                    false
+                }
+            }
         }
-    }
 
-    // File chooser (Browse Files)
-    override fun onShowFileChooser(
-        webView: WebView?,
-        filePathCallback: ValueCallback<Array<Uri>>?,
-        fileChooserParams: FileChooserParams?
-    ): Boolean {
-        this@CvWebViewActivity.filePathCallback = filePathCallback
-        val intent = fileChooserParams?.createIntent()
-        return try {
-            startActivityForResult(intent, FILE_CHOOSER_REQUEST_CODE)
-            true
-        } catch (e: Exception) {
-            this@CvWebViewActivity.filePathCallback = null
-            false
-        }
-    }
-}
-
-
-        // Download support (PDF/Word)
         webView.setDownloadListener { url, _, _, mimeType, _ ->
             try {
                 val request = DownloadManager.Request(Uri.parse(url))
@@ -110,29 +106,22 @@ class CvWebViewActivity : AppCompatActivity() {
             }
         }
 
-        // Load backend site
         webView.loadUrl(BuildConfig.API_BASE_URL)
 
-        // Native "Generate Resume" button logic
         generateResumeButton.setOnClickListener {
             if (creditManager.getAvailableCredits() > 0) {
                 creditManager.useCredit { success ->
                     if (success) {
-                        // Click hidden Tailor Resume button on site
                         webView.evaluateJavascript(
                             """
                             (function() {
                                 var btn = document.querySelector('button[aria-label="Tailor Resume"]');
                                 if(btn) { btn.click(); }
                             })();
-                            """
-                        , null)
+                            """.trimIndent(), null
+                        )
                     } else {
-                        Toast.makeText(
-                            this,
-                            "Error using credit. Please try again.",
-                            Toast.LENGTH_LONG
-                        ).show()
+                        Toast.makeText(this, "Error using credit. Please try again.", Toast.LENGTH_LONG).show()
                     }
                 }
             } else {
@@ -141,7 +130,6 @@ class CvWebViewActivity : AppCompatActivity() {
         }
     }
 
-    // File chooser result
     override fun onActivityResult(requestCode: Int, resultCode: Int, data: Intent?) {
         super.onActivityResult(requestCode, resultCode, data)
         if (requestCode == FILE_CHOOSER_REQUEST_CODE) {
@@ -154,22 +142,19 @@ class CvWebViewActivity : AppCompatActivity() {
         }
     }
 
-    // Back button = WebView back
     override fun onBackPressed() {
-        if (webView.canGoBack()) {
-            webView.goBack()
+        if (binding.webView.canGoBack()) {
+            binding.webView.goBack()
         } else {
             super.onBackPressed()
         }
     }
 
-    // JS bridge (optional)
     inner class AndroidBridge {
         @JavascriptInterface
         fun notifyResumeGenerated() {
             runOnUiThread {
-                Toast.makeText(this@CvWebViewActivity, "Resume Generated!", Toast.LENGTH_SHORT)
-                    .show()
+                Toast.makeText(this@CvWebViewActivity, "Resume Generated!", Toast.LENGTH_SHORT).show()
             }
         }
     }
