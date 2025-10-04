@@ -131,16 +131,19 @@ class CvWebViewActivity : AppCompatActivity() {
     }
 
     override fun onActivityResult(requestCode: Int, resultCode: Int, data: Intent?) {
-        super.onActivityResult(requestCode, resultCode, data)
-        if (requestCode == FILE_CHOOSER_REQUEST_CODE) {
-            val results: Array<Uri>? =
-                if (resultCode == Activity.RESULT_OK && data != null) {
-                    data.data?.let { arrayOf(it) }
-                } else null
-            filePathCallback?.onReceiveValue(results)
-            filePathCallback = null
+    super.onActivityResult(requestCode, resultCode, data)
+    if (requestCode == FILE_CHOOSER_REQUEST_CODE) {
+        val results: Array<Uri>? = when {
+            resultCode == Activity.RESULT_OK && data != null -> {
+                data.data?.let { arrayOf(it) } ?: arrayOf()
+            }
+            else -> null
         }
+        filePathCallback?.onReceiveValue(results)
+        filePathCallback = null
     }
+}
+
 
     override fun onBackPressed() {
         if (binding.webView.canGoBack()) {
