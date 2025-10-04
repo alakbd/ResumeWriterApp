@@ -79,17 +79,24 @@ class CvWebViewActivity : AppCompatActivity() {
                 fileChooserParams: FileChooserParams?
             ): Boolean {
                 this@CvWebViewActivity.filePathCallback = filePathCallback
+
                 val intent = fileChooserParams?.createIntent()
                 return try {
-                    startActivityForResult(intent, FILE_CHOOSER_REQUEST_CODE)
-                    true
+                    if (intent != null) {
+                        startActivityForResult(intent, FILE_CHOOSER_REQUEST_CODE)
+                        true
+                    } else {
+                        this@CvWebViewActivity.filePathCallback = null
+                        false
+                    }
                 } catch (e: Exception) {
                     this@CvWebViewActivity.filePathCallback = null
-                    Toast.makeText(this@CvWebViewActivity, "Unable to open file chooser", Toast.LENGTH_SHORT).show()
                     false
+                    }
                 }
+
             }
-        }
+
 
         // File Download handler (PDF/DOCX)
         webView.setDownloadListener { url, _, contentDisposition, mimeType, _ ->
