@@ -154,23 +154,33 @@ class MainActivity : AppCompatActivity() {
     }
 
     private fun generateCV() {
-        val availableCredits = creditManager.getAvailableCredits()
-        if (availableCredits <= 0) {
-            showMessage("Not enough credits! Please purchase more.")
-            return
-        }
-
-        binding.btnGenerateCv.isEnabled = false
-        binding.btnGenerateCv.text = "Generating CV..."
-
-        creditManager.useCredit { success ->
-            updateGenerateButton()
-            if (success) {
-                showMessage("CV generated successfully!")
-                updateCreditDisplay()
-            } else showMessage("Failed to generate CV. Please try again.")
-        }
+    val availableCredits = creditManager.getAvailableCredits()
+    if (availableCredits <= 0) {
+        showMessage("Not enough credits! Please purchase more.")
+        return
     }
+
+    binding.btnGenerateCv.isEnabled = false
+    binding.btnGenerateCv.text = "Generating CV..."
+
+    // Deduct 1 credit
+    creditManager.useCredit { success ->
+        updateGenerateButton()
+        if (success) {
+            updateCreditDisplay()
+            showMessage("Launching CV Builder...")
+
+            // 👉 Open the WebView after deducting a credit
+            val intent = Intent(this, CvWebViewActivity::class.java)
+            startActivity(intent)
+
+        } else {
+            showMessage("Failed to generate CV. Please try again.")
+        }
+        binding.btnGenerateCv.isEnabled = true
+    }
+}
+
 
     private fun purchaseProduct(productId: String) {
         if (!isBillingInitialized) {
