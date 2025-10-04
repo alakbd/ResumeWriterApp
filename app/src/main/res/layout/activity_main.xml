@@ -36,7 +36,7 @@
             android:layout_height="wrap_content"
             android:id="@+id/btn_generate_cv"
             style="@style/PrimaryButton"
-            android:text="Generate CV (1 Credit)"
+            android:text="Get Your CV (1 Credit)"
             android:layout_marginBottom="32dp"/>
 
         <!-- Purchase Section -->
