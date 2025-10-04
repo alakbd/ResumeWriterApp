@@ -26,18 +26,6 @@
         android:layout_weight="1"
         android:overScrollMode="never" />
 
-    <!-- Generate Resume Button -->
-    <Button
-        android:id="@+id/generateResumeButton"
-        android:layout_width="match_parent"
-        android:layout_height="wrap_content"
-        android:text="Generate Resume"
-        android:layout_marginTop="8dp"
-        android:layout_marginBottom="8dp"
-        android:backgroundTint="@color/purple_500"
-        android:textColor="@android:color/white"
-        android:textAllCaps="false"
-        android:padding="12dp"
-        android:elevation="4dp" />
+   
 
 </LinearLayout>
