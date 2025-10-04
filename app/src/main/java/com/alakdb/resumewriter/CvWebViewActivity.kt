@@ -56,24 +56,36 @@ class CvWebViewActivity : AppCompatActivity() {
             }
         }
 
-        // File upload support
         webView.webChromeClient = object : WebChromeClient() {
-            override fun onShowFileChooser(
-                webView: WebView?,
-                filePathCallback: ValueCallback<Array<Uri>>?,
-                fileChooserParams: FileChooserParams?
-            ): Boolean {
-                this@CvWebViewActivity.filePathCallback = filePathCallback
-                val intent = fileChooserParams?.createIntent()
-                try {
-                    startActivityForResult(intent, FILE_CHOOSER_REQUEST_CODE)
-                } catch (e: Exception) {
-                    this@CvWebViewActivity.filePathCallback = null
-                    return false
-                }
-                return true
-            }
+
+    // Progress bar updates
+    override fun onProgressChanged(view: WebView?, newProgress: Int) {
+        if (newProgress < 100) {
+            progressBar.visibility = View.VISIBLE
+            progressBar.progress = newProgress
+        } else {
+            progressBar.visibility = View.GONE
         }
+    }
+
+    // File chooser (Browse Files)
+    override fun onShowFileChooser(
+        webView: WebView?,
+        filePathCallback: ValueCallback<Array<Uri>>?,
+        fileChooserParams: FileChooserParams?
+    ): Boolean {
+        this@CvWebViewActivity.filePathCallback = filePathCallback
+        val intent = fileChooserParams?.createIntent()
+        return try {
+            startActivityForResult(intent, FILE_CHOOSER_REQUEST_CODE)
+            true
+        } catch (e: Exception) {
+            this@CvWebViewActivity.filePathCallback = null
+            false
+        }
+    }
+}
+
 
         // Download support (PDF/Word)
         webView.setDownloadListener { url, _, _, mimeType, _ ->
