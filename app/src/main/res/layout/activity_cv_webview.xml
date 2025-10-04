@@ -26,6 +26,10 @@
         android:layout_weight="1"
         android:overScrollMode="never" />
 
-   
+   <Button
+        android:id="@+id/generateResumeButton"
+        android:layout_width="wrap_content"
+        android:layout_height="wrap_content"
+        android:text="Generate Resume" />
 
 </LinearLayout>
