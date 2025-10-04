@@ -93,8 +93,12 @@ class CvWebViewActivity : AppCompatActivity() {
                 this@CvWebViewActivity.filePathCallback = filePathCallback
                 val intent = fileChooserParams?.createIntent()
                 return try {
+                    if (intent != null) {
                     startActivityForResult(intent, FILE_CHOOSER_REQUEST_CODE)
                     true
+                } else {
+                    false
+                }
                 } catch (e: Exception) {
                     this@CvWebViewActivity.filePathCallback = null
                     false
