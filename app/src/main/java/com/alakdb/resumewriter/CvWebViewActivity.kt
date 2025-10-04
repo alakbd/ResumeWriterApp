@@ -30,13 +30,20 @@ class CvWebViewActivity : AppCompatActivity() {
         progressBar = findViewById(R.id.progressBar)
         creditManager = CreditManager(this)
 
-        // WebView settings
+        /// WebView settings
         webView.settings.apply {
             javaScriptEnabled = true
             domStorageEnabled = true
+            javaScriptCanOpenWindowsAutomatically = true
+            setSupportMultipleWindows(false)
             setSupportZoom(false)
             displayZoomControls = false
-        }
+        // Add these for better compatibility
+            allowFileAccess = true
+            allowContentAccess = true
+            loadWithOverviewMode = true
+            useWideViewPort = true
+            }
 
         // Enable JS bridge
         webView.addJavascriptInterface(AndroidBridge(), "AndroidApp")
