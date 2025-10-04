@@ -1,17 +1,43 @@
+<?xml version="1.0" encoding="utf-8"?>
 <LinearLayout xmlns:android="http://schemas.android.com/apk/res/android"
+    android:id="@+id/container"
     android:layout_width="match_parent"
     android:layout_height="match_parent"
-    android:orientation="vertical">
+    android:orientation="vertical"
+    android:padding="8dp"
+    android:background="#FFFFFF">
 
+    <!-- Progress bar for WebView loading -->
+    <ProgressBar
+        android:id="@+id/progressBar"
+        style="?android:attr/progressBarStyleHorizontal"
+        android:layout_width="match_parent"
+        android:layout_height="4dp"
+        android:indeterminate="false"
+        android:progress="0"
+        android:visibility="gone"
+        android:progressTint="@color/purple_500" />
+
+    <!-- WebView -->
     <WebView
         android:id="@+id/webView"
         android:layout_width="match_parent"
         android:layout_height="0dp"
-        android:layout_weight="1" />
+        android:layout_weight="1"
+        android:overScrollMode="never" />
 
+    <!-- Generate Resume Button -->
     <Button
         android:id="@+id/generateResumeButton"
         android:layout_width="match_parent"
         android:layout_height="wrap_content"
-        android:text="Generate Resume" />
+        android:text="Generate Resume"
+        android:layout_marginTop="8dp"
+        android:layout_marginBottom="8dp"
+        android:backgroundTint="@color/purple_500"
+        android:textColor="@android:color/white"
+        android:textAllCaps="false"
+        android:padding="12dp"
+        android:elevation="4dp" />
+
 </LinearLayout>
