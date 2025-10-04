@@ -1,9 +1,7 @@
 package com.alakdb.resumewriter
 
-import android.app.Activity
 import android.app.DownloadManager
 import android.content.Context
-import android.content.Intent
 import android.net.Uri
 import android.os.Bundle
 import android.os.Environment
@@ -18,11 +16,10 @@ class CvWebViewActivity : AppCompatActivity() {
     private lateinit var webView: WebView
     private lateinit var progressBar: ProgressBar
     private lateinit var creditManager: CreditManager
-    private var filePathCallback: ValueCallback<Array<Uri>>? = null
 
-    companion object {
-        private const val FILE_CHOOSER_REQUEST_CODE = 101
-    }
+    private var filePathCallback: ValueCallback<Array<Uri>>? = null
+    private val FILE_CHOOSER_REQUEST_CODE = 101
+    private var creditUsed = false // ✅ Prevent double credit usage
 
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
@@ -32,30 +29,12 @@ class CvWebViewActivity : AppCompatActivity() {
         progressBar = findViewById(R.id.progressBar)
         creditManager = CreditManager(this)
 
-        // Check and deduct 1 credit before loading site
-        if (creditManager.getAvailableCredits() > 0) {
-            creditManager.useCredit { success ->
-                if (success) {
-                    setupWebView()
-                } else {
-                    Toast.makeText(this, "Error using credit. Please try again.", Toast.LENGTH_LONG).show()
-                    finish()
-                }
-            }
-        } else {
-            Toast.makeText(this, "Not enough credits. Please top up!", Toast.LENGTH_LONG).show()
-            finish()
-        }
-    }
-
-    private fun setupWebView() {
         webView.settings.apply {
             javaScriptEnabled = true
             domStorageEnabled = true
             javaScriptCanOpenWindowsAutomatically = true
             setSupportMultipleWindows(false)
-            setSupportZoom(true)
-            builtInZoomControls = true
+            setSupportZoom(false)
             displayZoomControls = false
             allowFileAccess = true
             allowContentAccess = true
@@ -63,10 +42,19 @@ class CvWebViewActivity : AppCompatActivity() {
             useWideViewPort = true
         }
 
-        // Interface for optional communication with JS
         webView.addJavascriptInterface(AndroidBridge(), "AndroidApp")
 
-        // File Uploads (PDF, DOCX, TXT)
+        webView.webViewClient = object : WebViewClient() {
+            override fun onPageFinished(view: WebView?, url: String?) {
+                super.onPageFinished(view, url)
+                // ✅ Hide native Tailor Resume button (if any duplicate)
+                webView.evaluateJavascript(
+                    "document.querySelector('#nativeTailorResumeButton')?.style.display='none';",
+                    null
+                )
+            }
+        }
+
         webView.webChromeClient = object : WebChromeClient() {
             override fun onProgressChanged(view: WebView?, newProgress: Int) {
                 progressBar.visibility = if (newProgress < 100) View.VISIBLE else View.GONE
@@ -79,92 +67,85 @@ class CvWebViewActivity : AppCompatActivity() {
                 fileChooserParams: FileChooserParams?
             ): Boolean {
                 this@CvWebViewActivity.filePathCallback = filePathCallback
-
                 val intent = fileChooserParams?.createIntent()
                 return try {
                     if (intent != null) {
                         startActivityForResult(intent, FILE_CHOOSER_REQUEST_CODE)
                         true
-                    } else {
-                        this@CvWebViewActivity.filePathCallback = null
-                        false
-                    }
+                    } else false
                 } catch (e: Exception) {
                     this@CvWebViewActivity.filePathCallback = null
                     false
-                    }
                 }
-
-            }
-
-
-        // File Download handler (PDF/DOCX)
-        webView.setDownloadListener { url, userAgent, contentDisposition, mimeType, _ ->
-            try {
-                val request = DownloadManager.Request(Uri.parse(url))
-                request.setNotificationVisibility(DownloadManager.Request.VISIBILITY_VISIBLE_NOTIFY_COMPLETED)
-                request.allowScanningByMediaScanner()
-
-        // Try to infer file name properly
-                val guessedFileName = URLUtil.guessFileName(url, contentDisposition, mimeType)
-                val finalFileName = when {
-                    guessedFileName.endsWith(".pdf", ignoreCase = true) -> guessedFileName
-                    guessedFileName.endsWith(".docx", ignoreCase = true) -> guessedFileName
-                    mimeType.contains("pdf", ignoreCase = true) -> "$guessedFileName.pdf"
-                    mimeType.contains("word", ignoreCase = true) -> "$guessedFileName.docx"
-                    url.endsWith(".pdf", ignoreCase = true) -> "resume_${System.currentTimeMillis()}.pdf"
-                    url.endsWith(".docx", ignoreCase = true) -> "resume_${System.currentTimeMillis()}.docx"
-                    else -> "resume_${System.currentTimeMillis()}.pdf" // default to PDF
-                }
-
-        // Save file in Downloads
-                request.setDestinationInExternalPublicDir(Environment.DIRECTORY_DOWNLOADS, finalFileName)
-                request.setMimeType(mimeType)
-
-                val dm = getSystemService(Context.DOWNLOAD_SERVICE) as DownloadManager
-                dm.enqueue(request)
-
-                Toast.makeText(this, "Downloading $finalFileName...", Toast.LENGTH_LONG).show()
-            } catch (e: Exception) {
-                Toast.makeText(this, "Download failed: ${e.message}", Toast.LENGTH_LONG).show()
             }
         }
 
-        // Hide Streamlit buttons or adjust UI (optional)
-        webView.webViewClient = object : WebViewClient() {
-            override fun onPageFinished(view: WebView?, url: String?) {
-                super.onPageFinished(view, url)
+        // ✅ Properly detect correct extension and MIME type
+        webView.setDownloadListener { url, _, contentDisposition, mimeType, _ ->
+            val request = DownloadManager.Request(Uri.parse(url))
+            request.setNotificationVisibility(DownloadManager.Request.VISIBILITY_VISIBLE_NOTIFY_COMPLETED)
 
-                // Example: Hide Tailor Resume button if needed
-                // webView.evaluateJavascript(
-                //     "document.querySelector('button[kind=\"primary\"]').style.display='none';", null
-                // )
-
-                progressBar.visibility = View.GONE
+            val guessedFileName = URLUtil.guessFileName(url, contentDisposition, mimeType)
+            val finalFileName = when {
+                guessedFileName.endsWith(".pdf", true) -> guessedFileName
+                guessedFileName.endsWith(".docx", true) -> guessedFileName
+                mimeType.contains("pdf") -> "resume_${System.currentTimeMillis()}.pdf"
+                mimeType.contains("word") || mimeType.contains("officedocument") -> "resume_${System.currentTimeMillis()}.docx"
+                else -> "resume_${System.currentTimeMillis()}.docx"
             }
+
+            request.setDestinationInExternalPublicDir(Environment.DIRECTORY_DOWNLOADS, finalFileName)
+            (getSystemService(Context.DOWNLOAD_SERVICE) as DownloadManager).enqueue(request)
+            Toast.makeText(this, "Downloading $finalFileName...", Toast.LENGTH_LONG).show()
         }
 
-        // Load your Streamlit backend (from build.gradle)
+        // ✅ Load your backend (Streamlit site)
         webView.loadUrl(BuildConfig.API_BASE_URL)
     }
 
-    // File chooser result callback
-    override fun onActivityResult(requestCode: Int, resultCode: Int, data: Intent?) {
-        if (requestCode == FILE_CHOOSER_REQUEST_CODE) {
-            val resultUris = if (resultCode == Activity.RESULT_OK && data?.data != null) {
-                arrayOf(data.data!!)
-            } else null
-            filePathCallback?.onReceiveValue(resultUris)
-            filePathCallback = null
-        }
-        super.onActivityResult(requestCode, resultCode, data)
-    }
-
     inner class AndroidBridge {
+
+        // ✅ Only deduct 1 credit when user actually presses the Tailor Resume button
+        @JavascriptInterface
+        fun onGenerateResumePressed() {
+            runOnUiThread {
+                if (!creditUsed) {
+                    if (creditManager.getAvailableCredits() > 0) {
+                        creditManager.useCredit { success ->
+                            if (success) {
+                                creditUsed = true
+                                Toast.makeText(
+                                    this@CvWebViewActivity,
+                                    "1 Credit used — Generating your tailored resume...",
+                                    Toast.LENGTH_SHORT
+                                ).show()
+                            } else {
+                                Toast.makeText(
+                                    this@CvWebViewActivity,
+                                    "Not enough credits!",
+                                    Toast.LENGTH_LONG
+                                ).show()
+                            }
+                        }
+                    } else {
+                        Toast.makeText(
+                            this@CvWebViewActivity,
+                            "You don’t have enough credits!",
+                            Toast.LENGTH_LONG
+                        ).show()
+                    }
+                }
+            }
+        }
+
         @JavascriptInterface
         fun notifyResumeGenerated() {
             runOnUiThread {
-                Toast.makeText(this@CvWebViewActivity, "Resume generated successfully!", Toast.LENGTH_SHORT).show()
+                Toast.makeText(
+                    this@CvWebViewActivity,
+                    "✅ Resume generated successfully!",
+                    Toast.LENGTH_SHORT
+                ).show()
             }
         }
     }
