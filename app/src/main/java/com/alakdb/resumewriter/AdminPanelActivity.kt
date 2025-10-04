@@ -6,6 +6,7 @@ import android.widget.ArrayAdapter
 import android.widget.AdapterView
 import android.widget.Toast
 import android.util.Log
+import com.google.firebase.firestore.DocumentSnapshot
 import com.google.firebase.firestore.Source
 import androidx.appcompat.app.AlertDialog
 import androidx.appcompat.app.AppCompatActivity
@@ -22,8 +23,7 @@ class AdminPanelActivity : AppCompatActivity() {
     private var selectedUserEmail: String = ""
     private var isUserBlocked: Boolean = false
 
-    // Master list of users (docId, email)
-    private val usersList = mutableListOf<Pair<String, String>>()
+    private val usersList = mutableListOf<Pair<String, String>>() // Master list of users (docId, email)
 
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
@@ -53,85 +53,65 @@ class AdminPanelActivity : AppCompatActivity() {
         binding.btnAdminStats.setOnClickListener { showUserStats() }
         binding.btnAdminLogout.setOnClickListener { logoutAdmin() }
         binding.btnBlockUser.setOnClickListener { toggleUserBlockStatus() }
-          // Add the refresh button
+
         binding.btnRefreshUsers.setOnClickListener {
-        showMessage("Refreshing users from server...")
-        loadUsers()
+            showMessage("Refreshing users from server...")
+            loadUsers()
         }
 
         binding.spUserSelector.onItemSelectedListener = object : AdapterView.OnItemSelectedListener {
-    override fun onItemSelected(
-        parent: AdapterView<*>,
-        view: android.view.View?,
-        position: Int,
-        id: Long
-    ) {
-        if (position == 0) {
-            clearSelection()
-            Log.d("AdminPanel", "No user selected (spinner default)")
-            return
-        }
-
-        // Corrected: Direct access since "Select a user..." is at index 0
-        val adjustedPosition = position - 1
-        if (adjustedPosition >= 0 && adjustedPosition < usersList.size) {
-            val selectedPair = usersList[adjustedPosition]
-            val userId = selectedPair.first
-            val userEmail = selectedPair.second
-            Log.d("AdminPanel", "Spinner selected: $userEmail / $userId")
-            
-            // Validate user exists before selection
-            validateUserExists(userId) { isValid ->
-                if (isValid) {
-                    selectUser(userId, userEmail)
-                } else {
-                    showMessage("User no longer exists - refreshing list")
+            override fun onItemSelected(parent: AdapterView<*>, view: android.view.View?, position: Int, id: Long) {
+                if (position == 0) {
                     clearSelection()
-                    loadUsers() // Refresh the list
+                    Log.d("AdminPanel", "No user selected (spinner default)")
+                    return
+                }
+
+                val adjustedPosition = position - 1
+                if (adjustedPosition >= 0 && adjustedPosition < usersList.size) {
+                    val selectedPair = usersList[adjustedPosition]
+                    val userId = selectedPair.first
+                    val userEmail = selectedPair.second
+
+                    validateUserExists(userId) { isValid ->
+                        if (isValid) {
+                            selectUser(userId, userEmail)
+                        } else {
+                            showMessage("User no longer exists - refreshing list")
+                            clearSelection()
+                            loadUsers()
+                        }
+                    }
+                } else {
+                    clearSelection()
+                    Log.e("AdminPanel", "Invalid spinner position: $position")
                 }
             }
-        } else {
-            clearSelection()
-            Log.e("AdminPanel", "Invalid spinner position: $position")
+
+            override fun onNothingSelected(parent: AdapterView<*>) {
+                clearSelection()
+            }
         }
     }
-
-    override fun onNothingSelected(parent: AdapterView<*>) {
-        clearSelection()
-    }
-}
 
     private fun loadUsers() {
         binding.tvUserStats.text = "Users: Loading..."
-        
         db.collection("users").get(Source.SERVER)
             .addOnSuccessListener { documents ->
                 usersList.clear()
-                
-                // Add default option first
                 val defaultOption = "" to "Select a user..."
-                
                 for (doc in documents) {
                     val email = doc.getString("email") ?: "Unknown Email"
                     usersList.add(doc.id to email)
                 }
-
-                // Create adapter with default option + users
                 val displayList = mutableListOf<String>()
                 displayList.add(defaultOption.second)
                 displayList.addAll(usersList.map { it.second })
-
-                val adapter = ArrayAdapter(
-                    this,
-                    android.R.layout.simple_spinner_item,
-                    displayList
-                )
+                val adapter = ArrayAdapter(this, android.R.layout.simple_spinner_item, displayList)
                 adapter.setDropDownViewResource(android.R.layout.simple_spinner_dropdown_item)
                 binding.spUserSelector.adapter = adapter
-                
-                if (usersList.isEmpty()) {
-                    showMessage("No users found in database")
-                }
+
+                if (usersList.isEmpty()) showMessage("No users found in database")
             }
             .addOnFailureListener { e ->
                 Log.e("AdminPanel", "Firestore error: ${e.message}", e)
@@ -141,19 +121,16 @@ class AdminPanelActivity : AppCompatActivity() {
     }
 
     private fun validateUserExists(userId: String, callback: (Boolean) -> Unit) {
-    if (userId.isEmpty()) {
-        callback(false)
-        return
-    }
-    
-    db.collection("users").document(userId).get(Source.SERVER)
-        .addOnSuccessListener { document ->
-            callback(document.exists())
-        }
-        .addOnFailureListener {
+        if (userId.isEmpty()) {
             callback(false)
+            return
         }
-}
+
+        db.collection("users").document(userId).get(Source.SERVER)
+            .addOnSuccessListener { document -> callback(document.exists()) }
+            .addOnFailureListener { callback(false) }
+    }
+
     private fun loadAdminStats() {
         binding.tvUserStats.text = "Users: Loading..."
         binding.tvCreditStats.text = "Credits: Loading..."
@@ -167,28 +144,19 @@ class AdminPanelActivity : AppCompatActivity() {
                 var blockedUsers = 0L
                 val dailyCount = mutableMapOf<String, Int>()
                 val monthlyCount = mutableMapOf<String, Int>()
-
                 val dayFormat = java.text.SimpleDateFormat("yyyy-MM-dd", java.util.Locale.getDefault())
                 val monthFormat = java.text.SimpleDateFormat("yyyy-MM", java.util.Locale.getDefault())
 
                 for (doc in documents) {
                     totalCredits += doc.getLong("totalCreditsEarned") ?: 0
                     totalCVs += doc.getLong("usedCredits") ?: 0
-                    
-                    // Count blocked users
-                    if (doc.getBoolean("isBlocked") == true) {
-                        blockedUsers++
-                    }
-
+                    if (doc.getBoolean("isBlocked") == true) blockedUsers++
                     val createdAt = doc.getLong("createdAt")
                     if (createdAt != null) {
                         try {
                             val date = java.util.Date(createdAt)
-                            val dayKey = dayFormat.format(date)
-                            val monthKey = monthFormat.format(date)
-
-                            dailyCount[dayKey] = dailyCount.getOrDefault(dayKey, 0) + 1
-                            monthlyCount[monthKey] = monthlyCount.getOrDefault(monthKey, 0) + 1
+                            dailyCount[dayFormat.format(date)] = dailyCount.getOrDefault(dayFormat.format(date), 0) + 1
+                            monthlyCount[monthFormat.format(date)] = monthlyCount.getOrDefault(monthFormat.format(date), 0) + 1
                         } catch (e: Exception) {
                             Log.e("AdminPanel", "Error parsing date for user ${doc.id}", e)
                         }
@@ -204,14 +172,8 @@ class AdminPanelActivity : AppCompatActivity() {
                     Joined Today: ${dailyCount.getOrDefault(today, 0)}
                     Joined This Month: ${monthlyCount.getOrDefault(thisMonth, 0)}
                 """.trimIndent()
-
-                binding.tvCreditStats.text = """
-                    Total Credits Earned: $totalCredits
-                """.trimIndent()
-
-                binding.tvCvStats.text = """
-                    Total CVs Generated: $totalCVs
-                """.trimIndent()
+                binding.tvCreditStats.text = "Total Credits Earned: $totalCredits"
+                binding.tvCvStats.text = "Total CVs Generated: $totalCVs"
             }
             .addOnFailureListener { e ->
                 Log.e("AdminPanel", "Failed to load admin stats: ${e.message}", e)
@@ -223,89 +185,61 @@ class AdminPanelActivity : AppCompatActivity() {
     }
 
     private fun setupManualEmailLoad() {
-    binding.btnLoadUser.setOnClickListener {
-        val emailInput = binding.etManualEmail.text.toString().trim()
-        if (emailInput.isEmpty()) {
-            showMessage("Enter an email first")
-            return@setOnClickListener
-        }
-
-        // Check if email exists in usersList first (case-insensitive)
-        val match = usersList.find { it.second.equals(emailInput, ignoreCase = true) }
-        if (match != null) {
-            validateUserExists(match.first) { isValid ->
-                if (isValid) {
-                    selectUser(match.first, match.second)
-                    // Update spinner selection
-                    val index = usersList.indexOf(match) + 1
-                    if (index < binding.spUserSelector.count) {
-                        binding.spUserSelector.setSelection(index)
-                    }
-                } else {
-                    showMessage("User was deleted - refreshing list")
-                    loadUsers() // Refresh to remove deleted users
-                }
+        binding.btnLoadUser.setOnClickListener {
+            val emailInput = binding.etManualEmail.text.toString().trim()
+            if (emailInput.isEmpty()) {
+                showMessage("Enter an email first")
+                return@setOnClickListener
             }
-        } else {
-            // Fetch from Firestore if not in list
-            db.collection("users").whereEqualTo("email", emailInput).get(Source.SERVER)
-                .addOnSuccessListener { documents ->
-                    when {
-                        documents.isEmpty -> {
-                            showMessage("User not found with email: $emailInput")
-                        }
-                        documents.size() > 1 -> {
-                            showMessage("Multiple users with same email. Using first match.")
-                            val doc = documents.documents[0]
-                            handleManualUserLoad(doc, emailInput)
-                        }
-                        else -> {
-                            val doc = documents.documents[0]
-                            handleManualUserLoad(doc, emailInput)
-                        }
+
+            val match = usersList.find { it.second.equals(emailInput, ignoreCase = true) }
+            if (match != null) {
+                validateUserExists(match.first) { isValid ->
+                    if (isValid) {
+                        selectUser(match.first, match.second)
+                        val index = usersList.indexOf(match) + 1
+                        if (index < binding.spUserSelector.count) binding.spUserSelector.setSelection(index)
+                    } else {
+                        showMessage("User was deleted - refreshing list")
+                        loadUsers()
                     }
                 }
-                .addOnFailureListener { e -> 
-                    showMessage("Failed to load user: ${e.message}")
-                }
+            } else {
+                db.collection("users").whereEqualTo("email", emailInput).get(Source.SERVER)
+                    .addOnSuccessListener { documents ->
+                        when {
+                            documents.isEmpty -> showMessage("User not found with email: $emailInput")
+                            documents.size() > 1 -> handleManualUserLoad(documents.documents[0], emailInput)
+                            else -> handleManualUserLoad(documents.documents[0], emailInput)
+                        }
+                    }
+                    .addOnFailureListener { e -> showMessage("Failed to load user: ${e.message}") }
+            }
         }
     }
-}
 
-private fun handleManualUserLoad(document: DocumentSnapshot, emailInput: String) {
-    val userId = document.id
-    val userEmail = document.getString("email") ?: emailInput
-    
-    // Check if this user already exists in our list with different case
-    val existingUser = usersList.find { it.first == userId }
-    if (existingUser == null) {
-        // Add to usersList and refresh spinner only if it's a new user
-        usersList.add(userId to userEmail)
-        refreshSpinnerAdapter()
-    }
-    
-    selectUser(userId, userEmail)
-    
-    // Try to find and select in spinner
-    val spinnerIndex = usersList.indexOfFirst { it.first == userId } + 1
-    if (spinnerIndex > 0 && spinnerIndex < binding.spUserSelector.count) {
-        binding.spUserSelector.setSelection(spinnerIndex)
-    }
-}
+    private fun handleManualUserLoad(document: DocumentSnapshot, emailInput: String) {
+        val userId = document.id
+        val userEmail = document.getString("email") ?: emailInput
 
-private fun refreshSpinnerAdapter() {
-    val displayList = mutableListOf<String>()
-    displayList.add("Select a user...")
-    displayList.addAll(usersList.map { it.second })
-    
-    val adapter = ArrayAdapter(
-        this,
-        android.R.layout.simple_spinner_item,
-        displayList
-    )
-    adapter.setDropDownViewResource(android.R.layout.simple_spinner_dropdown_item)
-    binding.spUserSelector.adapter = adapter
-}
+        if (usersList.none { it.first == userId }) {
+            usersList.add(userId to userEmail)
+            refreshSpinnerAdapter()
+        }
+
+        selectUser(userId, userEmail)
+
+        val spinnerIndex = usersList.indexOfFirst { it.first == userId } + 1
+        if (spinnerIndex > 0 && spinnerIndex < binding.spUserSelector.count) binding.spUserSelector.setSelection(spinnerIndex)
+    }
+
+    private fun refreshSpinnerAdapter() {
+        val displayList = mutableListOf("Select a user...") + usersList.map { it.second }
+        val adapter = ArrayAdapter(this, android.R.layout.simple_spinner_item, displayList)
+        adapter.setDropDownViewResource(android.R.layout.simple_spinner_dropdown_item)
+        binding.spUserSelector.adapter = adapter
+    }
+
 
     private fun selectUser(userId: String, userEmail: String) {
         selectedUserId = userId
