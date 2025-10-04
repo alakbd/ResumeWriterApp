@@ -99,22 +99,32 @@ class CvWebViewActivity : AppCompatActivity() {
 
 
         // File Download handler (PDF/DOCX)
-        webView.setDownloadListener { url, _, contentDisposition, mimeType, _ ->
+        webView.setDownloadListener { url, userAgent, contentDisposition, mimeType, _ ->
             try {
-                val filename = URLUtil.guessFileName(url, contentDisposition, mimeType)
                 val request = DownloadManager.Request(Uri.parse(url))
-                request.setMimeType(mimeType)
-                request.addRequestHeader("cookie", CookieManager.getInstance().getCookie(url))
-                request.addRequestHeader("User-Agent", webView.settings.userAgentString)
-                request.setDescription("Downloading file...")
-                request.setTitle(filename)
-                request.allowScanningByMediaScanner()
                 request.setNotificationVisibility(DownloadManager.Request.VISIBILITY_VISIBLE_NOTIFY_COMPLETED)
-                request.setDestinationInExternalPublicDir(Environment.DIRECTORY_DOWNLOADS, filename)
+                request.allowScanningByMediaScanner()
+
+        // Try to infer file name properly
+                val guessedFileName = URLUtil.guessFileName(url, contentDisposition, mimeType)
+                val finalFileName = when {
+                    guessedFileName.endsWith(".pdf", ignoreCase = true) -> guessedFileName
+                    guessedFileName.endsWith(".docx", ignoreCase = true) -> guessedFileName
+                    mimeType.contains("pdf", ignoreCase = true) -> "$guessedFileName.pdf"
+                    mimeType.contains("word", ignoreCase = true) -> "$guessedFileName.docx"
+                    url.endsWith(".pdf", ignoreCase = true) -> "resume_${System.currentTimeMillis()}.pdf"
+                    url.endsWith(".docx", ignoreCase = true) -> "resume_${System.currentTimeMillis()}.docx"
+                    else -> "resume_${System.currentTimeMillis()}.pdf" // default to PDF
+                }
+
+        // Save file in Downloads
+                request.setDestinationInExternalPublicDir(Environment.DIRECTORY_DOWNLOADS, finalFileName)
+                request.setMimeType(mimeType)
 
                 val dm = getSystemService(Context.DOWNLOAD_SERVICE) as DownloadManager
                 dm.enqueue(request)
-                Toast.makeText(this, "Downloading $filename...", Toast.LENGTH_LONG).show()
+
+                Toast.makeText(this, "Downloading $finalFileName...", Toast.LENGTH_LONG).show()
             } catch (e: Exception) {
                 Toast.makeText(this, "Download failed: ${e.message}", Toast.LENGTH_LONG).show()
             }
