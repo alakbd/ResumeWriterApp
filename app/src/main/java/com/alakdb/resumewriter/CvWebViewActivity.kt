@@ -10,6 +10,12 @@ import android.widget.Button
 import android.widget.ProgressBar
 import android.widget.Toast
 import androidx.appcompat.app.AppCompatActivity
+import android.content.Intent
+import android.os.Handler
+import android.os.Looper
+import androidx.activity.result.ActivityResultLauncher
+import androidx.activity.result.contract.ActivityResultContracts
+
 
 class CvWebViewActivity : AppCompatActivity() {
 
@@ -17,9 +23,10 @@ class CvWebViewActivity : AppCompatActivity() {
     private lateinit var generateResumeButton: Button
     private lateinit var progressBar: ProgressBar
     private lateinit var creditManager: CreditManager
+    private lateinit var fileChooserLauncher: ActivityResultLauncher<Intent>
 
     private var filePathCallback: ValueCallback<Array<Uri>>? = null
-    private val FILE_CHOOSER_REQUEST_CODE = 101
+    private val resumeButtonHandler = Handler(Looper.getMainLooper())
 
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
@@ -30,6 +37,20 @@ class CvWebViewActivity : AppCompatActivity() {
         progressBar = findViewById(R.id.progressBar)
         creditManager = CreditManager(this)
 
+        // ✅ Modern file chooser launcher
+        fileChooserLauncher =
+            registerForActivityResult(ActivityResultContracts.StartActivityForResult()) { result ->
+                if (result.resultCode == RESULT_OK) {
+                    val data: Intent? = result.data
+                    val results: Array<Uri>? = data?.data?.let { arrayOf(it) }
+                    filePathCallback?.onReceiveValue(results)
+                } else {
+                    filePathCallback?.onReceiveValue(null)
+                }
+                filePathCallback = null
+            }
+
+        
         /// WebView settings
         webView.settings.apply {
             javaScriptEnabled = true
@@ -75,8 +96,13 @@ class CvWebViewActivity : AppCompatActivity() {
                 super.onPageFinished(view, url)
                 // Hide site’s Tailor Resume button (so only native is visible)
                 webView.evaluateJavascript(
-                    "document.querySelector('#tailorResumeButton').style.display='none';",
-                    null
+                    """
+                    (function() {
+                        var button = document.querySelector('#tailorResumeButton')
+                                    || document.querySelector('button[aria-label="Tailor Resume"]');
+                        if(btn) { btn.style.display = 'none'; }
+                    })();
+                    """.trimIndent(), null
                 )
             }
         }
@@ -101,11 +127,9 @@ class CvWebViewActivity : AppCompatActivity() {
                 val intent = fileChooserParams?.createIntent()
                 return try {
                     if (intent != null) {
-                    startActivityForResult(intent, FILE_CHOOSER_REQUEST_CODE)
-                    true
-                } else {
-                    false
-                }
+                        fileChooserLauncher.launch(intent) // ✅ modern call
+                        true
+                        } else false
                 } catch (e: Exception) {
                     this@CvWebViewActivity.filePathCallback = null
                     false
