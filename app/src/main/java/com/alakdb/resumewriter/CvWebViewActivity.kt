@@ -35,26 +35,27 @@ class CvWebViewActivity : AppCompatActivity() {
         // Handle file uploads (upload CV / job description)
         webView.webChromeClient = object : WebChromeClient() {
             override fun onShowFileChooser(
-                webView: WebView?,
-                filePathCallback: ValueCallback<Array<Uri>>?,
-                fileChooserParams: FileChooserParams?
-            ): Boolean {
-                this@CvWebViewActivity.filePathCallback = filePathCallback
-                val intent = fileChooserParams?.createIntent()
-                try {
-                    startActivityForResult(intent, FILE_CHOOSER_REQUEST_CODE)
-                } catch (e: Exception) {
-                    this@CvWebViewActivity.filePathCallback = null
-                    Toast.makeText(
-                        this@CvWebViewActivity,
-                        "Cannot open file chooser",
-                        Toast.LENGTH_SHORT
-                    ).show()
-                    return false
-                }
-                return true
-            }
+    webView: WebView?,
+    filePathCallback: ValueCallback<Array<Uri>>?,
+    fileChooserParams: WebChromeClient.FileChooserParams?
+): Boolean {
+    this@CvWebViewActivity.filePathCallback = filePathCallback
+
+    val intent: Intent? = fileChooserParams?.createIntent()
+    return if (intent != null) {
+        try {
+            startActivityForResult(intent, FILE_CHOOSER_REQUEST_CODE)
+            true
+        } catch (e: Exception) {
+            this@CvWebViewActivity.filePathCallback = null
+            false
         }
+    } else {
+        this@CvWebViewActivity.filePathCallback = null
+        false
+    }
+}
+
 
         // Optional: Hide native Streamlit buttons if needed via JS
         webView.webViewClient = object : WebViewClient() {
