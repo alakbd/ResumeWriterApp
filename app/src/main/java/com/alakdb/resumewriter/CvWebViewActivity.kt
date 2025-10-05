@@ -10,7 +10,6 @@ import android.view.View
 import android.webkit.*
 import android.widget.ProgressBar
 import android.widget.Toast
-import android.util.Log
 import androidx.appcompat.app.AppCompatActivity
 
 class CvWebViewActivity : AppCompatActivity() {
@@ -36,7 +35,7 @@ class CvWebViewActivity : AppCompatActivity() {
         webView.setLayerType(View.LAYER_TYPE_HARDWARE, null)
         webView.scrollBarStyle = View.SCROLLBARS_INSIDE_OVERLAY
 
-        // 3️⃣ Configure WebView settings
+        // Configure WebView settings
         webView.settings.apply {
             javaScriptEnabled = true
             domStorageEnabled = true
@@ -48,24 +47,24 @@ class CvWebViewActivity : AppCompatActivity() {
             allowContentAccess = true
             loadWithOverviewMode = true
             useWideViewPort = true
-            mixedContentMode = WebSettings.MIXED_CONTENT_ALWAYS_ALLOW // ✅ Fix for stuck / blocked assets
+            mixedContentMode = WebSettings.MIXED_CONTENT_ALWAYS_ALLOW
         }
 
-        // 4️⃣ JS interface must be added before loading any page
+        // JS interface must be added before loading any page
         webView.addJavascriptInterface(AndroidBridge(), "AndroidApp")
 
-        // 5️⃣ Set clients (WebViewClient first, then WebChromeClient)
+        // Set WebViewClient
         webView.webViewClient = object : WebViewClient() {
             override fun onPageFinished(view: WebView?, url: String?) {
                 super.onPageFinished(view, url)
                 
-                // 1️⃣ Hide native duplicate button
+                // Hide native duplicate button
                 webView.evaluateJavascript(
                     "document.querySelector('#nativeTailorResumeButton')?.style.display='none';",
                     null
                 )
 
-                // 2️⃣ Inject global JS error catcher
+                // Inject global JS error catcher
                 webView.evaluateJavascript("""
                     window.onerror = function(message, source, lineno, colno, error) {
                         console.log("JS ERROR: " + message + " at " + source + ":" + lineno + ":" + colno);
@@ -75,36 +74,28 @@ class CvWebViewActivity : AppCompatActivity() {
                     };
                 """.trimIndent(), null)
 
-                // 3️⃣ Inject Streamlit button listener
+                // Inject Streamlit button listener
                 injectStreamlitButtonListener()
             }
 
-            // Optional: Handle redirects or link clicks cleanly
             override fun shouldOverrideUrlLoading(view: WebView?, request: WebResourceRequest?): Boolean {
                 view?.loadUrl(request?.url.toString())
                 return true
             }
         }
 
+        // Set WebChromeClient
         webView.webChromeClient = object : WebChromeClient() {
-
             override fun onProgressChanged(view: WebView?, newProgress: Int) {
                 progressBar.visibility = if (newProgress < 100) View.VISIBLE else View.GONE
                 progressBar.progress = newProgress
             }
 
-            // ✅ Put it *here*, inside webChromeClient
             override fun onConsoleMessage(consoleMessage: ConsoleMessage?): Boolean {
-               consoleMessage?.let {
-                   when(it.messageLevel()) {
-                    ConsoleMessage.MessageLevel.ERROR -> Log.e("WebViewConsole", it.message())
-                    ConsoleMessage.MessageLevel.WARNING -> Log.w("WebViewConsole", it.message())
-                    ConsoleMessage.MessageLevel.LOG,
-                    ConsoleMessage.MessageLevel.TIP,
-                    ConsoleMessage.MessageLevel.DEBUG -> Log.d("WebViewConsole", it.message())
-                    }
-                    Log.d("WebViewConsoleFull", "JS line ${it.lineNumber()} source: ${it.sourceId()}")
-               }
+                android.util.Log.d(
+                    "WebViewConsole",
+                    "${consoleMessage?.message()} (Line: ${consoleMessage?.lineNumber()})"
+                )
                 return true
             }
 
@@ -127,7 +118,7 @@ class CvWebViewActivity : AppCompatActivity() {
             }
         }
 
-        // ✅ Set download listener
+        // Set download listener
         webView.setDownloadListener { url, _, contentDisposition, mimeType, _ ->
             val request = DownloadManager.Request(Uri.parse(url))
             request.setNotificationVisibility(DownloadManager.Request.VISIBILITY_VISIBLE_NOTIFY_COMPLETED)
@@ -146,18 +137,16 @@ class CvWebViewActivity : AppCompatActivity() {
             Toast.makeText(this, "Downloading $finalFileName...", Toast.LENGTH_LONG).show()
         }
 
-        // ✅ Load your backend (Streamlit site) - ONLY ONCE
+        // Load your backend (Streamlit site)
         webView.loadUrl("${BuildConfig.API_BASE_URL}?fromApp=true")
     }
 
-    // ✅ Inject JavaScript to listen for Streamlit button clicks
+    // Inject JavaScript to listen for Streamlit button clicks
     private fun injectStreamlitButtonListener() {
         val jsCode = """
-            // Function to find and monitor the Streamlit "Generate Tailored Resume" button
             function connectToStreamlitButton() {
                 console.log('Looking for Streamlit button...');
                 
-                // Method 1: Look for button by text content
                 const buttons = document.querySelectorAll('button, [role="button"], .stButton button');
                 let targetButton = null;
                 
@@ -172,7 +161,6 @@ class CvWebViewActivity : AppCompatActivity() {
                     }
                 }
                 
-                // Method 2: Look for button by data-testid or other attributes (common in Streamlit)
                 if (!targetButton) {
                     targetButton = document.querySelector('[data-testid="baseButton-secondary"]') ||
                                   document.querySelector('.stButton > button') ||
@@ -182,7 +170,6 @@ class CvWebViewActivity : AppCompatActivity() {
                 }
                 
                 if (targetButton) {
-                    // Remove any existing listeners to prevent duplicates
                     targetButton.replaceWith(targetButton.cloneNode(true));
                     const newButton = document.querySelector('button[class*="secondary"]') || 
                                      document.querySelector('[data-testid="baseButton-secondary"]') ||
@@ -191,7 +178,6 @@ class CvWebViewActivity : AppCompatActivity() {
                     if (newButton) {
                         newButton.addEventListener('click', function() {
                             console.log('Generate Tailored Resume button clicked!');
-                            // Call Android interface to deduct credit
                             if (window.AndroidApp) {
                                 AndroidApp.onTailorResumeButtonClicked();
                             } else {
@@ -202,15 +188,12 @@ class CvWebViewActivity : AppCompatActivity() {
                     }
                 } else {
                     console.log('Streamlit button not found, retrying in 1 second...');
-                    // Retry after 1 second if button not found yet
                     setTimeout(connectToStreamlitButton, 1000);
                 }
             }
             
-            // Start looking for the button when page loads
             connectToStreamlitButton();
             
-            // Also retry when DOM changes (Streamlit is dynamic)
             const observer = new MutationObserver(function() {
                 connectToStreamlitButton();
             });
@@ -228,33 +211,24 @@ class CvWebViewActivity : AppCompatActivity() {
         super.onActivityResult(requestCode, resultCode, data)
     
         if (requestCode == FILE_CHOOSER_REQUEST_CODE) {
-            // Handle the file selection result
             val results = when {
                 resultCode == RESULT_OK && data != null -> {
-                    // Single file selection
                     arrayOf(data.data ?: return)
                 }
                 resultCode == RESULT_OK -> {
-                    // If you need to handle camera or multiple files, add here
                     null
                 }
                 else -> {
-                    // User cancelled
                     null
                 }
             }
         
-            // Pass the result back to WebView
             filePathCallback?.onReceiveValue(results)
             filePathCallback = null
         }
     }
 
     inner class AndroidBridge {
-
-        // ✅ REMOVED: onGenerateResumePressed() - No longer deduct credit here
-
-        // ✅ NEW: This method is called when Streamlit "Generate Tailored Resume" button is clicked
         @JavascriptInterface
         fun onTailorResumeButtonClicked() {
             runOnUiThread {
@@ -269,7 +243,6 @@ class CvWebViewActivity : AppCompatActivity() {
                                     Toast.LENGTH_SHORT
                                 ).show()
                                 
-                                // ✅ Notify Streamlit that credit was deducted and generation can proceed
                                 webView.evaluateJavascript(
                                     "if(window.streamlitApp) { streamlitApp.creditApproved(); }",
                                     null
@@ -307,7 +280,7 @@ class CvWebViewActivity : AppCompatActivity() {
                     "✅ Resume generated successfully!",
                     Toast.LENGTH_SHORT
                 ).show()
-                creditUsed = false // ✅ Allow next generation to use a credit
+                creditUsed = false
             }
         }
     }
