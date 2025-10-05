@@ -72,18 +72,21 @@ class CvWebViewActivity : AppCompatActivity() {
     }
 
     webView.webChromeClient = object : WebChromeClient() {
+
         override fun onProgressChanged(view: WebView?, newProgress: Int) {
             progressBar.visibility = if (newProgress < 100) View.VISIBLE else View.GONE
             progressBar.progress = newProgress
         }
-        // ✅ Add this method for logging JS console output
+
+        // ✅ Put it *here*, inside webChromeClient
         override fun onConsoleMessage(consoleMessage: ConsoleMessage?): Boolean {
             android.util.Log.d(
                 "WebViewConsole",
                 "${consoleMessage?.message()} (Line: ${consoleMessage?.lineNumber()})"
-        )
-        return true
-    }
+            )
+            return true
+        }
+
         override fun onShowFileChooser(
             webView: WebView?,
             filePathCallback: ValueCallback<Array<Uri>>?,
