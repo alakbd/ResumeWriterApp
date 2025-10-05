@@ -10,6 +10,10 @@ import android.view.View
 import android.webkit.*
 import android.widget.ProgressBar
 import android.widget.Toast
+import androidx.lifecycle.lifecycleScope
+import kotlinx.coroutines.Dispatchers
+import kotlinx.coroutines.launch
+
 import androidx.appcompat.app.AppCompatActivity
 
 class CvWebViewActivity : AppCompatActivity() {
