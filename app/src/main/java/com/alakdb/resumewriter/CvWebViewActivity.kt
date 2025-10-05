@@ -10,6 +10,7 @@ import android.view.View
 import android.webkit.*
 import android.widget.ProgressBar
 import android.widget.Toast
+import android.util.Log
 import androidx.appcompat.app.AppCompatActivity
 
 class CvWebViewActivity : AppCompatActivity() {
