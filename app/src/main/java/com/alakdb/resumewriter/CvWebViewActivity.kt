@@ -48,7 +48,8 @@ class CvWebViewActivity : AppCompatActivity() {
             loadWithOverviewMode = true
             useWideViewPort = true
             mixedContentMode = WebSettings.MIXED_CONTENT_ALWAYS_ALLOW
-        }
+            WebView.setWebContentsDebuggingEnabled(true) // Newly added
+        } 
 
         // JS interface must be added before loading any page
         webView.addJavascriptInterface(AndroidBridge(), "AndroidApp")
