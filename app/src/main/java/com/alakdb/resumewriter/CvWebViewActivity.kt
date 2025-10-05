@@ -57,7 +57,24 @@ class CvWebViewActivity : AppCompatActivity() {
         webView.webViewClient = object : WebViewClient() {
             override fun onPageFinished(view: WebView?, url: String?) {
                 super.onPageFinished(view, url)
+                // 1️⃣ Hide native duplicate button
+    webView.evaluateJavascript(
+        "document.querySelector('#nativeTailorResumeButton')?.style.display='none';",
+        null
+    )
+
+    // 2️⃣ Inject global JS error catcher
+    webView.evaluateJavascript("""
+        window.onerror = function(message, source, lineno, colno, error) {
+            console.log("JS ERROR: " + message + " at " + source + ":" + lineno + ":" + colno);
+        };
+        window.onunhandledrejection = function(event) {
+            console.log("Unhandled Promise rejection: " + event.reason);
+        };
+    """.trimIndent(), null)
+
                 injectStreamlitButtonListener()
+            }
 
                 // Optional: Hide native duplicate button
                 webView.evaluateJavascript(
