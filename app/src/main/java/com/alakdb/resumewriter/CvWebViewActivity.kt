@@ -60,7 +60,6 @@ class CvWebViewActivity : AppCompatActivity() {
             webView.clearCache(true)
             webView.clearHistory()
         }
-    }
         
         // Add JavaScript interface
         webView.addJavascriptInterface(AndroidBridge(), "AndroidApp")
