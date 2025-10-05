@@ -51,9 +51,10 @@ class CvWebViewActivity : AppCompatActivity() {
         }
 
         // Make sure these lines are INSIDE onCreate(), but OUTSIDE apply { }
-        webView.setLayerType(WebView.LAYER_TYPE_SOFTWARE, null)
-        webView.clearCache(true)
-        webView.clearHistory()
+        lifecycleScope.launch(Dispatchers.IO) {    
+            webView.clearCache(true)
+            webView.clearHistory()
+        }
         
         // Add JavaScript interface
         webView.addJavascriptInterface(AndroidBridge(), "AndroidApp")
