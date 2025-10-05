@@ -48,6 +48,10 @@ class CvWebViewActivity : AppCompatActivity() {
         webView.webViewClient = object : WebViewClient() {
             override fun onPageFinished(view: WebView?, url: String?) {
                 super.onPageFinished(view, url)
+                
+                // ✅ Inject JavaScript to connect Streamlit button to Android
+                injectStreamlitButtonListener()
+                
                 // ✅ Hide native Tailor Resume button (if any duplicate)
                 webView.evaluateJavascript(
                     "document.querySelector('#nativeTailorResumeButton')?.style.display='none';",
@@ -104,7 +108,80 @@ class CvWebViewActivity : AppCompatActivity() {
         webView.loadUrl("${BuildConfig.API_BASE_URL}?fromApp=true")
     }
 
-    // ✅ CORRECT PLACEMENT - onActivityResult is at activity level, NOT inside onCreate
+    // ✅ Inject JavaScript to listen for Streamlit button clicks
+    private fun injectStreamlitButtonListener() {
+        val jsCode = """
+            // Function to find and monitor the Streamlit "Generate Tailored Resume" button
+            function connectToStreamlitButton() {
+                console.log('Looking for Streamlit button...');
+                
+                // Method 1: Look for button by text content
+                const buttons = document.querySelectorAll('button, [role="button"], .stButton button');
+                let targetButton = null;
+                
+                for (let button of buttons) {
+                    if (button.textContent.includes('Generate Tailored Resume') || 
+                        button.textContent.includes('Tailored Resume') ||
+                        button.innerText.includes('Generate Tailored Resume') ||
+                        button.innerText.includes('Tailored Resume')) {
+                        targetButton = button;
+                        console.log('Found button by text:', button.textContent);
+                        break;
+                    }
+                }
+                
+                // Method 2: Look for button by data-testid or other attributes (common in Streamlit)
+                if (!targetButton) {
+                    targetButton = document.querySelector('[data-testid="baseButton-secondary"]') ||
+                                  document.querySelector('.stButton > button') ||
+                                  document.querySelector('[kind="secondary"]') ||
+                                  document.querySelector('button[class*="secondary"]');
+                    console.log('Found button by selector:', targetButton);
+                }
+                
+                if (targetButton) {
+                    // Remove any existing listeners to prevent duplicates
+                    targetButton.replaceWith(targetButton.cloneNode(true));
+                    const newButton = document.querySelector('button[class*="secondary"]') || 
+                                     document.querySelector('[data-testid="baseButton-secondary"]') ||
+                                     document.querySelector('.stButton > button');
+                    
+                    if (newButton) {
+                        newButton.addEventListener('click', function() {
+                            console.log('Generate Tailored Resume button clicked!');
+                            // Call Android interface to deduct credit
+                            if (window.AndroidApp) {
+                                AndroidApp.onTailorResumeButtonClicked();
+                            } else {
+                                console.log('AndroidApp interface not found');
+                            }
+                        });
+                        console.log('Listener attached to Streamlit button');
+                    }
+                } else {
+                    console.log('Streamlit button not found, retrying in 1 second...');
+                    // Retry after 1 second if button not found yet
+                    setTimeout(connectToStreamlitButton, 1000);
+                }
+            }
+            
+            // Start looking for the button when page loads
+            connectToStreamlitButton();
+            
+            // Also retry when DOM changes (Streamlit is dynamic)
+            const observer = new MutationObserver(function() {
+                connectToStreamlitButton();
+            });
+            
+            observer.observe(document.body, {
+                childList: true,
+                subtree: true
+            });
+        """.trimIndent()
+
+        webView.evaluateJavascript(jsCode, null)
+    }
+
     override fun onActivityResult(requestCode: Int, resultCode: Int, data: Intent?) {
         super.onActivityResult(requestCode, resultCode, data)
     
@@ -132,9 +209,12 @@ class CvWebViewActivity : AppCompatActivity() {
     }
 
     inner class AndroidBridge {
-        // ✅ Only deduct 1 credit when user actually presses the Tailor Resume button
+
+        // ✅ REMOVED: onGenerateResumePressed() - No longer deduct credit here
+
+        // ✅ NEW: This method is called when Streamlit "Generate Tailored Resume" button is clicked
         @JavascriptInterface
-        fun onGenerateResumePressed() {
+        fun onTailorResumeButtonClicked() {
             runOnUiThread {
                 if (!creditUsed) {
                     if (creditManager.getAvailableCredits() > 0) {
@@ -146,10 +226,16 @@ class CvWebViewActivity : AppCompatActivity() {
                                     "1 Credit used — Generating your tailored resume...",
                                     Toast.LENGTH_SHORT
                                 ).show()
+                                
+                                // ✅ Notify Streamlit that credit was deducted and generation can proceed
+                                webView.evaluateJavascript(
+                                    "if(window.streamlitApp) { streamlitApp.creditApproved(); }",
+                                    null
+                                )
                             } else {
                                 Toast.makeText(
                                     this@CvWebViewActivity,
-                                    "Not enough credits!",
+                                    "Credit deduction failed!",
                                     Toast.LENGTH_LONG
                                 ).show()
                             }
@@ -161,6 +247,12 @@ class CvWebViewActivity : AppCompatActivity() {
                             Toast.LENGTH_LONG
                         ).show()
                     }
+                } else {
+                    Toast.makeText(
+                        this@CvWebViewActivity,
+                        "Credit already used for this session",
+                        Toast.LENGTH_SHORT
+                    ).show()
                 }
             }
         }
