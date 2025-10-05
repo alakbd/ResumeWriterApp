@@ -265,7 +265,7 @@ class CvWebViewActivity : AppCompatActivity() {
                         }
                     } else {
                         Toast.makeText(
-                            this@CvWebViewViewActivity,
+                            this@CvWebViewActivity,
                             "You don't have enough credits!",
                             Toast.LENGTH_LONG
                         ).show()
