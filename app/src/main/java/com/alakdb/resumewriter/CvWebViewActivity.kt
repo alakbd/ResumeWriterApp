@@ -32,10 +32,11 @@ class CvWebViewActivity : AppCompatActivity() {
 
         // Configure WebView for better performance
         webView.setLayerType(View.LAYER_TYPE_HARDWARE, null)
+        webView.clearCache(true)
+        webView.clearHistory()
         webView.scrollBarStyle = View.SCROLLBARS_INSIDE_OVERLAY
 
-        // WebView settings
-        webView.settings.apply {
+        /webView.settings.apply {
             javaScriptEnabled = true
             domStorageEnabled = true
             javaScriptCanOpenWindowsAutomatically = true
@@ -48,7 +49,7 @@ class CvWebViewActivity : AppCompatActivity() {
             loadsImagesAutomatically = true
             useWideViewPort = true
             mixedContentMode = WebSettings.MIXED_CONTENT_ALWAYS_ALLOW
-            cacheMode = WebSettings.LOAD_DEFAULT
+            cacheMode = WebSettings.LOAD_NO_CACHE
         }
 
         // Add JavaScript interface
