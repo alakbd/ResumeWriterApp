@@ -94,10 +94,16 @@ class CvWebViewActivity : AppCompatActivity() {
 
             // ✅ Put it *here*, inside webChromeClient
             override fun onConsoleMessage(consoleMessage: ConsoleMessage?): Boolean {
-                android.util.Log.d(
-                    "WebViewConsole",
-                    "${consoleMessage?.message()} (Line: ${consoleMessage?.lineNumber()})"
-                )
+               consoleMessage?.let {
+                   when(it.messageLevel()) {
+                    ConsoleMessage.MessageLevel.ERROR -> Log.e("WebViewConsole", it.message())
+                    ConsoleMessage.MessageLevel.WARNING -> Log.w("WebViewConsole", it.message())
+                    ConsoleMessage.MessageLevel.LOG,
+                    ConsoleMessage.MessageLevel.TIP,
+                    ConsoleMessage.MessageLevel.DEBUG -> Log.d("WebViewConsole", it.message())
+                    }
+                    Log.d("WebViewConsoleFull", "JS line ${it.lineNumber()} source: ${it.sourceId()}")
+               }
                 return true
             }
 
