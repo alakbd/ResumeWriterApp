@@ -41,6 +41,31 @@ class CvWebViewActivity : AppCompatActivity() {
             loadWithOverviewMode = true
             useWideViewPort = true
         }
+    override fun onActivityResult(requestCode: Int, resultCode: Int, data: Intent?) {
+        super.onActivityResult(requestCode, resultCode, data)
+    
+        if (requestCode == FILE_CHOOSER_REQUEST_CODE) {
+        // Handle the file selection result
+            val results = when {
+                resultCode == RESULT_OK && data != null -> {
+                // Single file selection
+                    arrayOf(data.data ?: return)
+                }
+                resultCode == RESULT_OK -> {
+                // If you need to handle camera or multiple files, add here
+                    null
+                }
+                else -> {
+                // User cancelled
+                    null
+                }
+            }
+        
+        // Pass the result back to WebView
+        filePathCallback?.onReceiveValue(results)
+        filePathCallback = null
+    }
+}
 
         webView.addJavascriptInterface(AndroidBridge(), "AndroidApp")
 
