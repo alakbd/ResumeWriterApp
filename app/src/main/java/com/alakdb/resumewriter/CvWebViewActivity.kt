@@ -45,6 +45,7 @@ class CvWebViewActivity : AppCompatActivity() {
             allowFileAccess = true
             allowContentAccess = true
             loadWithOverviewMode = true
+            loadsImagesAutomatically = true
             useWideViewPort = true
             mixedContentMode = WebSettings.MIXED_CONTENT_ALWAYS_ALLOW
             cacheMode = WebSettings.LOAD_DEFAULT
