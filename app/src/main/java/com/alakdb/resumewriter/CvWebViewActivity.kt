@@ -56,7 +56,7 @@ class CvWebViewActivity : AppCompatActivity() {
         }
 
         // Make sure these lines are INSIDE onCreate(), but OUTSIDE apply { }
-        lifecycleScope.launch(Dispatchers.IO) {    
+        lifecycleScope.launch {    
             webView.clearCache(true)
             webView.clearHistory()
         }
