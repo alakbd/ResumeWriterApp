@@ -31,9 +31,7 @@ class CvWebViewActivity : AppCompatActivity() {
         creditManager = CreditManager(this)
 
         // Configure WebView for better performance
-        webView.setLayerType(View.LAYER_TYPE_HARDWARE, null)
-        webView.clearCache(true)
-        webView.clearHistory()
+      
         webView.scrollBarStyle = View.SCROLLBARS_INSIDE_OVERLAY
 
         /webView.settings.apply {
@@ -52,6 +50,11 @@ class CvWebViewActivity : AppCompatActivity() {
             cacheMode = WebSettings.LOAD_NO_CACHE
         }
 
+        // Make sure these lines are INSIDE onCreate(), but OUTSIDE apply { }
+        webView.setLayerType(WebView.LAYER_TYPE_SOFTWARE, null)
+        webView.clearCache(true)
+        webView.clearHistory()
+        
         // Add JavaScript interface
         webView.addJavascriptInterface(AndroidBridge(), "AndroidApp")
 
