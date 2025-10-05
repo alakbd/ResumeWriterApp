@@ -2,6 +2,7 @@ package com.alakdb.resumewriter
 
 import android.app.DownloadManager
 import android.content.Context
+import android.content.Intent
 import android.net.Uri
 import android.os.Bundle
 import android.os.Environment
@@ -41,31 +42,6 @@ class CvWebViewActivity : AppCompatActivity() {
             loadWithOverviewMode = true
             useWideViewPort = true
         }
-    override fun onActivityResult(requestCode: Int, resultCode: Int, data: Intent?) {
-        super.onActivityResult(requestCode, resultCode, data)
-    
-        if (requestCode == FILE_CHOOSER_REQUEST_CODE) {
-        // Handle the file selection result
-            val results = when {
-                resultCode == RESULT_OK && data != null -> {
-                // Single file selection
-                    arrayOf(data.data ?: return)
-                }
-                resultCode == RESULT_OK -> {
-                // If you need to handle camera or multiple files, add here
-                    null
-                }
-                else -> {
-                // User cancelled
-                    null
-                }
-            }
-        
-        // Pass the result back to WebView
-        filePathCallback?.onReceiveValue(results)
-        filePathCallback = null
-    }
-}
 
         webView.addJavascriptInterface(AndroidBridge(), "AndroidApp")
 
@@ -128,8 +104,34 @@ class CvWebViewActivity : AppCompatActivity() {
         webView.loadUrl("${BuildConfig.API_BASE_URL}?fromApp=true")
     }
 
-    inner class AndroidBridge {
+    // ✅ CORRECT PLACEMENT - onActivityResult is at activity level, NOT inside onCreate
+    override fun onActivityResult(requestCode: Int, resultCode: Int, data: Intent?) {
+        super.onActivityResult(requestCode, resultCode, data)
+    
+        if (requestCode == FILE_CHOOSER_REQUEST_CODE) {
+            // Handle the file selection result
+            val results = when {
+                resultCode == RESULT_OK && data != null -> {
+                    // Single file selection
+                    arrayOf(data.data ?: return)
+                }
+                resultCode == RESULT_OK -> {
+                    // If you need to handle camera or multiple files, add here
+                    null
+                }
+                else -> {
+                    // User cancelled
+                    null
+                }
+            }
+        
+            // Pass the result back to WebView
+            filePathCallback?.onReceiveValue(results)
+            filePathCallback = null
+        }
+    }
 
+    inner class AndroidBridge {
         // ✅ Only deduct 1 credit when user actually presses the Tailor Resume button
         @JavascriptInterface
         fun onGenerateResumePressed() {
@@ -155,7 +157,7 @@ class CvWebViewActivity : AppCompatActivity() {
                     } else {
                         Toast.makeText(
                             this@CvWebViewActivity,
-                            "You don’t have enough credits!",
+                            "You don't have enough credits!",
                             Toast.LENGTH_LONG
                         ).show()
                     }
