@@ -25,12 +25,15 @@ class CvWebViewActivity : AppCompatActivity() {
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
         setContentView(R.layout.activity_cv_webview)
-        webView.setLayerType(View.LAYER_TYPE_HARDWARE, null)
-        webView.scrollBarStyle = View.SCROLLBARS_INSIDE_OVERLAY
-
+        
+        // Initialize views after setContentView
         webView = findViewById(R.id.webView)
         progressBar = findViewById(R.id.progressBar)
         creditManager = CreditManager(this)
+
+        // Configure WebView hardware acceleration and scrollbars
+        webView.setLayerType(View.LAYER_TYPE_HARDWARE, null)
+        webView.scrollBarStyle = View.SCROLLBARS_INSIDE_OVERLAY
 
         // 3️⃣ Configure WebView settings
         webView.settings.apply {
@@ -45,72 +48,67 @@ class CvWebViewActivity : AppCompatActivity() {
             loadWithOverviewMode = true
             useWideViewPort = true
             mixedContentMode = WebSettings.MIXED_CONTENT_ALWAYS_ALLOW // ✅ Fix for stuck / blocked assets
-    }
+        }
 
-    
         // 4️⃣ JS interface must be added before loading any page
-    webView.addJavascriptInterface(AndroidBridge(), "AndroidApp")
+        webView.addJavascriptInterface(AndroidBridge(), "AndroidApp")
 
-    // 5️⃣ Set clients (WebViewClient first, then WebChromeClient)
-    webView.webViewClient = object : WebViewClient() {
-        override fun onPageFinished(view: WebView?, url: String?) {
-            super.onPageFinished(view, url)
-            injectStreamlitButtonListener()
+        // 5️⃣ Set clients (WebViewClient first, then WebChromeClient)
+        webView.webViewClient = object : WebViewClient() {
+            override fun onPageFinished(view: WebView?, url: String?) {
+                super.onPageFinished(view, url)
+                injectStreamlitButtonListener()
 
-            // Optional: Hide native duplicate button
-            webView.evaluateJavascript(
-                "document.querySelector('#nativeTailorResumeButton')?.style.display='none';",
-                null
-            )
-        }
+                // Optional: Hide native duplicate button
+                webView.evaluateJavascript(
+                    "document.querySelector('#nativeTailorResumeButton')?.style.display='none';",
+                    null
+                )
+            }
 
-        // Optional: Handle redirects or link clicks cleanly
-        override fun shouldOverrideUrlLoading(view: WebView?, request: WebResourceRequest?): Boolean {
-            view?.loadUrl(request?.url.toString())
-            return true
-        }
-    }
-
-    webView.webChromeClient = object : WebChromeClient() {
-
-        override fun onProgressChanged(view: WebView?, newProgress: Int) {
-            progressBar.visibility = if (newProgress < 100) View.VISIBLE else View.GONE
-            progressBar.progress = newProgress
-        }
-
-        // ✅ Put it *here*, inside webChromeClient
-        override fun onConsoleMessage(consoleMessage: ConsoleMessage?): Boolean {
-            android.util.Log.d(
-                "WebViewConsole",
-                "${consoleMessage?.message()} (Line: ${consoleMessage?.lineNumber()})"
-            )
-            return true
-        }
-
-        override fun onShowFileChooser(
-            webView: WebView?,
-            filePathCallback: ValueCallback<Array<Uri>>?,
-            fileChooserParams: FileChooserParams?
-        ): Boolean {
-            this@CvWebViewActivity.filePathCallback = filePathCallback
-            val intent = fileChooserParams?.createIntent()
-            return try {
-                if (intent != null) {
-                    startActivityForResult(intent, FILE_CHOOSER_REQUEST_CODE)
-                    true
-                } else false
-            } catch (e: Exception) {
-                this@CvWebViewActivity.filePathCallback = null
-                false
+            // Optional: Handle redirects or link clicks cleanly
+            override fun shouldOverrideUrlLoading(view: WebView?, request: WebResourceRequest?): Boolean {
+                view?.loadUrl(request?.url.toString())
+                return true
             }
         }
-    }
 
-    // 6️⃣ Load your backend last
-    webView.loadUrl("${BuildConfig.API_BASE_URL}?fromApp=true")
-}
-    
-        // ✅ Properly detect correct extension and MIME type
+        webView.webChromeClient = object : WebChromeClient() {
+
+            override fun onProgressChanged(view: WebView?, newProgress: Int) {
+                progressBar.visibility = if (newProgress < 100) View.VISIBLE else View.GONE
+                progressBar.progress = newProgress
+            }
+
+            // ✅ Put it *here*, inside webChromeClient
+            override fun onConsoleMessage(consoleMessage: ConsoleMessage?): Boolean {
+                android.util.Log.d(
+                    "WebViewConsole",
+                    "${consoleMessage?.message()} (Line: ${consoleMessage?.lineNumber()})"
+                )
+                return true
+            }
+
+            override fun onShowFileChooser(
+                webView: WebView?,
+                filePathCallback: ValueCallback<Array<Uri>>?,
+                fileChooserParams: FileChooserParams?
+            ): Boolean {
+                this@CvWebViewActivity.filePathCallback = filePathCallback
+                val intent = fileChooserParams?.createIntent()
+                return try {
+                    if (intent != null) {
+                        startActivityForResult(intent, FILE_CHOOSER_REQUEST_CODE)
+                        true
+                    } else false
+                } catch (e: Exception) {
+                    this@CvWebViewActivity.filePathCallback = null
+                    false
+                }
+            }
+        }
+
+        // ✅ Set download listener
         webView.setDownloadListener { url, _, contentDisposition, mimeType, _ ->
             val request = DownloadManager.Request(Uri.parse(url))
             request.setNotificationVisibility(DownloadManager.Request.VISIBILITY_VISIBLE_NOTIFY_COMPLETED)
@@ -129,7 +127,7 @@ class CvWebViewActivity : AppCompatActivity() {
             Toast.makeText(this, "Downloading $finalFileName...", Toast.LENGTH_LONG).show()
         }
 
-        // ✅ Load your backend (Streamlit site)
+        // ✅ Load your backend (Streamlit site) - ONLY ONCE
         webView.loadUrl("${BuildConfig.API_BASE_URL}?fromApp=true")
     }
 
@@ -267,7 +265,7 @@ class CvWebViewActivity : AppCompatActivity() {
                         }
                     } else {
                         Toast.makeText(
-                            this@CvWebViewActivity,
+                            this@CvWebViewViewActivity,
                             "You don't have enough credits!",
                             Toast.LENGTH_LONG
                         ).show()
