@@ -33,8 +33,9 @@ class CvWebViewActivity : AppCompatActivity() {
         // Configure WebView for better performance
       
         webView.scrollBarStyle = View.SCROLLBARS_INSIDE_OVERLAY
-
-        /webView.settings.apply {
+        
+        // WebView settings
+        webView.settings.apply {
             javaScriptEnabled = true
             domStorageEnabled = true
             javaScriptCanOpenWindowsAutomatically = true
