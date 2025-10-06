@@ -1,9 +1,11 @@
 <?xml version="1.0" encoding="utf-8"?>
 <manifest xmlns:android="http://schemas.android.com/apk/res/android">
-    
 
     <!-- Internet permission since your app loads web content -->
     <uses-permission android:name="android.permission.INTERNET" />
+    <!-- Permission for file downloads -->
+    <uses-permission android:name="android.permission.WRITE_EXTERNAL_STORAGE" />
+    <uses-permission android:name="android.permission.READ_EXTERNAL_STORAGE" />
 
     <application
         android:allowBackup="true"
@@ -14,45 +16,42 @@
         android:icon="@mipmap/ic_launcher"
         android:roundIcon="@mipmap/ic_launcher"
         android:theme="@style/Theme.ResumeWriterApp">
-        
 
         <activity
-        android:name=".MainActivity"
-        android:exported="true"
-        android:theme="@style/Theme.ResumeWriterApp">
+            android:name=".MainActivity"
+            android:exported="true"
+            android:theme="@style/Theme.ResumeWriterApp">
             <intent-filter>
-        <action android:name="android.intent.action.MAIN" />
-        <category android:name="android.intent.category.LAUNCHER" />
+                <action android:name="android.intent.action.MAIN" />
+                <category android:name="android.intent.category.LAUNCHER" />
             </intent-filter>
         </activity>
 
         <activity
             android:name=".CvWebViewActivity"
             android:exported="true"
-            android:hardwareAccelerated="false"
-            android:configChanges="orientation|keyboardHidden|screenSize"
+            android:hardwareAccelerated="true"
+            android:configChanges="orientation|keyboardHidden|screenSize|keyboard|smallestScreenSize|screenLayout"
+            android:windowSoftInputMode="adjustResize"
             android:theme="@style/Theme.AppCompat.Light.NoActionBar" />
 
-        
         <!-- Add LoginActivity -->
-        
         <activity
             android:name=".LoginActivity"
             android:exported="true" />
 
-        
         <!-- Add the missing admin activities -->
         <activity
             android:name=".AdminPanelActivity"
             android:exported="true" />
-        
+
         <activity
             android:name=".AdminLoginActivity"
             android:exported="true" />
-        
+
         <activity
             android:name=".UserRegistrationActivity"
             android:exported="true" />
-        
+
     </application>
 </manifest>
