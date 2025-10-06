@@ -6,15 +6,15 @@ plugins {
 }
 
 android {
-    namespace "com.alakdb.resumewriter"   // ✅ Add this line
+    namespace "com.alakdb.resumewriter"
     compileSdk 34
     
     defaultConfig {
         applicationId "com.alakdb.resumewriter"
         minSdk 21
         targetSdk 34
-        versionCode 6 // <--- incremented
-        versionName "1.5" // <--- optional, just for display
+        versionCode 6
+        versionName "1.5"
         buildConfigField "String", "API_BASE_URL", "\"https://resume-writer-04uv.onrender.com/\""
     }
 
@@ -43,9 +43,8 @@ android {
 dependencies {
     implementation 'androidx.core:core-ktx:1.12.0'
     implementation 'androidx.appcompat:appcompat:1.6.1'
-    implementation 'com.google.android.material:material:1.10.0'
+    implementation 'com.google.android.material:material:1.10.0' // Removed duplicate
     implementation 'androidx.constraintlayout:constraintlayout:2.1.4'
-    implementation 'com.google.android.material:material:1.9.0'
 
     // UI + Lifecycle (needed for AppCompatActivity, ViewModel, LiveData, etc.)
     implementation 'androidx.lifecycle:lifecycle-runtime-ktx:2.6.2'
@@ -57,23 +56,18 @@ dependencies {
     implementation 'com.android.billingclient:billing-ktx:6.2.0'
 
     // Firebase (BoM ensures versions stay compatible)
-    // Firebase BOM
     implementation platform('com.google.firebase:firebase-bom:32.7.0')
     
     // Other Firebase dependencies
     implementation 'com.google.firebase:firebase-firestore-ktx'
-    
-    // Firebase Auth KTX without version
     implementation 'com.google.firebase:firebase-auth-ktx'
 
+    // Coroutines - KEEP THIS, it's necessary
     implementation "org.jetbrains.kotlinx:kotlinx-coroutines-android:1.7.3"
     
-  
-
-
-    
-
+    // WebView compatibility (optional but recommended)
+    implementation 'androidx.webkit:webkit:1.8.0'
 }
 
-// Add this at the bottom if using Firebase
-apply plugin: 'com.google.gms.google-services'
+// Already applied at top, remove this duplicate
+// apply plugin: 'com.google.gms.google-services'
