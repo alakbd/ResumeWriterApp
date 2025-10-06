@@ -6,6 +6,8 @@ import android.content.Intent
 import android.net.Uri
 import android.os.Bundle
 import android.os.Environment
+import android.os.Handler
+import android.os.Looper
 import android.view.View
 import android.webkit.*
 import android.widget.ProgressBar
@@ -25,6 +27,14 @@ class CvWebViewActivity : AppCompatActivity() {
     private var filePathCallback: ValueCallback<Array<Uri>>? = null
     private val FILE_CHOOSER_REQUEST_CODE = 101
     private var creditUsed = false
+    
+    private val loadTimeoutHandler = Handler(Looper.getMainLooper())
+    private val loadTimeoutRunnable = Runnable {
+        if (progressBar.visibility == View.VISIBLE) {
+            progressBar.visibility = View.GONE
+            Toast.makeText(this, "Page loaded with reduced functionality", Toast.LENGTH_SHORT).show()
+        }
+    }
 
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
@@ -35,7 +45,6 @@ class CvWebViewActivity : AppCompatActivity() {
         creditManager = CreditManager(this)
 
         // Configure WebView for better performance
-      
         webView.scrollBarStyle = View.SCROLLBARS_INSIDE_OVERLAY
         
         // WebView settings
@@ -44,7 +53,8 @@ class CvWebViewActivity : AppCompatActivity() {
             domStorageEnabled = true
             javaScriptCanOpenWindowsAutomatically = true
             setSupportMultipleWindows(false)
-            setSupportZoom(false)
+            setSupportZoom(true)
+            builtInZoomControls = true
             displayZoomControls = false
             allowFileAccess = true
             allowContentAccess = true
@@ -52,10 +62,11 @@ class CvWebViewActivity : AppCompatActivity() {
             loadsImagesAutomatically = true
             useWideViewPort = true
             mixedContentMode = WebSettings.MIXED_CONTENT_ALWAYS_ALLOW
-            cacheMode = WebSettings.LOAD_NO_CACHE
+            cacheMode = WebSettings.LOAD_DEFAULT
+            setRenderPriority(WebSettings.RenderPriority.HIGH)
         }
 
-        // Make sure these lines are INSIDE onCreate(), but OUTSIDE apply { }
+        // Clear cache and history
         lifecycleScope.launch {    
             webView.clearCache(true)
             webView.clearHistory()
@@ -69,13 +80,12 @@ class CvWebViewActivity : AppCompatActivity() {
             override fun onPageFinished(view: WebView?, url: String?) {
                 super.onPageFinished(view, url)
                 progressBar.visibility = View.GONE
+                loadTimeoutHandler.removeCallbacks(loadTimeoutRunnable)
                 
-                // Wait a bit for Streamlit to fully load
+                // Single consolidated injection after page load
                 webView.postDelayed({
-                    injectStreamlitHelpers()
-                    injectSidebarHandler()
-                    injectButtonListener()
-                }, 2000) // Wait 2 seconds for Streamlit to initialize
+                    injectConsolidatedHelpers()
+                }, 1500)
             }
 
             override fun onReceivedError(
@@ -84,6 +94,9 @@ class CvWebViewActivity : AppCompatActivity() {
                 error: WebResourceError?
             ) {
                 super.onReceivedError(view, request, error)
+                loadTimeoutHandler.removeCallbacks(loadTimeoutRunnable)
+                progressBar.visibility = View.GONE
+                
                 Toast.makeText(
                     this@CvWebViewActivity, 
                     "Page loading error: ${error?.description}", 
@@ -103,13 +116,23 @@ class CvWebViewActivity : AppCompatActivity() {
                     true
                 }
             }
+            
+            override fun onPageCommitVisible(view: WebView?, url: String?) {
+                super.onPageCommitVisible(view, url)
+                // Page is visibly loading, remove timeout
+                loadTimeoutHandler.removeCallbacks(loadTimeoutRunnable)
+            }
         }
 
         // WebChromeClient
         webView.webChromeClient = object : WebChromeClient() {
             override fun onProgressChanged(view: WebView?, newProgress: Int) {
-                progressBar.visibility = if (newProgress < 100) View.VISIBLE else View.GONE
                 progressBar.progress = newProgress
+                if (newProgress >= 80) {
+                    progressBar.visibility = View.GONE
+                } else if (newProgress < 100 && progressBar.visibility != View.VISIBLE) {
+                    progressBar.visibility = View.VISIBLE
+                }
             }
 
             override fun onConsoleMessage(consoleMessage: ConsoleMessage?): Boolean {
@@ -161,248 +184,94 @@ class CvWebViewActivity : AppCompatActivity() {
         // Enable debugging in development
         WebView.setWebContentsDebuggingEnabled(true)
 
+        // Set 15-second load timeout
+        loadTimeoutHandler.postDelayed(loadTimeoutRunnable, 15000)
+
         // Load the URL
         webView.loadUrl("${BuildConfig.API_BASE_URL}?fromApp=true&embedded=true")
     }
 
-    private fun injectStreamlitHelpers() {
-        val helperCode = """
-            // Streamlit helper functions
-            window.streamlitApp = {
-                creditApproved: function() {
-                    console.log('Credit approved - resume generation can proceed');
-                    // You might want to trigger the actual generation here
-                },
+    private fun injectConsolidatedHelpers() {
+        val consolidatedCode = """
+            (function() {
+                'use strict';
                 
-                forceSidebarOpen: function() {
-                    try {
-                        // Try multiple ways to ensure sidebar is open
-                        const sidebar = document.querySelector('[data-testid="stSidebar"]');
-                        if (sidebar) {
-                            const isHidden = sidebar.style.display === 'none' || 
-                                           sidebar.style.visibility === 'hidden' ||
-                                           sidebar.offsetParent === null;
-                            
-                            if (isHidden) {
-                                sidebar.style.display = 'block';
-                                sidebar.style.visibility = 'visible';
-                                console.log('Sidebar forced open');
+                console.log('Injecting consolidated Streamlit helpers...');
+                
+                // Streamlit helper functions
+                window.streamlitApp = {
+                    creditApproved: function() {
+                        console.log('Credit approved - resume generation can proceed');
+                    },
+                    
+                    forceSidebarOpen: function() {
+                        try {
+                            const sidebar = document.querySelector('[data-testid="stSidebar"]');
+                            if (sidebar) {
+                                // Gentle approach - don't force display changes
+                                sidebar.style.cssText += '; min-width: 250px !important; z-index: 999 !important; position: relative !important;';
+                                console.log('Sidebar visibility enhanced');
                             }
+                        } catch (e) {
+                            console.log('Sidebar open error:', e);
                         }
-                        
-                        // Also try Streamlit's own methods
-                        if (window.streamlitDebug) {
-                            window.streamlitDebug.setSidebarVisible(true);
-                        }
-                    } catch (e) {
-                        console.log('Error forcing sidebar open:', e);
                     }
-                },
-                
-                fixSidebarInteractions: function() {
-                    // Add click handlers to ensure sidebar responds
-                    document.addEventListener('click', function(e) {
+                };
+
+                // Simplified button listener
+                function setupButtonListener() {
+                    console.log('Setting up simplified button listener...');
+                    
+                    function handleButtonClick(e) {
                         const target = e.target;
-                        if (target.closest('[data-testid="stSidebar"]') || 
-                            target.closest('.stButton') ||
-                            target.textContent.includes('Generate') ||
-                            target.textContent.includes('Tailor')) {
-                            console.log('Sidebar interaction detected');
-                        }
-                    });
-                }
-            };
-
-            // Initialize sidebar fixes
-            setTimeout(function() {
-                window.streamlitApp.forceSidebarOpen();
-                window.streamlitApp.fixSidebarInteractions();
-            }, 1000);
-
-        """.trimIndent()
-
-        webView.evaluateJavascript(helperCode, null)
-    }
-
-    private fun injectSidebarHandler() {
-        val sidebarCode = """
-            // Enhanced sidebar handler for Streamlit
-            function setupSidebarHandler() {
-                console.log('Setting up sidebar handler...');
-                
-                // Method 1: Wait for Streamlit to be ready
-                const waitForStreamlit = setInterval(function() {
-                    const sidebar = document.querySelector('[data-testid="stSidebar"]');
-                    const buttons = document.querySelectorAll('.stButton button, button[role="button"]');
-                    
-                    if (sidebar || buttons.length > 0) {
-                        clearInterval(waitForStreamlit);
-                        console.log('Streamlit elements found:', {
-                            sidebar: !!sidebar,
-                            buttons: buttons.length
-                        });
-                        
-                        // Ensure sidebar is visible and interactive
-                        if (sidebar) {
-                            sidebar.style.cssText = 'display: block !important; visibility: visible !important;';
-                            sidebar.setAttribute('data-app-active', 'true');
-                        }
-                        
-                        // Make all buttons interactive
-                        buttons.forEach(btn => {
-                            btn.style.pointerEvents = 'auto';
-                            btn.style.opacity = '1';
-                        });
-                        
-                        // Force redraw
-                        document.body.style.display = 'none';
-                        document.body.offsetHeight; // Trigger reflow
-                        document.body.style.display = '';
-                    }
-                }, 500);
-
-                // Stop trying after 10 seconds
-                setTimeout(() => clearInterval(waitForStreamlit), 10000);
-            }
-
-            // Start sidebar handler
-            setupSidebarHandler();
-
-            // Also try when DOM changes (Streamlit is very dynamic)
-            const sidebarObserver = new MutationObserver(function(mutations) {
-                mutations.forEach(function(mutation) {
-                    if (mutation.addedNodes.length > 0) {
-                        const hasStreamlitElements = Array.from(mutation.addedNodes).some(node => {
-                            return node.nodeType === 1 && (
-                                node.querySelector?.('[data-testid="stSidebar"]') ||
-                                node.querySelector?.('.stButton') ||
-                                node.textContent?.includes('Generate') ||
-                                node.textContent?.includes('Tailor')
-                            );
-                        });
-                        
-                        if (hasStreamlitElements) {
-                            console.log('New Streamlit elements detected');
-                            setupSidebarHandler();
-                        }
-                    }
-                });
-            });
-
-            sidebarObserver.observe(document.body, {
-                childList: true,
-                subtree: true,
-                attributes: true,
-                attributeFilter: ['style', 'class']
-            });
-
-        """.trimIndent()
-
-        webView.evaluateJavascript(sidebarCode, null)
-    }
-
-    private fun injectButtonListener() {
-        val buttonCode = """
-            // Enhanced button listener for Streamlit
-            function setupButtonListener() {
-                console.log('Setting up button listener...');
-                
-                function findAndConnectButton() {
-                    const selectors = [
-                        'button:contains("Generate Tailored Resume")',
-                        'button:contains("Tailored Resume")',
-                        '[data-testid="baseButton-secondary"]',
-                        '.stButton button',
-                        'button[kind="secondary"]',
-                        'button[class*="secondary"]',
-                        'button[role="button"]'
-                    ];
-                    
-                    let targetButton = null;
-                    
-                    // Try each selector
-                    for (const selector of selectors) {
-                        if (selector.includes('contains')) {
-                            // Text-based search
-                            const buttons = document.querySelectorAll('button');
-                            for (let button of buttons) {
-                                if (button.textContent.includes('Generate Tailored Resume') || 
-                                    button.textContent.includes('Tailored Resume')) {
-                                    targetButton = button;
-                                    break;
-                                }
-                            }
-                        } else {
-                            // CSS selector search
-                            targetButton = document.querySelector(selector);
-                        }
-                        
-                        if (targetButton) {
-                            console.log('Found button with selector:', selector);
-                            break;
-                        }
-                    }
-                    
-                    if (targetButton) {
-                        // Remove existing listeners and add new one
-                        const newButton = targetButton.cloneNode(true);
-                        targetButton.parentNode.replaceChild(newButton, targetButton);
-                        
-                        newButton.addEventListener('click', function(e) {
+                        if (target.tagName === 'BUTTON' && 
+                            (target.textContent.includes('Generate Tailored') || 
+                             target.textContent.includes('Tailored Resume'))) {
                             console.log('Generate Tailored Resume button clicked!');
-                            e.preventDefault();
-                            e.stopPropagation();
                             
                             if (window.AndroidApp) {
-                                AndroidApp.onTailorResumeButtonClicked();
-                            } else {
-                                console.log('AndroidApp interface not found');
-                                // Fallback: allow the click to proceed
-                                setTimeout(() => {
-                                    targetButton.click();
-                                }, 100);
+                                e.preventDefault();
+                                e.stopImmediatePropagation();
+                                window.AndroidApp.onTailorResumeButtonClicked();
+                                return false;
                             }
-                        });
-                        
-                        // Make button clearly interactive
-                        newButton.style.cssText = 'pointer-events: auto !important; opacity: 1 !important; cursor: pointer !important;';
-                        
-                        console.log('Button listener attached successfully');
+                        }
                         return true;
                     }
                     
-                    return false;
-                }
-                
-                // Try to find button immediately
-                if (!findAndConnectButton()) {
-                    // Retry every second for 10 seconds
-                    let attempts = 0;
-                    const retryInterval = setInterval(() => {
-                        attempts++;
-                        if (findAndConnectButton() || attempts >= 10) {
-                            clearInterval(retryInterval);
-                        }
+                    // Use event delegation
+                    document.addEventListener('click', handleButtonClick, true);
+                    
+                    // One-time setup for existing buttons
+                    setTimeout(() => {
+                        const buttons = document.querySelectorAll('button');
+                        buttons.forEach(btn => {
+                            if (btn.textContent.includes('Generate Tailored') || 
+                                btn.textContent.includes('Tailored Resume')) {
+                                btn.style.cssText += '; pointer-events: auto !important; cursor: pointer !important;';
+                                btn.addEventListener('click', handleButtonClick);
+                            }
+                        });
                     }, 1000);
                 }
-            }
-            
-            // Start button listener setup
-            setupButtonListener();
-            
-            // Also set up when new content is added
-            const buttonObserver = new MutationObserver(function() {
-                setupButtonListener();
-            });
-            
-            buttonObserver.observe(document.body, {
-                childList: true,
-                subtree: true
-            });
 
+                // Initialize everything
+                setTimeout(function() {
+                    if (window.streamlitApp) {
+                        window.streamlitApp.forceSidebarOpen();
+                    }
+                    setupButtonListener();
+                    
+                    // Notify that helpers are loaded
+                    console.log('Streamlit helpers loaded successfully');
+                }, 500);
+
+            })();
         """.trimIndent()
 
-        webView.evaluateJavascript(buttonCode, null)
+        webView.evaluateJavascript(consolidatedCode) { result ->
+            android.util.Log.d("WebView", "JavaScript injection completed")
+        }
     }
 
     override fun onActivityResult(requestCode: Int, resultCode: Int, data: Intent?) {
@@ -430,6 +299,13 @@ class CvWebViewActivity : AppCompatActivity() {
         }
     }
 
+    override fun onDestroy() {
+        super.onDestroy()
+        loadTimeoutHandler.removeCallbacks(loadTimeoutRunnable)
+        webView.stopLoading()
+        webView.destroy()
+    }
+
     inner class AndroidBridge {
         @JavascriptInterface
         fun onTailorResumeButtonClicked() {
@@ -437,24 +313,39 @@ class CvWebViewActivity : AppCompatActivity() {
                 if (!creditUsed) {
                     if (creditManager.getAvailableCredits() > 0) {
                         creditManager.useCredit { success ->
-                            if (success) {
-                                creditUsed = true
-                                Toast.makeText(
-                                    this@CvWebViewActivity,
-                                    "1 Credit used — Generating your tailored resume...",
-                                    Toast.LENGTH_SHORT
-                                ).show()
-                                
-                                webView.evaluateJavascript(
-                                    "if(window.streamlitApp) { streamlitApp.creditApproved(); }",
-                                    null
-                                )
-                            } else {
-                                Toast.makeText(
-                                    this@CvWebViewActivity,
-                                    "Credit deduction failed!",
-                                    Toast.LENGTH_LONG
-                                ).show()
+                            runOnUiThread {
+                                if (success) {
+                                    creditUsed = true
+                                    Toast.makeText(
+                                        this@CvWebViewActivity,
+                                        "1 Credit used — Generating your tailored resume...",
+                                        Toast.LENGTH_SHORT
+                                    ).show()
+                                    
+                                    // Allow the actual generation to proceed in Streamlit
+                                    webView.postDelayed({
+                                        webView.evaluateJavascript(
+                                            """
+                                            // Simulate button click to proceed with generation
+                                            const buttons = document.querySelectorAll('button');
+                                            buttons.forEach(btn => {
+                                                if (btn.textContent.includes('Generate Tailored') || 
+                                                    btn.textContent.includes('Tailored Resume')) {
+                                                    setTimeout(() => {
+                                                        btn.click();
+                                                    }, 500);
+                                                }
+                                            });
+                                            """.trimIndent(), null
+                                        )
+                                    }, 1000)
+                                } else {
+                                    Toast.makeText(
+                                        this@CvWebViewActivity,
+                                        "Credit deduction failed!",
+                                        Toast.LENGTH_LONG
+                                    ).show()
+                                }
                             }
                         }
                     } else {
@@ -484,6 +375,11 @@ class CvWebViewActivity : AppCompatActivity() {
                 ).show()
                 creditUsed = false
             }
+        }
+        
+        @JavascriptInterface
+        fun log(message: String) {
+            android.util.Log.d("WebViewJS", message)
         }
     }
 }
