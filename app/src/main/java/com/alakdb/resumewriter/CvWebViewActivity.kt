@@ -334,7 +334,7 @@ class CvWebViewActivity : AppCompatActivity() {
         })();
     """.trimIndent()
 
-    webView.evaluateJavascript(creditControlScript) { result ->
+    webView.evaluateJavascript(creditControlScript) { _ ->
         android.util.Log.d("WebView", "Credit control script injected")
     }
 }
@@ -356,11 +356,11 @@ class CvWebViewActivity : AppCompatActivity() {
         }
     }
 
-    override fun onBackPressed() {
+    onBackPressedDispatcher.addCallback(this) {
         if (webView.canGoBack()) {
             webView.goBack()
         } else {
-            super.onBackPressed()
+            finish()
         }
     }
 
