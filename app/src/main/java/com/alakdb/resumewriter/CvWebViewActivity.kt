@@ -178,166 +178,166 @@ class CvWebViewActivity : AppCompatActivity() {
     }
 
     private fun injectCreditControlScript() {
-        val creditControlScript = """
-            (function() {
-                'use strict';
-                
-                console.log('Injecting credit control system...');
-                
-                let resumeButtonBlocked = false;
-                
-                // Function to disable generate button
-                function disableGenerateButton() {
-                    const buttons = document.querySelectorAll('button');
-                    buttons.forEach(btn => {
-                        if (btn.textContent.includes('Generate Tailored') || 
-                            btn.textContent.includes('Tailored Resume')) {
-                            btn.disabled = true;
-                            btn.style.opacity = '0.5';
-                            btn.style.cursor = 'not-allowed';
-                            btn.innerHTML = '⏳ Checking Credits...';
-                        }
-                    });
-                    resumeButtonBlocked = true;
-                }
-                
-                // Function to enable generate button
-                function enableGenerateButton() {
-                    const buttons = document.querySelectorAll('button');
-                    buttons.forEach(btn => {
-                        if (btn.textContent.includes('Generate Tailored') || 
-                            btn.textContent.includes('Tailored Resume')) {
-                            btn.disabled = false;
-                            btn.style.opacity = '1';
-                            btn.style.cursor = 'pointer';
-                            // Restore original text
-                            const originalText = btn.getAttribute('data-original-text') || '✨ Generate Tailored Résumé';
-                            btn.innerHTML = originalText;
-                        }
-                    });
-                    resumeButtonBlocked = false;
-                }
-                
-                // Function to show error message
-                function showCreditError(message) {
-                    // Create or update error message
-                    let errorDiv = document.getElementById('android-credit-error');
-                    if (!errorDiv) {
-                        errorDiv = document.createElement('div');
-                        errorDiv.id = 'android-credit-error';
-                        errorDiv.style.cssText = 'background: #ffebee; color: #c62828; padding: 12px; margin: 10px 0; border-radius: 4px; border: 1px solid #ffcdd2; font-size: 14px;';
-                        // Insert at the top of the main content
-                        const mainContent = document.querySelector('.main') || document.body;
-                        mainContent.insertBefore(errorDiv, mainContent.firstChild);
+    val creditControlScript = """
+        (function() {
+            'use strict';
+            
+            console.log('Injecting credit control system...');
+            
+            let resumeButtonBlocked = false;
+            
+            // Function to disable generate button
+            function disableGenerateButton() {
+                const buttons = document.querySelectorAll('button');
+                buttons.forEach(btn => {
+                    if (btn.textContent.includes('Generate Tailored') || 
+                        btn.textContent.includes('Tailored Resume')) {
+                        btn.disabled = true;
+                        btn.style.opacity = '0.5';
+                        btn.style.cursor = 'not-allowed';
+                        btn.innerHTML = '⏳ Checking Credits...';
                     }
-                    errorDiv.innerHTML = `🚫 <strong>Credit Error:</strong> ' + message;
-                    
-                    // Auto-remove after 5 seconds
-                    setTimeout(() => {
-                        if (errorDiv && errorDiv.parentNode) {
-                            errorDiv.parentNode.removeChild(errorDiv);
-                        }
-                    }, 5000);
-                }
-                
-                // Function to show success message
-                function showSuccessMessage(message) {
-                    let successDiv = document.getElementById('android-success-message');
-                    if (!successDiv) {
-                        successDiv = document.createElement('div');
-                        successDiv.id = 'android-success-message';
-                        successDiv.style.cssText = 'background: #e8f5e8; color: #2e7d32; padding: 12px; margin: 10px 0; border-radius: 4px; border: 1px solid #c8e6c9; font-size: 14px;';
-                        const mainContent = document.querySelector('.main') || document.body;
-                        mainContent.insertBefore(successDiv, mainContent.firstChild);
+                });
+                resumeButtonBlocked = true;
+            }
+            
+            // Function to enable generate button
+            function enableGenerateButton() {
+                const buttons = document.querySelectorAll('button');
+                buttons.forEach(btn => {
+                    if (btn.textContent.includes('Generate Tailored') || 
+                        btn.textContent.includes('Tailored Resume')) {
+                        btn.disabled = false;
+                        btn.style.opacity = '1';
+                        btn.style.cursor = 'pointer';
+                        // Restore original text
+                        const originalText = btn.getAttribute('data-original-text') || '✨ Generate Tailored Résumé';
+                        btn.innerHTML = originalText;
                     }
-                    successDiv.innerHTML = `✅ <strong>Success:</strong> ' + message;
-                    
-                    // Auto-remove after 5 seconds
-                    setTimeout(() => {
-                        if (successDiv && successDiv.parentNode) {
-                            successDiv.parentNode.removeChild(successDiv);
-                        }
-                    }, 5000);
-                }
-                
-                // Store original button texts
-                function storeOriginalButtonTexts() {
-                    const buttons = document.querySelectorAll('button');
-                    buttons.forEach(btn => {
-                        if (btn.textContent.includes('Generate Tailored') || 
-                            btn.textContent.includes('Tailored Resume')) {
-                            btn.setAttribute('data-original-text', btn.innerHTML);
-                        }
-                    });
-                }
-                
-                // Intercept button clicks
-                function setupButtonInterception() {
-                    document.addEventListener('click', function(e) {
-                        const target = e.target;
-                        if (target.tagName === 'BUTTON' && 
-                            (target.textContent.includes('Generate Tailored') || 
-                             target.textContent.includes('Tailored Resume'))) {
-                            
-                            console.log('Generate button clicked - checking credits...');
-                            
-                            if (resumeButtonBlocked) {
-                                e.preventDefault();
-                                e.stopImmediatePropagation();
-                                showCreditError('Please wait for current generation to complete');
-                                return;
-                            }
-                            
-                            // ALWAYS check with Android app for EACH generation
-                            if (window.AndroidApp) {
-                                e.preventDefault();
-                                e.stopImmediatePropagation();
-                                
-                                disableGenerateButton();
-                                
-                                // Request credit check from Android for EACH generation
-                                window.AndroidApp.checkAndUseCredit();
-                            } else {
-                                console.log('AndroidApp interface not available');
-                                showCreditError('App communication error. Please restart the app.');
-                                enableGenerateButton();
-                            }
-                        }
-                    }, true); // Use capture phase to intercept early
-                }
-                
-                // Initialize the credit control system
-                function initializeCreditControl() {
-                    console.log('Initializing credit control system...');
-                    storeOriginalButtonTexts();
-                    setupButtonInterception();
-                    
-                    // Show Android app indicator
-                    const appIndicator = document.createElement('div');
-                    appIndicator.innerHTML = '<div style="background: #e3f2fd; color: #1565c0; padding: 10px; margin: 10px 0; border-radius: 4px; border: 1px solid #bbdefb; font-size: 14px;">📱 <strong>Mobile App:</strong> 1 Credit will be deducted for each resume generation</div>';
+                });
+                resumeButtonBlocked = false;
+            }
+            
+            // Function to show error message
+            function showCreditError(message) {
+                // Create or update error message
+                let errorDiv = document.getElementById('android-credit-error');
+                if (!errorDiv) {
+                    errorDiv = document.createElement('div');
+                    errorDiv.id = 'android-credit-error';
+                    errorDiv.style.cssText = 'background: #ffebee; color: #c62828; padding: 12px; margin: 10px 0; border-radius: 4px; border: 1px solid #ffcdd2; font-size: 14px;';
+                    // Insert at the top of the main content
                     const mainContent = document.querySelector('.main') || document.body;
-                    mainContent.insertBefore(appIndicator, mainContent.firstChild);
+                    mainContent.insertBefore(errorDiv, mainContent.firstChild);
                 }
+                errorDiv.innerHTML = '🚫 <strong>Credit Error:</strong> ' + message;
                 
-                // Expose functions to Android
-                window.androidCreditControl = {
-                    enableButton: enableGenerateButton,
-                    disableButton: disableGenerateButton,
-                    showError: showCreditError,
-                    showSuccess: showSuccessMessage
-                };
+                // Auto-remove after 5 seconds
+                setTimeout(() => {
+                    if (errorDiv && errorDiv.parentNode) {
+                        errorDiv.parentNode.removeChild(errorDiv);
+                    }
+                }, 5000);
+            }
+            
+            // Function to show success message
+            function showSuccessMessage(message) {
+                let successDiv = document.getElementById('android-success-message');
+                if (!successDiv) {
+                    successDiv = document.createElement('div');
+                    successDiv.id = 'android-success-message';
+                    successDiv.style.cssText = 'background: #e8f5e8; color: #2e7d32; padding: 12px; margin: 10px 0; border-radius: 4px; border: 1px solid #c8e6c9; font-size: 14px;';
+                    const mainContent = document.querySelector('.main') || document.body;
+                    mainContent.insertBefore(successDiv, mainContent.firstChild);
+                }
+                successDiv.innerHTML = '✅ <strong>Success:</strong> ' + message;
                 
-                // Start initialization
-                initializeCreditControl();
-                console.log('Credit control system injected successfully');
+                // Auto-remove after 5 seconds
+                setTimeout(() => {
+                    if (successDiv && successDiv.parentNode) {
+                        successDiv.parentNode.removeChild(successDiv);
+                    }
+                }, 5000);
+            }
+            
+            // Store original button texts
+            function storeOriginalButtonTexts() {
+                const buttons = document.querySelectorAll('button');
+                buttons.forEach(btn => {
+                    if (btn.textContent.includes('Generate Tailored') || 
+                        btn.textContent.includes('Tailored Resume')) {
+                        btn.setAttribute('data-original-text', btn.innerHTML);
+                    }
+                });
+            }
+            
+            // Intercept button clicks
+            function setupButtonInterception() {
+                document.addEventListener('click', function(e) {
+                    const target = e.target;
+                    if (target.tagName === 'BUTTON' && 
+                        (target.textContent.includes('Generate Tailored') || 
+                         target.textContent.includes('Tailored Resume'))) {
+                        
+                        console.log('Generate button clicked - checking credits...');
+                        
+                        if (resumeButtonBlocked) {
+                            e.preventDefault();
+                            e.stopImmediatePropagation();
+                            showCreditError('Please wait for current generation to complete');
+                            return;
+                        }
+                        
+                        // ALWAYS check with Android app for EACH generation
+                        if (window.AndroidApp) {
+                            e.preventDefault();
+                            e.stopImmediatePropagation();
+                            
+                            disableGenerateButton();
+                            
+                            // Request credit check from Android for EACH generation
+                            window.AndroidApp.checkAndUseCredit();
+                        } else {
+                            console.log('AndroidApp interface not available');
+                            showCreditError('App communication error. Please restart the app.');
+                            enableGenerateButton();
+                        }
+                    }
+                }, true); // Use capture phase to intercept early
+            }
+            
+            // Initialize the credit control system
+            function initializeCreditControl() {
+                console.log('Initializing credit control system...');
+                storeOriginalButtonTexts();
+                setupButtonInterception();
                 
-            })();
-        """.trimIndent()
+                // Show Android app indicator
+                const appIndicator = document.createElement('div');
+                appIndicator.innerHTML = '<div style="background: #e3f2fd; color: #1565c0; padding: 10px; margin: 10px 0; border-radius: 4px; border: 1px solid #bbdefb; font-size: 14px;">📱 <strong>Mobile App:</strong> 1 Credit will be deducted for each resume generation</div>';
+                const mainContent = document.querySelector('.main') || document.body;
+                mainContent.insertBefore(appIndicator, mainContent.firstChild);
+            }
+            
+            // Expose functions to Android
+            window.androidCreditControl = {
+                enableButton: enableGenerateButton,
+                disableButton: disableGenerateButton,
+                showError: showCreditError,
+                showSuccess: showSuccessMessage
+            };
+            
+            // Start initialization
+            initializeCreditControl();
+            console.log('Credit control system injected successfully');
+            
+        })();
+    """.trimIndent()
 
-        webView.evaluateJavascript(creditControlScript) { result ->
-            android.util.Log.d("WebView", "Credit control script injected")
-        }
+    webView.evaluateJavascript(creditControlScript) { result ->
+        android.util.Log.d("WebView", "Credit control script injected")
     }
+}
 
     override fun onActivityResult(requestCode: Int, resultCode: Int, data: Intent?) {
         super.onActivityResult(requestCode, resultCode, data)
