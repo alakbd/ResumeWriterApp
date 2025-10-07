@@ -8,14 +8,11 @@ import android.os.Bundle
 import android.os.Environment
 import android.os.Handler
 import android.os.Looper
+import android.preference.PreferenceManager
 import android.view.View
 import android.webkit.*
 import android.widget.ProgressBar
 import android.widget.Toast
-import androidx.lifecycle.lifecycleScope
-import kotlinx.coroutines.Dispatchers
-import kotlinx.coroutines.launch
-import kotlinx.coroutines.withContext
 import androidx.appcompat.app.AppCompatActivity
 
 class CvWebViewActivity : AppCompatActivity() {
@@ -26,7 +23,8 @@ class CvWebViewActivity : AppCompatActivity() {
 
     private var filePathCallback: ValueCallback<Array<Uri>>? = null
     private val FILE_CHOOSER_REQUEST_CODE = 101
-    private var creditUsed = false
+    private var creditUsedInThisSession = false
+    private var isGenerating = false
     
     private val loadTimeoutHandler = Handler(Looper.getMainLooper())
     private val loadTimeoutRunnable = Runnable {
@@ -44,7 +42,7 @@ class CvWebViewActivity : AppCompatActivity() {
         progressBar = findViewById(R.id.progressBar)
         creditManager = CreditManager(this)
 
-        // Configure WebView for better performance
+        // Configure WebView
         webView.scrollBarStyle = View.SCROLLBARS_INSIDE_OVERLAY
         
         // WebView settings
@@ -63,28 +61,25 @@ class CvWebViewActivity : AppCompatActivity() {
             useWideViewPort = true
             mixedContentMode = WebSettings.MIXED_CONTENT_ALWAYS_ALLOW
             cacheMode = WebSettings.LOAD_DEFAULT
-            setRenderPriority(WebSettings.RenderPriority.HIGH)
         }
 
         // Clear cache and history
-        lifecycleScope.launch {    
-            webView.clearCache(true)
-            webView.clearHistory()
-        }
+        webView.clearCache(true)
+        webView.clearHistory()
         
         // Add JavaScript interface
         webView.addJavascriptInterface(AndroidBridge(), "AndroidApp")
 
-        // WebViewClient with better error handling
+        // WebViewClient
         webView.webViewClient = object : WebViewClient() {
             override fun onPageFinished(view: WebView?, url: String?) {
                 super.onPageFinished(view, url)
                 progressBar.visibility = View.GONE
                 loadTimeoutHandler.removeCallbacks(loadTimeoutRunnable)
                 
-                // Single consolidated injection after page load
+                // Inject credit control JavaScript
                 webView.postDelayed({
-                    injectConsolidatedHelpers()
+                    injectCreditControlScript()
                 }, 1500)
             }
 
@@ -106,21 +101,13 @@ class CvWebViewActivity : AppCompatActivity() {
 
             override fun shouldOverrideUrlLoading(view: WebView?, request: WebResourceRequest?): Boolean {
                 val url = request?.url.toString()
-                // Allow same domain URLs to load in WebView, open others in browser
                 return if (url.contains(BuildConfig.API_BASE_URL)) {
-                    false // Let WebView handle it
+                    false
                 } else {
-                    // Open external links in browser
                     val intent = Intent(Intent.ACTION_VIEW, Uri.parse(url))
                     startActivity(intent)
                     true
                 }
-            }
-            
-            override fun onPageCommitVisible(view: WebView?, url: String?) {
-                super.onPageCommitVisible(view, url)
-                // Page is visibly loading, remove timeout
-                loadTimeoutHandler.removeCallbacks(loadTimeoutRunnable)
             }
         }
 
@@ -181,96 +168,111 @@ class CvWebViewActivity : AppCompatActivity() {
             Toast.makeText(this, "Downloading $finalFileName...", Toast.LENGTH_LONG).show()
         }
 
-        // Enable debugging in development
+        // Enable debugging
         WebView.setWebContentsDebuggingEnabled(true)
 
-        // Set 15-second load timeout
+        // Set load timeout
         loadTimeoutHandler.postDelayed(loadTimeoutRunnable, 15000)
 
         // Load the URL
-        webView.loadUrl("${BuildConfig.API_BASE_URL}?fromApp=true&embedded=true")
+        webView.loadUrl("${BuildConfig.API_BASE_URL}?fromApp=true&embedded=true&androidApp=true")
     }
 
-    private fun injectConsolidatedHelpers() {
-        val consolidatedCode = """
+    private fun injectCreditControlScript() {
+        val creditControlScript = """
             (function() {
                 'use strict';
                 
-                console.log('Injecting consolidated Streamlit helpers...');
+                console.log('Injecting credit control system...');
                 
-                // Streamlit helper functions
-                window.streamlitApp = {
-                    creditApproved: function() {
-                        console.log('Credit approved - resume generation can proceed');
-                    },
-                    
-                    forceSidebarOpen: function() {
-                        try {
-                            const sidebar = document.querySelector('[data-testid="stSidebar"]');
-                            if (sidebar) {
-                                // Gentle approach - don't force display changes
-                                sidebar.style.cssText += '; min-width: 250px !important; z-index: 999 !important; position: relative !important;';
-                                console.log('Sidebar visibility enhanced');
-                            }
-                        } catch (e) {
-                            console.log('Sidebar open error:', e);
+                let resumeButtonBlocked = false;
+                
+                // Function to disable generate button
+                function disableGenerateButton() {
+                    const buttons = document.querySelectorAll('button');
+                    buttons.forEach(btn => {
+                        if (btn.textContent.includes('Generate Tailored') || 
+                            btn.textContent.includes('Tailored Resume')) {
+                            btn.disabled = true;
+                            btn.style.opacity = '0.5';
+                            btn.style.cursor = 'not-allowed';
+                            btn.innerHTML = '⏳ Processing...';
                         }
-                    }
-                };
-
-                // Simplified button listener
-                function setupButtonListener() {
-                    console.log('Setting up simplified button listener...');
-                    
-                    function handleButtonClick(e) {
-                        const target = e.target;
-                        if (target.tagName === 'BUTTON' && 
-                            (target.textContent.includes('Generate Tailored') || 
-                             target.textContent.includes('Tailored Resume'))) {
-                            console.log('Generate Tailored Resume button clicked!');
-                            
-                            if (window.AndroidApp) {
-                                e.preventDefault();
-                                e.stopImmediatePropagation();
-                                window.AndroidApp.onTailorResumeButtonClicked();
-                                return false;
-                            }
-                        }
-                        return true;
-                    }
-                    
-                    // Use event delegation
-                    document.addEventListener('click', handleButtonClick, true);
-                    
-                    // One-time setup for existing buttons
-                    setTimeout(() => {
-                        const buttons = document.querySelectorAll('button');
-                        buttons.forEach(btn => {
-                            if (btn.textContent.includes('Generate Tailored') || 
-                                btn.textContent.includes('Tailored Resume')) {
-                                btn.style.cssText += '; pointer-events: auto !important; cursor: pointer !important;';
-                                btn.addEventListener('click', handleButtonClick);
-                            }
-                        });
-                    }, 1000);
+                    });
+                    resumeButtonBlocked = true;
                 }
-
-                // Initialize everything
-                setTimeout(function() {
-                    if (window.streamlitApp) {
-                        window.streamlitApp.forceSidebarOpen();
+                
+                // Function to enable generate button
+                function enableGenerateButton() {
+                    const buttons = document.querySelectorAll('button');
+                    buttons.forEach(btn => {
+                        if (btn.textContent.includes('Generate Tailored') || 
+                            btn.textContent.includes('Tailored Resume')) {
+                            btn.disabled = false;
+                            btn.style.opacity = '1';
+                            btn.style.cursor = 'pointer';
+                            btn.innerHTML = btn.innerHTML.replace('⏳ Processing...', '✨ Generate Tailored Résumé');
+                        }
+                    });
+                    resumeButtonBlocked = false;
+                }
+                
+                // Function to show error message
+                function showCreditError(message) {
+                    // Create or update error message
+                    let errorDiv = document.getElementById('android-credit-error');
+                    if (!errorDiv) {
+                        errorDiv = document.createElement('div');
+                        errorDiv.id = 'android-credit-error';
+                        errorDiv.style.cssText = 'background: #ffebee; color: #c62828; padding: 12px; margin: 10px 0; border-radius: 4px; border: 1px solid #ffcdd2;';
+                        document.body.insertBefore(errorDiv, document.body.firstChild);
                     }
-                    setupButtonListener();
-                    
-                    // Notify that helpers are loaded
-                    console.log('Streamlit helpers loaded successfully');
-                }, 500);
-
+                    errorDiv.innerHTML = `🚫 <strong>Credit Error:</strong> ${message}`;
+                }
+                
+                // Intercept button clicks
+                document.addEventListener('click', function(e) {
+                    const target = e.target;
+                    if (target.tagName === 'BUTTON' && 
+                        (target.textContent.includes('Generate Tailored') || 
+                         target.textContent.includes('Tailored Resume'))) {
+                        
+                        console.log('Generate button clicked - checking credits...');
+                        
+                        if (resumeButtonBlocked) {
+                            e.preventDefault();
+                            e.stopImmediatePropagation();
+                            showCreditError('Please wait for current generation to complete');
+                            return;
+                        }
+                        
+                        // Check with Android app before proceeding
+                        if (window.AndroidApp) {
+                            e.preventDefault();
+                            e.stopImmediatePropagation();
+                            
+                            disableGenerateButton();
+                            
+                            // Request credit check from Android
+                            window.AndroidApp.checkAndUseCredit();
+                        }
+                    }
+                });
+                
+                // Expose functions to Android
+                window.androidCreditControl = {
+                    enableButton: enableGenerateButton,
+                    disableButton: disableGenerateButton,
+                    showError: showCreditError
+                };
+                
+                console.log('Credit control system injected successfully');
+                
             })();
         """.trimIndent()
 
-        webView.evaluateJavascript(consolidatedCode) { result ->
-            android.util.Log.d("WebView", "JavaScript injection completed")
+        webView.evaluateJavascript(creditControlScript) { result ->
+            android.util.Log.d("WebView", "Credit control script injected")
         }
     }
 
@@ -307,60 +309,78 @@ class CvWebViewActivity : AppCompatActivity() {
     }
 
     inner class AndroidBridge {
+        
         @JavascriptInterface
-        fun onTailorResumeButtonClicked() {
+        fun checkAndUseCredit() {
             runOnUiThread {
-                if (!creditUsed) {
-                    if (creditManager.getAvailableCredits() > 0) {
-                        creditManager.useCredit { success ->
-                            runOnUiThread {
-                                if (success) {
-                                    creditUsed = true
-                                    Toast.makeText(
-                                        this@CvWebViewActivity,
-                                        "1 Credit used — Generating your tailored resume...",
-                                        Toast.LENGTH_SHORT
-                                    ).show()
-                                    
-                                    // Allow the actual generation to proceed in Streamlit
-                                    webView.postDelayed({
-                                        webView.evaluateJavascript(
-                                            """
-                                            // Simulate button click to proceed with generation
-                                            const buttons = document.querySelectorAll('button');
-                                            buttons.forEach(btn => {
-                                                if (btn.textContent.includes('Generate Tailored') || 
-                                                    btn.textContent.includes('Tailored Resume')) {
-                                                    setTimeout(() => {
-                                                        btn.click();
-                                                    }, 500);
-                                                }
-                                            });
-                                            """.trimIndent(), null
-                                        )
-                                    }, 1000)
-                                } else {
-                                    Toast.makeText(
-                                        this@CvWebViewActivity,
-                                        "Credit deduction failed!",
-                                        Toast.LENGTH_LONG
-                                    ).show()
+                if (isGenerating) {
+                    webView.evaluateJavascript(
+                        "if (window.androidCreditControl) { window.androidCreditControl.showError('Generation already in progress'); }",
+                        null
+                    )
+                    return@runOnUiThread
+                }
+                
+                if (creditUsedInThisSession) {
+                    webView.evaluateJavascript(
+                        "if (window.androidCreditControl) { window.androidCreditControl.showError('Credit already used in this session'); window.androidCreditControl.enableButton(); }",
+                        null
+                    )
+                    return@runOnUiThread
+                }
+                
+                if (!creditManager.canGenerateResume()) {
+                    webView.evaluateJavascript(
+                        "if (window.androidCreditControl) { window.androidCreditControl.showError('Not enough credits'); window.androidCreditControl.enableButton(); }",
+                        null
+                    )
+                    return@runOnUiThread
+                }
+                
+                // All checks passed, use credit
+                isGenerating = true
+                creditManager.useCredit { success ->
+                    runOnUiThread {
+                        if (success) {
+                            creditUsedInThisSession = true
+                            Toast.makeText(
+                                this@CvWebViewActivity,
+                                "1 Credit used — Generating your tailored resume...",
+                                Toast.LENGTH_SHORT
+                            ).show()
+                            
+                            // Enable the button and trigger the actual generation
+                            webView.evaluateJavascript(
+                                """
+                                if (window.androidCreditControl) {
+                                    window.androidCreditControl.enableButton();
                                 }
-                            }
+                                // Trigger the actual generation
+                                setTimeout(() => {
+                                    const buttons = document.querySelectorAll('button');
+                                    buttons.forEach(btn => {
+                                        if (btn.textContent.includes('Generate Tailored') || 
+                                            btn.textContent.includes('Tailored Resume')) {
+                                            btn.click();
+                                        }
+                                    });
+                                }, 500);
+                                """.trimIndent(), null
+                            )
+                            
+                        } else {
+                            webView.evaluateJavascript(
+                                "if (window.androidCreditControl) { window.androidCreditControl.showError('Credit deduction failed'); window.androidCreditControl.enableButton(); }",
+                                null
+                            )
+                            Toast.makeText(
+                                this@CvWebViewActivity,
+                                "Credit deduction failed!",
+                                Toast.LENGTH_LONG
+                            ).show()
                         }
-                    } else {
-                        Toast.makeText(
-                            this@CvWebViewActivity,
-                            "You don't have enough credits!",
-                            Toast.LENGTH_LONG
-                        ).show()
+                        isGenerating = false
                     }
-                } else {
-                    Toast.makeText(
-                        this@CvWebViewActivity,
-                        "Credit already used for this session",
-                        Toast.LENGTH_SHORT
-                    ).show()
                 }
             }
         }
@@ -373,7 +393,7 @@ class CvWebViewActivity : AppCompatActivity() {
                     "✅ Resume generated successfully!",
                     Toast.LENGTH_SHORT
                 ).show()
-                creditUsed = false
+                // Don't reset creditUsedInThisSession here - keep it for the session
             }
         }
         
