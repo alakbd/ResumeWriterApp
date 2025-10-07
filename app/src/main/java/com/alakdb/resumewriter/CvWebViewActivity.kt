@@ -59,8 +59,6 @@ class CvWebViewActivity : AppCompatActivity() {
             useWideViewPort = true
             mixedContentMode = WebSettings.MIXED_CONTENT_ALWAYS_ALLOW
             cacheMode = WebSettings.LOAD_DEFAULT
-    		setAppCacheEnabled(true)
-    		setAppCachePath(cacheDir?.absolutePath ?: "")
     		databaseEnabled = true
         }
 
@@ -447,7 +445,7 @@ class CvWebViewActivity : AppCompatActivity() {
         }
     }
 }
-}
+
 
         @JavascriptInterface
         fun notifyResumeGenerated() {
