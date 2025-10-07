@@ -339,7 +339,7 @@ class CvWebViewActivity : AppCompatActivity() {
                 
                 // All checks passed, use credit
                 isGenerating = true
-                creditManager.useCredit { success ->
+                creditManager.useCreditForResume { success ->
                     runOnUiThread {
                         if (success) {
                             creditUsedInThisSession = true
