@@ -54,8 +54,10 @@ class MainActivity : AppCompatActivity() {
     }
 
     private fun setupClickListeners() {
-        // Generate CV Button
-        binding.btnGenerateCv.setOnClickListener { generateCV() }
+        // Generate CV Button - UPDATED: Now opens WebView instead of direct generation
+        binding.btnGenerateCv.setOnClickListener { 
+            generateCV() 
+        }
 
         // Purchase Buttons
         binding.btnBuy3Cv.setOnClickListener {
@@ -140,8 +142,7 @@ class MainActivity : AppCompatActivity() {
 
         creditManager.syncWithFirebase { success, _ ->
             binding.btnGenerateCv.isEnabled = true
-            binding.btnGenerateCv.text = if (creditManager.getAvailableCredits() > 0)
-                "Generate CV (1 Credit)" else "No Credits Available"
+            updateGenerateButton()
 
             if (success) {
                 updateCreditDisplay()
@@ -154,33 +155,19 @@ class MainActivity : AppCompatActivity() {
     }
 
     private fun generateCV() {
-    val availableCredits = creditManager.getAvailableCredits()
-    if (availableCredits <= 0) {
-        showMessage("Not enough credits! Please purchase more.")
-        return
-    }
-
-    binding.btnGenerateCv.isEnabled = false
-    binding.btnGenerateCv.text = "Generating CV..."
-
-    // Deduct 1 credit
-    creditManager.useCredit { success ->
-        updateGenerateButton()
-        if (success) {
-            updateCreditDisplay()
-            showMessage("Launching CV Builder...")
-
-            // 👉 Open the WebView after deducting a credit
-            val intent = Intent(this, CvWebViewActivity::class.java)
-            startActivity(intent)
-
-        } else {
-            showMessage("Failed to generate CV. Please try again.")
+        val availableCredits = creditManager.getAvailableCredits()
+        if (availableCredits <= 0) {
+            showMessage("Not enough credits! Please purchase more.")
+            return
         }
-        binding.btnGenerateCv.isEnabled = true
-    }
-}
 
+        // RESET COOLDOWN WHEN USER EXPLICITLY STARTS A NEW RESUME GENERATION
+        creditManager.resetResumeCooldown()
+        
+        // Open WebView for resume generation
+        val intent = Intent(this, CvWebViewActivity::class.java)
+        startActivity(intent)
+    }
 
     private fun purchaseProduct(productId: String) {
         if (!isBillingInitialized) {
