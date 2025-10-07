@@ -23,21 +23,28 @@ jobs:
       - name: Setup Android SDK
         uses: android-actions/setup-android@v3
 
-      - name: Validate Gradle Wrapper
-        run: |
-          # Force download of Gradle 8.5
-          ./gradlew --version || true
-          
       - name: Make gradlew executable
         run: chmod +x ./gradlew
 
+      # 🧹 Clean Gradle caches that may contain stale Kotlin metadata
+      - name: Clean Gradle caches
+        run: |
+          rm -rf ~/.gradle/caches/build-cache
+          rm -rf ~/.gradle/caches/journal-1
+          rm -rf ~/.gradle/caches/transforms-3
+          rm -rf ~/.gradle/daemon/
+          rm -rf ~/.gradle/native/
+
+      # ⚡ Cache only Gradle dependency jars (safe & fast)
       - name: Cache Gradle dependencies
-        uses: actions/cache@v3
+        uses: actions/cache@v4
         with:
           path: |
-            ~/.gradle/caches
-            ~/.gradle/wrapper/
+            ~/.gradle/caches/modules-2/files-2.1
+            ~/.gradle/wrapper
           key: gradle-${{ runner.os }}-${{ hashFiles('**/*.gradle*', '**/gradle-wrapper.properties') }}
+          restore-keys: |
+            gradle-${{ runner.os }}-
 
       - name: Create google-services.json
         run: |
@@ -45,8 +52,9 @@ jobs:
           ${{ secrets.GOOGLE_SERVICES_JSON }}
           EOF
 
+      # 🧱 Force a full clean build to avoid stale bytecode
       - name: Clean & Build AAB
-        run: ./gradlew clean bundleRelease
+        run: ./gradlew clean bundleRelease --stacktrace --no-daemon
 
       - name: Upload AAB
         uses: actions/upload-artifact@v4
