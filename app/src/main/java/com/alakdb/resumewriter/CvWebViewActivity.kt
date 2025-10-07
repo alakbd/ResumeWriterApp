@@ -59,6 +59,9 @@ class CvWebViewActivity : AppCompatActivity() {
             useWideViewPort = true
             mixedContentMode = WebSettings.MIXED_CONTENT_ALWAYS_ALLOW
             cacheMode = WebSettings.LOAD_DEFAULT
+    		setAppCacheEnabled(true)
+    		setAppCachePath(cacheDir?.absolutePath ?: "")
+    		databaseEnabled = true
         }
 
         // Clear cache and history
@@ -229,7 +232,7 @@ class CvWebViewActivity : AppCompatActivity() {
                         const mainContent = document.querySelector('.main') || document.body;
                         mainContent.insertBefore(errorDiv, mainContent.firstChild);
                     }
-                    errorDiv.innerHTML = `🚫 <strong>Credit Error:</strong> \$\{message\}`;
+                    errorDiv.innerHTML = `🚫 <strong>Credit Error:</strong> ' + message;
                     
                     // Auto-remove after 5 seconds
                     setTimeout(() => {
@@ -249,7 +252,7 @@ class CvWebViewActivity : AppCompatActivity() {
                         const mainContent = document.querySelector('.main') || document.body;
                         mainContent.insertBefore(successDiv, mainContent.firstChild);
                     }
-                    successDiv.innerHTML = `✅ <strong>Success:</strong> \$\{message\}`;
+                    successDiv.innerHTML = `✅ <strong>Success:</strong> ' + message;
                     
                     // Auto-remove after 5 seconds
                     setTimeout(() => {
@@ -372,71 +375,79 @@ class CvWebViewActivity : AppCompatActivity() {
 
     inner class AndroidBridge {
         
-        @JavascriptInterface
+       @JavascriptInterface
         fun checkAndUseCredit() {
-            runOnUiThread {
+        runOnUiThread {
+            try {
                 if (isGenerating) {
                     webView.evaluateJavascript(
                         "if (window.androidCreditControl) { window.androidCreditControl.showError('Generation already in progress'); window.androidCreditControl.enableButton(); }",
-                        null
-                    )
-                    return@runOnUiThread
-                }
-                
-                // ALWAYS check credits for EACH generation
-                if (!creditManager.canGenerateResume()) {
-                    webView.evaluateJavascript(
-                        "if (window.androidCreditControl) { window.androidCreditControl.showError('Not enough credits! Please purchase more credits.'); window.androidCreditControl.enableButton(); }",
-                        null
-                    )
-                    return@runOnUiThread
-                }
-                
-                // All checks passed, use credit for THIS generation
-                isGenerating = true
-                creditManager.useCreditForResume { success ->
-                    runOnUiThread {
-                        if (success) {
-                            webView.evaluateJavascript(
-                                """
-                                if (window.androidCreditControl) {
-                                    window.androidCreditControl.showSuccess('1 credit deducted - generating your tailored resume...');
-                                }
-                                // Trigger the actual generation after credit deduction
-                                setTimeout(() => {
-                                    const buttons = document.querySelectorAll('button');
-                                    buttons.forEach(btn => {
-                                        if (btn.textContent.includes('Generate Tailored') || 
-                                            btn.textContent.includes('Tailored Resume')) {
-                                            // Create a new click event to trigger the actual Streamlit generation
-                                            const clickEvent = new MouseEvent('click', {
-                                                view: window,
-                                                bubbles: true,
-                                                cancelable: true
-                                            });
-                                            btn.dispatchEvent(clickEvent);
-                                        }
-                                    });
-                                }, 500);
-                                """.trimIndent(), null
-                            )
-                            
-                        } else {
-                            webView.evaluateJavascript(
-                                "if (window.androidCreditControl) { window.androidCreditControl.showError('Credit deduction failed! Please try again.'); window.androidCreditControl.enableButton(); }",
-                                null
-                            )
-                            Toast.makeText(
-                                this@CvWebViewActivity,
-                                "Credit deduction failed!",
-                                Toast.LENGTH_LONG
-                            ).show()
-                        }
-                        isGenerating = false
+                    null
+                )
+                return@runOnUiThread
+            }
+            
+            // Quick credit check first
+            if (creditManager.getAvailableCredits() <= 0) {
+                webView.evaluateJavascript(
+                    "if (window.androidCreditControl) { window.androidCreditControl.showError('Not enough credits! Please purchase more.'); window.androidCreditControl.enableButton(); }",
+                    null
+                )
+                return@runOnUiThread
+            }
+            
+            // Then check cooldown
+            if (!creditManager.canGenerateResume()) {
+                webView.evaluateJavascript(
+                    "if (window.androidCreditControl) { window.androidCreditControl.showError('Please wait 30 seconds between generations'); window.androidCreditControl.enableButton(); }",
+                    null
+                )
+                return@runOnUiThread
+            }
+            
+            isGenerating = true
+            creditManager.useCreditForResume { success ->
+                runOnUiThread {
+                    if (success) {
+                        // Success case - proceed with generation
+                        webView.evaluateJavascript(
+                            """
+                            if (window.androidCreditControl) {
+                                window.androidCreditControl.showSuccess('1 credit deducted - generating resume...');
+                                window.androidCreditControl.enableButton();
+                            }
+                            // Trigger actual generation
+                            setTimeout(() => {
+                                const buttons = document.querySelectorAll('button');
+                                buttons.forEach(btn => {
+                                    if (btn.textContent.includes('Generate Tailored') || 
+                                        btn.textContent.includes('Tailored Resume')) {
+                                        btn.click();
+                                    }
+                                });
+                            }, 100);
+                            """.trimIndent(), null
+                        )
+                    } else {
+                        webView.evaluateJavascript(
+                            "if (window.androidCreditControl) { window.androidCreditControl.showError('Credit deduction failed'); window.androidCreditControl.enableButton(); }",
+                            null
+                        )
                     }
+                    isGenerating = false
                 }
             }
+        } catch (e: Exception) {
+            // Handle any unexpected errors
+            webView.evaluateJavascript(
+                "if (window.androidCreditControl) { window.androidCreditControl.showError('System error: ' + '${e.message}'); window.androidCreditControl.enableButton(); }",
+                null
+            )
+            isGenerating = false
         }
+    }
+}
+}
 
         @JavascriptInterface
         fun notifyResumeGenerated() {
