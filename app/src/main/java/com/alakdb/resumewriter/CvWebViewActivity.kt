@@ -229,7 +229,7 @@ class CvWebViewActivity : AppCompatActivity() {
                         const mainContent = document.querySelector('.main') || document.body;
                         mainContent.insertBefore(errorDiv, mainContent.firstChild);
                     }
-                    errorDiv.innerHTML = `🚫 <strong>Credit Error:</strong> \${message}`;
+                    errorDiv.innerHTML = `🚫 <strong>Credit Error:</strong> \$\{message\}`;
                     
                     // Auto-remove after 5 seconds
                     setTimeout(() => {
@@ -249,7 +249,7 @@ class CvWebViewActivity : AppCompatActivity() {
                         const mainContent = document.querySelector('.main') || document.body;
                         mainContent.insertBefore(successDiv, mainContent.firstChild);
                     }
-                    successDiv.innerHTML = `✅ <strong>Success:</strong> \${message}`;
+                    successDiv.innerHTML = `✅ <strong>Success:</strong> \$\{message\}`;
                     
                     // Auto-remove after 5 seconds
                     setTimeout(() => {
