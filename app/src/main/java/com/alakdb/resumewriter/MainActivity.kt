@@ -54,10 +54,8 @@ class MainActivity : AppCompatActivity() {
     }
 
     private fun setupClickListeners() {
-        // Generate CV Button - UPDATED: Now opens WebView instead of direct generation
-        binding.btnGenerateCv.setOnClickListener { 
-            generateCV() 
-        }
+        // Generate CV Button - Opens WebView without deducting credit
+        binding.btnGenerateCv.setOnClickListener { generateCV() }
 
         // Purchase Buttons
         binding.btnBuy3Cv.setOnClickListener {
@@ -163,8 +161,9 @@ class MainActivity : AppCompatActivity() {
 
         // RESET COOLDOWN WHEN USER EXPLICITLY STARTS A NEW RESUME GENERATION
         creditManager.resetResumeCooldown()
-        
-        // Open WebView for resume generation
+
+        // Open WebView for resume generation (credit will be deducted inside WebView)
+        showMessage("Opening CV Builder...")
         val intent = Intent(this, CvWebViewActivity::class.java)
         startActivity(intent)
     }
@@ -257,8 +256,11 @@ class MainActivity : AppCompatActivity() {
     override fun onResume() {
         super.onResume()
         if (::creditManager.isInitialized) {
-            updateCreditDisplay()
-            updateAdminIndicator()
+            // Refresh credit display when returning from WebView
+            creditManager.syncWithFirebase { success, _ ->
+                updateCreditDisplay()
+                updateAdminIndicator()
+            }
         }
     }
 
