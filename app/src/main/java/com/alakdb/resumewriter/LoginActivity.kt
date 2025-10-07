@@ -12,6 +12,7 @@ import com.alakdb.resumewriter.databinding.ActivityLoginBinding
 class LoginActivity : AppCompatActivity() {
     private lateinit var binding: ActivityLoginBinding
     private lateinit var userManager: UserManager
+    private lateinit var creditManager: CreditManager
 
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
@@ -19,6 +20,7 @@ class LoginActivity : AppCompatActivity() {
         setContentView(binding.root)
 
         userManager = UserManager(this)
+        creditManager = CreditManager(this)
 
         // Check if already logged in
         if (userManager.isUserLoggedIn()) {
@@ -73,26 +75,19 @@ class LoginActivity : AppCompatActivity() {
             return false
         }
 
-        // Check if password is empty
-        if (password.isEmpty()) {
-            binding.etLoginPassword.error = "Password is required"
-            return false
-    }
-
         return true
     }
 
     private fun sendPasswordResetEmail(email: String) {
-    FirebaseAuth.getInstance().sendPasswordResetEmail(email)
-        .addOnCompleteListener { task ->
-            if (task.isSuccessful) {
-                Toast.makeText(this, "Password reset link sent to $email", Toast.LENGTH_LONG).show()
-            } else {
-                Toast.makeText(this, "Error: ${task.exception?.message}", Toast.LENGTH_LONG).show()
+        FirebaseAuth.getInstance().sendPasswordResetEmail(email)
+            .addOnCompleteListener { task ->
+                if (task.isSuccessful) {
+                    Toast.makeText(this, "Password reset link sent to $email", Toast.LENGTH_LONG).show()
+                } else {
+                    Toast.makeText(this, "Error: ${task.exception?.message}", Toast.LENGTH_LONG).show()
+                }
             }
-        }
-}
-
+    }
 
     private fun attemptLogin(email: String, password: String) {
         binding.btnLogin.isEnabled = false
@@ -104,6 +99,10 @@ class LoginActivity : AppCompatActivity() {
 
             if (success) {
                 showMessage("Login successful!")
+                
+                // RESET COOLDOWN ON SUCCESSFUL LOGIN
+                creditManager.resetResumeCooldown()
+                
                 startActivity(Intent(this@LoginActivity, MainActivity::class.java))
                 finish()
             } else {
