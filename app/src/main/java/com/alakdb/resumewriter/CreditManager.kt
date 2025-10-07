@@ -17,6 +17,62 @@ class CreditManager(private val context: Context) {
         private const val USED_CREDITS_KEY = "used_credits"
         private const val TOTAL_CREDITS_KEY = "total_credits"
         private const val ADMIN_MODE_KEY = "admin_mode"
+        private const val LAST_RESUME_TIME_KEY = "last_resume_time"
+    }
+
+    // -----------------------
+    // NEW METHODS FOR RESUME GENERATION CONTROL
+    // -----------------------
+    
+    /**
+     * Check if user can generate a resume (has credits and not in cooldown)
+     */
+    fun canGenerateResume(): Boolean {
+        return getAvailableCredits() > 0 && !hasUsedCreditRecently()
+    }
+
+    /**
+     * Use credit specifically for resume generation with additional checks
+     */
+    fun useCreditForResume(onComplete: (Boolean) -> Unit) {
+        if (!canGenerateResume()) {
+            onComplete(false)
+            return
+        }
+        
+        val currentCredits = getAvailableCredits()
+        if (currentCredits > 0) {
+            val newCredits = currentCredits - 1
+            val newUsed = getUsedCredits() + 1
+            
+            // Update local storage first
+            updateLocalCredits(newCredits, newUsed, getTotalCredits())
+            
+            // Mark the time of resume generation
+            prefs.edit()
+                .putLong(LAST_RESUME_TIME_KEY, System.currentTimeMillis())
+                .apply()
+            
+            // Sync to Firebase
+            syncCreditsToFirebase(newCredits, newUsed, onComplete)
+        } else {
+            onComplete(false)
+        }
+    }
+
+    /**
+     * Check if credit was used recently (within 30 seconds)
+     */
+    fun hasUsedCreditRecently(): Boolean {
+        val lastTime = prefs.getLong(LAST_RESUME_TIME_KEY, 0)
+        return System.currentTimeMillis() - lastTime < 30000 // 30 second cooldown
+    }
+
+    /**
+     * Reset the resume generation cooldown (useful when leaving the WebView)
+     */
+    fun resetResumeCooldown() {
+        prefs.edit().remove(LAST_RESUME_TIME_KEY).apply()
     }
 
     // -----------------------
