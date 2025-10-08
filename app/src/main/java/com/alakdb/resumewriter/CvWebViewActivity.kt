@@ -356,11 +356,11 @@ class CvWebViewActivity : AppCompatActivity() {
         }
     }
 
-    onBackPressedDispatcher.addCallback(this) {
+    override fun onBackPressed() {
         if (webView.canGoBack()) {
             webView.goBack()
         } else {
-            finish()
+            super.onBackPressed()
         }
     }
 
