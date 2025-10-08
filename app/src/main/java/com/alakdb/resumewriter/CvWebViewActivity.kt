@@ -494,26 +494,20 @@ fun checkAndUseCredit() {
     }
 }
 
-    @JavascriptInterface
-    fun notifyResumeGenerated() {
-        runOnUiThread {
-            Toast.makeText(
-                this@CvWebViewActivity,
-                "✅ Resume generated successfully! 1 credit used.",
-                Toast.LENGTH_SHORT
-            ).show()
-
-            webView.evaluateJavascript(
-                "if (window.androidCreditControl) { window.androidCreditControl.showSuccess('Resume generated successfully! 1 credit used. You can download it now.'); }",
-                null
-            )
-
-            webView.evaluateJavascript(
-                "if (window.androidCreditControl) { window.androidCreditControl.enableButton(); }",
-                null
-            )
-        }
+@JavascriptInterface
+fun notifyResumeGenerated() {
+    runOnUiThread {
+        // This should be called by the web page when resume generation is complete
+        Toast.makeText(
+            this@CvWebViewActivity,
+            "✅ Resume generated successfully!",
+            Toast.LENGTH_SHORT
+        ).show()
+        
+        // Reset the generating flag
+        isGenerating = false
     }
+}
 
     @JavascriptInterface
     fun log(message: String) {
