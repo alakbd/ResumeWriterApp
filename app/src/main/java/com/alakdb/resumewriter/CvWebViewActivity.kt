@@ -182,63 +182,176 @@ private fun injectCreditControlScript() {
         (function() {
             'use strict';
             
-            console.log('Injecting enhanced credit control system...');
+            console.log('Injecting SIMPLIFIED credit control system...');
             
             let resumeButtonBlocked = false;
             
-            // ... (keep all your existing functions: disableGenerateButton, enableGenerateButton, etc.)
+            // Function to disable generate button
+            function disableGenerateButton() {
+                console.log('Disabling generate button...');
+                const buttons = document.querySelectorAll('button');
+                let foundButtons = 0;
+                
+                buttons.forEach(btn => {
+                    const btnText = (btn.textContent || btn.innerText || '').toLowerCase();
+                    if (btnText.includes('generate') && 
+                        (btnText.includes('tailored') || btnText.includes('resume') || btnText.includes('cv'))) {
+                        console.log('Found generate button to disable:', btnText);
+                        btn.disabled = true;
+                        btn.style.opacity = '0.5';
+                        btn.style.cursor = 'not-allowed';
+                        btn.innerHTML = '⏳ Checking Credits...';
+                        foundButtons++;
+                    }
+                });
+                
+                resumeButtonBlocked = true;
+                console.log('Disabled ' + foundButtons + ' generate buttons');
+            }
             
-            // Enhanced button interception with better debugging
+            // Function to enable generate button
+            function enableGenerateButton() {
+                console.log('Enabling generate button...');
+                const buttons = document.querySelectorAll('button');
+                let foundButtons = 0;
+                
+                buttons.forEach(btn => {
+                    const btnText = (btn.textContent || btn.innerText || '').toLowerCase();
+                    if (btnText.includes('generate') && 
+                        (btnText.includes('tailored') || btnText.includes('resume') || btnText.includes('cv'))) {
+                        btn.disabled = false;
+                        btn.style.opacity = '1';
+                        btn.style.cursor = 'pointer';
+                        const originalText = btn.getAttribute('data-original-text') || '✨ Generate Tailored Résumé';
+                        btn.innerHTML = originalText;
+                        foundButtons++;
+                    }
+                });
+                
+                resumeButtonBlocked = false;
+                console.log('Enabled ' + foundButtons + ' generate buttons');
+            }
+            
+            // Function to show error message
+            function showCreditError(message) {
+                console.log('Showing credit error:', message);
+                let errorDiv = document.getElementById('android-credit-error');
+                if (!errorDiv) {
+                    errorDiv = document.createElement('div');
+                    errorDiv.id = 'android-credit-error';
+                    errorDiv.style.cssText = 'background: #ffebee; color: #c62828; padding: 12px; margin: 10px 0; border-radius: 4px; border: 1px solid #ffcdd2; font-size: 14px;';
+                    const mainContent = document.querySelector('.main') || document.body;
+                    mainContent.insertBefore(errorDiv, mainContent.firstChild);
+                }
+                errorDiv.innerHTML = '🚫 <strong>Credit Error:</strong> ' + message;
+                
+                setTimeout(() => {
+                    if (errorDiv && errorDiv.parentNode) {
+                        errorDiv.parentNode.removeChild(errorDiv);
+                    }
+                }, 5000);
+            }
+            
+            // Function to show success message
+            function showSuccessMessage(message) {
+                console.log('Showing success message:', message);
+                let successDiv = document.getElementById('android-success-message');
+                if (!successDiv) {
+                    successDiv = document.createElement('div');
+                    successDiv.id = 'android-success-message';
+                    successDiv.style.cssText = 'background: #e8f5e8; color: #2e7d32; padding: 12px; margin: 10px 0; border-radius: 4px; border: 1px solid #c8e6c9; font-size: 14px;';
+                    const mainContent = document.querySelector('.main') || document.body;
+                    mainContent.insertBefore(successDiv, mainContent.firstChild);
+                }
+                successDiv.innerHTML = '✅ <strong>Success:</strong> ' + message;
+                
+                setTimeout(() => {
+                    if (successDiv && successDiv.parentNode) {
+                        successDiv.parentNode.removeChild(successDiv);
+                    }
+                }, 5000);
+            }
+            
+            // Store original button texts
+            function storeOriginalButtonTexts() {
+                const buttons = document.querySelectorAll('button');
+                buttons.forEach(btn => {
+                    const btnText = (btn.textContent || btn.innerText || '').toLowerCase();
+                    if (btnText.includes('generate') && 
+                        (btnText.includes('tailored') || btnText.includes('resume') || btnText.includes('cv'))) {
+                        btn.setAttribute('data-original-text', btn.innerHTML);
+                    }
+                });
+            }
+            
+            // SIMPLE button interception - just block and call Android
             function setupButtonInterception() {
                 document.addEventListener('click', function(e) {
                     const target = e.target;
                     const btnText = (target.textContent || target.innerText || '').toLowerCase();
                     
                     if (target.tagName === 'BUTTON' && 
-                        (btnText.includes('generate tailored') || 
-                         btnText.includes('tailored resume') ||
-                         btnText.includes('generate resume') ||
-                         btnText.includes('generate cv'))) {
+                        btnText.includes('generate') && 
+                        (btnText.includes('tailored') || btnText.includes('resume') || btnText.includes('cv'))) {
                         
-                        console.log('=== GENERATE BUTTON CLICKED ===');
+                        console.log('=== GENERATE BUTTON CLICK INTERCEPTED ===');
                         console.log('Button text:', btnText);
-                        console.log('Button HTML:', target.outerHTML);
-                        console.log('Button classes:', target.className);
-                        console.log('Button disabled:', target.disabled);
                         
                         if (resumeButtonBlocked) {
+                            console.log('Button already blocked, preventing click');
                             e.preventDefault();
                             e.stopImmediatePropagation();
                             showCreditError('Please wait for current generation to complete');
                             return;
                         }
                         
-                        // ALWAYS check with Android app for EACH generation
+                        // ALWAYS call Android for credit check
                         if (window.AndroidApp) {
+                            console.log('Calling AndroidApp.checkAndUseCredit()');
                             e.preventDefault();
                             e.stopImmediatePropagation();
                             
-                            console.log('Calling AndroidApp.checkAndUseCredit()');
                             disableGenerateButton();
-                            
-                            // Request credit check from Android for EACH generation
                             window.AndroidApp.checkAndUseCredit();
                         } else {
-                            console.log('AndroidApp interface not available');
-                            showCreditError('App communication error. Please restart the app.');
-                            enableGenerateButton();
+                            console.log('AndroidApp not available, allowing normal click');
+                            // If Android interface not available, allow normal operation
                         }
                     }
                 }, true);
             }
             
-            // ... (rest of your existing initialization code)
+            // Initialize
+            function initializeCreditControl() {
+                console.log('Initializing SIMPLIFIED credit control...');
+                storeOriginalButtonTexts();
+                setupButtonInterception();
+                
+                // Show Android app indicator
+                const appIndicator = document.createElement('div');
+                appIndicator.innerHTML = '<div style="background: #e3f2fd; color: #1565c0; padding: 10px; margin: 10px 0; border-radius: 4px; border: 1px solid #bbdefb; font-size: 14px;">📱 <strong>Mobile App:</strong> 1 Credit deducted per resume generation</div>';
+                const mainContent = document.querySelector('.main') || document.body;
+                mainContent.insertBefore(appIndicator, mainContent.firstChild);
+                
+                console.log('Credit control initialized successfully');
+            }
+            
+            // Expose functions to Android
+            window.androidCreditControl = {
+                enableButton: enableGenerateButton,
+                disableButton: disableGenerateButton,
+                showError: showCreditError,
+                showSuccess: showSuccessMessage
+            };
+            
+            // Start initialization
+            initializeCreditControl();
             
         })();
     """.trimIndent()
 
     webView.evaluateJavascript(creditControlScript) { _ ->
-        android.util.Log.d("WebView", "Enhanced credit control script injected")
+        android.util.Log.d("WebView", "Simplified credit control script injected")
     }
 }
 
@@ -288,7 +401,7 @@ fun checkAndUseCredit() {
                 return@runOnUiThread
             }
 
-            // Quick credit check first (just for UI feedback)
+            // Quick credit check first
             if (creditManager.getAvailableCredits() <= 0) {
                 webView.evaluateJavascript(
                     "if (window.androidCreditControl) { window.androidCreditControl.showError('Not enough credits! Please purchase more.'); window.androidCreditControl.enableButton(); }",
@@ -307,196 +420,67 @@ fun checkAndUseCredit() {
             }
 
             isGenerating = true
-            
-            // STEP 1: First try to trigger the resume generation
-            webView.evaluateJavascript("""
-                console.log('Attempting to trigger resume generation...');
-                
-                // Enhanced function to trigger generation
-                function triggerResumeGeneration() {
-                    let generationTriggered = false;
-                    
-                    // Method 1: Look for generate buttons and click them
-                    const buttons = document.querySelectorAll('button');
-                    for (let btn of buttons) {
-                        const btnText = (btn.textContent || btn.innerText || '').toLowerCase();
-                        if (btnText.includes('generate') && 
-                            (btnText.includes('tailored') || btnText.includes('resume') || btnText.includes('cv'))) {
-                            console.log('Found generate button:', btnText);
+
+            // DEDUCT CREDIT IMMEDIATELY - This is the key fix
+            creditManager.useCreditForResume { success ->
+                runOnUiThread {
+                    if (success) {
+                        // Credit deducted - now trigger generation
+                        Toast.makeText(
+                            this@CvWebViewActivity,
+                            "✅ 1 credit deducted - Generating resume...",
+                            Toast.LENGTH_SHORT
+                        ).show()
+
+                        // Direct approach: Simply re-enable the button and let the original click happen
+                        webView.evaluateJavascript("""
+                            console.log('Credit deducted, allowing original click to proceed...');
                             
-                            // Store original state
-                            const originalDisabled = btn.disabled;
-                            const originalOpacity = btn.style.opacity;
+                            // Re-enable the button first
+                            if (window.androidCreditControl) {
+                                window.androidCreditControl.enableButton();
+                            }
                             
-                            // Ensure button is clickable
-                            btn.disabled = false;
-                            btn.style.opacity = '1';
-                            btn.style.pointerEvents = 'auto';
-                            
-                            // Create and dispatch proper click event
-                            const clickEvent = new MouseEvent('click', {
-                                bubbles: true,
-                                cancelable: true,
-                                view: window
-                            });
-                            
-                            btn.dispatchEvent(clickEvent);
-                            
-                            // Restore original state
+                            // Now find and click the original generate button
                             setTimeout(() => {
-                                btn.disabled = originalDisabled;
-                                btn.style.opacity = originalOpacity;
+                                const buttons = document.querySelectorAll('button');
+                                buttons.forEach(btn => {
+                                    const btnText = (btn.textContent || btn.innerText || '').toLowerCase();
+                                    if (btnText.includes('generate') && 
+                                        (btnText.includes('tailored') || btnText.includes('resume') || btnText.includes('cv'))) {
+                                        console.log('Clicking generate button:', btnText);
+                                        
+                                        // Remove any disabled state we added
+                                        btn.disabled = false;
+                                        btn.style.opacity = '1';
+                                        btn.style.pointerEvents = 'auto';
+                                        
+                                        // Trigger a real click event that will bubble properly
+                                        const clickEvent = new MouseEvent('click', {
+                                            bubbles: true,
+                                            cancelable: true,
+                                            view: window
+                                        });
+                                        
+                                        btn.dispatchEvent(clickEvent);
+                                    }
+                                });
                             }, 100);
                             
-                            generationTriggered = true;
-                            break;
-                        }
-                    }
-                    
-                    // Method 2: Look for form submissions
-                    if (!generationTriggered) {
-                        const forms = document.querySelectorAll('form');
-                        for (let form of forms) {
-                            const formHtml = form.innerHTML.toLowerCase();
-                            if (formHtml.includes('generate') || formHtml.includes('resume')) {
-                                console.log('Found resume form, submitting...');
-                                form.submit();
-                                generationTriggered = true;
-                                break;
+                            // Show success message
+                            if (window.androidCreditControl) {
+                                window.androidCreditControl.showSuccess('1 credit used - generating your resume...');
                             }
-                        }
-                    }
-                    
-                    // Method 3: Look for specific generation functions
-                    if (!generationTriggered) {
-                        const functionNames = [
-                            'generateResume', 'generateCV', 'createResume', 
-                            'startGeneration', 'generateTailoredResume',
-                            'generateResumeClick', 'generateCvClick'
-                        ];
-                        
-                        for (let funcName of functionNames) {
-                            if (typeof window[funcName] === 'function') {
-                                console.log('Calling generation function:', funcName);
-                                window[funcName]();
-                                generationTriggered = true;
-                                break;
-                            }
-                        }
-                    }
-                    
-                    return generationTriggered;
-                }
-                
-                // Execute and return result
-                const result = triggerResumeGeneration();
-                result;
-            """.trimIndent()) { generationResult ->
-                // STEP 2: Check if generation was triggered successfully
-                val generationTriggered = generationResult == "true"
-                
-                if (generationTriggered) {
-                    // STEP 3: Wait a moment to confirm generation actually started
-                    Handler(Looper.getMainLooper()).postDelayed({
-                        webView.evaluateJavascript("""
-                            // Check multiple indicators that generation is in progress
-                            function isGenerationInProgress() {
-                                // Check for loading indicators
-                                const loadingSelectors = [
-                                    '.loading', '.spinner', '.progress', 
-                                    '[aria-busy=true]', '.generating', '.processing',
-                                    '.btn-primary:disabled', 'button:disabled',
-                                    '.progress-bar', '.load'
-                                ];
-                                
-                                for (let selector of loadingSelectors) {
-                                    const elements = document.querySelectorAll(selector);
-                                    if (elements.length > 0) {
-                                        console.log('Found loading indicator:', selector);
-                                        return true;
-                                    }
-                                }
-                                
-                                // Check for text changes that indicate generation started
-                                const buttons = document.querySelectorAll('button');
-                                for (let btn of buttons) {
-                                    const btnText = (btn.textContent || btn.innerText || '').toLowerCase();
-                                    if (btnText.includes('generating') || 
-                                        btnText.includes('processing') ||
-                                        btnText.includes('creating') ||
-                                        btnText.includes('please wait')) {
-                                        console.log('Found generation text:', btnText);
-                                        return true;
-                                    }
-                                }
-                                
-                                // Check for any network requests that might indicate generation
-                                if (window.performance) {
-                                    const resources = window.performance.getEntriesByType('resource');
-                                    const recentResources = resources.filter(r => 
-                                        (r.name.includes('generate') || r.name.includes('resume')) &&
-                                        (performance.now() - r.startTime) < 3000
-                                    );
-                                    if (recentResources.length > 0) {
-                                        console.log('Found recent generation requests');
-                                        return true;
-                                    }
-                                }
-                                
-                                return false;
-                            }
-                            
-                            isGenerationInProgress();
-                        """.trimIndent()) { confirmationResult ->
-                            val generationConfirmed = confirmationResult == "true"
-                            
-                            runOnUiThread {
-                                if (generationConfirmed) {
-                                    // STEP 4: FINALLY deduct the credit since generation started
-                                    creditManager.useCreditForResume { success ->
-                                        runOnUiThread {
-                                            if (success) {
-                                                Toast.makeText(
-                                                    this@CvWebViewActivity,
-                                                    "✅ 1 credit deducted - Resume generation in progress!",
-                                                    Toast.LENGTH_SHORT
-                                                ).show()
-                                                
-                                                // Notify web page
-                                                webView.evaluateJavascript(
-                                                    "if (window.androidCreditControl) { window.androidCreditControl.showSuccess('1 credit deducted - Generating your resume...'); }",
-                                                    null
-                                                )
-                                            } else {
-                                                webView.evaluateJavascript(
-                                                    "if (window.androidCreditControl) { window.androidCreditControl.showError('Credit deduction failed'); window.androidCreditControl.enableButton(); }",
-                                                    null
-                                                )
-                                            }
-                                            isGenerating = false
-                                        }
-                                    }
-                                } else {
-                                    // Generation didn't start properly
-                                    webView.evaluateJavascript(
-                                        "if (window.androidCreditControl) { window.androidCreditControl.showError('Generation failed to start. Please try again.'); window.androidCreditControl.enableButton(); }",
-                                        null
-                                    )
-                                    isGenerating = false
-                                }
-                            }
-                        }
-                    }, 1500) // Wait 1.5 seconds to confirm generation started
-                    
-                } else {
-                    // Could not trigger generation at all
-                    runOnUiThread {
+                        """.trimIndent(), null)
+
+                    } else {
+                        // Credit deduction failed
                         webView.evaluateJavascript(
-                            "if (window.androidCreditControl) { window.androidCreditControl.showError('Could not start resume generation. Please try again.'); window.androidCreditControl.enableButton(); }",
+                            "if (window.androidCreditControl) { window.androidCreditControl.showError('Credit deduction failed'); window.androidCreditControl.enableButton(); }",
                             null
                         )
-                        isGenerating = false
                     }
+                    isGenerating = false
                 }
             }
 
