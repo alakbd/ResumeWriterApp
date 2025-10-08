@@ -182,54 +182,139 @@ private fun injectCreditControlScript() {
         (function() {
             'use strict';
             
-            console.log('Injecting SIMPLIFIED credit control system...');
+            console.log('Injecting SPECIFIC credit control system...');
             
             let resumeButtonBlocked = false;
+            let originalButtonHandlers = new Map();
             
-            // Function to disable generate button
+            // Function to disable generate button - ONLY FOR MAIN RESUME BUTTON
             function disableGenerateButton() {
-                console.log('Disabling generate button...');
+                console.log('Disabling MAIN generate button...');
                 const buttons = document.querySelectorAll('button');
-                let foundButtons = 0;
                 
                 buttons.forEach(btn => {
-                    const btnText = (btn.textContent || btn.innerText || '').toLowerCase();
-                    if (btnText.includes('generate') && 
-                        (btnText.includes('tailored') || btnText.includes('resume') || btnText.includes('cv'))) {
-                        console.log('Found generate button to disable:', btnText);
+                    const btnText = (btn.textContent || btn.innerText || '').toLowerCase().trim();
+                    
+                    // MORE SPECIFIC: Only target the main resume generation button
+                    // Exclude sample/preview buttons
+                    if ((btnText.includes('generate tailored resume') || 
+                         btnText.includes('generate tailored résumé') ||
+                         btnText.includes('create tailored resume') ||
+                         (btnText.includes('generate') && btnText.includes('tailored') && btnText.includes('resume') && !btnText.includes('sample') && !btnText.includes('preview'))) &&
+                         !btnText.includes('sample') && !btnText.includes('preview')) {
+                        
+                        console.log('Found MAIN generate button to disable:', btnText);
+                        
+                        // Store original handler
+                        if (!originalButtonHandlers.has(btn)) {
+                            originalButtonHandlers.set(btn, btn.onclick);
+                        }
+                        
                         btn.disabled = true;
                         btn.style.opacity = '0.5';
                         btn.style.cursor = 'not-allowed';
                         btn.innerHTML = '⏳ Checking Credits...';
-                        foundButtons++;
                     }
                 });
                 
                 resumeButtonBlocked = true;
-                console.log('Disabled ' + foundButtons + ' generate buttons');
             }
             
-            // Function to enable generate button
+            // Function to enable generate button - ONLY FOR MAIN RESUME BUTTON
             function enableGenerateButton() {
-                console.log('Enabling generate button...');
+                console.log('Enabling MAIN generate button...');
                 const buttons = document.querySelectorAll('button');
-                let foundButtons = 0;
                 
                 buttons.forEach(btn => {
-                    const btnText = (btn.textContent || btn.innerText || '').toLowerCase();
-                    if (btnText.includes('generate') && 
-                        (btnText.includes('tailored') || btnText.includes('resume') || btnText.includes('cv'))) {
+                    const btnText = (btn.textContent || btn.innerText || '').toLowerCase().trim();
+                    
+                    if ((btnText.includes('generate tailored resume') || 
+                         btnText.includes('generate tailored résumé') ||
+                         btnText.includes('create tailored resume') ||
+                         (btnText.includes('generate') && btnText.includes('tailored') && btnText.includes('resume') && !btnText.includes('sample') && !btnText.includes('preview'))) &&
+                         !btnText.includes('sample') && !btnText.includes('preview')) {
+                        
                         btn.disabled = false;
                         btn.style.opacity = '1';
                         btn.style.cursor = 'pointer';
                         const originalText = btn.getAttribute('data-original-text') || '✨ Generate Tailored Résumé';
                         btn.innerHTML = originalText;
-                        foundButtons++;
                     }
                 });
                 
                 resumeButtonBlocked = false;
-                console.log('Enabled ' + foundButtons + ' generate buttons');
+            }
+            
+            // Function to trigger actual generation - ONLY FOR MAIN RESUME BUTTON
+            function triggerActualGeneration() {
+                console.log('Triggering ACTUAL resume generation...');
+                const buttons = document.querySelectorAll('button');
+                let generationTriggered = false;
+                
+                buttons.forEach(btn => {
+                    const btnText = (btn.textContent || btn.innerText || '').toLowerCase().trim();
+                    
+                    // SPECIFIC: Only trigger the main resume generation, not sample/preview
+                    if ((btnText.includes('generate tailored resume') || 
+                         btnText.includes('generate tailored résumé') ||
+                         btnText.includes('create tailored resume') ||
+                         (btnText.includes('generate') && btnText.includes('tailored') && btnText.includes('resume') && !btnText.includes('sample') && !btnText.includes('preview'))) &&
+                         !btnText.includes('sample') && !btnText.includes('preview') &&
+                         !generationTriggered) {
+                        
+                        console.log('Found MAIN button to trigger generation:', btnText);
+                        
+                        // Re-enable the button first
+                        btn.disabled = false;
+                        btn.style.opacity = '1';
+                        btn.style.cursor = 'pointer';
+                        btn.innerHTML = btn.getAttribute('data-original-text') || '✨ Generate Tailored Résumé';
+                        
+                        // Trigger the original click handler
+                        if (originalButtonHandlers.has(btn)) {
+                            const originalHandler = originalButtonHandlers.get(btn);
+                            if (originalHandler) {
+                                console.log('Calling original handler for MAIN button');
+                                originalHandler.call(btn);
+                            }
+                        } else {
+                            // Fallback: trigger a native click
+                            console.log('Using fallback click for MAIN button');
+                            const clickEvent = new MouseEvent('click', {
+                                bubbles: true,
+                                cancelable: true,
+                                view: window
+                            });
+                            btn.dispatchEvent(clickEvent);
+                        }
+                        
+                        generationTriggered = true;
+                    }
+                });
+                
+                if (!generationTriggered) {
+                    console.log('No MAIN generation button found');
+                    // Try alternative selectors
+                    const alternativeSelectors = [
+                        'button[class*="generate"]',
+                        'button[class*="resume"]',
+                        'button[class*="tailored"]',
+                        'button[id*="generate"]',
+                        'button[id*="resume"]'
+                    ];
+                    
+                    for (let selector of alternativeSelectors) {
+                        const button = document.querySelector(selector);
+                        if (button && !generationTriggered) {
+                            console.log('Found button via selector:', selector);
+                            button.click();
+                            generationTriggered = true;
+                            break;
+                        }
+                    }
+                }
+                
+                return generationTriggered;
             }
             
             // Function to show error message
@@ -272,59 +357,74 @@ private fun injectCreditControlScript() {
                 }, 5000);
             }
             
-            // Store original button texts
-            function storeOriginalButtonTexts() {
+            // Store original button texts and handlers - ONLY FOR MAIN RESUME BUTTON
+            function storeOriginalButtonData() {
                 const buttons = document.querySelectorAll('button');
                 buttons.forEach(btn => {
-                    const btnText = (btn.textContent || btn.innerText || '').toLowerCase();
-                    if (btnText.includes('generate') && 
-                        (btnText.includes('tailored') || btnText.includes('resume') || btnText.includes('cv'))) {
+                    const btnText = (btn.textContent || btn.innerText || '').toLowerCase().trim();
+                    
+                    if ((btnText.includes('generate tailored resume') || 
+                         btnText.includes('generate tailored résumé') ||
+                         btnText.includes('create tailored resume') ||
+                         (btnText.includes('generate') && btnText.includes('tailored') && btnText.includes('resume') && !btnText.includes('sample') && !btnText.includes('preview'))) &&
+                         !btnText.includes('sample') && !btnText.includes('preview')) {
+                        
                         btn.setAttribute('data-original-text', btn.innerHTML);
+                        originalButtonHandlers.set(btn, btn.onclick);
+                        console.log('Stored original data for MAIN button:', btnText);
                     }
                 });
             }
             
-            // SIMPLE button interception - just block and call Android
+            // SPECIFIC button interception - ONLY FOR MAIN RESUME BUTTON
             function setupButtonInterception() {
                 document.addEventListener('click', function(e) {
                     const target = e.target;
-                    const btnText = (target.textContent || target.innerText || '').toLowerCase();
+                    const btnText = (target.textContent || target.innerText || '').toLowerCase().trim();
                     
+                    // VERY SPECIFIC: Only intercept the main resume generation button
+                    // Explicitly exclude sample/preview buttons
                     if (target.tagName === 'BUTTON' && 
-                        btnText.includes('generate') && 
-                        (btnText.includes('tailored') || btnText.includes('resume') || btnText.includes('cv'))) {
+                        ((btnText.includes('generate tailored resume') || 
+                          btnText.includes('generate tailored résumé') ||
+                          btnText.includes('create tailored resume') ||
+                          (btnText.includes('generate') && btnText.includes('tailored') && btnText.includes('resume'))) &&
+                         !btnText.includes('sample') && !btnText.includes('preview'))) {
                         
-                        console.log('=== GENERATE BUTTON CLICK INTERCEPTED ===');
-                        console.log('Button text:', btnText);
+                        console.log('=== MAIN GENERATE BUTTON CLICK INTERCEPTED ===');
+                        console.log('Main button text:', btnText);
                         
                         if (resumeButtonBlocked) {
-                            console.log('Button already blocked, preventing click');
+                            console.log('Main button already blocked, preventing click');
                             e.preventDefault();
                             e.stopImmediatePropagation();
                             showCreditError('Please wait for current generation to complete');
                             return;
                         }
                         
-                        // ALWAYS call Android for credit check
+                        // Call Android for credit check ONLY for main button
                         if (window.AndroidApp) {
-                            console.log('Calling AndroidApp.checkAndUseCredit()');
+                            console.log('Calling AndroidApp.checkAndUseCredit() for MAIN button');
                             e.preventDefault();
                             e.stopImmediatePropagation();
                             
                             disableGenerateButton();
                             window.AndroidApp.checkAndUseCredit();
                         } else {
-                            console.log('AndroidApp not available, allowing normal click');
-                            // If Android interface not available, allow normal operation
+                            console.log('AndroidApp not available, allowing normal click for MAIN button');
                         }
+                    } else if (target.tagName === 'BUTTON' && 
+                               (btnText.includes('sample') || btnText.includes('preview'))) {
+                        console.log('Sample/preview button clicked - ALLOWING without credit check');
+                        // Allow sample/preview buttons to work normally
                     }
                 }, true);
             }
             
             // Initialize
             function initializeCreditControl() {
-                console.log('Initializing SIMPLIFIED credit control...');
-                storeOriginalButtonTexts();
+                console.log('Initializing SPECIFIC credit control...');
+                storeOriginalButtonData();
                 setupButtonInterception();
                 
                 // Show Android app indicator
@@ -333,13 +433,14 @@ private fun injectCreditControlScript() {
                 const mainContent = document.querySelector('.main') || document.body;
                 mainContent.insertBefore(appIndicator, mainContent.firstChild);
                 
-                console.log('Credit control initialized successfully');
+                console.log('Specific credit control initialized successfully');
             }
             
             // Expose functions to Android
             window.androidCreditControl = {
                 enableButton: enableGenerateButton,
                 disableButton: disableGenerateButton,
+                triggerGeneration: triggerActualGeneration,
                 showError: showCreditError,
                 showSuccess: showSuccessMessage
             };
@@ -351,7 +452,7 @@ private fun injectCreditControlScript() {
     """.trimIndent()
 
     webView.evaluateJavascript(creditControlScript) { _ ->
-        android.util.Log.d("WebView", "Simplified credit control script injected")
+        android.util.Log.d("WebView", "Specific credit control script injected")
     }
 }
 
@@ -421,7 +522,7 @@ fun checkAndUseCredit() {
 
             isGenerating = true
 
-            // DEDUCT CREDIT IMMEDIATELY - This is the key fix
+            // DEDUCT CREDIT IMMEDIATELY
             creditManager.useCreditForResume { success ->
                 runOnUiThread {
                     if (success) {
@@ -432,44 +533,29 @@ fun checkAndUseCredit() {
                             Toast.LENGTH_SHORT
                         ).show()
 
-                        // Direct approach: Simply re-enable the button and let the original click happen
+                        // Use the new triggerGeneration method
                         webView.evaluateJavascript("""
-                            console.log('Credit deducted, allowing original click to proceed...');
-                            
-                            // Re-enable the button first
-                            if (window.androidCreditControl) {
-                                window.androidCreditControl.enableButton();
-                            }
-                            
-                            // Now find and click the original generate button
-                            setTimeout(() => {
+                            console.log('Credit deducted, triggering actual generation...');
+                            if (window.androidCreditControl && window.androidCreditControl.triggerGeneration) {
+                                const triggered = window.androidCreditControl.triggerGeneration();
+                                if (!triggered) {
+                                    window.androidCreditControl.showError('Failed to start generation. Please try again.');
+                                    window.androidCreditControl.enableButton();
+                                }
+                            } else {
+                                console.error('androidCreditControl not available');
+                                // Fallback: re-enable button and let user retry
                                 const buttons = document.querySelectorAll('button');
                                 buttons.forEach(btn => {
                                     const btnText = (btn.textContent || btn.innerText || '').toLowerCase();
                                     if (btnText.includes('generate') && 
                                         (btnText.includes('tailored') || btnText.includes('resume') || btnText.includes('cv'))) {
-                                        console.log('Clicking generate button:', btnText);
-                                        
-                                        // Remove any disabled state we added
                                         btn.disabled = false;
                                         btn.style.opacity = '1';
-                                        btn.style.pointerEvents = 'auto';
-                                        
-                                        // Trigger a real click event that will bubble properly
-                                        const clickEvent = new MouseEvent('click', {
-                                            bubbles: true,
-                                            cancelable: true,
-                                            view: window
-                                        });
-                                        
-                                        btn.dispatchEvent(clickEvent);
+                                        btn.style.cursor = 'pointer';
+                                        btn.innerHTML = btn.getAttribute('data-original-text') || '✨ Generate Tailored Résumé';
                                     }
                                 });
-                            }, 100);
-                            
-                            // Show success message
-                            if (window.androidCreditControl) {
-                                window.androidCreditControl.showSuccess('1 credit used - generating your resume...');
                             }
                         """.trimIndent(), null)
 
@@ -479,8 +565,8 @@ fun checkAndUseCredit() {
                             "if (window.androidCreditControl) { window.androidCreditControl.showError('Credit deduction failed'); window.androidCreditControl.enableButton(); }",
                             null
                         )
+                        isGenerating = false
                     }
-                    isGenerating = false
                 }
             }
 
