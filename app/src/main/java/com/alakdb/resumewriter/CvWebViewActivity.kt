@@ -372,112 +372,109 @@ class CvWebViewActivity : AppCompatActivity() {
     }
 
     inner class AndroidBridge {
-        
-       @JavascriptInterface
-        fun checkAndUseCredit() {
+
+    @JavascriptInterface
+    fun checkAndUseCredit() {
         runOnUiThread {
             try {
                 if (isGenerating) {
                     webView.evaluateJavascript(
                         "if (window.androidCreditControl) { window.androidCreditControl.showError('Generation already in progress'); window.androidCreditControl.enableButton(); }",
-                    null
-                )
-                return@runOnUiThread
-            }
-            
-            // Quick credit check first
-            if (creditManager.getAvailableCredits() <= 0) {
-                webView.evaluateJavascript(
-                    "if (window.androidCreditControl) { window.androidCreditControl.showError('Not enough credits! Please purchase more.'); window.androidCreditControl.enableButton(); }",
-                    null
-                )
-                return@runOnUiThread
-            }
-            
-            // Then check cooldown
-            if (!creditManager.canGenerateResume()) {
-                webView.evaluateJavascript(
-                    "if (window.androidCreditControl) { window.androidCreditControl.showError('Please wait 30 seconds between generations'); window.androidCreditControl.enableButton(); }",
-                    null
-                )
-                return@runOnUiThread
-            }
-            
-            isGenerating = true
-            creditManager.useCreditForResume { success ->
-                runOnUiThread {
-                    if (success) {
-                        // Success case - proceed with generation
-                        webView.evaluateJavascript(
-                            """
-                            if (window.androidCreditControl) {
-                                window.androidCreditControl.showSuccess('1 credit deducted - generating resume...');
-                                window.androidCreditControl.enableButton();
-                            }
-                            // Trigger actual generation
-                            setTimeout(() => {
-                                const buttons = document.querySelectorAll('button');
-                                buttons.forEach(btn => {
-                                    if (btn.textContent.includes('Generate Tailored') || 
-                                        btn.textContent.includes('Tailored Resume')) {
-                                        btn.click();
-                                    }
-                                });
-                            }, 100);
-                            """.trimIndent(), null
-                        )
-                    } else {
-                        webView.evaluateJavascript(
-                            "if (window.androidCreditControl) { window.androidCreditControl.showError('Credit deduction failed'); window.androidCreditControl.enableButton(); }",
-                            null
-                        )
-                    }
-                    isGenerating = false
+                        null
+                    )
+                    return@runOnUiThread
                 }
+
+                // Quick credit check first
+                if (creditManager.getAvailableCredits() <= 0) {
+                    webView.evaluateJavascript(
+                        "if (window.androidCreditControl) { window.androidCreditControl.showError('Not enough credits! Please purchase more.'); window.androidCreditControl.enableButton(); }",
+                        null
+                    )
+                    return@runOnUiThread
+                }
+
+                // Then check cooldown
+                if (!creditManager.canGenerateResume()) {
+                    webView.evaluateJavascript(
+                        "if (window.androidCreditControl) { window.androidCreditControl.showError('Please wait 30 seconds between generations'); window.androidCreditControl.enableButton(); }",
+                        null
+                    )
+                    return@runOnUiThread
+                }
+
+                isGenerating = true
+                creditManager.useCreditForResume { success ->
+                    runOnUiThread {
+                        if (success) {
+                            // Success case - proceed with generation
+                            webView.evaluateJavascript(
+                                """
+                                if (window.androidCreditControl) {
+                                    window.androidCreditControl.showSuccess('1 credit deducted - generating resume...');
+                                    window.androidCreditControl.enableButton();
+                                }
+                                // Trigger actual generation
+                                setTimeout(() => {
+                                    const buttons = document.querySelectorAll('button');
+                                    buttons.forEach(btn => {
+                                        if (btn.textContent.includes('Generate Tailored') || 
+                                            btn.textContent.includes('Tailored Resume')) {
+                                            btn.click();
+                                        }
+                                    });
+                                }, 100);
+                                """.trimIndent(), null
+                            )
+                        } else {
+                            webView.evaluateJavascript(
+                                "if (window.androidCreditControl) { window.androidCreditControl.showError('Credit deduction failed'); window.androidCreditControl.enableButton(); }",
+                                null
+                            )
+                        }
+                        isGenerating = false
+                    }
+                }
+            } catch (e: Exception) {
+                // Handle any unexpected errors
+                webView.evaluateJavascript(
+                    "if (window.androidCreditControl) { window.androidCreditControl.showError('System error: ${e.message}'); window.androidCreditControl.enableButton(); }",
+                    null
+                )
+                isGenerating = false
             }
-        } catch (e: Exception) {
-            // Handle any unexpected errors
+        }
+    }
+
+    @JavascriptInterface
+    fun notifyResumeGenerated() {
+        runOnUiThread {
+            Toast.makeText(
+                this@CvWebViewActivity,
+                "✅ Resume generated successfully! 1 credit used.",
+                Toast.LENGTH_SHORT
+            ).show()
+
             webView.evaluateJavascript(
-                "if (window.androidCreditControl) { window.androidCreditControl.showError('System error: ' + '${e.message}'); window.androidCreditControl.enableButton(); }",
+                "if (window.androidCreditControl) { window.androidCreditControl.showSuccess('Resume generated successfully! 1 credit used. You can download it now.'); }",
                 null
             )
-            isGenerating = false
+
+            webView.evaluateJavascript(
+                "if (window.androidCreditControl) { window.androidCreditControl.enableButton(); }",
+                null
+            )
         }
+    }
+
+    @JavascriptInterface
+    fun log(message: String) {
+        android.util.Log.d("WebViewJS", message)
+    }
+
+    @JavascriptInterface
+    fun getRemainingCredits(): Int {
+        return creditManager.getAvailableCredits()
     }
 }
 
-
-        @JavascriptInterface
-        fun notifyResumeGenerated() {
-            runOnUiThread {
-                Toast.makeText(
-                    this@CvWebViewActivity,
-                    "✅ Resume generated successfully! 1 credit used.",
-                    Toast.LENGTH_SHORT
-                ).show()
-                
-                // Notify JavaScript that resume was generated
-                webView.evaluateJavascript(
-                    "if (window.androidCreditControl) { window.androidCreditControl.showSuccess('Resume generated successfully! 1 credit used. You can download it now.'); }",
-                    null
-                )
-                
-                // Re-enable the generate button for next generation
-                webView.evaluateJavascript(
-                    "if (window.androidCreditControl) { window.androidCreditControl.enableButton(); }",
-                    null
-                )
-            }
-        }
-        
-        @JavascriptInterface
-        fun log(message: String) {
-            android.util.Log.d("WebViewJS", message)
-        }
-        
-        @JavascriptInterface
-        fun getRemainingCredits(): Int {
-            return creditManager.getAvailableCredits()
-        }
-    }
-}
