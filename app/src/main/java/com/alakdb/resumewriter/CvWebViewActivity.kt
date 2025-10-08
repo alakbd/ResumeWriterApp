@@ -475,6 +475,6 @@ class CvWebViewActivity : AppCompatActivity() {
     @JavascriptInterface
     fun getRemainingCredits(): Int {
         return creditManager.getAvailableCredits()
+        }
     }
 }
-
