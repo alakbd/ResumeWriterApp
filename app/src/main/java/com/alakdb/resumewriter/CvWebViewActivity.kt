@@ -182,46 +182,37 @@ private fun injectCreditControlScript() {
         (function() {
             'use strict';
             try {
-                console.log('Injecting CREDIT VERIFICATION system...');
-                
-                // ---------- DEBUG LOGGING WRAPPER ----------
-                (function() {
-                    const oldLog = console.log;
-                    const oldError = console.error;
-                    const oldWarn = console.warn;
+                // ---------- LOGGING BRIDGE ----------
+                const log = (msg) => {
+                    try { window.AndroidApp.log(String(msg)); } catch (e) {}
+                };
 
-                    console.log = function(...args) {
-                        oldLog.apply(console, args);
-                        if (window.AndroidApp && window.AndroidApp.log) {
-                            window.AndroidApp.log("JS LOG: " + args.join(' '));
-                        }
-                    };
+                const origLog = console.log;
+                const origError = console.error;
+                const origWarn = console.warn;
 
-                    console.error = function(...args) {
-                        oldError.apply(console, args);
-                        if (window.AndroidApp && window.AndroidApp.log) {
-                            window.AndroidApp.log("JS ERROR: " + args.join(' '));
-                        }
-                    };
+                console.log = function(...args) {
+                    origLog.apply(console, args);
+                    try { window.AndroidApp.log('JS LOG: ' + args.join(' ')); } catch (e) {}
+                };
 
-                    console.warn = function(...args) {
-                        oldWarn.apply(console, args);
-                        if (window.AndroidApp && window.AndroidApp.log) {
-                            window.AndroidApp.log("JS WARN: " + args.join(' '));
-                        }
-                    };
+                console.error = function(...args) {
+                    origError.apply(console, args);
+                    try { window.AndroidApp.log('JS ERROR: ' + args.join(' ')); } catch (e) {}
+                };
 
-                    window.onerror = function(msg, url, line, col, error) {
-                        const formatted = "JS UNCAUGHT: " + msg + 
-                                          " at " + url + ":" + line + ":" + col +
-                                          (error && error.stack ? "\n" + error.stack : "");
-                        console.error(formatted);
-                        if (window.AndroidApp && window.AndroidApp.log) {
-                            window.AndroidApp.log(formatted);
-                        }
-                        return false;
-                    };
-                })();
+                console.warn = function(...args) {
+                    origWarn.apply(console, args);
+                    try { window.AndroidApp.log('JS WARN: ' + args.join(' ')); } catch (e) {}
+                };
+
+                window.addEventListener('error', function(e) {
+                    try {
+                        window.AndroidApp.log('JS UNCAUGHT: ' + e.message + ' @ ' + e.filename + ':' + e.lineno);
+                    } catch (err) {}
+                });
+
+                log('Injecting CREDIT VERIFICATION system...');
 
                 // ---------- CREDIT CONTROL SYSTEM ----------
                 let creditCheckInProgress = false;
@@ -371,17 +362,18 @@ private fun injectCreditControlScript() {
                 initializeCreditControl();
             } catch (err) {
                 if (window.AndroidApp && window.AndroidApp.log) {
-                    window.AndroidApp.log("INJECTION ERROR: " + err.stack);
+                    window.AndroidApp.log('INJECTION ERROR: ' + err.stack);
                 }
-                console.error("INJECTION ERROR:", err);
+                console.error('INJECTION ERROR:', err);
             }
         })();
     """.trimIndent()
 
     webView.evaluateJavascript(creditControlScript) { _ ->
-        Log.d("WebView", "✅ Credit verification + JS logger injected")
+        Log.d("WebViewJS", "✅ Credit verification + JS logger injected")
     }
 }
+
 
 
     override fun onActivityResult(requestCode: Int, resultCode: Int, data: Intent?) {
