@@ -415,7 +415,7 @@ inner class AndroidBridge {
 fun checkAndUseCredit() {
     runOnUiThread {
         try {
-            // If already generating, reject immediately
+            // Prevent multiple generations
             if (isGenerating) {
                 webView.evaluateJavascript(
                     "if (window.androidCreditControl) { window.androidCreditControl.showError('Generation in progress. Please wait.'); }",
@@ -424,7 +424,7 @@ fun checkAndUseCredit() {
                 return@runOnUiThread
             }
 
-            // Check available credits
+            // Check credits
             if (creditManager.getAvailableCredits() <= 0) {
                 webView.evaluateJavascript(
                     "if (window.androidCreditControl) { window.androidCreditControl.showError('Not enough credits!'); }",
@@ -433,24 +433,26 @@ fun checkAndUseCredit() {
                 return@runOnUiThread
             }
 
-            // Deduct credit **atomically**
-            val success = creditManager.useCreditForResumeSync() // synchronous deduction
-            if (!success) {
-                webView.evaluateJavascript(
-                    "if (window.androidCreditControl) { window.androidCreditControl.showError('Credit deduction failed.'); }",
-                    null
-                )
-                return@runOnUiThread
+            // Deduct credit asynchronously
+            creditManager.useCreditForResume { success ->
+                runOnUiThread {
+                    if (!success) {
+                        webView.evaluateJavascript(
+                            "if (window.androidCreditControl) { window.androidCreditControl.showError('Credit deduction failed.'); }",
+                            null
+                        )
+                        return@runOnUiThread
+                    }
+
+                    isGenerating = true
+
+                    // Trigger generation
+                    webView.evaluateJavascript(
+                        "if (window.androidCreditControl) { window.androidCreditControl.triggerGeneration(); }",
+                        null
+                    )
+                }
             }
-
-            // Mark as generating
-            isGenerating = true
-
-            // Trigger generation
-            webView.evaluateJavascript(
-                "if (window.androidCreditControl) { window.androidCreditControl.triggerGeneration(); }",
-                null
-            )
 
         } catch (e: Exception) {
             isGenerating = false
@@ -461,6 +463,7 @@ fun checkAndUseCredit() {
         }
     }
 }
+
 
 
 // Add this new method to handle generation failures
