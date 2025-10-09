@@ -1,4 +1,4 @@
-name: Build Signed APK + AAB
+name: Build & Sign APK + AAB
 
 on:
   push:
@@ -9,7 +9,7 @@ jobs:
     runs-on: ubuntu-latest
 
     steps:
-      # 1️⃣ Checkout repository
+      # 1️⃣ Checkout repo
       - name: Checkout repository
         uses: actions/checkout@v4
         with:
@@ -46,35 +46,38 @@ jobs:
           ${{ secrets.GOOGLE_SERVICES_JSON }}
           EOF
 
-      # 7️⃣ Decode Base64 keystore and save as file
-      - name: Create Keystore from Secret
+      # 7️⃣ Decode Base64 Keystore Secret
+      - name: Decode and save keystore
         run: |
-          echo "${{ secrets.KEYSTORE_BASE64 }}" | base64 --decode > ./app/my-release-key.jks
+          mkdir -p $HOME/app
+          echo "${{ secrets.KEYSTORE_BASE64 }}" | base64 --decode > $HOME/app/my-release-key.jks
 
-      # 8️⃣ Build signed APK
-      - name: Build Signed APK
-        run: ./gradlew clean assembleRelease \
-          -Pandroid.injected.signing.store.file=app/my-release-key.jks \
-          -Pandroid.injected.signing.store.password=${{ secrets.KEYSTORE_PASSWORD }} \
-          -Pandroid.injected.signing.key.alias=${{ secrets.KEY_ALIAS }} \
-          -Pandroid.injected.signing.key.password=${{ secrets.KEY_PASSWORD }}
+      # 8️⃣ Build Signed Release APK
+      - name: Build Signed Release APK
+        run: |
+          ./gradlew clean assembleRelease \
+            -Pandroid.injected.signing.store.file=$HOME/app/my-release-key.jks \
+            -Pandroid.injected.signing.store.password=${{ secrets.KEYSTORE_PASSWORD }} \
+            -Pandroid.injected.signing.key.alias=${{ secrets.KEY_ALIAS }} \
+            -Pandroid.injected.signing.key.password=${{ secrets.KEY_PASSWORD }}
 
-      # 9️⃣ Upload signed APK
+      # 9️⃣ Upload Signed APK
       - name: Upload Signed APK
         uses: actions/upload-artifact@v4
         with:
           name: app-release-apk
           path: app/build/outputs/apk/release/app-release.apk
 
-      # 🔟 Build signed AAB
-      - name: Build Signed AAB
-        run: ./gradlew clean bundleRelease \
-          -Pandroid.injected.signing.store.file=app/my-release-key.jks \
-          -Pandroid.injected.signing.store.password=${{ secrets.KEYSTORE_PASSWORD }} \
-          -Pandroid.injected.signing.key.alias=${{ secrets.KEY_ALIAS }} \
-          -Pandroid.injected.signing.key.password=${{ secrets.KEY_PASSWORD }}
+      # 🔟 Build Signed AAB (Play Store bundle)
+      - name: Build Signed Release AAB
+        run: |
+          ./gradlew clean bundleRelease \
+            -Pandroid.injected.signing.store.file=$HOME/app/my-release-key.jks \
+            -Pandroid.injected.signing.store.password=${{ secrets.KEYSTORE_PASSWORD }} \
+            -Pandroid.injected.signing.key.alias=${{ secrets.KEY_ALIAS }} \
+            -Pandroid.injected.signing.key.password=${{ secrets.KEY_PASSWORD }}
 
-      # 1️⃣1️⃣ Upload signed AAB
+      # 11️⃣ Upload Signed AAB
       - name: Upload Signed AAB
         uses: actions/upload-artifact@v4
         with:
