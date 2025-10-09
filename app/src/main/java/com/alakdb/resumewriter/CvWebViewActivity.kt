@@ -415,88 +415,53 @@ inner class AndroidBridge {
 fun checkAndUseCredit() {
     runOnUiThread {
         try {
+            // If already generating, reject immediately
             if (isGenerating) {
                 webView.evaluateJavascript(
-                    "if (window.androidCreditControl) { window.androidCreditControl.showError('Generation already in progress'); window.androidCreditControl.enableButton(); }",
+                    "if (window.androidCreditControl) { window.androidCreditControl.showError('Generation in progress. Please wait.'); }",
                     null
                 )
                 return@runOnUiThread
             }
 
-            // Quick credit check first
+            // Check available credits
             if (creditManager.getAvailableCredits() <= 0) {
                 webView.evaluateJavascript(
-                    "if (window.androidCreditControl) { window.androidCreditControl.showError('Not enough credits! Please purchase more.'); window.androidCreditControl.enableButton(); }",
+                    "if (window.androidCreditControl) { window.androidCreditControl.showError('Not enough credits!'); }",
                     null
                 )
                 return@runOnUiThread
             }
 
-            // Then check cooldown
-            if (!creditManager.canGenerateResume()) {
+            // Deduct credit **atomically**
+            val success = creditManager.useCreditForResumeSync() // synchronous deduction
+            if (!success) {
                 webView.evaluateJavascript(
-                    "if (window.androidCreditControl) { window.androidCreditControl.showError('Please wait 30 seconds between generations'); window.androidCreditControl.enableButton(); }",
+                    "if (window.androidCreditControl) { window.androidCreditControl.showError('Credit deduction failed.'); }",
                     null
                 )
                 return@runOnUiThread
             }
 
+            // Mark as generating
             isGenerating = true
 
-            // DEDUCT CREDIT IMMEDIATELY
-            creditManager.useCreditForResume { success ->
-                runOnUiThread {
-                    if (success) {
-                        // Credit deducted - now trigger generation
-                        Toast.makeText(
-                            this@CvWebViewActivity,
-                            "✅ 1 credit deducted - Generating resume...",
-                            Toast.LENGTH_SHORT
-                        ).show()
-
-                        // Use the new robust triggerGeneration method with multiple fallbacks
-                        webView.evaluateJavascript("""
-                            console.log('=== CREDIT DEDUCTION SUCCESSFUL - TRIGGERING GENERATION ===');
-                            if (window.androidCreditControl && window.androidCreditControl.triggerGeneration) {
-                                const success = window.androidCreditControl.triggerGeneration();
-                                if (success) {
-                                    console.log('Generation triggered successfully');
-                                    window.androidCreditControl.showSuccess('1 credit used - generating your resume...');
-                                } else {
-                                    console.error('Failed to trigger generation');
-                                    window.androidCreditControl.showError('Failed to start generation. Please try again.');
-                                    window.androidCreditControl.enableButton();
-                                    // Notify Android that generation failed
-                                    if (window.AndroidApp) {
-                                        window.AndroidApp.notifyGenerationFailed();
-                                    }
-                                }
-                            } else {
-                                console.error('androidCreditControl not available');
-                                window.androidCreditControl.enableButton();
-                            }
-                        """.trimIndent(), null)
-
-                    } else {
-                        // Credit deduction failed
-                        webView.evaluateJavascript(
-                            "if (window.androidCreditControl) { window.androidCreditControl.showError('Credit deduction failed'); window.androidCreditControl.enableButton(); }",
-                            null
-                        )
-                        isGenerating = false
-                    }
-                }
-            }
-
-        } catch (e: Exception) {
+            // Trigger generation
             webView.evaluateJavascript(
-                "if (window.androidCreditControl) { window.androidCreditControl.showError('System error: ${e.message}'); window.androidCreditControl.enableButton(); }",
+                "if (window.androidCreditControl) { window.androidCreditControl.triggerGeneration(); }",
                 null
             )
+
+        } catch (e: Exception) {
             isGenerating = false
+            webView.evaluateJavascript(
+                "if (window.androidCreditControl) { window.androidCreditControl.showError('System error: ${e.message}'); }",
+                null
+            )
         }
     }
 }
+
 
 // Add this new method to handle generation failures
 @JavascriptInterface
