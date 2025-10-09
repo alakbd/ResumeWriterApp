@@ -1,4 +1,4 @@
-name: Build AAB
+name: Build APK
 
 on:
   push:
@@ -45,11 +45,12 @@ jobs:
           ${{ secrets.GOOGLE_SERVICES_JSON }}
           EOF
 
-      - name: Clean & Build AAB
-        run: ./gradlew clean bundleRelease
+      - name: Clean & Build APK
+        run: ./gradlew clean assembleRelease
 
-      - name: Upload AAB
+      - name: Upload APK
         uses: actions/upload-artifact@v4
         with:
-          name: app-release
-          path: app/build/outputs/bundle/release/app-release.aab
+          name: app-release-apk
+          path: app/build/outputs/apk/release/app-release.apk
+
