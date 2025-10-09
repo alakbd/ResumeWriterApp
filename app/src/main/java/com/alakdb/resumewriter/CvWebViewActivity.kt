@@ -207,10 +207,17 @@ private fun injectCreditControlScript() {
                     try { window.AndroidApp.log('JS WARN: ' + args.join(' ')); } catch (e) {}
                 };
 
-                window.addEventListener('error', function(e) {
+                // ---------- IMPROVED ERROR LISTENER ----------
+                window.addEventListener("error", function (e) {
                     try {
-                        window.AndroidApp.log('JS UNCAUGHT: ' + e.message + ' @ ' + e.filename + ':' + e.lineno);
-                    } catch (err) {}
+                        const details = 
+                            "Message: " + e.message + 
+                            " @ " + e.filename + ":" + e.lineno + 
+                            " Stack: " + (e.error && e.error.stack ? e.error.stack : "No stack");
+                        window.AndroidApp.log("JS ERROR TRACE: " + details);
+                    } catch (err) {
+                        window.AndroidApp.log("JS ERROR HANDLER FAILED: " + err);
+                    }
                 });
 
                 log('Injecting CREDIT VERIFICATION system...');
@@ -262,7 +269,6 @@ private fun injectCreditControlScript() {
                     setTimeout(() => { restoreOriginalState(button); }, 3000);
                 }
 
-                // ✅ Improved success behavior: restores click + auto-generates
                 function showSuccessState(button) {
                     console.log('Restoring original button handler and auto-clicking...');
                     if (originalButtonState && originalButtonState.onclick) {
@@ -277,7 +283,6 @@ private fun injectCreditControlScript() {
                     button.style.border = '1px solid #c8e6c9';
                     creditCheckInProgress = false;
 
-                    // Auto-trigger generation
                     setTimeout(() => {
                         try { button.click(); } catch (err) {
                             console.error('Auto-click failed:', err);
@@ -308,7 +313,7 @@ private fun injectCreditControlScript() {
 
                             if (btnText.includes('credit approved') || btnText.includes('generating')) {
                                 console.log('Already approved, allowing natural click');
-                                return; // let normal generation happen
+                                return;
                             }
 
                             console.log('First click - checking credits with Android');
@@ -374,6 +379,7 @@ private fun injectCreditControlScript() {
         Log.d("WebViewJS", "✅ Credit verification + JS logger injected")
     }
 }
+
 
 
 
