@@ -181,233 +181,208 @@ private fun injectCreditControlScript() {
     val creditControlScript = """
         (function() {
             'use strict';
-            
-            console.log('Injecting ROBUST credit control system...');
-            
-            let resumeButtonBlocked = false;
-            let lastClickedButton = null;
-            
-            // Function to disable generate button
-            function disableGenerateButton(button) {
-                console.log('Disabling generate button...');
-                if (button) {
-                    // Store the original button
-                    lastClickedButton = button;
-                    
-                    // Store original text and state
-                    if (!button.getAttribute('data-original-text')) {
-                        button.setAttribute('data-original-text', button.innerHTML);
-                    }
-                    if (!button.getAttribute('data-original-onclick')) {
-                        button.setAttribute('data-original-onclick', button.onclick ? button.onclick.toString() : '');
-                    }
-                    
-                    button.disabled = true;
-                    button.style.opacity = '0.5';
-                    button.style.cursor = 'not-allowed';
+            try {
+                console.log('Injecting CREDIT VERIFICATION system...');
+                
+                // ---------- DEBUG LOGGING WRAPPER ----------
+                (function() {
+                    const oldLog = console.log;
+                    const oldError = console.error;
+                    const oldWarn = console.warn;
+
+                    console.log = function(...args) {
+                        oldLog.apply(console, args);
+                        if (window.AndroidApp && window.AndroidApp.log) {
+                            window.AndroidApp.log("JS LOG: " + args.join(' '));
+                        }
+                    };
+
+                    console.error = function(...args) {
+                        oldError.apply(console, args);
+                        if (window.AndroidApp && window.AndroidApp.log) {
+                            window.AndroidApp.log("JS ERROR: " + args.join(' '));
+                        }
+                    };
+
+                    console.warn = function(...args) {
+                        oldWarn.apply(console, args);
+                        if (window.AndroidApp && window.AndroidApp.log) {
+                            window.AndroidApp.log("JS WARN: " + args.join(' '));
+                        }
+                    };
+
+                    window.onerror = function(msg, url, line, col, error) {
+                        const formatted = "JS UNCAUGHT: " + msg + 
+                                          " at " + url + ":" + line + ":" + col +
+                                          (error && error.stack ? "\n" + error.stack : "");
+                        console.error(formatted);
+                        if (window.AndroidApp && window.AndroidApp.log) {
+                            window.AndroidApp.log(formatted);
+                        }
+                        return false;
+                    };
+                })();
+
+                // ---------- CREDIT CONTROL SYSTEM ----------
+                let creditCheckInProgress = false;
+                let originalButtonState = null;
+                let lastClickedButton = null;
+
+                function storeOriginalButtonState(button) {
+                    originalButtonState = {
+                        html: button.innerHTML,
+                        disabled: button.disabled,
+                        onclick: button.onclick,
+                        form: button.form
+                    };
+                    console.log('Stored original button state');
+                }
+
+                function showCheckingState(button) {
                     button.innerHTML = '⏳ Checking Credits...';
-                    
-                    resumeButtonBlocked = true;
+                    button.disabled = true;
+                    button.style.opacity = '0.6';
+                    button.style.cursor = 'not-allowed';
+                    creditCheckInProgress = true;
                 }
-            }
-            
-            // Function to enable generate button
-            function enableGenerateButton() {
-                console.log('Enabling generate button...');
-                if (lastClickedButton) {
-                    lastClickedButton.disabled = false;
-                    lastClickedButton.style.opacity = '1';
-                    lastClickedButton.style.cursor = 'pointer';
-                    const originalText = lastClickedButton.getAttribute('data-original-text') || '✨ Generate Tailored Résumé';
-                    lastClickedButton.innerHTML = originalText;
-                }
-                resumeButtonBlocked = false;
-            }
-            
-            // Function to trigger actual generation
-            function triggerActualGeneration() {
-                console.log('=== ATTEMPTING TO TRIGGER ACTUAL GENERATION ===');
-                
-                if (!lastClickedButton) {
-                    console.log('No last clicked button found');
-                    return false;
-                }
-                
-                // Re-enable the button first
-                enableGenerateButton();
-                
-                // Method 1: Try to trigger the original click handler
-                const originalOnclick = lastClickedButton.getAttribute('data-original-onclick');
-                if (originalOnclick && originalOnclick !== '') {
-                    console.log('Attempting to execute original onclick handler');
-                    try {
-                        // Create and execute the original function
-                        const originalFunction = new Function(originalOnclick);
-                        originalFunction.call(lastClickedButton);
-                        console.log('Original onclick handler executed successfully');
-                        return true;
-                    } catch (e) {
-                        console.log('Failed to execute original onclick:', e);
-                    }
-                }
-                
-                // Method 2: Try to find and click the form submit button
-                console.log('Trying form submission method...');
-                const forms = document.querySelectorAll('form');
-                for (let form of forms) {
-                    const submitButton = form.querySelector('button[type="submit"], input[type="submit"]');
-                    if (submitButton) {
-                        console.log('Found submit button in form, triggering click');
-                        submitButton.click();
-                        return true;
-                    }
-                }
-                
-                // Method 3: Try to find any generate button and click it
-                console.log('Trying to find generate button again...');
-                const buttons = document.querySelectorAll('button');
-                for (let button of buttons) {
-                    const btnText = (button.textContent || button.innerText || '').toLowerCase().trim();
-                    if ((btnText.includes('generate tailored resume') || 
-                         btnText.includes('generate tailored résumé') ||
-                         btnText.includes('create tailored resume') ||
-                         (btnText.includes('generate') && btnText.includes('tailored') && btnText.includes('resume'))) &&
-                        !btnText.includes('sample') && !btnText.includes('preview')) {
-                        
-                        console.log('Found generate button again, clicking:', btnText);
-                        button.click();
-                        return true;
-                    }
-                }
-                
-                // Method 4: Last resort - try to submit the first form on the page
-                console.log('Trying to submit first form...');
-                const firstForm = document.querySelector('form');
-                if (firstForm) {
-                    console.log('Submitting first form found');
-                    firstForm.submit();
-                    return true;
-                }
-                
-                console.log('All generation methods failed');
-                return false;
-            }
-            
-            // Function to show error message
-            function showCreditError(message) {
-                console.log('Showing credit error:', message);
-                let errorDiv = document.getElementById('android-credit-error');
-                if (!errorDiv) {
-                    errorDiv = document.createElement('div');
-                    errorDiv.id = 'android-credit-error';
-                    errorDiv.style.cssText = 'background: #ffebee; color: #c62828; padding: 12px; margin: 10px 0; border-radius: 4px; border: 1px solid #ffcdd2; font-size: 14px; z-index: 10000; position: relative;';
-                    const mainContent = document.querySelector('.main') || document.body;
-                    mainContent.insertBefore(errorDiv, mainContent.firstChild);
-                }
-                errorDiv.innerHTML = '🚫 <strong>Credit Error:</strong> ' + message;
-                
-                setTimeout(() => {
-                    if (errorDiv && errorDiv.parentNode) {
-                        errorDiv.parentNode.removeChild(errorDiv);
-                    }
-                }, 5000);
-            }
-            
-            // Function to show success message
-            function showSuccessMessage(message) {
-                console.log('Showing success message:', message);
-                let successDiv = document.getElementById('android-success-message');
-                if (!successDiv) {
-                    successDiv = document.createElement('div');
-                    successDiv.id = 'android-success-message';
-                    successDiv.style.cssText = 'background: #e8f5e8; color: #2e7d32; padding: 12px; margin: 10px 0; border-radius: 4px; border: 1px solid #c8e6c9; font-size: 14px; z-index: 10000; position: relative;';
-                    const mainContent = document.querySelector('.main') || document.body;
-                    mainContent.insertBefore(successDiv, mainContent.firstChild);
-                }
-                successDiv.innerHTML = '✅ <strong>Success:</strong> ' + message;
-                
-                setTimeout(() => {
-                    if (successDiv && successDiv.parentNode) {
-                        successDiv.parentNode.removeChild(successDiv);
-                    }
-                }, 5000);
-            }
-            
-            // SPECIFIC button interception
-            function setupButtonInterception() {
-                document.addEventListener('click', function(e) {
-                    const target = e.target;
-                    const btnText = (target.textContent || target.innerText || '').toLowerCase().trim();
-                    
-                    // VERY SPECIFIC: Only intercept the main resume generation button
-                    if (target.tagName === 'BUTTON' && 
-                        ((btnText.includes('generate tailored resume') || 
-                          btnText.includes('generate tailored résumé') ||
-                          btnText.includes('create tailored resume') ||
-                          (btnText.includes('generate') && btnText.includes('tailored') && btnText.includes('resume'))) &&
-                         !btnText.includes('sample') && !btnText.includes('preview'))) {
-                        
-                        console.log('=== MAIN GENERATE BUTTON CLICK INTERCEPTED ===');
-                        console.log('Main button text:', btnText);
-                        
-                        if (resumeButtonBlocked) {
-                            console.log('Main button already blocked, preventing click');
-                            e.preventDefault();
-                            e.stopImmediatePropagation();
-                            showCreditError('Please wait for current generation to complete');
-                            return;
-                        }
-                        
-                        // Call Android for credit check ONLY for main button
-                        if (window.AndroidApp) {
-                            console.log('Calling AndroidApp.checkAndUseCredit() for MAIN button');
-                            e.preventDefault();
-                            e.stopImmediatePropagation();
-                            
-                            disableGenerateButton(target);
-                            window.AndroidApp.checkAndUseCredit();
-                        } else {
-                            console.log('AndroidApp not available, allowing normal click for MAIN button');
+
+                function restoreOriginalState(button) {
+                    if (originalButtonState) {
+                        button.innerHTML = originalButtonState.html;
+                        button.disabled = originalButtonState.disabled;
+                        button.style.opacity = '1';
+                        button.style.cursor = 'pointer';
+                        if (originalButtonState.onclick) {
+                            button.onclick = originalButtonState.onclick;
                         }
                     }
-                }, true);
+                    creditCheckInProgress = false;
+                }
+
+                function showErrorState(button, message) {
+                    button.innerHTML = '❌ ' + message;
+                    button.disabled = true;
+                    button.style.opacity = '0.8';
+                    button.style.cursor = 'not-allowed';
+                    button.style.background = '#ffebee';
+                    button.style.color = '#c62828';
+                    button.style.border = '1px solid #ffcdd2';
+                    setTimeout(() => { restoreOriginalState(button); }, 3000);
+                }
+
+                // ✅ Improved success behavior: restores click + auto-generates
+                function showSuccessState(button) {
+                    console.log('Restoring original button handler and auto-clicking...');
+                    if (originalButtonState && originalButtonState.onclick) {
+                        button.onclick = originalButtonState.onclick;
+                    }
+                    button.innerHTML = '✅ Credit Approved - Generating...';
+                    button.disabled = false;
+                    button.style.opacity = '1';
+                    button.style.cursor = 'pointer';
+                    button.style.background = '#e8f5e8';
+                    button.style.color = '#2e7d32';
+                    button.style.border = '1px solid #c8e6c9';
+                    creditCheckInProgress = false;
+
+                    // Auto-trigger generation
+                    setTimeout(() => {
+                        try { button.click(); } catch (err) {
+                            console.error('Auto-click failed:', err);
+                        }
+                    }, 300);
+                }
+
+                function setupButtonInterception() {
+                    document.addEventListener('click', function(e) {
+                        const target = e.target;
+                        const btnText = (target.textContent || target.innerText || '').toLowerCase().trim();
+
+                        if (target.tagName === 'BUTTON' &&
+                            ((btnText.includes('generate tailored resume') || 
+                              btnText.includes('generate tailored résumé') ||
+                              btnText.includes('create tailored resume') ||
+                              (btnText.includes('generate') && btnText.includes('tailored') && btnText.includes('resume'))) &&
+                             !btnText.includes('sample') && !btnText.includes('preview'))) {
+
+                            console.log('=== GENERATE BUTTON CLICKED ===');
+
+                            if (creditCheckInProgress) {
+                                console.log('Credit check already in progress, preventing click');
+                                e.preventDefault();
+                                e.stopImmediatePropagation();
+                                return;
+                            }
+
+                            if (btnText.includes('credit approved') || btnText.includes('generating')) {
+                                console.log('Already approved, allowing natural click');
+                                return; // let normal generation happen
+                            }
+
+                            console.log('First click - checking credits with Android');
+                            e.preventDefault();
+                            e.stopImmediatePropagation();
+                            storeOriginalButtonState(target);
+                            lastClickedButton = target;
+                            showCheckingState(target);
+
+                            if (window.AndroidApp && window.AndroidApp.checkAndUseCredit) {
+                                window.AndroidApp.checkAndUseCredit();
+                            } else {
+                                console.error('AndroidApp not available');
+                                restoreOriginalState(target);
+                            }
+                        }
+                    }, true);
+                }
+
+                function initializeCreditControl() {
+                    console.log('Initializing credit verification system...');
+                    setupButtonInterception();
+
+                    const appIndicator = document.createElement('div');
+                    appIndicator.innerHTML =
+                        '<div style="background: #e3f2fd; color: #1565c0; padding: 10px; margin: 10px 0; border-radius: 4px; border: 1px solid #bbdefb; font-size: 14px; z-index: 9999; position: relative;">📱 <strong>Mobile App:</strong> 1 Credit = 1 Resume Generation</div>';
+                    const mainContent = document.querySelector('.main') || document.body;
+                    mainContent.insertBefore(appIndicator, mainContent.firstChild);
+                    console.log('Credit verification system initialized');
+                }
+
+                window.androidCreditControl = {
+                    onCreditApproved: function() {
+                        console.log('Credit approved - enabling generation');
+                        if (lastClickedButton) {
+                            showSuccessState(lastClickedButton);
+                        }
+                    },
+                    onCreditError: function(message) {
+                        console.error('Credit error:', message);
+                        if (lastClickedButton) {
+                            showErrorState(lastClickedButton, message);
+                        }
+                    },
+                    restoreButton: function() {
+                        if (lastClickedButton) {
+                            restoreOriginalState(lastClickedButton);
+                        }
+                    }
+                };
+
+                initializeCreditControl();
+            } catch (err) {
+                if (window.AndroidApp && window.AndroidApp.log) {
+                    window.AndroidApp.log("INJECTION ERROR: " + err.stack);
+                }
+                console.error("INJECTION ERROR:", err);
             }
-            
-            // Initialize
-            function initializeCreditControl() {
-                console.log('Initializing ROBUST credit control...');
-                setupButtonInterception();
-                
-                // Show Android app indicator
-                const appIndicator = document.createElement('div');
-                appIndicator.innerHTML = '<div style="background: #e3f2fd; color: #1565c0; padding: 10px; margin: 10px 0; border-radius: 4px; border: 1px solid #bbdefb; font-size: 14px; z-index: 9999; position: relative;">📱 <strong>Mobile App:</strong> 1 Credit deducted per resume generation</div>';
-                const mainContent = document.querySelector('.main') || document.body;
-                mainContent.insertBefore(appIndicator, mainContent.firstChild);
-                
-                console.log('Robust credit control initialized successfully');
-            }
-            
-            // Expose functions to Android
-            window.androidCreditControl = {
-                enableButton: enableGenerateButton,
-                disableButton: disableGenerateButton,
-                triggerGeneration: triggerActualGeneration,
-                showError: showCreditError,
-                showSuccess: showSuccessMessage,
-                // Debug function
-                getLastButton: function() { return lastClickedButton; }
-            };
-            
-            // Start initialization
-            initializeCreditControl();
-            
         })();
     """.trimIndent()
 
     webView.evaluateJavascript(creditControlScript) { _ ->
-        android.util.Log.d("WebView", "Robust credit control script injected")
+        Log.d("WebView", "✅ Credit verification + JS logger injected")
     }
 }
+
 
     override fun onActivityResult(requestCode: Int, resultCode: Int, data: Intent?) {
         super.onActivityResult(requestCode, resultCode, data)
