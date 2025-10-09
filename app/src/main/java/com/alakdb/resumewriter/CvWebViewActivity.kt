@@ -592,7 +592,8 @@ fun debugPageState() {
         const forms = document.querySelectorAll('form');
         console.log('Forms count:', forms.length);
     """.trimIndent(), null)
-        }
+}
+
 
     }
 }
