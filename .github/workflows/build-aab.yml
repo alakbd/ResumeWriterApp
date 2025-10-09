@@ -1,4 +1,4 @@
-name: Build APK + AAB
+name: Build Signed APK + AAB
 
 on:
   push:
@@ -9,7 +9,7 @@ jobs:
     runs-on: ubuntu-latest
 
     steps:
-      # 1️⃣ Checkout repo
+      # 1️⃣ Checkout repository
       - name: Checkout repository
         uses: actions/checkout@v4
         with:
@@ -46,23 +46,36 @@ jobs:
           ${{ secrets.GOOGLE_SERVICES_JSON }}
           EOF
 
-      # 7️⃣ Build release APK
-      - name: Clean & Build Release APK
-        run: ./gradlew clean assembleRelease
+      # 7️⃣ Decode Base64 keystore and save as file
+      - name: Create Keystore from Secret
+        run: |
+          echo "${{ secrets.KEYSTORE_BASE64 }}" | base64 --decode > ./app/my-release-key.jks
 
-      # 8️⃣ Upload APK artifact
-      - name: Upload APK
+      # 8️⃣ Build signed APK
+      - name: Build Signed APK
+        run: ./gradlew clean assembleRelease \
+          -Pandroid.injected.signing.store.file=app/my-release-key.jks \
+          -Pandroid.injected.signing.store.password=${{ secrets.KEYSTORE_PASSWORD }} \
+          -Pandroid.injected.signing.key.alias=${{ secrets.KEY_ALIAS }} \
+          -Pandroid.injected.signing.key.password=${{ secrets.KEY_PASSWORD }}
+
+      # 9️⃣ Upload signed APK
+      - name: Upload Signed APK
         uses: actions/upload-artifact@v4
         with:
           name: app-release-apk
-          path: app/build/outputs/apk/release/app-release-unsigned.apk
+          path: app/build/outputs/apk/release/app-release.apk
 
-      # 9️⃣ Optional: Build AAB for Play Store
-      - name: Clean & Build AAB
-        run: ./gradlew clean bundleRelease
+      # 🔟 Build signed AAB
+      - name: Build Signed AAB
+        run: ./gradlew clean bundleRelease \
+          -Pandroid.injected.signing.store.file=app/my-release-key.jks \
+          -Pandroid.injected.signing.store.password=${{ secrets.KEYSTORE_PASSWORD }} \
+          -Pandroid.injected.signing.key.alias=${{ secrets.KEY_ALIAS }} \
+          -Pandroid.injected.signing.key.password=${{ secrets.KEY_PASSWORD }}
 
-      # 🔟 Upload AAB artifact
-      - name: Upload AAB
+      # 1️⃣1️⃣ Upload signed AAB
+      - name: Upload Signed AAB
         uses: actions/upload-artifact@v4
         with:
           name: app-release-aab
