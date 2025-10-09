@@ -582,7 +582,7 @@ fun debugPageState() {
         console.log('All buttons count:', buttons.length);
         buttons.forEach((btn, index) => {
             const btnText = (btn.textContent || btn.innerText || '').toLowerCase().trim();
-            console.log(`Button \${index}: "\${btnText}"`, {
+            console.log('Button ' + index + ': "' + btnText + '"', {
                 disabled: btn.disabled,
                 onclick: btn.onclick ? 'exists' : 'null',
                 html: btn.innerHTML
@@ -592,7 +592,8 @@ fun debugPageState() {
         const forms = document.querySelectorAll('form');
         console.log('Forms count:', forms.length);
     """.trimIndent(), null)
-}
+        }
+
 
 
     }
