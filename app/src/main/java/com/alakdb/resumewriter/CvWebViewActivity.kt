@@ -486,7 +486,7 @@ inner class AndroidBridge {
     fun getRemainingCredits(): Int {
         return creditManager.getAvailableCredits()
     }
-}
+
 
 
 // Add this temporary method to AndroidBridge for debugging
@@ -515,4 +515,4 @@ fun debugPageState() {
 
 
     }
-}
+
