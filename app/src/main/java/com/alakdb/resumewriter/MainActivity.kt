@@ -157,16 +157,12 @@ class MainActivity : AppCompatActivity() {
         if (availableCredits <= 0) {
             showMessage("Not enough credits! Please purchase more.")
             return
-        }
-
-        // RESET COOLDOWN WHEN USER EXPLICITLY STARTS A NEW RESUME GENERATION
-        creditManager.resetResumeCooldown()
-
-        // Open WebView for resume generation (credit will be deducted inside WebView)
-        showMessage("Opening CV Builder...")
-        val intent = Intent(this, CvWebViewActivity::class.java)
-        startActivity(intent)
     }
+
+    // Open the new Resume Generation Activity
+    val intent = Intent(this, ResumeGenerationActivity::class.java)
+    startActivity(intent)
+}
 
     private fun purchaseProduct(productId: String) {
         if (!isBillingInitialized) {
