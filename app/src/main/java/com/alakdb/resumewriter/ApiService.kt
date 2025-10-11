@@ -1,6 +1,7 @@
 package com.alakdb.resumewriter
 
 import android.util.Log
+import android.content.Context
 import com.google.gson.Gson
 import okhttp3.*
 import okhttp3.MediaType.Companion.toMediaType
