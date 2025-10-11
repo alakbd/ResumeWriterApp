@@ -1,6 +1,7 @@
 package com.alakdb.resumewriter
 
 import android.util.Log
+import kotlinx.coroutines.tasks.await
 import android.content.Context
 import com.google.firebase.auth.FirebaseAuth
 import com.google.gson.Gson
