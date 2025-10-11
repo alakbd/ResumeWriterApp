@@ -17,7 +17,7 @@ class ApiService(private val context: Context) {
         .build()
     
     private val gson = Gson()
-    private val baseUrl = "https://your-api-server.com" // Replace with your API URL
+    private val baseUrl = "https://resume-writer-api.onrender.com/" // Replace with your API URL
 
     interface ApiCallback {
         fun onSuccess(response: JSONObject)
