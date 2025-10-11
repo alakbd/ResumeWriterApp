@@ -1,6 +1,7 @@
 package com.alakdb.resumewriter
 
 import android.content.Intent
+import android.util.Log
 import android.net.Uri
 import android.os.Bundle
 import android.widget.Toast
@@ -18,6 +19,9 @@ class ResumeGenerationActivity : AppCompatActivity() {
     private lateinit var apiService: ApiService
     private lateinit var creditManager: CreditManager
     private lateinit var auth: FirebaseAuth
+
+     // ✅ Add this line to fix "Unresolved reference: baseUrl"
+    private val baseUrl = "https://resume-writer-api.onrender.com"
     
     private var currentResumeText: String = ""
     private var currentJobDesc: String = ""
@@ -136,7 +140,7 @@ class ResumeGenerationActivity : AppCompatActivity() {
 
     private fun showError(message: String) {
         Toast.makeText(this, message, Toast.LENGTH_LONG).show()
-        Log.e("ResumeGeneration", message)
+        Log.e("ResumeGeneration", message) // ✅ Log import fixes this
     }
 
     private fun showSuccess(message: String) {
