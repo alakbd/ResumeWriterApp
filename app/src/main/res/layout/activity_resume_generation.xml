@@ -57,7 +57,7 @@
             android:layout_height="wrap_content"
             android:text="Generate Resume (1 Credit)"
             android:layout_marginTop="16dp"
-            android:background="@color/colorPrimary"
+            android:background="@color/primary"
             android:textColor="@android:color/white" />
 
         <TextView
