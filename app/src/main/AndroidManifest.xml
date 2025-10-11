@@ -28,12 +28,10 @@
         </activity>
 
         <activity
-            android:name=".CvWebViewActivity"
-            android:exported="true"
-            android:hardwareAccelerated="true"
-            android:configChanges="orientation|keyboardHidden|screenSize|keyboard|smallestScreenSize|screenLayout"
-            android:windowSoftInputMode="adjustResize"
-            android:theme="@style/Theme.AppCompat.Light.NoActionBar" />
+        android:name=".ResumeGenerationActivity"
+        android:exported="false"
+        android:label="Generate Resume"
+        android:theme="@style/Theme.AppCompat.Light.NoActionBar" />
 
         <!-- Add LoginActivity -->
         <activity
