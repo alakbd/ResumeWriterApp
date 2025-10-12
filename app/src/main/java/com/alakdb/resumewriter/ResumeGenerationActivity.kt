@@ -1,6 +1,7 @@
 package com.alakdb.resumewriter
 
 import android.content.Intent
+import android.widget.TextView
 import android.net.Uri
 import android.util.Log
 import android.app.Activity
@@ -74,27 +75,14 @@ class ResumeGenerationActivity : AppCompatActivity() {
             "text/plain"
         )
 
-    resumePicker = registerForActivityResult(ActivityResultContracts.StartActivityForResult()) { result ->
-        if (result.resultCode == Activity.RESULT_OK) {
-            result.data?.data?.let { uri ->
-            selectedResumeUri = uri
-            binding.tvResumeFile.text = getFileName(uri) ?: "Resume file selected"
-            binding.tvResumeFile.setTextColor(getColor(android.R.color.holo_green_dark))
-            checkGenerateButtonState()
-            }
-        }
+    resumePicker = registerForActivityResult(ActivityResultContracts.GetContent()) { uri ->
+        uri?.let { handleSelectedFile(it, binding.tvResumeFile) { selectedResumeUri = it } }
     }
 
-    jobDescPicker = registerForActivityResult(ActivityResultContracts.StartActivityForResult()) { result ->
-        if (result.resultCode == Activity.RESULT_OK) {
-            result.data?.data?.let { uri ->
-            selectedJobDescUri = uri
-            binding.tvJobDescFile.text = getFileName(uri) ?: "Job description file selected"
-            binding.tvJobDescFile.setTextColor(getColor(android.R.color.holo_green_dark))
-            checkGenerateButtonState()
-            }
-        }
+    jobDescPicker = registerForActivityResult(ActivityResultContracts.GetContent()) { uri ->
+        uri?.let { handleSelectedFile(it, binding.tvJobDescFile) { selectedJobDescUri = it } }
     }
+
 
 
     fun handleSelectedFile(uri: Uri, textView: TextView, setUri: (Uri) -> Unit) {
@@ -108,18 +96,18 @@ class ResumeGenerationActivity : AppCompatActivity() {
             showError("Unsupported file type. Please select PDF, DOCX, or TXT")
         }
     }
-}
+
 
 
     
     private fun setupUI() {
         // File selection buttons
         binding.btnSelectResume.setOnClickListener {
-            openFilePicker(resumePicker) // use Intent with all MIME types
+            resumePicker.launch("application/pdf,application/vnd.openxmlformats-officedocument.wordprocessingml.document,text/plain")
         }
 
         binding.btnSelectJobDesc.setOnClickListener {
-             openFilePicker(jobDescPicker) // use Intent with all MIME types
+            jobDescPicker.launch("application/pdf,application/vnd.openxmlformats-officedocument.wordprocessingml.document,text/plain")
         }
 
                 // Clear selection buttons
