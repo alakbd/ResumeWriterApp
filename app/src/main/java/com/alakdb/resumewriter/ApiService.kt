@@ -15,6 +15,7 @@ import java.io.InputStream
 import java.util.concurrent.TimeUnit
 import okhttp3.logging.HttpLoggingInterceptor
 import java.io.IOException
+import java.io.FileOutputStream
 
 class ApiService(private val context: Context) {
     private val client = OkHttpClient.Builder()
@@ -22,7 +23,7 @@ class ApiService(private val context: Context) {
         .readTimeout(60, TimeUnit.SECONDS)
         .writeTimeout(30, TimeUnit.SECONDS)
         .addInterceptor(HttpLoggingInterceptor().apply {
-            level = HttpLoggingInterceptor.Level.BODY // This will log all requests/responses
+            level = HttpLoggingInterceptor.Level.BODY
         })
         .build()
     
@@ -68,7 +69,8 @@ class ApiService(private val context: Context) {
                 ApiResult.Error("Connection failed: ${response.code} - ${response.message}")
             }
         } catch (e: Exception) {
-            ApiResult.Error("Connection test failed: ${e.message}")
+            Log.e("ApiService", "Connection test error: ${e.message}", e)
+            ApiResult.Error("Connection test failed: ${e.message ?: "Unknown error"}")
         }
     }
 
@@ -90,24 +92,21 @@ class ApiService(private val context: Context) {
                 .build()
 
             val response = client.newCall(request).execute()
-            
-            if (!response.isSuccessful) {
-                return ApiResult.Error("HTTP ${response.code}: ${response.message}")
-            }
-            
             val responseBody = response.body?.string()
-            if (responseBody != null) {
+            
+            if (response.isSuccessful && responseBody != null) {
                 val jsonResponse = JSONObject(responseBody)
-                if (jsonResponse.getBoolean("success")) {
+                if (jsonResponse.optBoolean("success", false)) {
                     ApiResult.Success(jsonResponse)
                 } else {
-                    ApiResult.Error(jsonResponse.getString("message"))
+                    ApiResult.Error(jsonResponse.optString("message", "Unknown error"))
                 }
             } else {
-                ApiResult.Error("Empty response from server")
+                ApiResult.Error("HTTP ${response.code}: ${response.message}")
             }
         } catch (e: Exception) {
-            ApiResult.Error("Network error: ${e.message}")
+            Log.e("ApiService", "Deduct credit error: ${e.message}", e)
+            ApiResult.Error("Network error: ${e.message ?: "Unknown error"}")
         }
     }
 
@@ -134,19 +133,16 @@ class ApiService(private val context: Context) {
                 .build()
 
             val response = client.newCall(request).execute()
-            
-            if (!response.isSuccessful) {
-                return ApiResult.Error("HTTP ${response.code}: ${response.message}")
-            }
-            
             val responseBody = response.body?.string()
-            if (responseBody != null) {
+            
+            if (response.isSuccessful && responseBody != null) {
                 ApiResult.Success(JSONObject(responseBody))
             } else {
-                ApiResult.Error("Empty response from server")
+                ApiResult.Error("HTTP ${response.code}: ${response.message}")
             }
         } catch (e: Exception) {
-            ApiResult.Error("Network error: ${e.message}")
+            Log.e("ApiService", "Generate resume error: ${e.message}", e)
+            ApiResult.Error("Network error: ${e.message ?: "Unknown error"}")
         }
     }
 
@@ -161,21 +157,21 @@ class ApiService(private val context: Context) {
                 return ApiResult.Error("User not authenticated")
             }
 
-            // Convert URIs to files and create multipart request
-            val resumeFile = uriToFile(resumeFileUri)
-            val jobDescFile = uriToFile(jobDescFileUri)
+            // Convert URIs to files
+            val resumeFile = uriToFile(resumeFileUri, "resume")
+            val jobDescFile = uriToFile(jobDescFileUri, "job_desc")
 
             val requestBody = MultipartBody.Builder()
                 .setType(MultipartBody.FORM)
                 .addFormDataPart("tone", tone)
                 .addFormDataPart(
                     "resume_file", 
-                    resumeFile.name ?: "resume.pdf",
+                    getFileName(resumeFileUri) ?: "resume.pdf",
                     resumeFile.asRequestBody(getMediaType(resumeFileUri))
                 )
                 .addFormDataPart(
                     "job_description_file", 
-                    jobDescFile.name ?: "job_description.pdf",
+                    getFileName(jobDescFileUri) ?: "job_description.pdf",
                     jobDescFile.asRequestBody(getMediaType(jobDescFileUri))
                 )
                 .build()
@@ -187,19 +183,16 @@ class ApiService(private val context: Context) {
                 .build()
 
             val response = client.newCall(request).execute()
-            
-            if (!response.isSuccessful) {
-                return ApiResult.Error("HTTP ${response.code}: ${response.message}")
-            }
-            
             val responseBody = response.body?.string()
-            if (responseBody != null) {
+            
+            if (response.isSuccessful && responseBody != null) {
                 ApiResult.Success(JSONObject(responseBody))
             } else {
-                ApiResult.Error("Empty response from server")
+                ApiResult.Error("HTTP ${response.code}: ${response.message}")
             }
         } catch (e: Exception) {
-            ApiResult.Error("File upload error: ${e.message}")
+            Log.e("ApiService", "Generate resume from files error: ${e.message}", e)
+            ApiResult.Error("File upload error: ${e.message ?: "Unknown error"}")
         }
     }
 
@@ -217,27 +210,24 @@ class ApiService(private val context: Context) {
                 .build()
 
             val response = client.newCall(request).execute()
-            
-            if (!response.isSuccessful) {
-                return ApiResult.Error("HTTP ${response.code}: ${response.message}")
-            }
-            
             val responseBody = response.body?.string()
-            if (responseBody != null) {
+            
+            if (response.isSuccessful && responseBody != null) {
                 ApiResult.Success(JSONObject(responseBody))
             } else {
-                ApiResult.Error("Empty response from server")
+                ApiResult.Error("HTTP ${response.code}: ${response.message}")
             }
         } catch (e: Exception) {
-            ApiResult.Error("Network error: ${e.message}")
+            Log.e("ApiService", "Get user credits error: ${e.message}", e)
+            ApiResult.Error("Network error: ${e.message ?: "Unknown error"}")
         }
     }
 
     // Helper functions for file handling
-    private fun uriToFile(uri: Uri): File {
+    private fun uriToFile(uri: Uri, prefix: String): File {
         return try {
             val inputStream: InputStream? = context.contentResolver.openInputStream(uri)
-            val file = File.createTempFile("upload_", "_temp", context.cacheDir)
+            val file = File.createTempFile("${prefix}_upload_", "_temp", context.cacheDir)
             inputStream?.use { input ->
                 file.outputStream().use { output ->
                     input.copyTo(output)
@@ -254,6 +244,18 @@ class ApiService(private val context: Context) {
         return mimeType?.toMediaType() ?: "application/octet-stream".toMediaType()
     }
 
+    private fun getFileName(uri: Uri): String? {
+        return try {
+            context.contentResolver.query(uri, null, null, null, null)?.use { cursor ->
+                val nameIndex = cursor.getColumnIndex(android.provider.OpenableColumns.DISPLAY_NAME)
+                cursor.moveToFirst()
+                cursor.getString(nameIndex)
+            }
+        } catch (e: Exception) {
+            null
+        }
+    }
+
     // Extension function for File to RequestBody
     private fun File.asRequestBody(mediaType: MediaType?): RequestBody {
         return this.inputStream().readBytes().toRequestBody(mediaType)
@@ -267,7 +269,7 @@ class ApiService(private val context: Context) {
     // Utility function to save file data to storage
     fun saveFileToStorage(data: ByteArray, filename: String): File {
         val file = File(context.getExternalFilesDir(null), filename)
-        file.outputStream().use { it.write(data) }
+        FileOutputStream(file).use { it.write(data) }
         return file
     }
 }
