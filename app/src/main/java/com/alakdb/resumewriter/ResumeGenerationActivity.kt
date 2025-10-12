@@ -31,8 +31,8 @@ class ResumeGenerationActivity : AppCompatActivity() {
     private var genResult: String? = null
 
     // File picker launchers
-    private lateinit var resumePicker: ActivityResultLauncher<Intent>
-    private lateinit var jobDescPicker: ActivityResultLauncher<Intent>
+    private lateinit var resumePicker: ActivityResultLauncher<String>
+    private lateinit var jobDescPicker: ActivityResultLauncher<String>
 
     // File picker contracts
     private val resumeFilePicker = registerForActivityResult(ActivityResultContracts.GetContent()) { uri ->
@@ -69,23 +69,16 @@ class ResumeGenerationActivity : AppCompatActivity() {
     }
     
     private fun registerFilePickers() {
-        val mimeTypes = arrayOf(
-            "application/pdf",
-            "application/vnd.openxmlformats-officedocument.wordprocessingml.document",
-            "text/plain"
-        )
+        resumePicker = registerForActivityResult(ActivityResultContracts.GetContent()) { uri ->
+            uri?.let { handleSelectedFile(it, binding.tvResumeFile) { selectedResumeUri = it } }
+        }
 
-    resumePicker = registerForActivityResult(ActivityResultContracts.GetContent()) { uri ->
-        uri?.let { handleSelectedFile(it, binding.tvResumeFile) { selectedResumeUri = it } }
+        jobDescPicker = registerForActivityResult(ActivityResultContracts.GetContent()) { uri ->
+            uri?.let { handleSelectedFile(it, binding.tvJobDescFile) { selectedJobDescUri = it } }
+        }
     }
 
-    jobDescPicker = registerForActivityResult(ActivityResultContracts.GetContent()) { uri ->
-        uri?.let { handleSelectedFile(it, binding.tvJobDescFile) { selectedJobDescUri = it } }
-    }
-
-
-
-    fun handleSelectedFile(uri: Uri, textView: TextView, setUri: (Uri) -> Unit) {
+    private fun handleSelectedFile(uri: Uri, textView: TextView, setUri: (Uri) -> Unit) {
         val name = getFileName(uri) ?: ""
         if (name.endsWith(".pdf", true) || name.endsWith(".docx", true) || name.endsWith(".txt", true)) {
             setUri(uri)
@@ -96,9 +89,6 @@ class ResumeGenerationActivity : AppCompatActivity() {
             showError("Unsupported file type. Please select PDF, DOCX, or TXT")
         }
     }
-
-
-
     
     private fun setupUI() {
         // File selection buttons
@@ -110,7 +100,7 @@ class ResumeGenerationActivity : AppCompatActivity() {
             jobDescPicker.launch("application/pdf,application/vnd.openxmlformats-officedocument.wordprocessingml.document,text/plain")
         }
 
-                // Clear selection buttons
+        // Clear selection buttons
         binding.btnClearResume.setOnClickListener {
             selectedResumeUri = null
             binding.tvResumeFile.text = "No file selected"
@@ -154,21 +144,6 @@ class ResumeGenerationActivity : AppCompatActivity() {
         binding.btnRetryConnection.setOnClickListener {
             testApiConnection()
         }
-
-        // Clear selection buttons
-        binding.btnClearResume.setOnClickListener {
-            selectedResumeUri = null
-            binding.tvResumeFile.text = "No file selected"
-            binding.tvResumeFile.setTextColor(getColor(android.R.color.darker_gray))
-            checkGenerateButtonState()
-        }
-
-        binding.btnClearJobDesc.setOnClickListener {
-            selectedJobDescUri = null
-            binding.tvJobDescFile.text = "No file selected"
-            binding.tvJobDescFile.setTextColor(getColor(android.R.color.darker_gray))
-            checkGenerateButtonState()
-        }
     }
 
     private fun openFilePicker(picker: ActivityResultLauncher<Intent>) {
@@ -183,8 +158,6 @@ class ResumeGenerationActivity : AppCompatActivity() {
         }
         picker.launch(intent)
     }
-
-
 
     private fun checkGenerateButtonState() {
         val hasFiles = selectedResumeUri != null && selectedJobDescUri != null
