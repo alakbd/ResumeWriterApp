@@ -2,6 +2,8 @@ package com.alakdb.resumewriter
 
 import android.app.Activity
 import android.content.Intent
+import android.content.Context
+import android.net.ConnectivityManager
 import android.net.Uri
 import android.os.Bundle
 import android.provider.OpenableColumns
