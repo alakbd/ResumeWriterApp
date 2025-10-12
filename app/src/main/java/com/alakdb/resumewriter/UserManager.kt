@@ -107,6 +107,20 @@ class UserManager(private val context: Context) {
             }
     }
 
+
+
+    /** Usertoken stored in UserManager */
+    fun saveUserToken(token: String) {
+        val prefs = context.getSharedPreferences("app_prefs", Context.MODE_PRIVATE)
+        prefs.edit().putString("firebase_token", token).apply()
+    }
+
+    fun getUserToken(): String? {
+        val prefs = context.getSharedPreferences("app_prefs", Context.MODE_PRIVATE)
+        return prefs.getString("firebase_token", null)
+    }
+
+    
     /** Check if user is logged in */
     fun isUserLoggedIn(): Boolean {
         return auth.currentUser != null && prefs.getBoolean(IS_REGISTERED_KEY, false)
