@@ -329,7 +329,7 @@ class ResumeGenerationActivity : AppCompatActivity() {
                     }
                 }
                 is ApiService.ApiResult.Error -> {
-                    showError("Credit deduction failed: ${DeductResult.message}")
+                    showError("Credit deduction failed: ${deductResult.message}")
                 }
             }
             
