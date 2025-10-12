@@ -148,62 +148,100 @@ class ApiService(private val context: Context) {
     // -----------------------------
     suspend fun deductCredit(userId: String): ApiResult<JSONObject> {
         return try {
-            val token = getCurrentUserToken() ?: return ApiResult.Error("User not authenticated", 401)
+            val authValue = getAuthIdentifier()
+            if (authValue == null) {
+                return ApiResult.Error("User authentication unavailable", 401)
+        }
 
-            val requestBody = gson.toJson(mapOf("user_id" to userId))
+            val requestBody = gson.toJson(DeductCreditRequest(user_id = userId))
                 .toRequestBody("application/json".toMediaType())
 
             val request = Request.Builder()
                 .url("$baseUrl/deduct-credit")
                 .post(requestBody)
-                .addHeader("Authorization", "Bearer $token")
+                .addHeader("Authorization", authValue)
+                .addHeader("Content-Type", "application/json")
                 .build()
 
             val response = client.newCall(request).execute()
-            val responseBody = response.body?.string()
 
-            if (!response.isSuccessful) return ApiResult.Error("HTTP ${response.code}: ${response.message}", response.code)
-            if (responseBody != null) return ApiResult.Success(JSONObject(responseBody))
-            ApiResult.Error("Empty response from server", response.code)
+            if (!response.isSuccessful) {
+                val errorMessage = handleErrorResponse(response)
+                return ApiResult.Error(errorMessage, response.code)
+            }
+
+            val responseBody = response.body?.string()
+            if (responseBody != null) {
+                val jsonResponse = JSONObject(responseBody)
+                if (jsonResponse.optBoolean("success", false)) {
+                ApiResult.Success(jsonResponse)
+                } else {
+                    ApiResult.Error(jsonResponse.optString("message", "Unknown error"), response.code)
+                }
+            } else {
+                ApiResult.Error("Empty response from server", response.code)
+            }
         } catch (e: Exception) {
-            ApiResult.Error("Network error: ${e.message}", 1001)
+            ApiResult.Error("Network error: ${e.message}", getErrorCode(e))
         }
     }
+
 
     // -----------------------------
     // Generate Resume API
     // -----------------------------
-    suspend fun generateResume(resumeText: String, jobDescription: String, tone: String = "Professional"): ApiResult<JSONObject> {
+    suspend fun generateResume(
+        resumeText: String,
+        jobDescription: String,
+        tone: String = "Professional"
+    ): ApiResult<JSONObject> {
         return try {
-            val token = getCurrentUserToken() ?: return ApiResult.Error("User not authenticated", 401)
-            val requestBody = gson.toJson(mapOf(
-                "resume_text" to resumeText,
-                "job_description" to jobDescription,
-                "tone" to tone
-            )).toRequestBody("application/json".toMediaType())
+            val authValue = getAuthIdentifier()
+            if (authValue == null) {
+                return ApiResult.Error("User authentication unavailable", 401)
+            }
+
+            val requestBody = gson.toJson(
+                GenerateResumeRequest(resumeText, jobDescription, tone)
+            ).toRequestBody("application/json".toMediaType())
 
             val request = Request.Builder()
                 .url("$baseUrl/generate-resume")
                 .post(requestBody)
-                .addHeader("Authorization", "Bearer $token")
+                .addHeader("Authorization", authValue)
+                .addHeader("Content-Type", "application/json")
                 .build()
 
             val response = client.newCall(request).execute()
-            val body = response.body?.string()
-            if (!response.isSuccessful) return ApiResult.Error("HTTP ${response.code}", response.code)
-            if (body != null) return ApiResult.Success(JSONObject(body))
-            ApiResult.Error("Empty response from server", response.code)
+
+            if (!response.isSuccessful) {
+                val errorMessage = handleErrorResponse(response)
+                return ApiResult.Error(errorMessage, response.code)
+            }
+
+            val responseBody = response.body?.string()
+            if (responseBody != null) {
+                ApiResult.Success(JSONObject(responseBody))
+            } else {
+                ApiResult.Error("Empty response from server", response.code)
+            }
         } catch (e: Exception) {
-            ApiResult.Error("Network error: ${e.message}", 1001)
+            ApiResult.Error("Network error: ${e.message}", getErrorCode(e))
         }
     }
-
     // -----------------------------
     // Generate Resume From Files API
     // -----------------------------
-    suspend fun generateResumeFromFiles(resumeFileUri: Uri, jobDescFileUri: Uri, tone: String = "Professional"): ApiResult<JSONObject> {
+    suspend fun generateResumeFromFiles(
+        resumeFileUri: Uri,
+        jobDescFileUri: Uri,
+        tone: String = "Professional"
+    ): ApiResult<JSONObject> {
         return try {
-            val token = getCurrentUserToken() ?: return ApiResult.Error("User not authenticated", 401)
+            val authValue = getAuthIdentifier()
+            if (authValue == null) {
+                return ApiResult.Error("User authentication unavailable", 401)
+            }
 
             val resumeFile = uriToFile(resumeFileUri)
             val jobDescFile = uriToFile(jobDescFileUri)
@@ -211,23 +249,39 @@ class ApiService(private val context: Context) {
             val requestBody = MultipartBody.Builder()
                 .setType(MultipartBody.FORM)
                 .addFormDataPart("tone", tone)
-                .addFormDataPart("resume_file", resumeFile.name, resumeFile.asRequestBody(getMediaType(resumeFileUri)))
-                .addFormDataPart("job_description_file", jobDescFile.name, jobDescFile.asRequestBody(getMediaType(jobDescFileUri)))
+                .addFormDataPart(
+                    "resume_file",
+                    resumeFile.name ?: "resume.pdf",
+                    resumeFile.asRequestBody(getMediaType(resumeFileUri))
+                )
+                .addFormDataPart(
+                    "job_description_file",
+                    jobDescFile.name ?: "job_description.pdf",
+                    jobDescFile.asRequestBody(getMediaType(jobDescFileUri))
+                )
                 .build()
 
             val request = Request.Builder()
                 .url("$baseUrl/generate-resume-from-files")
                 .post(requestBody)
-                .addHeader("Authorization", "Bearer $token")
+                .addHeader("Authorization", authValue)
                 .build()
 
             val response = client.newCall(request).execute()
-            val body = response.body?.string()
-            if (!response.isSuccessful) return ApiResult.Error("HTTP ${response.code}", response.code)
-            if (body != null) return ApiResult.Success(JSONObject(body))
-            ApiResult.Error("Empty response from server", response.code)
+
+            if (!response.isSuccessful) {
+                val errorMessage = handleErrorResponse(response)
+                return ApiResult.Error(errorMessage, response.code)
+            }
+
+            val responseBody = response.body?.string()
+            if (responseBody != null) {
+                ApiResult.Success(JSONObject(responseBody))
+            } else {
+                ApiResult.Error("Empty response from server", response.code)
+            }
         } catch (e: Exception) {
-            ApiResult.Error("File upload error: ${e.message}", 1001)
+            ApiResult.Error("File upload error: ${e.message}", getErrorCode(e))
         }
     }
 
@@ -236,7 +290,10 @@ class ApiService(private val context: Context) {
     // -----------------------------
     suspend fun getUserCredits(): ApiResult<JSONObject> {
         return try {
-            val token = getCurrentUserToken() ?: return ApiResult.Error("User not authenticated", 401)
+            val authValue = getAuthIdentifier()
+            if (authValue == null) {
+                return ApiResult.Error("User authentication unavailable", 401)
+            }
 
             val fullUrl = HttpUrl.Builder()
                 .scheme("https")
@@ -248,16 +305,24 @@ class ApiService(private val context: Context) {
             val request = Request.Builder()
                 .url(fullUrl)
                 .get()
-                .addHeader("Authorization", "Bearer $token")
+                .addHeader("Authorization", authValue)
                 .build()
-        val response = client.newCall(request).execute()
-            val responseBody = response.body?.string()
 
-            if (!response.isSuccessful) return ApiResult.Error("HTTP ${response.code}: ${response.message}", response.code)
-            if (responseBody != null) return ApiResult.Success(JSONObject(responseBody))
-            ApiResult.Error("Empty response from server", response.code)
+            val response = client.newCall(request).execute()
+
+            if (!response.isSuccessful) {
+                val errorMessage = handleErrorResponse(response)
+                return ApiResult.Error(errorMessage, response.code)
+            }
+
+            val responseBody = response.body?.string()
+            if (responseBody != null) {
+                ApiResult.Success(JSONObject(responseBody))
+            } else {
+                ApiResult.Error("Empty response from server", response.code)
+            }
         } catch (e: Exception) {
-            ApiResult.Error("Network error: ${e.message}", 1001)
+            ApiResult.Error("Network error: ${e.message}", getErrorCode(e))
         }
     }
 
