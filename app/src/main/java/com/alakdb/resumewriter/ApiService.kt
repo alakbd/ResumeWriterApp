@@ -306,8 +306,15 @@ class ApiService(private val context: Context) {
                 return ApiResult.Error("User not authenticated", 401)
             }
 
+            val fullUrl = HttpUrl.Builder()
+                .scheme("https")
+                .host("resume-writer-api.onrender.com")
+                .addPathSegment("user")
+                .addPathSegment("credits")
+                .build()
+
             val request = Request.Builder()
-                .url("$baseUrl/user/credits")
+                .url(fullUrl)
                 .get()
                 .addHeader("Authorization", "Bearer $token")
                 .build()
