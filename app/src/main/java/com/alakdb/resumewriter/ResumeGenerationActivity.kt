@@ -77,7 +77,10 @@ class ResumeGenerationActivity : AppCompatActivity() {
     resumePicker = registerForActivityResult(ActivityResultContracts.StartActivityForResult()) { result ->
         if (result.resultCode == Activity.RESULT_OK) {
             result.data?.data?.let { uri ->
-                handleSelectedFile(uri, binding.tvResumeFile) { selectedResumeUri = it }
+            selectedResumeUri = uri
+            binding.tvResumeFile.text = getFileName(uri) ?: "Resume file selected"
+            binding.tvResumeFile.setTextColor(getColor(android.R.color.holo_green_dark))
+            checkGenerateButtonState()
             }
         }
     }
@@ -85,10 +88,14 @@ class ResumeGenerationActivity : AppCompatActivity() {
     jobDescPicker = registerForActivityResult(ActivityResultContracts.StartActivityForResult()) { result ->
         if (result.resultCode == Activity.RESULT_OK) {
             result.data?.data?.let { uri ->
-                handleSelectedFile(uri, binding.tvJobDescFile) { selectedJobDescUri = it }
+            selectedJobDescUri = uri
+            binding.tvJobDescFile.text = getFileName(uri) ?: "Job description file selected"
+            binding.tvJobDescFile.setTextColor(getColor(android.R.color.holo_green_dark))
+            checkGenerateButtonState()
             }
         }
     }
+
 
     fun handleSelectedFile(uri: Uri, textView: TextView, setUri: (Uri) -> Unit) {
         val name = getFileName(uri) ?: ""
