@@ -28,30 +28,10 @@ class ResumeGenerationActivity : AppCompatActivity() {
     private var selectedResumeUri: Uri? = null
     private var selectedJobDescUri: Uri? = null
     private var currentGeneratedResume: JSONObject? = null
-    private var genResult: String? = null
 
-    // File picker launchers
+    // File picker launchers - Fixed type
     private lateinit var resumePicker: ActivityResultLauncher<String>
     private lateinit var jobDescPicker: ActivityResultLauncher<String>
-
-    // File picker contracts
-    private val resumeFilePicker = registerForActivityResult(ActivityResultContracts.GetContent()) { uri ->
-        uri?.let {
-            selectedResumeUri = it
-            binding.tvResumeFile.text = getFileName(it) ?: "Resume file selected"
-            binding.tvResumeFile.setTextColor(getColor(android.R.color.holo_green_dark))
-            checkGenerateButtonState()
-        }
-    }
-
-    private val jobDescFilePicker = registerForActivityResult(ActivityResultContracts.GetContent()) { uri ->
-        uri?.let {
-            selectedJobDescUri = it
-            binding.tvJobDescFile.text = getFileName(it) ?: "Job description file selected"
-            binding.tvJobDescFile.setTextColor(getColor(android.R.color.holo_green_dark))
-            checkGenerateButtonState()
-        }
-    }
 
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
@@ -62,10 +42,10 @@ class ResumeGenerationActivity : AppCompatActivity() {
         creditManager = CreditManager(this)
         auth = FirebaseAuth.getInstance()
 
+        registerFilePickers()
         setupUI()
         checkGenerateButtonState()
         testApiConnection()
-        registerFilePickers()
     }
     
     private fun registerFilePickers() {
@@ -146,19 +126,6 @@ class ResumeGenerationActivity : AppCompatActivity() {
         }
     }
 
-    private fun openFilePicker(picker: ActivityResultLauncher<Intent>) {
-        val intent = Intent(Intent.ACTION_OPEN_DOCUMENT).apply {
-            addCategory(Intent.CATEGORY_OPENABLE)
-            type = "*/*"
-            putExtra(Intent.EXTRA_MIME_TYPES, arrayOf(
-                "application/pdf",
-                "application/vnd.openxmlformats-officedocument.wordprocessingml.document",
-                "text/plain"
-            ))
-        }
-        picker.launch(intent)
-    }
-
     private fun checkGenerateButtonState() {
         val hasFiles = selectedResumeUri != null && selectedJobDescUri != null
         val hasText = binding.etResumeText.text.isNotEmpty() && binding.etJobDescription.text.isNotEmpty()
@@ -181,8 +148,10 @@ class ResumeGenerationActivity : AppCompatActivity() {
         binding.btnRetryConnection.isEnabled = false
 
         CoroutineScope(Dispatchers.Main).launch {
+            Log.d("API_TEST", "Starting API connection test...")
             when (val result = apiService.testConnection()) {
                 is ApiService.ApiResult.Success -> {
+                    Log.d("API_TEST", "API connection successful")
                     binding.tvConnectionStatus.text = "✅ API Connected Successfully"
                     binding.tvConnectionStatus.setTextColor(getColor(android.R.color.holo_green_dark))
                     binding.progressConnection.visibility = android.view.View.GONE
@@ -190,6 +159,7 @@ class ResumeGenerationActivity : AppCompatActivity() {
                     showSuccess("API connection successful")
                 }
                 is ApiService.ApiResult.Error -> {
+                    Log.e("API_TEST", "API connection failed: ${result.message}")
                     binding.tvConnectionStatus.text = "❌ Connection Failed: ${result.message}"
                     binding.tvConnectionStatus.setTextColor(getColor(android.R.color.holo_red_dark))
                     binding.progressConnection.visibility = android.view.View.GONE
