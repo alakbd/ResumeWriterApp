@@ -129,21 +129,59 @@ class ResumeGenerationActivity : AppCompatActivity() {
         binding.btnRetryConnection.isEnabled = false
 
         CoroutineScope(Dispatchers.Main).launch {
-            when (val result = apiService.testConnection()) {
-                is ApiService.ApiResult.Success -> {
-                    binding.tvConnectionStatus.text = "✅ API Connected Successfully"
-                    binding.tvConnectionStatus.setTextColor(getColor(android.R.color.holo_green_dark))
-                    binding.progressConnection.visibility = android.view.View.GONE
-                    binding.btnRetryConnection.isEnabled = true
-                    showSuccess("API connection successful")
+            // Test basic connectivity first
+            if (!isNetworkAvailable()) {
+                binding.tvConnectionStatus.text = "❌ No internet connection"
+                binding.tvConnectionStatus.setTextColor(getColor(android.R.color.holo_red_dark))
+                binding.progressConnection.visibility = android.view.View.GONE
+                binding.btnRetryConnection.isEnabled = true
+                showError("Please check your internet connection")
+                return@launch
+        }
+        when (val result = apiService.testConnection()) {
+            is ApiService.ApiResult.Success -> {
+                binding.tvConnectionStatus.text = "✅ API Connected Successfully"
+                binding.tvConnectionStatus.setTextColor(getColor(android.R.color.holo_green_dark))
+                binding.progressConnection.visibility = android.view.View.GONE
+                binding.btnRetryConnection.isEnabled = true
+                showSuccess("API connection successful")
+                
+                // Update credits display after successful connection
+                updateCreditDisplay()
+            }
+            is ApiService.ApiResult.Error -> {
+                binding.tvConnectionStatus.text = "❌ Connection Failed: ${result.message}"
+                binding.tvConnectionStatus.setTextColor(getColor(android.R.color.holo_red_dark))
+                binding.progressConnection.visibility = android.view.View.GONE
+                binding.btnRetryConnection.isEnabled = true
+                showError("API connection failed: ${result.message}")
+                
+                // Provide helpful suggestions based on error
+                provideConnectionHelp(result.message)
                 }
-                is ApiService.ApiResult.Error -> {
-                    binding.tvConnectionStatus.text = "❌ Connection Failed: ${result.message}"
-                    binding.tvConnectionStatus.setTextColor(getColor(android.R.color.holo_red_dark))
-                    binding.progressConnection.visibility = android.view.View.GONE
-                    binding.btnRetryConnection.isEnabled = true
-                    showError("API connection failed: ${result.message}")
-                }
+            }
+        }
+    }
+
+    private fun isNetworkAvailable(): Boolean {
+    val connectivityManager = getSystemService(Context.CONNECTIVITY_SERVICE) as ConnectivityManager
+    val networkInfo = connectivityManager.activeNetworkInfo
+    return networkInfo != null && networkInfo.isConnected
+}
+
+    private fun provideConnectionHelp(errorMessage: String?) {
+        when {
+            errorMessage?.contains("Failed to connect") == true -> {
+                showError("Cannot reach server. Please check if the server is running.")
+            }
+            errorMessage?.contains("timeout") == true -> {
+                showError("Connection timeout. Server might be overloaded. Please try again.")
+            }
+            errorMessage?.contains("SSL") == true -> {
+                showError("SSL handshake failed. Please check your connection security.")
+            }
+            else -> {
+                showError("Connection failed. Please check your internet and try again.")
             }
         }
     }
@@ -281,14 +319,22 @@ class ResumeGenerationActivity : AppCompatActivity() {
     /** ---------------- Credit Display ---------------- **/
     private fun updateCreditDisplay() {
         CoroutineScope(Dispatchers.Main).launch {
+            binding.tvCreditInfo.text = "Loading credits..."
+        
             when (val result = apiService.getUserCredits()) {
                 is ApiService.ApiResult.Success -> {
-                    val available = result.data.optInt("available_credits", 0)
-                    val used = result.data.optInt("used_credits", 0)
-                    binding.tvCreditInfo.text = "Credits: $available available, $used used"
+                    try {
+                        val available = result.data.getInt("available_credits")
+                        val used = result.data.getInt("used_credits")
+                        binding.tvCreditInfo.text = "Credits: $available available, $used used"
+                    } catch (e: Exception) {
+                        binding.tvCreditInfo.text = "Credits: Error parsing data"
+                        Log.e("ResumeGeneration", "Error parsing credit data: ${e.message}")
+                    }
                 }
                 is ApiService.ApiResult.Error -> {
                     binding.tvCreditInfo.text = "Credits: Unable to load"
+                    Log.e("ResumeGeneration", "Error loading credits: ${result.message}")
                 }
             }
         }
