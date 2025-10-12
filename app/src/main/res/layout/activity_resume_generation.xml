@@ -122,8 +122,8 @@
                     android:layout_width="wrap_content"
                     android:layout_height="wrap_content"
                     android:text="Clear"
-                    android:background="@drawable/button_clear"
-                    android:textColor="#d32f2f" />
+                    android:background="@color/button_clear"
+                    android:textColor="@color/button_clear_text" />
 
             </LinearLayout>
 
@@ -167,7 +167,7 @@
                     android:layout_height="wrap_content"
                     android:layout_weight="1"
                     android:text="Select Job Description"
-                    android:background="@drawable/button_secondary"
+                    android:background="@color/secondary"
                     android:textColor="#333333"
                     android:layout_marginEnd="8dp" />
 
@@ -176,8 +176,8 @@
                     android:layout_width="wrap_content"
                     android:layout_height="wrap_content"
                     android:text="Clear"
-                    android:background="@drawable/button_clear"
-                    android:textColor="#d32f2f" />
+                    android:background="@color/button_clear"
+                    android:textColor="@color/button_clear_text" />
 
             </LinearLayout>
 
@@ -273,7 +273,7 @@
                 android:layout_width="match_parent"
                 android:layout_height="wrap_content"
                 android:text="Generate Resume (1 Credit)"
-                android:background="@drawable/button_primary"
+                android:background="@color/primary"
                 android:textColor="@android:color/white"
                 android:textSize="16sp"
                 android:textStyle="bold"
@@ -333,7 +333,7 @@
                 android:layout_height="wrap_content"
                 android:layout_weight="1"
                 android:text="📝 Download DOCX"
-                android:background="@drawable/button_success"
+                android:background="@color/success"
                 android:textColor="@android:color/white"
                 android:layout_marginEnd="8dp"
                 android:padding="12dp" />
@@ -344,7 +344,7 @@
                 android:layout_height="wrap_content"
                 android:layout_weight="1"
                 android:text="📄 Download PDF"
-                android:background="@drawable/button_success"
+                android:background="@color/success"
                 android:textColor="@android:color/white"
                 android:layout_marginStart="8dp"
                 android:padding="12dp" />
@@ -357,7 +357,7 @@
             android:layout_width="match_parent"
             android:layout_height="wrap_content"
             android:text="← Back to Main Menu"
-            android:background="@drawable/button_secondary"
+            android:background="@color/secondary"
             android:textColor="#666666"
             android:layout_marginTop="8dp"
             android:padding="12dp" />
