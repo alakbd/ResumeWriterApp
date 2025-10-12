@@ -97,32 +97,47 @@ private fun attemptLogin(email: String, password: String) {
         binding.btnLogin.isEnabled = true
         binding.btnLogin.text = "Login"
 
-        if (success) {
-            // Fetch Firebase token
-            FirebaseAuth.getInstance().currentUser?.getIdToken(true)
-                ?.addOnCompleteListener { task ->
-                    if (task.isSuccessful) {
-                        val idToken = task.result?.token
-                        if (!idToken.isNullOrEmpty()) {
-                            // Store token in UserManager (or ApiService)
-                            userManager.saveUserToken(idToken)
-                        }
+if (success) {
+    val firebaseUser = FirebaseAuth.getInstance().currentUser
 
-                        // Now proceed to MainActivity
+    if (firebaseUser != null) {
+        firebaseUser.getIdToken(true)
+            .addOnCompleteListener { task ->
+                if (task.isSuccessful) {
+                    val idToken = task.result?.token
+                    if (!idToken.isNullOrEmpty()) {
+                        userManager.saveUserToken(idToken)
                         showMessage("Login successful!")
                         creditManager.resetResumeCooldown()
                         startActivity(Intent(this@LoginActivity, MainActivity::class.java))
                         finish()
                     } else {
-                        showMessage("Failed to get auth token: ${task.exception?.message}")
+                        showMessage("Failed to get ID token — trying fallback.")
+                        // Fallback logic below
+                        handleMissingToken()
                     }
+                } else {
+                    showMessage("Token fetch error: ${task.exception?.message}")
+                    handleMissingToken()
                 }
-        } else {
-            showMessage(error ?: "Login failed")
+            }
+    } else {
+        showMessage("User not found in FirebaseAuth — trying fallback.")
+        handleMissingToken()
+    }
+} else {
+    showMessage(error ?: "Login failed")
         }
     }
 }
 
+private fun handleMissingToken() {
+    // Optional: use API key fallback if needed
+    userManager.saveUserToken("API_FALLBACK_MODE") // You can replace with BuildConfig.API_KEY if using API key fallback
+    creditManager.resetResumeCooldown()
+    startActivity(Intent(this@LoginActivity, MainActivity::class.java))
+    finish()
+}
 
     private fun showMessage(message: String) {
         Toast.makeText(this, message, Toast.LENGTH_SHORT).show()
