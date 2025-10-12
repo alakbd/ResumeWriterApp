@@ -114,8 +114,10 @@ class ApiService(private val context: Context) {
     }
 
     suspend fun getCurrentUserToken(): String? {
+        val currentUser = FirebaseAuth.getInstance().currentUser ?: return null
         return try {
-            FirebaseAuth.getInstance().currentUser?.getIdToken(false)?.await()?.token
+            // true = force refresh
+            currentUser.getIdToken(true).await().token
         } catch (e: Exception) {
             Log.e("ApiService", "Error getting user token: ${e.message}")
             null
