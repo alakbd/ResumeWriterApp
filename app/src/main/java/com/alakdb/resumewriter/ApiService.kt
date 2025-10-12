@@ -247,7 +247,7 @@ class ApiService(private val context: Context) {
 
             val request = Request.Builder()
                 .url(fullUrl)
-                .get
+                .get()
                 .addHeader("Authorization", "Bearer $token")
                 .build()
         val response = client.newCall(request).execute()
