@@ -127,7 +127,7 @@ class ApiService(private val context: Context) {
     suspend fun testConnection(): ApiResult<JSONObject> {
         return try {
             // Try multiple endpoints to verify connection
-            val endpoints = listOf("/", "/health", "/api", "/test")
+            val endpoints = listOf("/", "/health", "/api", "/credit")
             var lastError: String? = null
             
             for (endpoint in endpoints) {
