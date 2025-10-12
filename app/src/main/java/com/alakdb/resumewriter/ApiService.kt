@@ -113,16 +113,17 @@ class ApiService(private val context: Context) {
         }
     }
 
-    suspend fun getCurrentUserToken(): String? {
-        val currentUser = FirebaseAuth.getInstance().currentUser ?: return null
-        return try {
-            // true = force refresh
-            currentUser.getIdToken(true).await().token
-        } catch (e: Exception) {
-            Log.e("ApiService", "Error getting user token: ${e.message}")
-            null
-        }
-    }
+        suspend fun getCurrentUserToken(): String? {
+            return userManager.getUserToken() ?: run {
+                val currentUser = FirebaseAuth.getInstance().currentUser ?: return null
+                return try {
+                    currentUser.getIdToken(true).await().token?.also { userManager.saveUserToken(it) }
+                } catch (e: Exception) {
+                    Log.e("ApiService", "Error getting user token: ${e.message}")
+                    null
+                    }
+                }
+            }
 
     suspend fun testConnection(): ApiResult<JSONObject> {
         return try {
