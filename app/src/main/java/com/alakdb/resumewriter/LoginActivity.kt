@@ -105,7 +105,7 @@ private fun attemptLogin(email: String, password: String) {
                         val idToken = task.result?.token
                         if (!idToken.isNullOrEmpty()) {
                             // Store token in UserManager (or ApiService)
-                            userManager.setUserToken(idToken)
+                            userManager.saveUserToken(idToken)
                         }
 
                         // Now proceed to MainActivity
