@@ -24,4 +24,8 @@
     <!-- Your Block Button colors -->
     <color name="colorBlockRed">#FF5722</color>
     <color name="colorUnblockGreen">#4CAF50</color>
+
+    <!-- Button -->
+    <color name="button_clear">#FFCDD2</color> <!-- light red background -->
+    <color name="button_clear_text">#D32F2F</color> <!-- darker red text -->
 </resources>
