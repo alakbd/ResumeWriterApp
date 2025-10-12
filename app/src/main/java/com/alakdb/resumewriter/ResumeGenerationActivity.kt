@@ -2,10 +2,13 @@ package com.alakdb.resumewriter
 
 import android.content.Intent
 import android.net.Uri
+import android.util.Log
+import android.app.Activity
 import android.os.Bundle
 import android.widget.Toast
 import androidx.activity.result.contract.ActivityResultContracts
 import androidx.appcompat.app.AppCompatActivity
+import androidx.activity.result.ActivityResultLauncher
 import com.alakdb.resumewriter.databinding.ActivityResumeGenerationBinding
 import com.google.firebase.auth.FirebaseAuth
 import kotlinx.coroutines.CoroutineScope
@@ -24,6 +27,7 @@ class ResumeGenerationActivity : AppCompatActivity() {
     private var selectedResumeUri: Uri? = null
     private var selectedJobDescUri: Uri? = null
     private var currentGeneratedResume: JSONObject? = null
+    private var genResult: String? = null
 
     // File picker contracts
     private val resumeFilePicker = registerForActivityResult(ActivityResultContracts.GetContent()) { uri ->
@@ -121,7 +125,7 @@ class ResumeGenerationActivity : AppCompatActivity() {
             addCategory(Intent.CATEGORY_OPENABLE)
         }
         when (picker) {
-            is androidx.activity.result.ActivityResultLauncher<Uri?> -> picker.launch("*/*")
+            is androidx.activity.result.ActivityResultLauncher<*> -> picker.launch("*/*")
         }
     }
 
