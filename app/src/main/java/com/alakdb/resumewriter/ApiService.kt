@@ -132,8 +132,14 @@ class ApiService(private val context: Context) {
             
             for (endpoint in endpoints) {
                 try {
+                    val fullUrl = HttpUrl.Builder()
+                        .scheme("https")
+                        .host("resume-writer-api.onrender.com")
+                        .addPathSegment(endpoint.removePrefix("/"))
+                        .build()
+
                     val request = Request.Builder()
-                        .url("$baseUrl$endpoint")
+                        .url(fullUrl)
                         .get()
                         .build()
 
