@@ -158,16 +158,11 @@ class ResumeGenerationActivity : AppCompatActivity() {
         }
     }
 
-    private fun openFilePicker(picker: Any, mimeTypes: Array<String>) {
-        val intent = Intent(Intent.ACTION_GET_CONTENT).apply {
-            type = "*/*"
-            putExtra(Intent.EXTRA_MIME_TYPES, mimeTypes)
-            addCategory(Intent.CATEGORY_OPENABLE)
-        }
-        when (picker) {
-            is androidx.activity.result.ActivityResultLauncher<*> -> picker.launch("*/*")
-        }
+    private fun openFilePicker(picker: ActivityResultLauncher<String>, mimeTypes: Array<String>) {
+        val mimeType = if (mimeTypes.isNotEmpty()) mimeTypes[0] else "*/*"
+        picker.launch(mimeType)
     }
+
 
     private fun checkGenerateButtonState() {
         val hasFiles = selectedResumeUri != null && selectedJobDescUri != null
@@ -268,7 +263,7 @@ class ResumeGenerationActivity : AppCompatActivity() {
                     }
                 }
                 is ApiService.ApiResult.Error -> {
-                    showError("Credit deduction failed: ${genResult.message}")
+                    showError("Credit deduction failed: ${deductResult.message}")
                 }
             }
             
