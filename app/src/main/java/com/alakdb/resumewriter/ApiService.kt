@@ -13,6 +13,8 @@ import org.json.JSONObject
 import java.io.File
 import java.io.InputStream
 import java.util.concurrent.TimeUnit
+import okhttp3.logging.HttpLoggingInterceptor
+import java.io.IOException
 
 class ApiService(private val context: Context) {
     private val client = OkHttpClient.Builder()
