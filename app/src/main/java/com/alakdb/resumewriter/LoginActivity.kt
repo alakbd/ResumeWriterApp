@@ -89,27 +89,40 @@ class LoginActivity : AppCompatActivity() {
             }
     }
 
-    private fun attemptLogin(email: String, password: String) {
-        binding.btnLogin.isEnabled = false
-        binding.btnLogin.text = "Logging in..."
+private fun attemptLogin(email: String, password: String) {
+    binding.btnLogin.isEnabled = false
+    binding.btnLogin.text = "Logging in..."
 
-        userManager.loginUser(email, password) { success, error ->
-            binding.btnLogin.isEnabled = true
-            binding.btnLogin.text = "Login"
+    userManager.loginUser(email, password) { success, error ->
+        binding.btnLogin.isEnabled = true
+        binding.btnLogin.text = "Login"
 
-            if (success) {
-                showMessage("Login successful!")
-                
-                // RESET COOLDOWN ON SUCCESSFUL LOGIN
-                creditManager.resetResumeCooldown()
-                
-                startActivity(Intent(this@LoginActivity, MainActivity::class.java))
-                finish()
-            } else {
-                showMessage(error ?: "Login failed")
-            }
+        if (success) {
+            // Fetch Firebase token
+            FirebaseAuth.getInstance().currentUser?.getIdToken(true)
+                ?.addOnCompleteListener { task ->
+                    if (task.isSuccessful) {
+                        val idToken = task.result?.token
+                        if (!idToken.isNullOrEmpty()) {
+                            // Store token in UserManager (or ApiService)
+                            userManager.setUserToken(idToken)
+                        }
+
+                        // Now proceed to MainActivity
+                        showMessage("Login successful!")
+                        creditManager.resetResumeCooldown()
+                        startActivity(Intent(this@LoginActivity, MainActivity::class.java))
+                        finish()
+                    } else {
+                        showMessage("Failed to get auth token: ${task.exception?.message}")
+                    }
+                }
+        } else {
+            showMessage(error ?: "Login failed")
         }
     }
+}
+
 
     private fun showMessage(message: String) {
         Toast.makeText(this, message, Toast.LENGTH_SHORT).show()
