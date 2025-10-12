@@ -34,7 +34,7 @@ class ApiService(private val context: Context) {
         .addInterceptor(RetryInterceptor())  // Add retry mechanism
         .addInterceptor(ConnectivityInterceptor(context)) // Add connectivity check
         .build()
-    
+    private val userManager = UserManager(context)
     private val gson = Gson()
     private val baseUrl = "https://resume-writer-api.onrender.com"
 
