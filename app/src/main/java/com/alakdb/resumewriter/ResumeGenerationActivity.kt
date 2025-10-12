@@ -1,35 +1,35 @@
 package com.alakdb.resumewriter
 
-import android.content.Intent
-import android.widget.TextView
-import android.net.Uri
-import android.util.Log
 import android.app.Activity
+import android.content.Intent
+import android.net.Uri
 import android.os.Bundle
+import android.provider.OpenableColumns
+import android.util.Log
+import android.widget.TextView
 import android.widget.Toast
+import androidx.activity.result.ActivityResultLauncher
 import androidx.activity.result.contract.ActivityResultContracts
 import androidx.appcompat.app.AppCompatActivity
-import androidx.activity.result.ActivityResultLauncher
 import com.alakdb.resumewriter.databinding.ActivityResumeGenerationBinding
 import com.google.firebase.auth.FirebaseAuth
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.launch
-import kotlinx.coroutines.withContext
 import org.json.JSONObject
 import java.io.File
 
 class ResumeGenerationActivity : AppCompatActivity() {
+
     private lateinit var binding: ActivityResumeGenerationBinding
     private lateinit var apiService: ApiService
     private lateinit var creditManager: CreditManager
     private lateinit var auth: FirebaseAuth
-    
+
     private var selectedResumeUri: Uri? = null
     private var selectedJobDescUri: Uri? = null
     private var currentGeneratedResume: JSONObject? = null
 
-    // File picker launchers - Fixed type
     private lateinit var resumePicker: ActivityResultLauncher<String>
     private lateinit var jobDescPicker: ActivityResultLauncher<String>
 
@@ -37,7 +37,7 @@ class ResumeGenerationActivity : AppCompatActivity() {
         super.onCreate(savedInstanceState)
         binding = ActivityResumeGenerationBinding.inflate(layoutInflater)
         setContentView(binding.root)
-        
+
         apiService = ApiService(this)
         creditManager = CreditManager(this)
         auth = FirebaseAuth.getInstance()
@@ -47,7 +47,8 @@ class ResumeGenerationActivity : AppCompatActivity() {
         checkGenerateButtonState()
         testApiConnection()
     }
-    
+
+    /** ---------------- File Picker Setup ---------------- **/
     private fun registerFilePickers() {
         resumePicker = registerForActivityResult(ActivityResultContracts.GetContent()) { uri ->
             uri?.let { handleSelectedFile(it, binding.tvResumeFile) { selectedResumeUri = it } }
@@ -69,18 +70,17 @@ class ResumeGenerationActivity : AppCompatActivity() {
             showError("Unsupported file type. Please select PDF, DOCX, or TXT")
         }
     }
-    
+
+    /** ---------------- UI Setup ---------------- **/
     private fun setupUI() {
-        // File selection buttons
         binding.btnSelectResume.setOnClickListener {
-            resumePicker.launch("application/pdf,application/vnd.openxmlformats-officedocument.wordprocessingml.document,text/plain")
+            resumePicker.launch("application/*")
         }
 
         binding.btnSelectJobDesc.setOnClickListener {
-            jobDescPicker.launch("application/pdf,application/vnd.openxmlformats-officedocument.wordprocessingml.document,text/plain")
+            jobDescPicker.launch("application/*")
         }
 
-        // Clear selection buttons
         binding.btnClearResume.setOnClickListener {
             selectedResumeUri = null
             binding.tvResumeFile.text = "No file selected"
@@ -95,52 +95,33 @@ class ResumeGenerationActivity : AppCompatActivity() {
             checkGenerateButtonState()
         }
 
-        // Generate button
         binding.btnGenerateResume.setOnClickListener {
-            if (selectedResumeUri != null && selectedJobDescUri != null) {
-                generateResumeFromFiles()
-            } else if (binding.etResumeText.text.isNotEmpty() && binding.etJobDescription.text.isNotEmpty()) {
-                generateResumeFromText()
-            } else {
-                showError("Please provide both resume and job description")
+            when {
+                selectedResumeUri != null && selectedJobDescUri != null -> generateResumeFromFiles()
+                binding.etResumeText.text.isNotEmpty() && binding.etJobDescription.text.isNotEmpty() -> generateResumeFromText()
+                else -> showError("Please provide both resume and job description")
             }
         }
 
-        // Download buttons
-        binding.btnDownloadDocx.setOnClickListener {
-            downloadFile("docx")
-        }
-
-        binding.btnDownloadPdf.setOnClickListener {
-            downloadFile("pdf")
-        }
-
-        // Back button
-        binding.btnBack.setOnClickListener {
-            finish()
-        }
-
-        // Refresh connection
-        binding.btnRetryConnection.setOnClickListener {
-            testApiConnection()
-        }
+        binding.btnDownloadDocx.setOnClickListener { downloadFile("docx") }
+        binding.btnDownloadPdf.setOnClickListener { downloadFile("pdf") }
+        binding.btnBack.setOnClickListener { finish() }
+        binding.btnRetryConnection.setOnClickListener { testApiConnection() }
     }
 
     private fun checkGenerateButtonState() {
         val hasFiles = selectedResumeUri != null && selectedJobDescUri != null
         val hasText = binding.etResumeText.text.isNotEmpty() && binding.etJobDescription.text.isNotEmpty()
-        
+
         binding.btnGenerateResume.isEnabled = hasFiles || hasText
-        
-        if (hasFiles) {
-            binding.btnGenerateResume.text = "Generate Resume from Files (1 Credit)"
-        } else if (hasText) {
-            binding.btnGenerateResume.text = "Generate Resume from Text (1 Credit)"
-        } else {
-            binding.btnGenerateResume.text = "Generate Resume"
+        binding.btnGenerateResume.text = when {
+            hasFiles -> "Generate Resume from Files (1 Credit)"
+            hasText -> "Generate Resume from Text (1 Credit)"
+            else -> "Generate Resume"
         }
     }
 
+    /** ---------------- API Connection Test ---------------- **/
     private fun testApiConnection() {
         binding.layoutConnectionStatus.visibility = android.view.View.VISIBLE
         binding.tvConnectionStatus.text = "Testing connection..."
@@ -148,10 +129,8 @@ class ResumeGenerationActivity : AppCompatActivity() {
         binding.btnRetryConnection.isEnabled = false
 
         CoroutineScope(Dispatchers.Main).launch {
-            Log.d("API_TEST", "Starting API connection test...")
             when (val result = apiService.testConnection()) {
                 is ApiService.ApiResult.Success -> {
-                    Log.d("API_TEST", "API connection successful")
                     binding.tvConnectionStatus.text = "✅ API Connected Successfully"
                     binding.tvConnectionStatus.setTextColor(getColor(android.R.color.holo_green_dark))
                     binding.progressConnection.visibility = android.view.View.GONE
@@ -159,7 +138,6 @@ class ResumeGenerationActivity : AppCompatActivity() {
                     showSuccess("API connection successful")
                 }
                 is ApiService.ApiResult.Error -> {
-                    Log.e("API_TEST", "API connection failed: ${result.message}")
                     binding.tvConnectionStatus.text = "❌ Connection Failed: ${result.message}"
                     binding.tvConnectionStatus.setTextColor(getColor(android.R.color.holo_red_dark))
                     binding.progressConnection.visibility = android.view.View.GONE
@@ -170,68 +148,39 @@ class ResumeGenerationActivity : AppCompatActivity() {
         }
     }
 
+    /** ---------------- Resume Generation ---------------- **/
     private fun generateResumeFromFiles() {
-        val resumeUri = selectedResumeUri
-        val jobDescUri = selectedJobDescUri
+        val resumeUri = selectedResumeUri ?: return showError("Please select both files")
+        val jobDescUri = selectedJobDescUri ?: return showError("Please select both files")
 
-        if (resumeUri == null || jobDescUri == null) {
-            showError("Please select both files")
-            return
-        }
-
-        binding.btnGenerateResume.isEnabled = false
-        binding.btnGenerateResume.text = "Processing..."
-        binding.progressGenerate.visibility = android.view.View.VISIBLE
+        disableGenerateButton("Processing...")
 
         CoroutineScope(Dispatchers.Main).launch {
-            val user = auth.currentUser
-            if (user == null) {
-                showError("User not logged in")
-                resetGenerateButton()
-                return@launch
-            }
+            val user = auth.currentUser ?: return@launch showErrorAndReset("User not logged in")
 
-            // Step 1: Check credits first
             when (val creditResult = apiService.getUserCredits()) {
                 is ApiService.ApiResult.Success -> {
-                    val availableCredits = creditResult.data.getInt("available_credits")
-                    if (availableCredits <= 0) {
-                        showError("Insufficient credits. Please purchase more.")
-                        resetGenerateButton()
-                        return@launch
-                    }
+                    val available = creditResult.data.optInt("available_credits", 0)
+                    if (available <= 0) return@launch showErrorAndReset("Insufficient credits. Please purchase more.")
                 }
-                is ApiService.ApiResult.Error -> {
-                    showError("Failed to check credits: ${creditResult.message}")
-                    resetGenerateButton()
-                    return@launch
-                }
+                is ApiService.ApiResult.Error -> return@launch showErrorAndReset("Failed to check credits: ${creditResult.message}")
             }
 
-            // Step 2: Deduct credit
-            when (val deductResult = apiService.deductCredit(user.uid)) {
+            when (val deduct = apiService.deductCredit(user.uid)) {
                 is ApiService.ApiResult.Success -> {
-                    // Step 3: Generate resume
-                    when (val genResult = apiService.generateResumeFromFiles(resumeUri, jobDescUri)) {
+                    when (val gen = apiService.generateResumeFromFiles(resumeUri, jobDescUri)) {
                         is ApiService.ApiResult.Success -> {
-                            currentGeneratedResume = genResult.data
-                            displayGeneratedResume(genResult.data)
+                            currentGeneratedResume = gen.data
+                            displayGeneratedResume(gen.data)
                             showSuccess("Resume generated successfully!")
-                            
-                            // Update credit display
                             updateCreditDisplay()
                         }
-                        is ApiService.ApiResult.Error -> {
-                            showError("Generation failed: ${genResult.message}")
-                            // Note: Credit was already deducted, this is intentional
-                        }
+                        is ApiService.ApiResult.Error -> showError("Generation failed: ${gen.message}")
                     }
                 }
-                is ApiService.ApiResult.Error -> {
-                    showError("Credit deduction failed: ${deductResult.message}")
-                }
+                is ApiService.ApiResult.Error -> showError("Credit deduction failed: ${deduct.message}")
             }
-            
+
             resetGenerateButton()
         }
     }
@@ -245,103 +194,67 @@ class ResumeGenerationActivity : AppCompatActivity() {
             return
         }
 
-        binding.btnGenerateResume.isEnabled = false
-        binding.btnGenerateResume.text = "Processing..."
-        binding.progressGenerate.visibility = android.view.View.VISIBLE
+        disableGenerateButton("Processing...")
 
         CoroutineScope(Dispatchers.Main).launch {
-            val user = auth.currentUser
-            if (user == null) {
-                showError("User not logged in")
-                resetGenerateButton()
-                return@launch
-            }
+            val user = auth.currentUser ?: return@launch showErrorAndReset("User not logged in")
 
-            // Step 1: Check credits first
             when (val creditResult = apiService.getUserCredits()) {
                 is ApiService.ApiResult.Success -> {
-                    val availableCredits = creditResult.data.getInt("available_credits")
-                    if (availableCredits <= 0) {
-                        showError("Insufficient credits. Please purchase more.")
-                        resetGenerateButton()
-                        return@launch
-                    }
+                    val available = creditResult.data.optInt("available_credits", 0)
+                    if (available <= 0) return@launch showErrorAndReset("Insufficient credits. Please purchase more.")
                 }
-                is ApiService.ApiResult.Error -> {
-                    showError("Failed to check credits: ${creditResult.message}")
-                    resetGenerateButton()
-                    return@launch
-                }
+                is ApiService.ApiResult.Error -> return@launch showErrorAndReset("Failed to check credits: ${creditResult.message}")
             }
 
-            // Step 2: Deduct credit
-            when (val deductResult = apiService.deductCredit(user.uid)) {
+            when (val deduct = apiService.deductCredit(user.uid)) {
                 is ApiService.ApiResult.Success -> {
-                    // Step 3: Generate resume
-                    when (val genResult = apiService.generateResume(resumeText, jobDesc)) {
+                    when (val gen = apiService.generateResume(resumeText, jobDesc)) {
                         is ApiService.ApiResult.Success -> {
-                            currentGeneratedResume = genResult.data
-                            displayGeneratedResume(genResult.data)
+                            currentGeneratedResume = gen.data
+                            displayGeneratedResume(gen.data)
                             showSuccess("Resume generated successfully!")
-                            
-                            // Update credit display
                             updateCreditDisplay()
                         }
-                        is ApiService.ApiResult.Error -> {
-                            showError("Generation failed: ${genResult.message}")
-                            // Note: Credit was already deducted, this is intentional
-                        }
+                        is ApiService.ApiResult.Error -> showError("Generation failed: ${gen.message}")
                     }
                 }
-                is ApiService.ApiResult.Error -> {
-                    showError("Credit deduction failed: ${deductResult.message}")
-                }
+                is ApiService.ApiResult.Error -> showError("Credit deduction failed: ${deduct.message}")
             }
-            
+
             resetGenerateButton()
         }
     }
 
+    /** ---------------- Display & Download ---------------- **/
     private fun displayGeneratedResume(resumeData: JSONObject) {
         try {
-            val resumeText = resumeData.getString("resume_text")
-            binding.tvGeneratedResume.text = resumeText
+            binding.tvGeneratedResume.text = resumeData.getString("resume_text")
             binding.layoutDownloadButtons.visibility = android.view.View.VISIBLE
-            
-            // Show remaining credits if available
-            if (resumeData.has("remaining_credits")) {
-                val remaining = resumeData.getInt("remaining_credits")
-                binding.tvCreditInfo.text = "Remaining credits: $remaining"
+
+            resumeData.optInt("remaining_credits").takeIf { it > 0 }?.let {
+                binding.tvCreditInfo.text = "Remaining credits: $it"
                 binding.tvCreditInfo.visibility = android.view.View.VISIBLE
             }
-            
+
         } catch (e: Exception) {
             showError("Error displaying resume: ${e.message}")
         }
     }
 
     private fun downloadFile(format: String) {
-        val resumeData = currentGeneratedResume ?: run {
-            showError("No resume generated yet")
-            return
-        }
+        val resumeData = currentGeneratedResume ?: return showError("No resume generated yet")
 
         CoroutineScope(Dispatchers.Main).launch {
             try {
-                when (format) {
-                    "docx" -> {
-                        val base64Data = resumeData.getString("docx_data")
-                        val fileData = apiService.decodeBase64File(base64Data)
-                        val file = apiService.saveFileToStorage(fileData, "generated_resume.docx")
-                        showDownloadSuccess(file, "DOCX")
-                    }
-                    "pdf" -> {
-                        val base64Data = resumeData.getString("pdf_data")
-                        val fileData = apiService.decodeBase64File(base64Data)
-                        val file = apiService.saveFileToStorage(fileData, "generated_resume.pdf")
-                        showDownloadSuccess(file, "PDF")
-                    }
-                }
+                val fileName = "generated_resume.${format.lowercase()}"
+                val base64Key = "${format.lowercase()}_data"
+                val base64Data = resumeData.getString(base64Key)
+
+                val fileData = apiService.decodeBase64File(base64Data)
+                val file = apiService.saveFileToStorage(fileData, fileName)
+                showDownloadSuccess(file, format.uppercase())
+
             } catch (e: Exception) {
                 showError("Download failed: ${e.message}")
             }
@@ -349,7 +262,6 @@ class ResumeGenerationActivity : AppCompatActivity() {
     }
 
     private fun showDownloadSuccess(file: File, format: String) {
-        // Create share intent
         val shareIntent = Intent(Intent.ACTION_SEND).apply {
             type = when (format) {
                 "DOCX" -> "application/vnd.openxmlformats-officedocument.wordprocessingml.document"
@@ -362,19 +274,17 @@ class ResumeGenerationActivity : AppCompatActivity() {
             addFlags(Intent.FLAG_GRANT_READ_URI_PERMISSION)
         }
 
-        // Show success message with option to share
         Toast.makeText(this, "$format file saved successfully!", Toast.LENGTH_LONG).show()
-        
-        // Optionally start share dialog
         startActivity(Intent.createChooser(shareIntent, "Share Resume"))
     }
 
+    /** ---------------- Credit Display ---------------- **/
     private fun updateCreditDisplay() {
         CoroutineScope(Dispatchers.Main).launch {
             when (val result = apiService.getUserCredits()) {
                 is ApiService.ApiResult.Success -> {
-                    val available = result.data.getInt("available_credits")
-                    val used = result.data.getInt("used_credits")
+                    val available = result.data.optInt("available_credits", 0)
+                    val used = result.data.optInt("used_credits", 0)
                     binding.tvCreditInfo.text = "Credits: $available available, $used used"
                 }
                 is ApiService.ApiResult.Error -> {
@@ -384,6 +294,13 @@ class ResumeGenerationActivity : AppCompatActivity() {
         }
     }
 
+    /** ---------------- Helpers ---------------- **/
+    private fun disableGenerateButton(text: String) {
+        binding.btnGenerateResume.isEnabled = false
+        binding.btnGenerateResume.text = text
+        binding.progressGenerate.visibility = android.view.View.VISIBLE
+    }
+
     private fun resetGenerateButton() {
         binding.btnGenerateResume.isEnabled = true
         binding.btnGenerateResume.text = "Generate Resume"
@@ -391,10 +308,15 @@ class ResumeGenerationActivity : AppCompatActivity() {
         checkGenerateButtonState()
     }
 
+    private fun showErrorAndReset(msg: String) {
+        showError(msg)
+        resetGenerateButton()
+    }
+
     private fun getFileName(uri: Uri): String? {
         return try {
             contentResolver.query(uri, null, null, null, null)?.use { cursor ->
-                val nameIndex = cursor.getColumnIndex(android.provider.OpenableColumns.DISPLAY_NAME)
+                val nameIndex = cursor.getColumnIndex(OpenableColumns.DISPLAY_NAME)
                 cursor.moveToFirst()
                 cursor.getString(nameIndex)
             }
