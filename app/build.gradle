@@ -15,7 +15,7 @@ android {
         targetSdk 34
         versionCode 6
         versionName "1.5"
-        buildConfigField "String", "API_BASE_URL", "\"https://resume-writer-04uv.onrender.com/\""
+        buildConfigField "String", "API_BASE_URL", "\"https://resume-writer-api.onrender.com/\""
     }
 
     buildFeatures {
