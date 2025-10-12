@@ -98,20 +98,25 @@ private fun attemptLogin(email: String, password: String) {
         binding.btnLogin.text = "Login"
 
 if (success) {
-    val firebaseUser = FirebaseAuth.getInstance().currentUser
+    // 🔍 Diagnostic logging to check token status
+        Log.d("TOKEN_CHECK", "User UID: ${FirebaseAuth.getInstance().currentUser?.uid}")
+        FirebaseAuth.getInstance().currentUser?.getIdToken(true)?.addOnSuccessListener {
+            Log.d("TOKEN_CHECK", "Fetched ID Token: ${it.token}")
+        }
+        val firebaseUser = FirebaseAuth.getInstance().currentUser
 
-    if (firebaseUser != null) {
-        firebaseUser.getIdToken(true)
-            .addOnCompleteListener { task ->
-                if (task.isSuccessful) {
-                    val idToken = task.result?.token
-                    if (!idToken.isNullOrEmpty()) {
-                        userManager.saveUserToken(idToken)
-                        showMessage("Login successful!")
-                        creditManager.resetResumeCooldown()
-                        startActivity(Intent(this@LoginActivity, MainActivity::class.java))
-                        finish()
-                    } else {
+        if (firebaseUser != null) {
+            firebaseUser.getIdToken(true)
+                .addOnCompleteListener { task ->
+                    if (task.isSuccessful) {
+                        val idToken = task.result?.token
+                        if (!idToken.isNullOrEmpty()) {
+                            userManager.saveUserToken(idToken)
+                            showMessage("Login successful!")
+                            creditManager.resetResumeCooldown()
+                            startActivity(Intent(this@LoginActivity, MainActivity::class.java))
+                            finish()
+                        } else {
                         showMessage("Failed to get ID token — trying fallback.")
                         // Fallback logic below
                         handleMissingToken()
@@ -119,14 +124,14 @@ if (success) {
                 } else {
                     showMessage("Token fetch error: ${task.exception?.message}")
                     handleMissingToken()
+                    }
                 }
+        } else {
+            showMessage("User not found in FirebaseAuth — trying fallback.")
+            handleMissingToken()
             }
-    } else {
-        showMessage("User not found in FirebaseAuth — trying fallback.")
-        handleMissingToken()
-    }
-} else {
-    showMessage(error ?: "Login failed")
+        } else {
+            showMessage(error ?: "Login failed")
         }
     }
 }
