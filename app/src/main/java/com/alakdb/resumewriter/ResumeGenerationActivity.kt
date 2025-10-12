@@ -29,6 +29,10 @@ class ResumeGenerationActivity : AppCompatActivity() {
     private var currentGeneratedResume: JSONObject? = null
     private var genResult: String? = null
 
+    // File picker launchers
+    private lateinit var resumePicker: ActivityResultLauncher<String>
+    private lateinit var jobDescPicker: ActivityResultLauncher<String>
+
     // File picker contracts
     private val resumeFilePicker = registerForActivityResult(ActivityResultContracts.GetContent()) { uri ->
         uri?.let {
@@ -60,8 +64,29 @@ class ResumeGenerationActivity : AppCompatActivity() {
         setupUI()
         checkGenerateButtonState()
         testApiConnection()
+        registerFilePickers()
+    }
+        private fun registerFilePickers() {
+        resumePicker = registerForActivityResult(ActivityResultContracts.GetContent()) { uri: Uri? ->
+            uri?.let {
+                selectedResumeUri = it
+                binding.tvResumeFile.text = getFileName(it) ?: "Resume file selected"
+                binding.tvResumeFile.setTextColor(getColor(android.R.color.holo_green_dark))
+                checkGenerateButtonState()
+            }
+        }
+
+        jobDescPicker = registerForActivityResult(ActivityResultContracts.GetContent()) { uri: Uri? ->
+            uri?.let {
+                selectedJobDescUri = it
+                binding.tvJobDescFile.text = getFileName(it) ?: "Job description file selected"
+                binding.tvJobDescFile.setTextColor(getColor(android.R.color.holo_green_dark))
+                checkGenerateButtonState()
+            }
+        }
     }
 
+    
     private fun setupUI() {
         // File selection buttons
         binding.btnSelectResume.setOnClickListener {
@@ -70,6 +95,21 @@ class ResumeGenerationActivity : AppCompatActivity() {
 
         binding.btnSelectJobDesc.setOnClickListener {
             openFilePicker(jobDescFilePicker, arrayOf("application/pdf", "application/vnd.openxmlformats-officedocument.wordprocessingml.document", "text/plain"))
+        }
+
+                // Clear selection buttons
+        binding.btnClearResume.setOnClickListener {
+            selectedResumeUri = null
+            binding.tvResumeFile.text = "No file selected"
+            binding.tvResumeFile.setTextColor(getColor(android.R.color.darker_gray))
+            checkGenerateButtonState()
+        }
+
+        binding.btnClearJobDesc.setOnClickListener {
+            selectedJobDescUri = null
+            binding.tvJobDescFile.text = "No file selected"
+            binding.tvJobDescFile.setTextColor(getColor(android.R.color.darker_gray))
+            checkGenerateButtonState()
         }
 
         // Generate button
