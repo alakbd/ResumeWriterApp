@@ -30,7 +30,7 @@
         </activity>
 
         <activity
-        android:name=".ResumeGenerationActivity"
+        android:name="com.alakdb.resumewriter.ResumeGenerationActivity"
         android:exported="true"
         android:label="Generate Resume"
         android:theme="@style/Theme.AppCompat.Light.NoActionBar" />
