@@ -37,6 +37,13 @@ class ApiService(private val context: Context) {
     private val gson = Gson()
     private val baseUrl = "https://resume-writer-api.onrender.com"
 
+    data class DeductCreditRequest(val user_id: String)
+    data class GenerateResumeRequest(
+        val resume_text: String,
+        val job_description: String,
+        val tone: String = "Professional"
+        )
+
     // -----------------------------
     // API Result Sealed Class
     // -----------------------------
@@ -148,7 +155,7 @@ class ApiService(private val context: Context) {
     // -----------------------------
     suspend fun deductCredit(userId: String): ApiResult<JSONObject> {
         return try {
-            val authValue = getAuthIdentifier()
+            val authValue = getCurrentUserToken()
             if (authValue == null) {
                 return ApiResult.Error("User authentication unavailable", 401)
         }
@@ -196,7 +203,7 @@ class ApiService(private val context: Context) {
         tone: String = "Professional"
     ): ApiResult<JSONObject> {
         return try {
-            val authValue = getAuthIdentifier()
+            val authValue = getCurrentUserToken()
             if (authValue == null) {
                 return ApiResult.Error("User authentication unavailable", 401)
             }
@@ -238,7 +245,7 @@ class ApiService(private val context: Context) {
         tone: String = "Professional"
     ): ApiResult<JSONObject> {
         return try {
-            val authValue = getAuthIdentifier()
+            val authValue = getCurrentUserToken()
             if (authValue == null) {
                 return ApiResult.Error("User authentication unavailable", 401)
             }
@@ -290,7 +297,7 @@ class ApiService(private val context: Context) {
     // -----------------------------
     suspend fun getUserCredits(): ApiResult<JSONObject> {
         return try {
-            val authValue = getAuthIdentifier()
+            val authValue = getCurrentUserToken()
             if (authValue == null) {
                 return ApiResult.Error("User authentication unavailable", 401)
             }
@@ -359,6 +366,24 @@ class ApiService(private val context: Context) {
         return file
     }
 
+    private fun handleErrorResponse(response: Response): String {
+        return try {
+            val errorBody = response.body?.string()
+            "HTTP ${response.code}: ${response.message}. Body: $errorBody"
+        } catch (e: Exception) {
+            "HTTP ${response.code}: ${response.message}"
+            }
+        }
+
+    private fun getErrorCode(exception: Exception): Int {
+    return when (exception) {
+        is java.net.SocketTimeoutException -> 1002
+        is java.net.UnknownHostException -> 1003
+        is IOException -> 1001
+        else -> 1000
+        }
+    }
+    
     // -----------------------------
     // Network Check
     // -----------------------------
