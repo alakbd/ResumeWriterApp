@@ -395,10 +395,12 @@ class ApiService(private val context: Context) {
         }
     }
 
-    // Network availability check
+ 
+// Network availability check
     fun isNetworkAvailable(): Boolean {
         val connectivityManager = context.getSystemService(Context.CONNECTIVITY_SERVICE) as ConnectivityManager
-        return if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.M) {
+
+        val isConnected = if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.M) {
             val network = connectivityManager.activeNetwork
             val capabilities = connectivityManager.getNetworkCapabilities(network)
             capabilities != null && (
@@ -411,7 +413,10 @@ class ApiService(private val context: Context) {
             val networkInfo = connectivityManager.activeNetworkInfo
             networkInfo != null && networkInfo.isConnected
         }
+
+        return isConnected
     }
+
 
     // Get detailed connection diagnostics
     suspend fun getConnectionDiagnostics(): Map<String, Any> {
