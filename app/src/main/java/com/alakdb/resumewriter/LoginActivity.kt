@@ -1,6 +1,7 @@
 package com.alakdb.resumewriter
 
 import android.content.Intent
+import android.util.Log
 import android.os.Bundle
 import android.widget.Button
 import android.widget.EditText
