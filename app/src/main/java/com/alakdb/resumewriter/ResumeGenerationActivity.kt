@@ -30,8 +30,8 @@ class ResumeGenerationActivity : AppCompatActivity() {
     private var genResult: String? = null
 
     // File picker launchers
-    private lateinit var resumePicker: ActivityResultLauncher<String>
-    private lateinit var jobDescPicker: ActivityResultLauncher<String>
+    private lateinit var resumePicker: ActivityResultLauncher<Intent>
+    private lateinit var jobDescPicker: ActivityResultLauncher<Intent>
 
     // File picker contracts
     private val resumeFilePicker = registerForActivityResult(ActivityResultContracts.GetContent()) { uri ->
@@ -66,35 +66,53 @@ class ResumeGenerationActivity : AppCompatActivity() {
         testApiConnection()
         registerFilePickers()
     }
-        private fun registerFilePickers() {
-        resumePicker = registerForActivityResult(ActivityResultContracts.GetContent()) { uri: Uri? ->
-            uri?.let {
-                selectedResumeUri = it
-                binding.tvResumeFile.text = getFileName(it) ?: "Resume file selected"
-                binding.tvResumeFile.setTextColor(getColor(android.R.color.holo_green_dark))
-                checkGenerateButtonState()
-            }
-        }
+    
+    private fun registerFilePickers() {
+        val mimeTypes = arrayOf(
+            "application/pdf",
+            "application/vnd.openxmlformats-officedocument.wordprocessingml.document",
+            "text/plain"
+        )
 
-        jobDescPicker = registerForActivityResult(ActivityResultContracts.GetContent()) { uri: Uri? ->
-            uri?.let {
-                selectedJobDescUri = it
-                binding.tvJobDescFile.text = getFileName(it) ?: "Job description file selected"
-                binding.tvJobDescFile.setTextColor(getColor(android.R.color.holo_green_dark))
-                checkGenerateButtonState()
+    resumePicker = registerForActivityResult(ActivityResultContracts.StartActivityForResult()) { result ->
+        if (result.resultCode == Activity.RESULT_OK) {
+            result.data?.data?.let { uri ->
+                handleSelectedFile(uri, binding.tvResumeFile) { selectedResumeUri = it }
             }
         }
     }
+
+    jobDescPicker = registerForActivityResult(ActivityResultContracts.StartActivityForResult()) { result ->
+        if (result.resultCode == Activity.RESULT_OK) {
+            result.data?.data?.let { uri ->
+                handleSelectedFile(uri, binding.tvJobDescFile) { selectedJobDescUri = it }
+            }
+        }
+    }
+
+    fun handleSelectedFile(uri: Uri, textView: TextView, setUri: (Uri) -> Unit) {
+        val name = getFileName(uri) ?: ""
+        if (name.endsWith(".pdf", true) || name.endsWith(".docx", true) || name.endsWith(".txt", true)) {
+            setUri(uri)
+            textView.text = name
+            textView.setTextColor(getColor(android.R.color.holo_green_dark))
+            checkGenerateButtonState()
+        } else {
+            showError("Unsupported file type. Please select PDF, DOCX, or TXT")
+        }
+    }
+}
+
 
     
     private fun setupUI() {
         // File selection buttons
         binding.btnSelectResume.setOnClickListener {
-            openFilePicker(resumeFilePicker, arrayOf("application/pdf", "application/vnd.openxmlformats-officedocument.wordprocessingml.document", "text/plain"))
+            openFilePicker(resumePicker) // use Intent with all MIME types
         }
 
         binding.btnSelectJobDesc.setOnClickListener {
-            openFilePicker(jobDescFilePicker, arrayOf("application/pdf", "application/vnd.openxmlformats-officedocument.wordprocessingml.document", "text/plain"))
+             openFilePicker(jobDescPicker) // use Intent with all MIME types
         }
 
                 // Clear selection buttons
@@ -158,10 +176,19 @@ class ResumeGenerationActivity : AppCompatActivity() {
         }
     }
 
-    private fun openFilePicker(picker: ActivityResultLauncher<String>, mimeTypes: Array<String>) {
-        val mimeType = if (mimeTypes.isNotEmpty()) mimeTypes[0] else "*/*"
-        picker.launch(mimeType)
+    private fun openFilePicker(picker: ActivityResultLauncher<Intent>) {
+        val intent = Intent(Intent.ACTION_OPEN_DOCUMENT).apply {
+            addCategory(Intent.CATEGORY_OPENABLE)
+            type = "*/*"
+            putExtra(Intent.EXTRA_MIME_TYPES, arrayOf(
+                "application/pdf",
+                "application/vnd.openxmlformats-officedocument.wordprocessingml.document",
+                "text/plain"
+            ))
+        }
+        picker.launch(intent)
     }
+
 
 
     private fun checkGenerateButtonState() {
