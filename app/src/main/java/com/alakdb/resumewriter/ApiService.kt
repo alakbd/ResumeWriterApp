@@ -179,7 +179,7 @@ class ApiService(private val context: Context) {
             val request = Request.Builder()
                 .url("$baseUrl/deduct-credit")
                 .post(body)
-                .addHeader("Authorization", auth)
+                .addHeader("X-Auth-Token", auth)
                 .addHeader("Content-Type", "application/json")
                 .build()
             val response = client.newCall(request).execute()
@@ -202,7 +202,7 @@ class ApiService(private val context: Context) {
             val request = Request.Builder()
                 .url("$baseUrl/generate-resume")
                 .post(body)
-                .addHeader("Authorization", auth)
+                .addHeader("X-Auth-Token", auth)
                 .build()
             val response = client.newCall(request).execute()
             val respBody = response.body?.string() ?: "{}"
@@ -232,7 +232,7 @@ class ApiService(private val context: Context) {
             val request = Request.Builder()
                 .url("$baseUrl/generate-resume-from-files")
                 .post(body)
-                .addHeader("Authorization", auth)
+                .addHeader("X-Auth-Token", auth)
                 .build()
 
             val response = client.newCall(request).execute()
@@ -253,7 +253,7 @@ class ApiService(private val context: Context) {
             val request = Request.Builder()
                 .url("$baseUrl/user/credits")
                 .get()
-                .addHeader("Authorization", auth)
+                .addHeader("X-Auth-Token", auth)
                 .build()
             val response = client.newCall(request).execute()
             val respBody = response.body?.string() ?: "{}"
@@ -343,7 +343,7 @@ class ApiService(private val context: Context) {
                     "GET" -> reqBuilder.get()
                     "POST" -> reqBuilder.post("{}".toRequestBody("application/json".toMediaType()))
                 }
-                getCurrentUserToken()?.let { token -> reqBuilder.addHeader("Authorization", "Bearer $token") }
+                getCurrentUserToken()?.let { token -> reqBuilder.addHeader("X-Auth-Token", "Bearer $token") }
                 val resp = client.newCall(reqBuilder.build()).execute()
                 results[path] = "HTTP ${resp.code} - ${resp.message}"
             } catch (e: Exception) {
