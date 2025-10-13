@@ -11,13 +11,16 @@ import com.google.gson.Gson
 import kotlinx.coroutines.tasks.await
 import okhttp3.*
 import okhttp3.MediaType.Companion.toMediaType
-import okhttp3.RequestBody.Companion.toRequestBody
+import okhttp3.Interceptor
+import okhttp3.Response
+import okhttp3.Protocol
 import okhttp3.logging.HttpLoggingInterceptor
 import org.json.JSONObject
 import java.io.File
 import java.io.IOException
 import java.io.InputStream
 import java.util.concurrent.TimeUnit
+import okhttp3.ResponseBody.Companion.toResponseBody
 
 class ApiService(private val context: Context) {
 
