@@ -72,20 +72,7 @@ class ApiService(private val context: Context) {
         data class Error(val message: String, val code: Int = 0) : ApiResult<Nothing>()
     }
 
-    // -----------------------------
-    // Connectivity Interceptor
-    // -----------------------------
-    private class ConnectivityInterceptor(private val context: Context) : Interceptor {
-        
-    }
-        // -----------------------------
-        // Network Check
-        // -----------------------------
-    
-        private fun isNetworkAvailable(context: Context): Boolean {
-
-       
-        }    
+    // -----------------------------  
         
 }
         // -----------------------------
