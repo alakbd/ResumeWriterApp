@@ -16,6 +16,8 @@ import java.io.File
 import java.io.IOException
 import java.util.concurrent.TimeUnit
 import okhttp3.RequestBody.Companion.toRequestBody
+import kotlinx.coroutines.runBlocking
+import kotlinx.coroutines.delay
 
 class ApiService(private val context: Context) {
 
@@ -66,34 +68,28 @@ class ApiService(private val context: Context) {
     // -----------------------------
     // RetryInterceptor
     // -----------------------------
-    private class RetryInterceptor : Interceptor {
-        override fun intercept(chain: Interceptor.Chain): Response {
-            val request = chain.request()
-            var response: Response? = null
-            var retries = 0
-            val maxRetries = 3
+    private class RetryInterceptor: Interceptor {
+    override fun intercept(chain: Interceptor.Chain): Response = runBlocking {
+        var attempt = 0
+        val maxRetries = 3
+        var lastException: IOException? = null
 
-            while (retries < maxRetries) {
-                try {
-                    response = chain.proceed(request)
-                    if (response.isSuccessful) return response
-                } catch (e: IOException) {
-                    Log.w("RetryInterceptor", "Request failed (attempt ${retries + 1}): ${e.message}")
-                    if (retries >= maxRetries - 1) throw e
-                }
-                retries++
-                try {
-                    val backoff = 500L * retries
-                    Log.d("RetryInterceptor", "Retrying after ${backoff}ms (attempt $retries/$maxRetries)")
-                    Thread.sleep(backoff)
-                } catch (e: InterruptedException) {
-                    Thread.currentThread().interrupt()
-                    throw IOException("Retry interrupted", e)
-                }
+        while (attempt < maxRetries) {
+            try {
+                val response = chain.proceed(chain.request())
+                if (response.isSuccessful) return@runBlocking response
+                if (response.code in 400..499) return@runBlocking response
+            } catch (e: IOException) {
+                lastException = e
             }
-            return response ?: throw IOException("Request failed after $maxRetries retries")
+            attempt++
+            val backoff = 500L * attempt
+            Log.d("RetryInterceptor", "Retry attempt $attempt after $backoff ms")
+            delay(backoff)
         }
+        throw lastException ?: IOException("Unknown network error after $maxRetries attempts")
     }
+}
 
     // -----------------------------
     // Current User Token
