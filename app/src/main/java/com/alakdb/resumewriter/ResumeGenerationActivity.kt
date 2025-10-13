@@ -42,6 +42,29 @@ class ResumeGenerationActivity : AppCompatActivity() {
         setContentView(binding.root)
 
         apiService = ApiService(this)
+        //below code added temporary
+        lifecycleScope.launch {
+    try {
+        val result = retryNetwork { apiService.getUserCredits() }
+
+        when (result) {
+            is ApiService.ApiResult.Success -> {
+                // Update UI with credits
+                creditTextView.text = result.data.getInt("credits").toString()
+            }
+            is ApiService.ApiResult.Error -> {
+                // Show error message
+                Toast.makeText(this@ResumeGenerationActivity, result.message, Toast.LENGTH_SHORT).show()
+            }
+        }
+    } catch (e: Exception) {
+        // Handle unexpected exceptions
+        Toast.makeText(this@ResumeGenerationActivity, "Network error: ${e.message}", Toast.LENGTH_SHORT).show()
+    }
+}
+
+
+        
         creditManager = CreditManager(this)
         auth = FirebaseAuth.getInstance()
 
