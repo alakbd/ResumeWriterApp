@@ -42,7 +42,6 @@ class ApiService(private val context: Context) {
             }
         )
         .addInterceptor(RetryInterceptor())
-        .addInterceptor(ConnectivityInterceptor(context))
         .build()
     private fun logNetworkError(tag: String, e: Exception) {
         val logMessage = "❌ ${e::class.simpleName}: ${e.message}"
@@ -77,45 +76,17 @@ class ApiService(private val context: Context) {
     // Connectivity Interceptor
     // -----------------------------
     private class ConnectivityInterceptor(private val context: Context) : Interceptor {
-        override fun intercept(chain: Interceptor.Chain): Response {
-            if (!isNetworkAvailable(context)) {
-                Log.e("ConnectivityInterceptor", "No network available for ${chain.request().url}")
-            // Return a clean 503-style response instead of throwing an exception
-            return Response.Builder()
-                .request(chain.request())
-                .protocol(Protocol.HTTP_1_1)
-                .code(503)
-                .message("No internet connection")
-                .body("".toResponseBody(null))
-                .build()
-        }
-        Log.d("ConnectivityInterceptor", "Network available for ${chain.request().url}")
-        return chain.proceed(chain.request())
+        
     }
         // -----------------------------
         // Network Check
         // -----------------------------
     
         private fun isNetworkAvailable(context: Context): Boolean {
-            val cm = context.getSystemService(Context.CONNECTIVITY_SERVICE) as ConnectivityManager
-            return if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.M) {
-                val network = cm.activeNetwork
-                val capabilities = cm.getNetworkCapabilities(network)
-                val result = capabilities != null && (
-                    capabilities.hasTransport(NetworkCapabilities.TRANSPORT_WIFI) ||
-                    capabilities.hasTransport(NetworkCapabilities.TRANSPORT_CELLULAR) ||
-                    capabilities.hasTransport(NetworkCapabilities.TRANSPORT_ETHERNET)
-                )
-                Log.d("ApiService", "Network available (M+): $result")
-                result
-            } else {
-                @Suppress("DEPRECATION")
-                val info = cm.activeNetworkInfo
-                val result = info != null && info.isConnected
-                Log.d("ApiService", "Network available (<M): $result")
-                result
-            }
-        }
+
+       
+        }    
+        
 }
         // -----------------------------
         // RetryInterceptor
