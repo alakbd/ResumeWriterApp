@@ -1,10 +1,7 @@
 package com.alakdb.resumewriter
 
 import android.content.Context
-import android.net.ConnectivityManager
-import android.net.NetworkCapabilities
 import android.net.Uri
-import android.os.Build
 import android.util.Log
 import com.google.firebase.auth.FirebaseAuth
 import com.google.gson.Gson
@@ -13,16 +10,12 @@ import okhttp3.*
 import okhttp3.MediaType.Companion.toMediaType
 import okhttp3.Interceptor
 import okhttp3.Response
-import okhttp3.Protocol
 import okhttp3.logging.HttpLoggingInterceptor
 import org.json.JSONObject
 import java.io.File
 import java.io.IOException
-import java.io.InputStream
 import java.util.concurrent.TimeUnit
-import okhttp3.ResponseBody.Companion.toResponseBody
 import okhttp3.RequestBody.Companion.toRequestBody
-
 
 class ApiService(private val context: Context) {
 
@@ -35,26 +28,24 @@ class ApiService(private val context: Context) {
         .readTimeout(120, TimeUnit.SECONDS)
         .writeTimeout(60, TimeUnit.SECONDS)
         .addInterceptor(
-            HttpLoggingInterceptor { message ->
-                Log.d("NetworkLog", message)
-            }.apply {
-                level = HttpLoggingInterceptor.Level.BODY
-            }
+            HttpLoggingInterceptor { message -> Log.d("NetworkLog", message) }
+                .apply { level = HttpLoggingInterceptor.Level.BODY }
         )
         .addInterceptor(RetryInterceptor())
         .build()
+
     private fun logNetworkError(tag: String, e: Exception) {
         val logMessage = "❌ ${e::class.simpleName}: ${e.message}"
         Log.e(tag, logMessage, e)
-         appendLogToFile(logMessage)
-        }
+        appendLogToFile(logMessage)
+    }
 
     private fun appendLogToFile(message: String) {
-    try {
-        val logFile = File(context.getExternalFilesDir(null), "network_log.txt")
-        logFile.appendText("${System.currentTimeMillis()}: $message\n")
-    } catch (e: Exception) {
-        Log.e("ApiService", "Failed to write log file: ${e.message}")
+        try {
+            val logFile = File(context.getExternalFilesDir(null), "network_log.txt")
+            logFile.appendText("${System.currentTimeMillis()}: $message\n")
+        } catch (e: Exception) {
+            Log.e("ApiService", "Failed to write log file: ${e.message}")
         }
     }
 
@@ -72,97 +63,87 @@ class ApiService(private val context: Context) {
         data class Error(val message: String, val code: Int = 0) : ApiResult<Nothing>()
     }
 
-    // -----------------------------  
-        
-}
-        // -----------------------------
-        // RetryInterceptor
-        // -----------------------------
-    private class RetryInterceptor: Interceptor {
-    override fun intercept(chain: Interceptor.Chain): Response {
-        val request = chain.request()
-        var response: Response? = null
-        var retries = 0
-        val maxRetries = 3
+    // -----------------------------
+    // RetryInterceptor
+    // -----------------------------
+    private class RetryInterceptor : Interceptor {
+        override fun intercept(chain: Interceptor.Chain): Response {
+            val request = chain.request()
+            var response: Response? = null
+            var retries = 0
+            val maxRetries = 3
 
-        while (retries < maxRetries) {
-            try {
-                response = chain.proceed(request)
-                if (response.isSuccessful) return response
-            } catch (e: IOException) {
-                Log.w("RetryInterceptor", "Request failed (attempt ${retries + 1}): ${e.message}")
-                if (retries >= maxRetries - 1) throw e
-            }
-
-            retries++
-            try {
-                // Non-blocking delay using system clock instead of Thread.sleep
-                val backoff = 500L * retries
-                Log.d("RetryInterceptor", "Retrying after ${backoff}ms (attempt $retries/$maxRetries)")
-                Thread.sleep(backoff) // Safe here since OkHttp uses a background thread
-            } catch (e: InterruptedException) {
-                Thread.currentThread().interrupt()
-                throw IOException("Retry interrupted", e)
-            }
-        }
-
-        return response ?: throw IOException("Request failed after $maxRetries retries")
-    }
-}
-
-    
-    suspend fun getCurrentUserToken(): String? {
-    // Try saved token
-    userManager.getUserToken()?.let { return it }
-
-    // Try Firebase token
-    val currentUser = FirebaseAuth.getInstance().currentUser ?: return null
-    return try {
-        val token = currentUser.getIdToken(true).await().token
-        token?.also { userManager.saveUserToken(it) }
-    } catch (e: Exception) {
-        Log.e("ApiService", "Error fetching Firebase token: ${e.message}")
-        null
-    }
-}
-
-    suspend fun testConnection(): ApiResult<JSONObject> {
-    return try {
-        val endpoints = listOf("/", "/health", "/user/credits")
-        var lastError: String? = null
-        for (endpoint in endpoints) {
-            try {
-                val fullUrl = "$baseUrl$endpoint"
-                val request = Request.Builder()
-                    .url(fullUrl)
-                    .get()
-                    .build()
-                val response = client.newCall(request).execute()
-                val body = response.body?.string()
-                if (response.isSuccessful && body != null) {
-                    return ApiResult.Success(JSONObject(body))
-                } else {
-                    lastError = "HTTP ${response.code} for $endpoint"
+            while (retries < maxRetries) {
+                try {
+                    response = chain.proceed(request)
+                    if (response.isSuccessful) return response
+                } catch (e: IOException) {
+                    Log.w("RetryInterceptor", "Request failed (attempt ${retries + 1}): ${e.message}")
+                    if (retries >= maxRetries - 1) throw e
                 }
-            } catch (e: Exception) {
-                logNetworkError("ApiService", e)
-                return ApiResult.Error("Network error: ${e.message}", getErrorCode(e))
+                retries++
+                try {
+                    val backoff = 500L * retries
+                    Log.d("RetryInterceptor", "Retrying after ${backoff}ms (attempt $retries/$maxRetries)")
+                    Thread.sleep(backoff)
+                } catch (e: InterruptedException) {
+                    Thread.currentThread().interrupt()
+                    throw IOException("Retry interrupted", e)
+                }
             }
+            return response ?: throw IOException("Request failed after $maxRetries retries")
         }
-        ApiResult.Error(lastError ?: "All endpoints failed")
-    } catch (e: Exception) {
-        ApiResult.Error("Connection test failed: ${e.message}")
     }
-}
-    
+
+    // -----------------------------
+    // Current User Token
+    // -----------------------------
+    suspend fun getCurrentUserToken(): String? {
+        userManager.getUserToken()?.let { return it }
+        val currentUser = FirebaseAuth.getInstance().currentUser ?: return null
+        return try {
+            val token = currentUser.getIdToken(true).await().token
+            token?.also { userManager.saveUserToken(it) }
+        } catch (e: Exception) {
+            Log.e("ApiService", "Error fetching Firebase token: ${e.message}")
+            null
+        }
+    }
+
+    // -----------------------------
+    // Test Connection
+    // -----------------------------
+    suspend fun testConnection(): ApiResult<JSONObject> {
+        return try {
+            val endpoints = listOf("/", "/health", "/user/credits")
+            var lastError: String? = null
+            for (endpoint in endpoints) {
+                try {
+                    val fullUrl = "$baseUrl$endpoint"
+                    val request = Request.Builder().url(fullUrl).get().build()
+                    val response = client.newCall(request).execute()
+                    val body = response.body?.string()
+                    if (response.isSuccessful && body != null) {
+                        return ApiResult.Success(JSONObject(body))
+                    } else {
+                        lastError = "HTTP ${response.code} for $endpoint"
+                    }
+                } catch (e: Exception) {
+                    logNetworkError("ApiService", e)
+                    return ApiResult.Error("Network error: ${e.message}", getErrorCode(e))
+                }
+            }
+            ApiResult.Error(lastError ?: "All endpoints failed")
+        } catch (e: Exception) {
+            ApiResult.Error("Connection test failed: ${e.message}")
+        }
+    }
+
     // -----------------------------
     // Authentication
     // -----------------------------
     private suspend fun getAuthIdentifier(): String? {
-        // Try stored token first
         userManager.getUserToken()?.let { return "Bearer $it" }
-
-        // Firebase ID token
         val currentUser = FirebaseAuth.getInstance().currentUser
         if (currentUser != null) {
             return try {
@@ -175,8 +156,6 @@ class ApiService(private val context: Context) {
                 null
             }
         }
-
-        // Fallback: Firebase UID
         return currentUser?.uid
     }
 
@@ -199,7 +178,7 @@ class ApiService(private val context: Context) {
             ApiResult.Success(JSONObject(respBody))
         } catch (e: Exception) {
             logNetworkError("ApiService", e)
-            return ApiResult.Error("Network error: ${e.message}", getErrorCode(e))
+            ApiResult.Error("Network error: ${e.message}", getErrorCode(e))
         }
     }
 
@@ -222,7 +201,7 @@ class ApiService(private val context: Context) {
             ApiResult.Success(JSONObject(respBody))
         } catch (e: Exception) {
             logNetworkError("ApiService", e)
-            return ApiResult.Error("Network error: ${e.message}", getErrorCode(e))
+            ApiResult.Error("Network error: ${e.message}", getErrorCode(e))
         }
     }
 
@@ -254,7 +233,7 @@ class ApiService(private val context: Context) {
             ApiResult.Success(JSONObject(respBody))
         } catch (e: Exception) {
             logNetworkError("ApiService", e)
-            return ApiResult.Error("Network error: ${e.message}", getErrorCode(e))
+            ApiResult.Error("Network error: ${e.message}", getErrorCode(e))
         }
     }
 
@@ -275,7 +254,7 @@ class ApiService(private val context: Context) {
             ApiResult.Success(JSONObject(respBody))
         } catch (e: Exception) {
             logNetworkError("ApiService", e)
-            return ApiResult.Error("Network error: ${e.message}", getErrorCode(e))
+            ApiResult.Error("Network error: ${e.message}", getErrorCode(e))
         }
     }
 
@@ -292,9 +271,7 @@ class ApiService(private val context: Context) {
 
     private fun File.asRequestBody(mediaType: MediaType) = this.inputStream().readBytes().toRequestBody(mediaType)
 
-    fun decodeBase64File(base64Data: String): ByteArray {
-        return android.util.Base64.decode(base64Data, android.util.Base64.DEFAULT)
-    }
+    fun decodeBase64File(base64Data: String): ByteArray = android.util.Base64.decode(base64Data, android.util.Base64.DEFAULT)
 
     fun saveFileToStorage(data: ByteArray, filename: String): File {
         val file = File(context.getExternalFilesDir(null), filename)
@@ -320,9 +297,6 @@ class ApiService(private val context: Context) {
         is IOException -> 1001
         else -> 1000
     }
-
-
-
 
     // -----------------------------
     // Optional: Server Diagnostics
