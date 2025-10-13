@@ -83,3 +83,12 @@ jobs:
         with:
           name: app-release-aab
           path: app/build/outputs/bundle/release/app-release.aab
+          
+      # 151️⃣ Upload Network Log Errors
+      - name: Upload network log
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: network-log
+          path: '**/network_log.txt'
+
