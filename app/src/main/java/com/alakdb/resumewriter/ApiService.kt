@@ -68,28 +68,22 @@ class ApiService(private val context: Context) {
     // -----------------------------
     // RetryInterceptor
     // -----------------------------
-    private class RetryInterceptor: Interceptor {
-    override fun intercept(chain: Interceptor.Chain): Response = runBlocking {
-        var attempt = 0
-        val maxRetries = 3
-        var lastException: IOException? = null
-
-        while (attempt < maxRetries) {
+    suspend fun <T> retryNetwork(times: Int = 3, block: suspend () -> T): T {
+        var currentAttempt = 0
+        var lastError: Exception? = null
+        while (currentAttempt < times) {
             try {
-                val response = chain.proceed(chain.request())
-                if (response.isSuccessful) return@runBlocking response
-                if (response.code in 400..499) return@runBlocking response
-            } catch (e: IOException) {
-                lastException = e
-            }
-            attempt++
-            val backoff = 500L * attempt
-            Log.d("RetryInterceptor", "Retry attempt $attempt after $backoff ms")
-            delay(backoff)
+                return block()
+            } catch (e: Exception) {
+                lastError = e
+                currentAttempt++
+                if (currentAttempt < times) {
+                    delay(500L * currentAttempt) // exponential backoff
+                }
+            }    
         }
-        throw lastException ?: IOException("Unknown network error after $maxRetries attempts")
+        throw lastError ?: IOException("Unknown network error")
     }
-}
 
     // -----------------------------
     // Current User Token
