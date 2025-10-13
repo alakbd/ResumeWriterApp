@@ -95,23 +95,27 @@ class ApiService(private val context: Context) {
         // -----------------------------
         // Network Check
         // -----------------------------
-    private fun isNetworkAvailable(context: Context): Boolean {
-        val connectivityManager =
-            context.getSystemService(Context.CONNECTIVITY_SERVICE) as ConnectivityManager
-
-        if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.M) {
-            val network = connectivityManager.activeNetwork ?: return false
-            val capabilities = connectivityManager.getNetworkCapabilities(network) ?: return false
-            return capabilities.hasCapability(NetworkCapabilities.NET_CAPABILITY_INTERNET) &&
-                   (capabilities.hasTransport(NetworkCapabilities.TRANSPORT_WIFI)
-                    || capabilities.hasTransport(NetworkCapabilities.TRANSPORT_CELLULAR)
-                    || capabilities.hasTransport(NetworkCapabilities.TRANSPORT_ETHERNET))
-        } else {
-            @Suppress("DEPRECATION")
-            val info = connectivityManager.activeNetworkInfo
-            return info != null && info.isConnected
+    
+        private fun isNetworkAvailable(context: Context): Boolean {
+            val cm = context.getSystemService(Context.CONNECTIVITY_SERVICE) as ConnectivityManager
+            return if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.M) {
+                val network = cm.activeNetwork
+                val capabilities = cm.getNetworkCapabilities(network)
+                val result = capabilities != null && (
+                    capabilities.hasTransport(NetworkCapabilities.TRANSPORT_WIFI) ||
+                    capabilities.hasTransport(NetworkCapabilities.TRANSPORT_CELLULAR) ||
+                    capabilities.hasTransport(NetworkCapabilities.TRANSPORT_ETHERNET)
+                )
+                Log.d("ApiService", "Network available (M+): $result")
+                result
+            } else {
+                @Suppress("DEPRECATION")
+                val info = cm.activeNetworkInfo
+                val result = info != null && info.isConnected
+                Log.d("ApiService", "Network available (<M): $result")
+                result
+            }
         }
-    }
 }
         // -----------------------------
         // RetryInterceptor
