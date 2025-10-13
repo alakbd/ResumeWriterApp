@@ -69,54 +69,80 @@ class ApiService(private val context: Context) {
     }
 
     // -----------------------------
-    // Retry Interceptor
-    // -----------------------------
-    private class RetryInterceptor: Interceptor {
-        override fun intercept(chain: Interceptor.Chain): Response {
-            val request = chain.request()
-            var response: Response? = null
-            var retries = 0
-            val maxRetries = 3
-            while (retries <= maxRetries) {
-                try {
-                    response = chain.proceed(request)
-                    if (response.isSuccessful || retries >= maxRetries) return response
-                } catch (e: IOException) {
-                    if (retries >= maxRetries) throw e
-                }
-                retries++
-                Thread.sleep((1000 * retries).toLong())
-            }
-            return response ?: throw IOException("Request failed after $maxRetries retries")
-        }
-    }
-
-    // -----------------------------
     // Connectivity Interceptor
     // -----------------------------
     private class ConnectivityInterceptor(private val context: Context) : Interceptor {
         override fun intercept(chain: Interceptor.Chain): Response {
-            if (!isNetworkAvailable(context)) throw IOException("No internet connection")
-            return chain.proceed(chain.request())
+            if (!isNetworkAvailable(context)) {
+                Log.e("ConnectivityInterceptor", "No network available for ${chain.request().url}")
+            // Return a clean 503-style response instead of throwing an exception
+            return Response.Builder()
+                .request(chain.request())
+                .protocol(Protocol.HTTP_1_1)
+                .code(503)
+                .message("No internet connection")
+                .body("".toResponseBody(null))
+                .build()
         }
+        Log.d("ConnectivityInterceptor", "Network available for ${chain.request().url}")
+        return chain.proceed(chain.request())
+    }
+        // -----------------------------
+        // Network Check
+        // -----------------------------
+    private fun isNetworkAvailable(context: Context): Boolean {
+        val connectivityManager =
+            context.getSystemService(Context.CONNECTIVITY_SERVICE) as ConnectivityManager
 
-        private fun isNetworkAvailable(context: Context): Boolean {
-            val cm = context.getSystemService(Context.CONNECTIVITY_SERVICE) as ConnectivityManager
-            return if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.M) {
-                val network = cm.activeNetwork
-                val capabilities = cm.getNetworkCapabilities(network)
-                capabilities != null && (
-                        capabilities.hasTransport(NetworkCapabilities.TRANSPORT_WIFI) ||
-                                capabilities.hasTransport(NetworkCapabilities.TRANSPORT_CELLULAR) ||
-                                capabilities.hasTransport(NetworkCapabilities.TRANSPORT_ETHERNET)
-                        )
-            } else {
-                @Suppress("DEPRECATION")
-                val info = cm.activeNetworkInfo
-                info != null && info.isConnected
-            }
+        if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.M) {
+            val network = connectivityManager.activeNetwork ?: return false
+            val capabilities = connectivityManager.getNetworkCapabilities(network) ?: return false
+            return capabilities.hasCapability(NetworkCapabilities.NET_CAPABILITY_INTERNET) &&
+                   (capabilities.hasTransport(NetworkCapabilities.TRANSPORT_WIFI)
+                    || capabilities.hasTransport(NetworkCapabilities.TRANSPORT_CELLULAR)
+                    || capabilities.hasTransport(NetworkCapabilities.TRANSPORT_ETHERNET))
+        } else {
+            @Suppress("DEPRECATION")
+            val info = connectivityManager.activeNetworkInfo
+            return info != null && info.isConnected
         }
     }
+}
+        // -----------------------------
+        // RetryInterceptor
+        // -----------------------------
+    private class RetryInterceptor: Interceptor {
+    override fun intercept(chain: Interceptor.Chain): Response {
+        val request = chain.request()
+        var response: Response? = null
+        var retries = 0
+        val maxRetries = 3
+
+        while (retries < maxRetries) {
+            try {
+                response = chain.proceed(request)
+                if (response.isSuccessful) return response
+            } catch (e: IOException) {
+                Log.w("RetryInterceptor", "Request failed (attempt ${retries + 1}): ${e.message}")
+                if (retries >= maxRetries - 1) throw e
+            }
+
+            retries++
+            try {
+                // Non-blocking delay using system clock instead of Thread.sleep
+                val backoff = 500L * retries
+                Log.d("RetryInterceptor", "Retrying after ${backoff}ms (attempt $retries/$maxRetries)")
+                Thread.sleep(backoff) // Safe here since OkHttp uses a background thread
+            } catch (e: InterruptedException) {
+                Thread.currentThread().interrupt()
+                throw IOException("Retry interrupted", e)
+            }
+        }
+
+        return response ?: throw IOException("Request failed after $maxRetries retries")
+    }
+}
+
     
     suspend fun getCurrentUserToken(): String? {
     // Try saved token
@@ -328,23 +354,8 @@ class ApiService(private val context: Context) {
         else -> 1000
     }
 
-    // -----------------------------
-    // Network Check
-    // -----------------------------
-    fun isNetworkAvailable(): Boolean {
-        val cm = context.getSystemService(Context.CONNECTIVITY_SERVICE) as ConnectivityManager
-        return if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.M) {
-            val network = cm.activeNetwork
-            val cap = cm.getNetworkCapabilities(network)
-            cap != null && (cap.hasTransport(NetworkCapabilities.TRANSPORT_WIFI)
-                    || cap.hasTransport(NetworkCapabilities.TRANSPORT_CELLULAR)
-                    || cap.hasTransport(NetworkCapabilities.TRANSPORT_ETHERNET))
-        } else {
-            @Suppress("DEPRECATION")
-            val info = cm.activeNetworkInfo
-            info != null && info.isConnected
-        }
-    }
+
+
 
     // -----------------------------
     // Optional: Server Diagnostics
