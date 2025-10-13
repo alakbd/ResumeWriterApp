@@ -23,15 +23,60 @@ class ApiService(private val context: Context) {
     private val userManager = UserManager(context)
 
     // -----------------------------
-    // OkHttp Client with Retry
+    // OkHttp Client with Retry Interceptor
     // -----------------------------
     private val client = OkHttpClient.Builder()
         .connectTimeout(60, TimeUnit.SECONDS)
         .readTimeout(120, TimeUnit.SECONDS)
         .writeTimeout(60, TimeUnit.SECONDS)
+        .addInterceptor(RetryInterceptor(3)) // Add retry interceptor
         .addInterceptor(HttpLoggingInterceptor { msg -> Log.d("NetworkLog", msg) }
             .apply { level = HttpLoggingInterceptor.Level.BODY })
         .build()
+
+    // -----------------------------
+    // Retry Interceptor
+    // -----------------------------
+    class RetryInterceptor(private val maxRetries: Int) : Interceptor {
+        override fun intercept(chain: Interceptor.Chain): Response {
+            var request = chain.request()
+            var response: Response
+            var retryCount = 0
+            
+            while (retryCount <= maxRetries) {
+                try {
+                    response = chain.proceed(request)
+                    
+                    // If successful or client error (4xx), don't retry
+                    if (response.isSuccessful || response.code in 400..499) {
+                        return response
+                    }
+                    
+                    // For server errors (5xx) or network errors, retry
+                    if (retryCount < maxRetries) {
+                        response.close()
+                        Thread.sleep(getBackoffDelay(retryCount))
+                        retryCount++
+                    } else {
+                        return response
+                    }
+                } catch (e: Exception) {
+                    if (retryCount < maxRetries) {
+                        Thread.sleep(getBackoffDelay(retryCount))
+                        retryCount++
+                    } else {
+                        throw e
+                    }
+                }
+            }
+            
+            throw IOException("Max retries reached")
+        }
+        
+        private fun getBackoffDelay(retryCount: Int): Long {
+            return (500L * (retryCount + 1))
+        }
+    }
 
     // -----------------------------
     // Data Classes
@@ -45,26 +90,6 @@ class ApiService(private val context: Context) {
     sealed class ApiResult<out T> {
         data class Success<out T>(val data: T) : ApiResult<T>()
         data class Error(val message: String, val code: Int = 0) : ApiResult<Nothing>()
-    }
-
-    // -----------------------------
-    // Retry Network Helper
-    // -----------------------------
-    suspend fun <T> retryNetwork(times: Int = 3, block: suspend () -> T): T {
-        var currentAttempt = 0
-        var lastError: Exception? = null
-        while (currentAttempt < times) {
-            try {
-                return block()
-            } catch (e: Exception) {
-                lastError = e
-                currentAttempt++
-                if (currentAttempt < times) {
-                    delay(500L * currentAttempt) // exponential backoff
-                }
-            }
-        }
-        throw lastError ?: IOException("Unknown network error")
     }
 
     // -----------------------------
@@ -104,7 +129,7 @@ class ApiService(private val context: Context) {
     // -----------------------------
     // Test Connection
     // -----------------------------
-    suspend fun testConnection(): ApiResult<JSONObject> = retryNetwork {
+    suspend fun testConnection(): ApiResult<JSONObject> = executeApiCall {
         val endpoints = listOf("/", "/health", "/user/credits")
         var lastError: String? = null
         for (endpoint in endpoints) {
@@ -113,11 +138,11 @@ class ApiService(private val context: Context) {
                 val request = Request.Builder().url(url).get().build()
                 val response = client.newCall(request).execute()
                 val body = response.body?.string()
-                if (response.isSuccessful && body != null) return@retryNetwork ApiResult.Success(JSONObject(body))
+                if (response.isSuccessful && body != null) return@executeApiCall ApiResult.Success(JSONObject(body))
                 else lastError = "HTTP ${response.code} for $endpoint"
             } catch (e: Exception) {
                 logNetworkError("ApiService", e)
-                return@retryNetwork ApiResult.Error("Network error: ${e.message}", getErrorCode(e))
+                lastError = "Network error: ${e.message}"
             }
         }
         ApiResult.Error(lastError ?: "All endpoints failed")
@@ -126,8 +151,8 @@ class ApiService(private val context: Context) {
     // -----------------------------
     // Deduct Credit
     // -----------------------------
-    suspend fun deductCredit(userId: String): ApiResult<JSONObject> = retryNetwork {
-        val auth = getAuthIdentifier() ?: return@retryNetwork ApiResult.Error("User authentication unavailable", 401)
+    suspend fun deductCredit(userId: String): ApiResult<JSONObject> = executeApiCall {
+        val auth = getAuthIdentifier() ?: return@executeApiCall ApiResult.Error("User authentication unavailable", 401)
         val body = gson.toJson(DeductCreditRequest(userId)).toRequestBody("application/json".toMediaType())
         val request = Request.Builder()
             .url("$baseUrl/deduct-credit")
@@ -137,7 +162,7 @@ class ApiService(private val context: Context) {
             .build()
         client.newCall(request).execute().use { response ->
             val respBody = response.body?.string() ?: "{}"
-            if (!response.isSuccessful) return@retryNetwork ApiResult.Error(handleErrorResponse(response), response.code)
+            if (!response.isSuccessful) return@executeApiCall ApiResult.Error(handleErrorResponse(response), response.code)
             ApiResult.Success(JSONObject(respBody))
         }
     }
@@ -145,8 +170,8 @@ class ApiService(private val context: Context) {
     // -----------------------------
     // Generate Resume
     // -----------------------------
-    suspend fun generateResume(resumeText: String, jobDescription: String, tone: String = "Professional"): ApiResult<JSONObject> = retryNetwork {
-        val auth = getAuthIdentifier() ?: return@retryNetwork ApiResult.Error("User authentication unavailable", 401)
+    suspend fun generateResume(resumeText: String, jobDescription: String, tone: String = "Professional"): ApiResult<JSONObject> = executeApiCall {
+        val auth = getAuthIdentifier() ?: return@executeApiCall ApiResult.Error("User authentication unavailable", 401)
         val body = gson.toJson(GenerateResumeRequest(resumeText, jobDescription, tone)).toRequestBody("application/json".toMediaType())
         val request = Request.Builder()
             .url("$baseUrl/generate-resume")
@@ -155,7 +180,7 @@ class ApiService(private val context: Context) {
             .build()
         client.newCall(request).execute().use { response ->
             val respBody = response.body?.string() ?: "{}"
-            if (!response.isSuccessful) return@retryNetwork ApiResult.Error(handleErrorResponse(response), response.code)
+            if (!response.isSuccessful) return@executeApiCall ApiResult.Error(handleErrorResponse(response), response.code)
             ApiResult.Success(JSONObject(respBody))
         }
     }
@@ -163,8 +188,8 @@ class ApiService(private val context: Context) {
     // -----------------------------
     // Generate Resume from Files
     // -----------------------------
-    suspend fun generateResumeFromFiles(resumeUri: Uri, jobDescUri: Uri, tone: String = "Professional"): ApiResult<JSONObject> = retryNetwork {
-        val auth = getAuthIdentifier() ?: return@retryNetwork ApiResult.Error("User authentication unavailable", 401)
+    suspend fun generateResumeFromFiles(resumeUri: Uri, jobDescUri: Uri, tone: String = "Professional"): ApiResult<JSONObject> = executeApiCall {
+        val auth = getAuthIdentifier() ?: return@executeApiCall ApiResult.Error("User authentication unavailable", 401)
         val resumeFile = uriToFile(resumeUri)
         val jobDescFile = uriToFile(jobDescUri)
 
@@ -183,7 +208,7 @@ class ApiService(private val context: Context) {
 
         client.newCall(request).execute().use { response ->
             val respBody = response.body?.string() ?: "{}"
-            if (!response.isSuccessful) return@retryNetwork ApiResult.Error(handleErrorResponse(response), response.code)
+            if (!response.isSuccessful) return@executeApiCall ApiResult.Error(handleErrorResponse(response), response.code)
             ApiResult.Success(JSONObject(respBody))
         }
     }
@@ -191,8 +216,8 @@ class ApiService(private val context: Context) {
     // -----------------------------
     // Get User Credits
     // -----------------------------
-    suspend fun getUserCredits(): ApiResult<JSONObject> = retryNetwork {
-        val auth = getAuthIdentifier() ?: return@retryNetwork ApiResult.Error("User authentication unavailable", 401)
+    suspend fun getUserCredits(): ApiResult<JSONObject> = executeApiCall {
+        val auth = getAuthIdentifier() ?: return@executeApiCall ApiResult.Error("User authentication unavailable", 401)
         val request = Request.Builder()
             .url("$baseUrl/user/credits")
             .get()
@@ -200,8 +225,28 @@ class ApiService(private val context: Context) {
             .build()
         client.newCall(request).execute().use { response ->
             val respBody = response.body?.string() ?: "{}"
-            if (!response.isSuccessful) return@retryNetwork ApiResult.Error(handleErrorResponse(response), response.code)
+            if (!response.isSuccessful) return@executeApiCall ApiResult.Error(handleErrorResponse(response), response.code)
             ApiResult.Success(JSONObject(respBody))
+        }
+    }
+
+    // -----------------------------
+    // Safe API Call Wrapper
+    // -----------------------------
+    private suspend fun <T> executeApiCall(block: suspend () -> ApiResult<T>): ApiResult<T> {
+        return try {
+            block()
+        } catch (e: Exception) {
+            logNetworkError("ApiService", e)
+            ApiResult.Error(
+                when {
+                    e is java.net.SocketTimeoutException -> "Connection timeout"
+                    e is java.net.UnknownHostException -> "No internet connection"
+                    e is IOException -> "Network error: ${e.message}"
+                    else -> "Unexpected error: ${e.message}"
+                },
+                getErrorCode(e)
+            )
         }
     }
 
@@ -227,8 +272,6 @@ class ApiService(private val context: Context) {
         } catch (_: Exception) {}
     }
 
-
-
     fun decodeBase64File(base64Data: String): ByteArray = android.util.Base64.decode(base64Data, android.util.Base64.DEFAULT)
 
     fun saveFileToStorage(data: ByteArray, filename: String): File {
@@ -237,7 +280,7 @@ class ApiService(private val context: Context) {
         return file
     }
 
-        // -----------------------------
+    // -----------------------------
     // Error Handling
     // -----------------------------
     private fun handleErrorResponse(response: Response): String {
@@ -284,6 +327,4 @@ class ApiService(private val context: Context) {
         }
         return results
     }
-
-    
 }
