@@ -1,9 +1,7 @@
 package com.alakdb.resumewriter
 
-import android.app.Activity
-import android.content.Intent
 import android.content.Context
-import android.net.NetworkCapabilities
+import android.content.Intent
 import android.net.ConnectivityManager
 import android.net.Uri
 import android.os.Bundle
@@ -14,10 +12,9 @@ import android.widget.Toast
 import androidx.activity.result.ActivityResultLauncher
 import androidx.activity.result.contract.ActivityResultContracts
 import androidx.appcompat.app.AppCompatActivity
+import androidx.lifecycle.lifecycleScope
 import com.alakdb.resumewriter.databinding.ActivityResumeGenerationBinding
 import com.google.firebase.auth.FirebaseAuth
-import kotlinx.coroutines.CoroutineScope
-import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.launch
 import org.json.JSONObject
 import java.io.File
@@ -26,7 +23,6 @@ class ResumeGenerationActivity : AppCompatActivity() {
 
     private lateinit var binding: ActivityResumeGenerationBinding
     private lateinit var apiService: ApiService
-    private lateinit var creditManager: CreditManager
     private lateinit var auth: FirebaseAuth
 
     private var selectedResumeUri: Uri? = null
@@ -42,36 +38,13 @@ class ResumeGenerationActivity : AppCompatActivity() {
         setContentView(binding.root)
 
         apiService = ApiService(this)
-        //below code added temporary
-        lifecycleScope.launch {
-    try {
-        val result = retryNetwork { apiService.getUserCredits() }
-
-        when (result) {
-            is ApiService.ApiResult.Success -> {
-                // Update UI with credits
-                creditTextView.text = result.data.getInt("credits").toString()
-            }
-            is ApiService.ApiResult.Error -> {
-                // Show error message
-                Toast.makeText(this@ResumeGenerationActivity, result.message, Toast.LENGTH_SHORT).show()
-            }
-        }
-    } catch (e: Exception) {
-        // Handle unexpected exceptions
-        Toast.makeText(this@ResumeGenerationActivity, "Network error: ${e.message}", Toast.LENGTH_SHORT).show()
-    }
-}
-
-
-        
-        creditManager = CreditManager(this)
         auth = FirebaseAuth.getInstance()
 
         registerFilePickers()
         setupUI()
         checkGenerateButtonState()
         testApiConnection()
+        updateCreditDisplay() // Initialize credit display
     }
 
     /** ---------------- File Picker Setup ---------------- **/
@@ -154,7 +127,7 @@ class ResumeGenerationActivity : AppCompatActivity() {
         binding.progressConnection.visibility = android.view.View.VISIBLE
         binding.btnRetryConnection.isEnabled = false
 
-        CoroutineScope(Dispatchers.Main).launch {
+        lifecycleScope.launch {
             // Test basic connectivity first
             if (!isNetworkAvailable()) {
                 binding.tvConnectionStatus.text = "❌ No internet connection"
@@ -163,37 +136,38 @@ class ResumeGenerationActivity : AppCompatActivity() {
                 binding.btnRetryConnection.isEnabled = true
                 showError("Please check your internet connection")
                 return@launch
-        }
-        when (val result = apiService.testConnection()) {
-            is ApiService.ApiResult.Success -> {
-                binding.tvConnectionStatus.text = "✅ API Connected Successfully"
-                binding.tvConnectionStatus.setTextColor(getColor(android.R.color.holo_green_dark))
-                binding.progressConnection.visibility = android.view.View.GONE
-                binding.btnRetryConnection.isEnabled = true
-                showSuccess("API connection successful")
-                
-                // Update credits display after successful connection
-                updateCreditDisplay()
             }
-            is ApiService.ApiResult.Error -> {
-                binding.tvConnectionStatus.text = "❌ Connection Failed: ${result.message}"
-                binding.tvConnectionStatus.setTextColor(getColor(android.R.color.holo_red_dark))
-                binding.progressConnection.visibility = android.view.View.GONE
-                binding.btnRetryConnection.isEnabled = true
-                showError("API connection failed: ${result.message}")
-                
-                // Provide helpful suggestions based on error
-                provideConnectionHelp(result.message)
+            
+            when (val result = apiService.testConnection()) {
+                is ApiService.ApiResult.Success -> {
+                    binding.tvConnectionStatus.text = "✅ API Connected Successfully"
+                    binding.tvConnectionStatus.setTextColor(getColor(android.R.color.holo_green_dark))
+                    binding.progressConnection.visibility = android.view.View.GONE
+                    binding.btnRetryConnection.isEnabled = true
+                    showSuccess("API connection successful")
+                    
+                    // Update credits display after successful connection
+                    updateCreditDisplay()
+                }
+                is ApiService.ApiResult.Error -> {
+                    binding.tvConnectionStatus.text = "❌ Connection Failed: ${result.message}"
+                    binding.tvConnectionStatus.setTextColor(getColor(android.R.color.holo_red_dark))
+                    binding.progressConnection.visibility = android.view.View.GONE
+                    binding.btnRetryConnection.isEnabled = true
+                    showError("API connection failed: ${result.message}")
+                    
+                    // Provide helpful suggestions based on error
+                    provideConnectionHelp(result.message)
                 }
             }
         }
     }
 
     private fun isNetworkAvailable(): Boolean {
-    val connectivityManager = getSystemService(Context.CONNECTIVITY_SERVICE) as ConnectivityManager
-    val networkInfo = connectivityManager.activeNetworkInfo
-    return networkInfo != null && networkInfo.isConnected
-}
+        val connectivityManager = getSystemService(Context.CONNECTIVITY_SERVICE) as ConnectivityManager
+        val networkInfo = connectivityManager.activeNetworkInfo
+        return networkInfo != null && networkInfo.isConnected
+    }
 
     private fun provideConnectionHelp(errorMessage: String?) {
         when {
@@ -219,30 +193,38 @@ class ResumeGenerationActivity : AppCompatActivity() {
 
         disableGenerateButton("Processing...")
 
-        CoroutineScope(Dispatchers.Main).launch {
+        lifecycleScope.launch {
             val user = auth.currentUser ?: return@launch showErrorAndReset("User not logged in")
 
+            // First check if user has credits
             when (val creditResult = apiService.getUserCredits()) {
                 is ApiService.ApiResult.Success -> {
-                    val available = creditResult.data.optInt("available_credits", 0)
-                    if (available <= 0) return@launch showErrorAndReset("Insufficient credits. Please purchase more.")
-                }
-                is ApiService.ApiResult.Error -> return@launch showErrorAndReset("Failed to check credits: ${creditResult.message}")
-            }
-
-            when (val deduct = apiService.deductCredit(user.uid)) {
-                is ApiService.ApiResult.Success -> {
-                    when (val gen = apiService.generateResumeFromFiles(resumeUri, jobDescUri)) {
-                        is ApiService.ApiResult.Success -> {
-                            currentGeneratedResume = gen.data
-                            displayGeneratedResume(gen.data)
-                            showSuccess("Resume generated successfully!")
-                            updateCreditDisplay()
+                    try {
+                        val credits = creditResult.data.getInt("credits")
+                        if (credits <= 0) {
+                            showErrorAndReset("Insufficient credits. Please purchase more.")
+                            return@launch
                         }
-                        is ApiService.ApiResult.Error -> showError("Generation failed: ${gen.message}")
+                        
+                        // User has credits, proceed with generation
+                        when (val gen = apiService.generateResumeFromFiles(resumeUri, jobDescUri)) {
+                            is ApiService.ApiResult.Success -> {
+                                currentGeneratedResume = gen.data
+                                displayGeneratedResume(gen.data)
+                                showSuccess("Resume generated successfully!")
+                                updateCreditDisplay() // Refresh credit display
+                            }
+                            is ApiService.ApiResult.Error -> {
+                                showError("Generation failed: ${gen.message}")
+                            }
+                        }
+                    } catch (e: Exception) {
+                        showErrorAndReset("Error checking credits: ${e.message}")
                     }
                 }
-                is ApiService.ApiResult.Error -> showError("Credit deduction failed: ${deduct.message}")
+                is ApiService.ApiResult.Error -> {
+                    showErrorAndReset("Failed to check credits: ${creditResult.message}")
+                }
             }
 
             resetGenerateButton()
@@ -260,30 +242,38 @@ class ResumeGenerationActivity : AppCompatActivity() {
 
         disableGenerateButton("Processing...")
 
-        CoroutineScope(Dispatchers.Main).launch {
+        lifecycleScope.launch {
             val user = auth.currentUser ?: return@launch showErrorAndReset("User not logged in")
 
+            // First check if user has credits
             when (val creditResult = apiService.getUserCredits()) {
                 is ApiService.ApiResult.Success -> {
-                    val available = creditResult.data.optInt("available_credits", 0)
-                    if (available <= 0) return@launch showErrorAndReset("Insufficient credits. Please purchase more.")
-                }
-                is ApiService.ApiResult.Error -> return@launch showErrorAndReset("Failed to check credits: ${creditResult.message}")
-            }
-
-            when (val deduct = apiService.deductCredit(user.uid)) {
-                is ApiService.ApiResult.Success -> {
-                    when (val gen = apiService.generateResume(resumeText, jobDesc)) {
-                        is ApiService.ApiResult.Success -> {
-                            currentGeneratedResume = gen.data
-                            displayGeneratedResume(gen.data)
-                            showSuccess("Resume generated successfully!")
-                            updateCreditDisplay()
+                    try {
+                        val credits = creditResult.data.getInt("credits")
+                        if (credits <= 0) {
+                            showErrorAndReset("Insufficient credits. Please purchase more.")
+                            return@launch
                         }
-                        is ApiService.ApiResult.Error -> showError("Generation failed: ${gen.message}")
+                        
+                        // User has credits, proceed with generation
+                        when (val gen = apiService.generateResume(resumeText, jobDesc)) {
+                            is ApiService.ApiResult.Success -> {
+                                currentGeneratedResume = gen.data
+                                displayGeneratedResume(gen.data)
+                                showSuccess("Resume generated successfully!")
+                                updateCreditDisplay() // Refresh credit display
+                            }
+                            is ApiService.ApiResult.Error -> {
+                                showError("Generation failed: ${gen.message}")
+                            }
+                        }
+                    } catch (e: Exception) {
+                        showErrorAndReset("Error checking credits: ${e.message}")
                     }
                 }
-                is ApiService.ApiResult.Error -> showError("Credit deduction failed: ${deduct.message}")
+                is ApiService.ApiResult.Error -> {
+                    showErrorAndReset("Failed to check credits: ${creditResult.message}")
+                }
             }
 
             resetGenerateButton()
@@ -296,8 +286,10 @@ class ResumeGenerationActivity : AppCompatActivity() {
             binding.tvGeneratedResume.text = resumeData.getString("resume_text")
             binding.layoutDownloadButtons.visibility = android.view.View.VISIBLE
 
-            resumeData.optInt("remaining_credits").takeIf { it > 0 }?.let {
-                binding.tvCreditInfo.text = "Remaining credits: $it"
+            // Show remaining credits if available
+            if (resumeData.has("remaining_credits")) {
+                val remaining = resumeData.getInt("remaining_credits")
+                binding.tvCreditInfo.text = "Remaining credits: $remaining"
                 binding.tvCreditInfo.visibility = android.view.View.VISIBLE
             }
 
@@ -309,12 +301,17 @@ class ResumeGenerationActivity : AppCompatActivity() {
     private fun downloadFile(format: String) {
         val resumeData = currentGeneratedResume ?: return showError("No resume generated yet")
 
-        CoroutineScope(Dispatchers.Main).launch {
+        lifecycleScope.launch {
             try {
                 val fileName = "generated_resume.${format.lowercase()}"
                 val base64Key = "${format.lowercase()}_data"
+                
+                if (!resumeData.has(base64Key)) {
+                    showError("$format format not available for download")
+                    return@launch
+                }
+                
                 val base64Data = resumeData.getString(base64Key)
-
                 val fileData = apiService.decodeBase64File(base64Data)
                 val file = apiService.saveFileToStorage(fileData, fileName)
                 showDownloadSuccess(file, format.uppercase())
@@ -344,15 +341,15 @@ class ResumeGenerationActivity : AppCompatActivity() {
 
     /** ---------------- Credit Display ---------------- **/
     private fun updateCreditDisplay() {
-        CoroutineScope(Dispatchers.Main).launch {
+        lifecycleScope.launch {
             binding.tvCreditInfo.text = "Loading credits..."
         
             when (val result = apiService.getUserCredits()) {
                 is ApiService.ApiResult.Success -> {
                     try {
-                        val available = result.data.getInt("available_credits")
-                        val used = result.data.getInt("used_credits")
-                        binding.tvCreditInfo.text = "Credits: $available available, $used used"
+                        val credits = result.data.getInt("credits")
+                        binding.tvCreditInfo.text = "Available credits: $credits"
+                        binding.tvCreditInfo.visibility = android.view.View.VISIBLE
                     } catch (e: Exception) {
                         binding.tvCreditInfo.text = "Credits: Error parsing data"
                         Log.e("ResumeGeneration", "Error parsing credit data: ${e.message}")
