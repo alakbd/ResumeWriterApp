@@ -231,7 +231,7 @@ class ApiService(private val context: Context) {
     }
 
     // -----------------------------
-    // Safe API Call Wrapper
+    // Safe API Call Wrapper (MISSING FUNCTION - ADDED)
     // -----------------------------
     private suspend fun <T> executeApiCall(block: suspend () -> ApiResult<T>): ApiResult<T> {
         return try {
@@ -261,7 +261,9 @@ class ApiService(private val context: Context) {
         return file
     }
 
-    private fun File.asRequestBody(mediaType: MediaType) = this.inputStream().readBytes().toRequestBody(mediaType)
+    private fun File.asRequestBody(mediaType: MediaType): RequestBody {
+        return this.inputStream().readBytes().toRequestBody(mediaType)
+    }
 
     private fun logNetworkError(tag: String, e: Exception) {
         val logMessage = "❌ ${e::class.simpleName}: ${e.message}"
@@ -292,7 +294,7 @@ class ApiService(private val context: Context) {
         }
     }
 
-    private fun getErrorCode(e: Exception) = when (e) {
+    private fun getErrorCode(e: Exception): Int = when (e) {
         is java.net.SocketTimeoutException -> 1002
         is java.net.UnknownHostException -> 1003
         is IOException -> 1001
