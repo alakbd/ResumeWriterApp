@@ -21,6 +21,8 @@ import java.io.IOException
 import java.io.InputStream
 import java.util.concurrent.TimeUnit
 import okhttp3.ResponseBody.Companion.toResponseBody
+import okhttp3.RequestBody.Companion.toRequestBody
+
 
 class ApiService(private val context: Context) {
 
