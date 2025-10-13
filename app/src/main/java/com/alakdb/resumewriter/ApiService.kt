@@ -100,7 +100,50 @@ class ApiService(private val context: Context) {
             }
         }
     }
+    
+    suspend fun getCurrentUserToken(): String? {
+    // Try saved token
+    userManager.getUserToken()?.let { return it }
 
+    // Try Firebase token
+    val currentUser = FirebaseAuth.getInstance().currentUser ?: return null
+    return try {
+        val token = currentUser.getIdToken(true).await().token
+        token?.also { userManager.saveUserToken(it) }
+    } catch (e: Exception) {
+        Log.e("ApiService", "Error fetching Firebase token: ${e.message}")
+        null
+    }
+}
+
+    suspend fun testConnection(): ApiResult<JSONObject> {
+    return try {
+        val endpoints = listOf("/", "/health", "/user/credits")
+        var lastError: String? = null
+        for (endpoint in endpoints) {
+            try {
+                val fullUrl = "$baseUrl$endpoint"
+                val request = Request.Builder()
+                    .url(fullUrl)
+                    .get()
+                    .build()
+                val response = client.newCall(request).execute()
+                val body = response.body?.string()
+                if (response.isSuccessful && body != null) {
+                    return ApiResult.Success(JSONObject(body))
+                } else {
+                    lastError = "HTTP ${response.code} for $endpoint"
+                }
+            } catch (e: Exception) {
+                lastError = "Failed $endpoint: ${e.message}"
+            }
+        }
+        ApiResult.Error(lastError ?: "All endpoints failed")
+    } catch (e: Exception) {
+        ApiResult.Error("Connection test failed: ${e.message}")
+    }
+}
+    
     // -----------------------------
     // Authentication
     // -----------------------------
@@ -233,6 +276,16 @@ class ApiService(private val context: Context) {
     }
 
     private fun File.asRequestBody(mediaType: MediaType) = this.inputStream().readBytes().toRequestBody(mediaType)
+
+    fun decodeBase64File(base64Data: String): ByteArray {
+        return android.util.Base64.decode(base64Data, android.util.Base64.DEFAULT)
+    }
+
+    fun saveFileToStorage(data: ByteArray, filename: String): File {
+        val file = File(context.getExternalFilesDir(null), filename)
+        file.outputStream().use { it.write(data) }
+        return file
+    }
 
     // -----------------------------
     // Error Handling
