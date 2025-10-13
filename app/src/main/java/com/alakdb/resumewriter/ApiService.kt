@@ -29,13 +29,30 @@ class ApiService(private val context: Context) {
         .connectTimeout(60, TimeUnit.SECONDS)
         .readTimeout(120, TimeUnit.SECONDS)
         .writeTimeout(60, TimeUnit.SECONDS)
-        .addInterceptor(HttpLoggingInterceptor().apply {
-            level = if (BuildConfig.DEBUG) HttpLoggingInterceptor.Level.BODY
-                    else HttpLoggingInterceptor.Level.BASIC
-        })
+        .addInterceptor(
+            HttpLoggingInterceptor { message ->
+                Log.d("NetworkLog", message)
+            }.apply {
+                level = HttpLoggingInterceptor.Level.BODY
+            }
+        )
         .addInterceptor(RetryInterceptor())
         .addInterceptor(ConnectivityInterceptor(context))
         .build()
+    private fun logNetworkError(tag: String, e: Exception) {
+        val logMessage = "❌ ${e::class.simpleName}: ${e.message}"
+        Log.e(tag, logMessage, e)
+         appendLogToFile(logMessage)
+        }
+
+    private fun appendLogToFile(message: String) {
+    try {
+        val logFile = File(context.getExternalFilesDir(null), "network_log.txt")
+        logFile.appendText("${System.currentTimeMillis()}: $message\n")
+    } catch (e: Exception) {
+        Log.e("ApiService", "Failed to write log file: ${e.message}")
+        }
+    }
 
     // -----------------------------
     // Data Classes
@@ -54,7 +71,7 @@ class ApiService(private val context: Context) {
     // -----------------------------
     // Retry Interceptor
     // -----------------------------
-    private class RetryInterceptor : Interceptor {
+    private class RetryInterceptor: Interceptor {
         override fun intercept(chain: Interceptor.Chain): Response {
             val request = chain.request()
             var response: Response? = null
@@ -135,7 +152,8 @@ class ApiService(private val context: Context) {
                     lastError = "HTTP ${response.code} for $endpoint"
                 }
             } catch (e: Exception) {
-                lastError = "Failed $endpoint: ${e.message}"
+                logNetworkError("ApiService", e)
+                return ApiResult.Error("Network error: ${e.message}", getErrorCode(e))
             }
         }
         ApiResult.Error(lastError ?: "All endpoints failed")
@@ -187,7 +205,8 @@ class ApiService(private val context: Context) {
             if (!response.isSuccessful) return ApiResult.Error(handleErrorResponse(response), response.code)
             ApiResult.Success(JSONObject(respBody))
         } catch (e: Exception) {
-            ApiResult.Error("Network error: ${e.message}", getErrorCode(e))
+            logNetworkError("ApiService", e)
+            return ApiResult.Error("Network error: ${e.message}", getErrorCode(e))
         }
     }
 
@@ -209,7 +228,8 @@ class ApiService(private val context: Context) {
             if (!response.isSuccessful) return ApiResult.Error(handleErrorResponse(response), response.code)
             ApiResult.Success(JSONObject(respBody))
         } catch (e: Exception) {
-            ApiResult.Error("Network error: ${e.message}", getErrorCode(e))
+            logNetworkError("ApiService", e)
+            return ApiResult.Error("Network error: ${e.message}", getErrorCode(e))
         }
     }
 
@@ -240,7 +260,8 @@ class ApiService(private val context: Context) {
             if (!response.isSuccessful) return ApiResult.Error(handleErrorResponse(response), response.code)
             ApiResult.Success(JSONObject(respBody))
         } catch (e: Exception) {
-            ApiResult.Error("File upload error: ${e.message}", getErrorCode(e))
+            logNetworkError("ApiService", e)
+            return ApiResult.Error("Network error: ${e.message}", getErrorCode(e))
         }
     }
 
@@ -260,7 +281,8 @@ class ApiService(private val context: Context) {
             if (!response.isSuccessful) return ApiResult.Error(handleErrorResponse(response), response.code)
             ApiResult.Success(JSONObject(respBody))
         } catch (e: Exception) {
-            ApiResult.Error("Network error: ${e.message}", getErrorCode(e))
+            logNetworkError("ApiService", e)
+            return ApiResult.Error("Network error: ${e.message}", getErrorCode(e))
         }
     }
 
