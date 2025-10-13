@@ -227,21 +227,7 @@ class ApiService(private val context: Context) {
         } catch (_: Exception) {}
     }
 
-    private fun handleErrorResponse(response: Response): String {
-        return try {
-            val body = response.body?.string()
-            "HTTP ${response.code}: ${response.message}. Body: $body"
-        } catch (e: Exception) {
-            "HTTP ${response.code}: ${response.message}"
-        }
-    }
 
-    private fun getErrorCode(e: Exception) = when (e) {
-        is java.net.SocketTimeoutException -> 1002
-        is java.net.UnknownHostException -> 1003
-        is IOException -> 1001
-        else -> 1000
-    }
 
     fun decodeBase64File(base64Data: String): ByteArray = android.util.Base64.decode(base64Data, android.util.Base64.DEFAULT)
 
