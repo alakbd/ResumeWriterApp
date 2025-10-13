@@ -5,19 +5,16 @@ import android.net.Uri
 import android.util.Log
 import com.google.firebase.auth.FirebaseAuth
 import com.google.gson.Gson
+import kotlinx.coroutines.delay
 import kotlinx.coroutines.tasks.await
 import okhttp3.*
 import okhttp3.MediaType.Companion.toMediaType
-import okhttp3.Interceptor
-import okhttp3.Response
+import okhttp3.RequestBody.Companion.toRequestBody
 import okhttp3.logging.HttpLoggingInterceptor
 import org.json.JSONObject
 import java.io.File
 import java.io.IOException
 import java.util.concurrent.TimeUnit
-import okhttp3.RequestBody.Companion.toRequestBody
-import kotlinx.coroutines.runBlocking
-import kotlinx.coroutines.delay
 
 class ApiService(private val context: Context) {
 
@@ -25,31 +22,16 @@ class ApiService(private val context: Context) {
     private val baseUrl = "https://resume-writer-api.onrender.com"
     private val userManager = UserManager(context)
 
+    // -----------------------------
+    // OkHttp Client with Retry
+    // -----------------------------
     private val client = OkHttpClient.Builder()
         .connectTimeout(60, TimeUnit.SECONDS)
         .readTimeout(120, TimeUnit.SECONDS)
         .writeTimeout(60, TimeUnit.SECONDS)
-        .addInterceptor(
-            HttpLoggingInterceptor { message -> Log.d("NetworkLog", message) }
-                .apply { level = HttpLoggingInterceptor.Level.BODY }
-        )
-        .addInterceptor(RetryInterceptor())
+        .addInterceptor(HttpLoggingInterceptor { msg -> Log.d("NetworkLog", msg) }
+            .apply { level = HttpLoggingInterceptor.Level.BODY })
         .build()
-
-    private fun logNetworkError(tag: String, e: Exception) {
-        val logMessage = "❌ ${e::class.simpleName}: ${e.message}"
-        Log.e(tag, logMessage, e)
-        appendLogToFile(logMessage)
-    }
-
-    private fun appendLogToFile(message: String) {
-        try {
-            val logFile = File(context.getExternalFilesDir(null), "network_log.txt")
-            logFile.appendText("${System.currentTimeMillis()}: $message\n")
-        } catch (e: Exception) {
-            Log.e("ApiService", "Failed to write log file: ${e.message}")
-        }
-    }
 
     // -----------------------------
     // Data Classes
@@ -66,7 +48,7 @@ class ApiService(private val context: Context) {
     }
 
     // -----------------------------
-    // RetryInterceptor
+    // Retry Network Helper
     // -----------------------------
     suspend fun <T> retryNetwork(times: Int = 3, block: suspend () -> T): T {
         var currentAttempt = 0
@@ -80,7 +62,7 @@ class ApiService(private val context: Context) {
                 if (currentAttempt < times) {
                     delay(500L * currentAttempt) // exponential backoff
                 }
-            }    
+            }
         }
         throw lastError ?: IOException("Unknown network error")
     }
@@ -101,42 +83,13 @@ class ApiService(private val context: Context) {
     }
 
     // -----------------------------
-    // Test Connection
-    // -----------------------------
-    suspend fun testConnection(): ApiResult<JSONObject> {
-        return try {
-            val endpoints = listOf("/", "/health", "/user/credits")
-            var lastError: String? = null
-            for (endpoint in endpoints) {
-                try {
-                    val fullUrl = "$baseUrl$endpoint"
-                    val request = Request.Builder().url(fullUrl).get().build()
-                    val response = client.newCall(request).execute()
-                    val body = response.body?.string()
-                    if (response.isSuccessful && body != null) {
-                        return ApiResult.Success(JSONObject(body))
-                    } else {
-                        lastError = "HTTP ${response.code} for $endpoint"
-                    }
-                } catch (e: Exception) {
-                    logNetworkError("ApiService", e)
-                    return ApiResult.Error("Network error: ${e.message}", getErrorCode(e))
-                }
-            }
-            ApiResult.Error(lastError ?: "All endpoints failed")
-        } catch (e: Exception) {
-            ApiResult.Error("Connection test failed: ${e.message}")
-        }
-    }
-
-    // -----------------------------
-    // Authentication
+    // Authentication Helper
     // -----------------------------
     private suspend fun getAuthIdentifier(): String? {
         userManager.getUserToken()?.let { return "Bearer $it" }
         val currentUser = FirebaseAuth.getInstance().currentUser
-        if (currentUser != null) {
-            return try {
+        return if (currentUser != null) {
+            try {
                 val idToken = currentUser.getIdToken(true).await().token
                 if (!idToken.isNullOrEmpty()) {
                     userManager.saveUserToken(idToken)
@@ -145,111 +98,115 @@ class ApiService(private val context: Context) {
             } catch (e: Exception) {
                 null
             }
+        } else null
+    }
+
+    // -----------------------------
+    // Test Connection
+    // -----------------------------
+    suspend fun testConnection(): ApiResult<JSONObject> = retryNetwork {
+        val endpoints = listOf("/", "/health", "/user/credits")
+        var lastError: String? = null
+        for (endpoint in endpoints) {
+            try {
+                val url = "$baseUrl$endpoint"
+                val request = Request.Builder().url(url).get().build()
+                val response = client.newCall(request).execute()
+                val body = response.body?.string()
+                if (response.isSuccessful && body != null) return@retryNetwork ApiResult.Success(JSONObject(body))
+                else lastError = "HTTP ${response.code} for $endpoint"
+            } catch (e: Exception) {
+                logNetworkError("ApiService", e)
+                return@retryNetwork ApiResult.Error("Network error: ${e.message}", getErrorCode(e))
+            }
         }
-        return currentUser?.uid
+        ApiResult.Error(lastError ?: "All endpoints failed")
     }
 
     // -----------------------------
     // Deduct Credit
     // -----------------------------
-    suspend fun deductCredit(userId: String): ApiResult<JSONObject> {
-        return try {
-            val auth = getAuthIdentifier() ?: return ApiResult.Error("User authentication unavailable", 401)
-            val body = gson.toJson(DeductCreditRequest(userId)).toRequestBody("application/json".toMediaType())
-            val request = Request.Builder()
-                .url("$baseUrl/deduct-credit")
-                .post(body)
-                .addHeader("X-Auth-Token", auth)
-                .addHeader("Content-Type", "application/json")
-                .build()
-            val response = client.newCall(request).execute()
+    suspend fun deductCredit(userId: String): ApiResult<JSONObject> = retryNetwork {
+        val auth = getAuthIdentifier() ?: return@retryNetwork ApiResult.Error("User authentication unavailable", 401)
+        val body = gson.toJson(DeductCreditRequest(userId)).toRequestBody("application/json".toMediaType())
+        val request = Request.Builder()
+            .url("$baseUrl/deduct-credit")
+            .post(body)
+            .addHeader("X-Auth-Token", auth)
+            .addHeader("Content-Type", "application/json")
+            .build()
+        client.newCall(request).execute().use { response ->
             val respBody = response.body?.string() ?: "{}"
-            if (!response.isSuccessful) return ApiResult.Error(handleErrorResponse(response), response.code)
+            if (!response.isSuccessful) return@retryNetwork ApiResult.Error(handleErrorResponse(response), response.code)
             ApiResult.Success(JSONObject(respBody))
-        } catch (e: Exception) {
-            logNetworkError("ApiService", e)
-            ApiResult.Error("Network error: ${e.message}", getErrorCode(e))
         }
     }
 
     // -----------------------------
     // Generate Resume
     // -----------------------------
-    suspend fun generateResume(resumeText: String, jobDescription: String, tone: String = "Professional"): ApiResult<JSONObject> {
-        return try {
-            val auth = getAuthIdentifier() ?: return ApiResult.Error("User authentication unavailable", 401)
-            val body = gson.toJson(GenerateResumeRequest(resumeText, jobDescription, tone))
-                .toRequestBody("application/json".toMediaType())
-            val request = Request.Builder()
-                .url("$baseUrl/generate-resume")
-                .post(body)
-                .addHeader("X-Auth-Token", auth)
-                .build()
-            val response = client.newCall(request).execute()
+    suspend fun generateResume(resumeText: String, jobDescription: String, tone: String = "Professional"): ApiResult<JSONObject> = retryNetwork {
+        val auth = getAuthIdentifier() ?: return@retryNetwork ApiResult.Error("User authentication unavailable", 401)
+        val body = gson.toJson(GenerateResumeRequest(resumeText, jobDescription, tone)).toRequestBody("application/json".toMediaType())
+        val request = Request.Builder()
+            .url("$baseUrl/generate-resume")
+            .post(body)
+            .addHeader("X-Auth-Token", auth)
+            .build()
+        client.newCall(request).execute().use { response ->
             val respBody = response.body?.string() ?: "{}"
-            if (!response.isSuccessful) return ApiResult.Error(handleErrorResponse(response), response.code)
+            if (!response.isSuccessful) return@retryNetwork ApiResult.Error(handleErrorResponse(response), response.code)
             ApiResult.Success(JSONObject(respBody))
-        } catch (e: Exception) {
-            logNetworkError("ApiService", e)
-            ApiResult.Error("Network error: ${e.message}", getErrorCode(e))
         }
     }
 
     // -----------------------------
     // Generate Resume from Files
     // -----------------------------
-    suspend fun generateResumeFromFiles(resumeUri: Uri, jobDescUri: Uri, tone: String = "Professional"): ApiResult<JSONObject> {
-        return try {
-            val auth = getAuthIdentifier() ?: return ApiResult.Error("User authentication unavailable", 401)
-            val resumeFile = uriToFile(resumeUri)
-            val jobDescFile = uriToFile(jobDescUri)
+    suspend fun generateResumeFromFiles(resumeUri: Uri, jobDescUri: Uri, tone: String = "Professional"): ApiResult<JSONObject> = retryNetwork {
+        val auth = getAuthIdentifier() ?: return@retryNetwork ApiResult.Error("User authentication unavailable", 401)
+        val resumeFile = uriToFile(resumeUri)
+        val jobDescFile = uriToFile(jobDescUri)
 
-            val body = MultipartBody.Builder()
-                .setType(MultipartBody.FORM)
-                .addFormDataPart("tone", tone)
-                .addFormDataPart("resume_file", resumeFile.name, resumeFile.asRequestBody("application/pdf".toMediaType()))
-                .addFormDataPart("job_description_file", jobDescFile.name, jobDescFile.asRequestBody("application/pdf".toMediaType()))
-                .build()
+        val body = MultipartBody.Builder()
+            .setType(MultipartBody.FORM)
+            .addFormDataPart("tone", tone)
+            .addFormDataPart("resume_file", resumeFile.name, resumeFile.asRequestBody("application/pdf".toMediaType()))
+            .addFormDataPart("job_description_file", jobDescFile.name, jobDescFile.asRequestBody("application/pdf".toMediaType()))
+            .build()
 
-            val request = Request.Builder()
-                .url("$baseUrl/generate-resume-from-files")
-                .post(body)
-                .addHeader("X-Auth-Token", auth)
-                .build()
+        val request = Request.Builder()
+            .url("$baseUrl/generate-resume-from-files")
+            .post(body)
+            .addHeader("X-Auth-Token", auth)
+            .build()
 
-            val response = client.newCall(request).execute()
+        client.newCall(request).execute().use { response ->
             val respBody = response.body?.string() ?: "{}"
-            if (!response.isSuccessful) return ApiResult.Error(handleErrorResponse(response), response.code)
+            if (!response.isSuccessful) return@retryNetwork ApiResult.Error(handleErrorResponse(response), response.code)
             ApiResult.Success(JSONObject(respBody))
-        } catch (e: Exception) {
-            logNetworkError("ApiService", e)
-            ApiResult.Error("Network error: ${e.message}", getErrorCode(e))
         }
     }
 
     // -----------------------------
     // Get User Credits
     // -----------------------------
-    suspend fun getUserCredits(): ApiResult<JSONObject> {
-        return try {
-            val auth = getAuthIdentifier() ?: return ApiResult.Error("User authentication unavailable", 401)
-            val request = Request.Builder()
-                .url("$baseUrl/user/credits")
-                .get()
-                .addHeader("X-Auth-Token", auth)
-                .build()
-            val response = client.newCall(request).execute()
+    suspend fun getUserCredits(): ApiResult<JSONObject> = retryNetwork {
+        val auth = getAuthIdentifier() ?: return@retryNetwork ApiResult.Error("User authentication unavailable", 401)
+        val request = Request.Builder()
+            .url("$baseUrl/user/credits")
+            .get()
+            .addHeader("X-Auth-Token", auth)
+            .build()
+        client.newCall(request).execute().use { response ->
             val respBody = response.body?.string() ?: "{}"
-            if (!response.isSuccessful) return ApiResult.Error(handleErrorResponse(response), response.code)
+            if (!response.isSuccessful) return@retryNetwork ApiResult.Error(handleErrorResponse(response), response.code)
             ApiResult.Success(JSONObject(respBody))
-        } catch (e: Exception) {
-            logNetworkError("ApiService", e)
-            ApiResult.Error("Network error: ${e.message}", getErrorCode(e))
         }
     }
 
     // -----------------------------
-    // URI/File Utilities
+    // Utilities
     // -----------------------------
     private fun uriToFile(uri: Uri): File {
         val input = context.contentResolver.openInputStream(uri)
@@ -261,6 +218,31 @@ class ApiService(private val context: Context) {
 
     private fun File.asRequestBody(mediaType: MediaType) = this.inputStream().readBytes().toRequestBody(mediaType)
 
+    private fun logNetworkError(tag: String, e: Exception) {
+        val logMessage = "❌ ${e::class.simpleName}: ${e.message}"
+        Log.e(tag, logMessage, e)
+        try {
+            val logFile = File(context.getExternalFilesDir(null), "network_log.txt")
+            logFile.appendText("${System.currentTimeMillis()}: $logMessage\n")
+        } catch (_: Exception) {}
+    }
+
+    private fun handleErrorResponse(response: Response): String {
+        return try {
+            val body = response.body?.string()
+            "HTTP ${response.code}: ${response.message}. Body: $body"
+        } catch (e: Exception) {
+            "HTTP ${response.code}: ${response.message}"
+        }
+    }
+
+    private fun getErrorCode(e: Exception) = when (e) {
+        is java.net.SocketTimeoutException -> 1002
+        is java.net.UnknownHostException -> 1003
+        is IOException -> 1001
+        else -> 1000
+    }
+
     fun decodeBase64File(base64Data: String): ByteArray = android.util.Base64.decode(base64Data, android.util.Base64.DEFAULT)
 
     fun saveFileToStorage(data: ByteArray, filename: String): File {
@@ -269,7 +251,7 @@ class ApiService(private val context: Context) {
         return file
     }
 
-    // -----------------------------
+        // -----------------------------
     // Error Handling
     // -----------------------------
     private fun handleErrorResponse(response: Response): String {
@@ -316,4 +298,6 @@ class ApiService(private val context: Context) {
         }
         return results
     }
+
+    
 }
