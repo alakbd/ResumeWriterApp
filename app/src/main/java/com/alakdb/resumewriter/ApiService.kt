@@ -21,6 +21,10 @@ import java.util.concurrent.TimeUnit
 
 class ApiService(private val context: Context) {
 
+    private val gson = Gson()
+    private val baseUrl = "https://resume-writer-api.onrender.com"
+    private val userManager = UserManager(context)
+
     private val client = OkHttpClient.Builder()
         .connectTimeout(60, TimeUnit.SECONDS)
         .readTimeout(120, TimeUnit.SECONDS)
@@ -33,19 +37,14 @@ class ApiService(private val context: Context) {
         .addInterceptor(ConnectivityInterceptor(context))
         .build()
 
-    private val userManager = UserManager(context)
-    private val gson = Gson()
-    private val baseUrl = "https://resume-writer-api.onrender.com"
-
+    // -----------------------------
+    // Data Classes
+    // -----------------------------
     data class DeductCreditRequest(val user_id: String)
-    data class GenerateResumeRequest(
-        val resume_text: String,
-        val job_description: String,
-        val tone: String = "Professional"
-        )
+    data class GenerateResumeRequest(val resume_text: String, val job_description: String, val tone: String = "Professional")
 
     // -----------------------------
-    // API Result Sealed Class
+    // API Result Wrapper
     // -----------------------------
     sealed class ApiResult<out T> {
         data class Success<out T>(val data: T) : ApiResult<T>()
@@ -59,18 +58,17 @@ class ApiService(private val context: Context) {
         override fun intercept(chain: Interceptor.Chain): Response {
             val request = chain.request()
             var response: Response? = null
-            var retryCount = 0
+            var retries = 0
             val maxRetries = 3
-
-            while (retryCount <= maxRetries) {
+            while (retries <= maxRetries) {
                 try {
                     response = chain.proceed(request)
-                    if (response.isSuccessful || retryCount >= maxRetries) return response
+                    if (response.isSuccessful || retries >= maxRetries) return response
                 } catch (e: IOException) {
-                    if (retryCount >= maxRetries) throw e
+                    if (retries >= maxRetries) throw e
                 }
-                retryCount++
-                Thread.sleep((1000 * retryCount).toLong())
+                retries++
+                Thread.sleep((1000 * retries).toLong())
             }
             return response ?: throw IOException("Request failed after $maxRetries retries")
         }
@@ -81,18 +79,20 @@ class ApiService(private val context: Context) {
     // -----------------------------
     private class ConnectivityInterceptor(private val context: Context) : Interceptor {
         override fun intercept(chain: Interceptor.Chain): Response {
-            if (!isNetworkAvailable()) throw IOException("No internet connection available")
+            if (!isNetworkAvailable(context)) throw IOException("No internet connection")
             return chain.proceed(chain.request())
         }
 
-        private fun isNetworkAvailable(): Boolean {
+        private fun isNetworkAvailable(context: Context): Boolean {
             val cm = context.getSystemService(Context.CONNECTIVITY_SERVICE) as ConnectivityManager
             return if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.M) {
                 val network = cm.activeNetwork
-                val cap = cm.getNetworkCapabilities(network)
-                cap != null && (cap.hasTransport(NetworkCapabilities.TRANSPORT_WIFI)
-                        || cap.hasTransport(NetworkCapabilities.TRANSPORT_CELLULAR)
-                        || cap.hasTransport(NetworkCapabilities.TRANSPORT_ETHERNET))
+                val capabilities = cm.getNetworkCapabilities(network)
+                capabilities != null && (
+                        capabilities.hasTransport(NetworkCapabilities.TRANSPORT_WIFI) ||
+                                capabilities.hasTransport(NetworkCapabilities.TRANSPORT_CELLULAR) ||
+                                capabilities.hasTransport(NetworkCapabilities.TRANSPORT_ETHERNET)
+                        )
             } else {
                 @Suppress("DEPRECATION")
                 val info = cm.activeNetworkInfo
@@ -102,229 +102,157 @@ class ApiService(private val context: Context) {
     }
 
     // -----------------------------
-    // User Token Management
+    // Authentication
     // -----------------------------
-    suspend fun getCurrentUserToken(): String? {
-        return userManager.getUserToken() ?: run {
-            val currentUser = FirebaseAuth.getInstance().currentUser ?: return null
+    private suspend fun getAuthIdentifier(): String? {
+        // Try stored token first
+        userManager.getUserToken()?.let { return "Bearer $it" }
+
+        // Firebase ID token
+        val currentUser = FirebaseAuth.getInstance().currentUser
+        if (currentUser != null) {
             return try {
-                currentUser.getIdToken(true).await().token?.also { userManager.saveUserToken(it) }
+                val idToken = currentUser.getIdToken(true).await().token
+                if (!idToken.isNullOrEmpty()) {
+                    userManager.saveUserToken(idToken)
+                    "Bearer $idToken"
+                } else null
             } catch (e: Exception) {
-                Log.e("ApiService", "Error getting user token: ${e.message}")
                 null
             }
         }
+
+        // Fallback: Firebase UID
+        return currentUser?.uid
     }
 
     // -----------------------------
-    // Test Connection
-    // -----------------------------
-    suspend fun testConnection(): ApiResult<JSONObject> {
-        return try {
-            val endpoints = listOf("/", "/health", "/api", "/user/credits")
-            var lastError: String? = null
-            for (endpoint in endpoints) {
-                try {
-                    val fullUrl = HttpUrl.Builder()
-                        .scheme("https")
-                        .host("resume-writer-api.onrender.com")
-                        .addPathSegment(endpoint.removePrefix("/"))
-                        .build()
-
-                    val request = Request.Builder().url(fullUrl).get().build()
-                    val response = client.newCall(request).execute()
-                    val body = response.body?.string()
-
-                    if (response.isSuccessful && body != null) {
-                        return ApiResult.Success(JSONObject(body))
-                    } else {
-                        lastError = "HTTP ${response.code} for $endpoint"
-                    }
-                } catch (e: Exception) {
-                    lastError = "Failed to connect to $endpoint: ${e.message}"
-                }
-            }
-            ApiResult.Error(lastError ?: "All connection tests failed")
-        } catch (e: Exception) {
-            ApiResult.Error("Connection test failed: ${e.message}")
-        }
-    }
-
-    // -----------------------------
-    // Deduct Credit API
+    // Deduct Credit
     // -----------------------------
     suspend fun deductCredit(userId: String): ApiResult<JSONObject> {
         return try {
-            val token = getAuthIdentifier() ?: return ApiResult.Error("User not authenticated", 401)
-            val requestBody = gson.toJson(DeductCreditRequest(userId)).toRequestBody("application/json".toMediaType())
+            val auth = getAuthIdentifier() ?: return ApiResult.Error("User authentication unavailable", 401)
+            val body = gson.toJson(DeductCreditRequest(userId)).toRequestBody("application/json".toMediaType())
             val request = Request.Builder()
                 .url("$baseUrl/deduct-credit")
-                .post(requestBody)
-                .addHeader("Authorization", "Bearer $token")
+                .post(body)
+                .addHeader("Authorization", auth)
                 .addHeader("Content-Type", "application/json")
                 .build()
             val response = client.newCall(request).execute()
+            val respBody = response.body?.string() ?: "{}"
             if (!response.isSuccessful) return ApiResult.Error(handleErrorResponse(response), response.code)
-            ApiResult.Success(JSONObject(response.body?.string() ?: "{}"))
+            ApiResult.Success(JSONObject(respBody))
         } catch (e: Exception) {
             ApiResult.Error("Network error: ${e.message}", getErrorCode(e))
         }
     }
 
+    // -----------------------------
+    // Generate Resume
+    // -----------------------------
+    suspend fun generateResume(resumeText: String, jobDescription: String, tone: String = "Professional"): ApiResult<JSONObject> {
+        return try {
+            val auth = getAuthIdentifier() ?: return ApiResult.Error("User authentication unavailable", 401)
+            val body = gson.toJson(GenerateResumeRequest(resumeText, jobDescription, tone))
+                .toRequestBody("application/json".toMediaType())
+            val request = Request.Builder()
+                .url("$baseUrl/generate-resume")
+                .post(body)
+                .addHeader("Authorization", auth)
+                .build()
+            val response = client.newCall(request).execute()
+            val respBody = response.body?.string() ?: "{}"
+            if (!response.isSuccessful) return ApiResult.Error(handleErrorResponse(response), response.code)
+            ApiResult.Success(JSONObject(respBody))
+        } catch (e: Exception) {
+            ApiResult.Error("Network error: ${e.message}", getErrorCode(e))
+        }
+    }
 
     // -----------------------------
-    // Generate Resume API
+    // Generate Resume from Files
     // -----------------------------
-suspend fun generateResume(resumeText: String, jobDescription: String, tone: String = "Professional"): ApiResult<JSONObject> {
-    return try {
-        val token = getAuthIdentifier() ?: return ApiResult.Error("User not authenticated", 401)
-        val requestBody = gson.toJson(GenerateResumeRequest(resumeText, jobDescription, tone)).toRequestBody("application/json".toMediaType())
-        val request = Request.Builder()
-            .url("$baseUrl/generate-resume")
-            .post(requestBody)
-            .addHeader("Authorization", "Bearer $token")
-            .build()
-        val response = client.newCall(request).execute()
-        if (!response.isSuccessful) return ApiResult.Error(handleErrorResponse(response), response.code)
-        ApiResult.Success(JSONObject(response.body?.string() ?: "{}"))
-    } catch (e: Exception) {
-        ApiResult.Error("Network error: ${e.message}", getErrorCode(e))
+    suspend fun generateResumeFromFiles(resumeUri: Uri, jobDescUri: Uri, tone: String = "Professional"): ApiResult<JSONObject> {
+        return try {
+            val auth = getAuthIdentifier() ?: return ApiResult.Error("User authentication unavailable", 401)
+            val resumeFile = uriToFile(resumeUri)
+            val jobDescFile = uriToFile(jobDescUri)
+
+            val body = MultipartBody.Builder()
+                .setType(MultipartBody.FORM)
+                .addFormDataPart("tone", tone)
+                .addFormDataPart("resume_file", resumeFile.name, resumeFile.asRequestBody("application/pdf".toMediaType()))
+                .addFormDataPart("job_description_file", jobDescFile.name, jobDescFile.asRequestBody("application/pdf".toMediaType()))
+                .build()
+
+            val request = Request.Builder()
+                .url("$baseUrl/generate-resume-from-files")
+                .post(body)
+                .addHeader("Authorization", auth)
+                .build()
+
+            val response = client.newCall(request).execute()
+            val respBody = response.body?.string() ?: "{}"
+            if (!response.isSuccessful) return ApiResult.Error(handleErrorResponse(response), response.code)
+            ApiResult.Success(JSONObject(respBody))
+        } catch (e: Exception) {
+            ApiResult.Error("File upload error: ${e.message}", getErrorCode(e))
+        }
     }
-}
-    // -----------------------------
-    // Generate Resume From Files API
-    // -----------------------------
-suspend fun generateResumeFromFiles(resumeFile: File, jobDescFile: File, tone: String = "Professional"): ApiResult<JSONObject> {
-    return try {
-        val token = getAuthIdentifier() ?: return ApiResult.Error("User not authenticated", 401)
-        val requestBody = MultipartBody.Builder()
-            .setType(MultipartBody.FORM)
-            .addFormDataPart("tone", tone)
-            .addFormDataPart("resume_file", resumeFile.name, resumeFile.asRequestBody("application/pdf".toMediaType()))
-            .addFormDataPart("job_description_file", jobDescFile.name, jobDescFile.asRequestBody("application/pdf".toMediaType()))
-            .build()
-        val request = Request.Builder()
-            .url("$baseUrl/generate-resume-from-files")
-            .post(requestBody)
-            .addHeader("Authorization", "Bearer $token")
-            .build()
-        val response = client.newCall(request).execute()
-        if (!response.isSuccessful) return ApiResult.Error(handleErrorResponse(response), response.code)
-        ApiResult.Success(JSONObject(response.body?.string() ?: "{}"))
-    } catch (e: Exception) {
-        ApiResult.Error("File upload error: ${e.message}", getErrorCode(e))
-    }
-}
 
     // -----------------------------
     // Get User Credits
     // -----------------------------
-    
-suspend fun getUserCredits(): ApiResult<JSONObject> {
-    return try {
-        val token = getAuthIdentifier() ?: return ApiResult.Error("User not authenticated", 401)
-        val request = Request.Builder()
-            .url("$baseUrl/user/credits")
-            .get()
-            .addHeader("Authorization", "Bearer $token")
-            .build()
-        val response = client.newCall(request).execute()
-        if (!response.isSuccessful) return ApiResult.Error(handleErrorResponse(response), response.code)
-        ApiResult.Success(JSONObject(response.body?.string() ?: "{}"))
-    } catch (e: Exception) {
-        ApiResult.Error("Network error: ${e.message}", getErrorCode(e))
-    }
-}
-
-    // -----------------------------
-    // Helper Functions for File Handling
-    // -----------------------------
-    private fun uriToFile(uri: Uri): File {
+    suspend fun getUserCredits(): ApiResult<JSONObject> {
         return try {
-            val inputStream: InputStream? = context.contentResolver.openInputStream(uri)
-            val file = File.createTempFile("upload_", "_temp", context.cacheDir)
-            inputStream?.use { input -> file.outputStream().use { output -> input.copyTo(output) } }
-            file
+            val auth = getAuthIdentifier() ?: return ApiResult.Error("User authentication unavailable", 401)
+            val request = Request.Builder()
+                .url("$baseUrl/user/credits")
+                .get()
+                .addHeader("Authorization", auth)
+                .build()
+            val response = client.newCall(request).execute()
+            val respBody = response.body?.string() ?: "{}"
+            if (!response.isSuccessful) return ApiResult.Error(handleErrorResponse(response), response.code)
+            ApiResult.Success(JSONObject(respBody))
         } catch (e: Exception) {
-            throw IOException("Failed to convert URI to file: ${e.message}")
+            ApiResult.Error("Network error: ${e.message}", getErrorCode(e))
         }
     }
 
-    private fun getMediaType(uri: Uri): MediaType? {
-        val mimeType = context.contentResolver.getType(uri)
-        return mimeType?.toMediaType() ?: "application/octet-stream".toMediaType()
-    }
-
-    private fun File.asRequestBody(mediaType: MediaType?): RequestBody {
-        return this.inputStream().readBytes().toRequestBody(mediaType)
-    }
-
-    fun decodeBase64File(base64Data: String): ByteArray {
-        return android.util.Base64.decode(base64Data, android.util.Base64.DEFAULT)
-    }
-
-    fun saveFileToStorage(data: ByteArray, filename: String): File {
-        val file = File(context.getExternalFilesDir(null), filename)
-        file.outputStream().use { it.write(data) }
+    // -----------------------------
+    // URI/File Utilities
+    // -----------------------------
+    private fun uriToFile(uri: Uri): File {
+        val input = context.contentResolver.openInputStream(uri)
+            ?: throw IOException("Failed to open URI: $uri")
+        val file = File.createTempFile("upload_", "_tmp", context.cacheDir)
+        input.use { inputStream -> file.outputStream().use { it.write(inputStream.readBytes()) } }
         return file
     }
 
+    private fun File.asRequestBody(mediaType: MediaType) = this.inputStream().readBytes().toRequestBody(mediaType)
+
+    // -----------------------------
+    // Error Handling
+    // -----------------------------
     private fun handleErrorResponse(response: Response): String {
         return try {
-            val errorBody = response.body?.string()
-            "HTTP ${response.code}: ${response.message}. Body: $errorBody"
+            val body = response.body?.string()
+            "HTTP ${response.code}: ${response.message}. Body: $body"
         } catch (e: Exception) {
             "HTTP ${response.code}: ${response.message}"
-            }
         }
+    }
 
-    private fun getErrorCode(exception: Exception): Int {
-    return when (exception) {
+    private fun getErrorCode(e: Exception) = when (e) {
         is java.net.SocketTimeoutException -> 1002
         is java.net.UnknownHostException -> 1003
         is IOException -> 1001
         else -> 1000
-        }
-    }
-    //Run server diagnostic
-    suspend fun runServerDiagnostics(): Map<String, String> {
-        val endpoints = listOf(
-            "/" to "GET",
-            "/health" to "GET",
-            "/credit" to "POST",
-            "/generate-resume" to "POST"
-        )
-
-    val results = mutableMapOf<String, String>()
-
-    for ((path, method) in endpoints) {
-        try {
-            val url = "$baseUrl$path"
-
-            val requestBuilder = Request.Builder().url(url)
-
-            when (method) {
-                "GET" -> requestBuilder.get()
-                "POST" -> requestBuilder.post("{}".toRequestBody("application/json".toMediaType()))
-            }
-
-            // Add Authorization if you want to simulate logged-in user
-            getCurrentUserToken()?.let { token ->
-                requestBuilder.addHeader("Authorization", "Bearer $token")
-            }
-
-            val response = client.newCall(requestBuilder.build()).execute()
-            results[path] = "HTTP ${response.code} - ${response.message}"
-        } catch (e: Exception) {
-            results[path] = "ERROR: ${e.message}"
-        }
     }
 
-    return results
-}
-
-
-    
     // -----------------------------
     // Network Check
     // -----------------------------
@@ -341,5 +269,34 @@ suspend fun getUserCredits(): ApiResult<JSONObject> {
             val info = cm.activeNetworkInfo
             info != null && info.isConnected
         }
+    }
+
+    // -----------------------------
+    // Optional: Server Diagnostics
+    // -----------------------------
+    suspend fun runServerDiagnostics(): Map<String, String> {
+        val endpoints = listOf(
+            "/" to "GET",
+            "/health" to "GET",
+            "/credit" to "POST",
+            "/generate-resume" to "POST"
+        )
+        val results = mutableMapOf<String, String>()
+        for ((path, method) in endpoints) {
+            try {
+                val url = "$baseUrl$path"
+                val reqBuilder = Request.Builder().url(url)
+                when (method) {
+                    "GET" -> reqBuilder.get()
+                    "POST" -> reqBuilder.post("{}".toRequestBody("application/json".toMediaType()))
+                }
+                getCurrentUserToken()?.let { token -> reqBuilder.addHeader("Authorization", "Bearer $token") }
+                val resp = client.newCall(reqBuilder.build()).execute()
+                results[path] = "HTTP ${resp.code} - ${resp.message}"
+            } catch (e: Exception) {
+                results[path] = "ERROR: ${e.message}"
+            }
+        }
+        return results
     }
 }
