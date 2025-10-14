@@ -70,6 +70,22 @@ class ApiService(private val context: Context) {
         }
     }
 
+    suspend fun generateResumeWithWarmUp(
+        resumeText: String, 
+        jobDescription: String, 
+        tone: String = "Professional"
+    ): ApiResult<JSONObject> {
+        // First warm up the server
+            val warmUpResult = warmUpServer()
+            if (warmUpResult is ApiResult.Error) {
+                Log.w("ApiService", "Warm-up failed but proceeding: ${warmUpResult.message}")
+        }
+    
+    // Then generate resume
+    return generateResume(resumeText, jobDescription, tone)
+}
+
+    
     // Current User Token with better error handling
     suspend fun getCurrentUserToken(): String? {
         return try {
