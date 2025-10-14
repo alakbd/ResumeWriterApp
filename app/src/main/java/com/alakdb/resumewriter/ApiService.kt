@@ -16,6 +16,7 @@ import okhttp3.Interceptor
 import okhttp3.Response
 import java.io.IOException
 import java.util.concurrent.TimeUnit
+import okhttp3.ResponseBody.Companion.toResponseBody
 
 class ApiService(private val context: Context) {
 
@@ -47,23 +48,22 @@ class ApiService(private val context: Context) {
     }
 
     // Custom Interceptor for better error handling
-    class ErrorInterceptor : Interceptor {
+    class ErrorInterceptor: Interceptor {
         override fun intercept(chain: Interceptor.Chain): Response {
             val request = chain.request()
-            try {
-                val response = chain.proceed(request)
-
-                if (!response.isSuccessful) {
-                    Log.e("NetworkError", "HTTP ${response.code} for ${request.url}")
-                }
-
-                return response
-            } catch (e: Exception) {
-                Log.e(
-                    "NetworkError",
-                    "🚨 Request failed for ${request.url}: ${e.javaClass.simpleName} - ${e.message}", e)
-                    
-            // Do NOT throw for testing
+        return try {
+            val response = chain.proceed(request)
+            if (!response.isSuccessful) {
+                Log.e("NetworkError", "HTTP ${response.code} for ${request.url}")
+            }
+            response
+        } catch (e: Exception) {
+            Log.e(
+                "NetworkError",
+                "🚨 Request failed for ${request.url}: ${e.javaClass.simpleName} - ${e.message}",
+                e
+            )
+            // Return a fake 500 response so it doesn't crash
             Response.Builder()
                 .request(request)
                 .protocol(Protocol.HTTP_1_1)
@@ -71,9 +71,9 @@ class ApiService(private val context: Context) {
                 .message("Interceptor caught")
                 .body("{}".toResponseBody("application/json".toMediaType()))
                 .build()
-            }
         }
     }
+}
 
     // Current User Token with better error handling
     suspend fun getCurrentUserToken(): String? {
