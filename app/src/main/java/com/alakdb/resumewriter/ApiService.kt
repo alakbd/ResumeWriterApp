@@ -25,16 +25,16 @@ class ApiService(private val context: Context) {
 
     // Enhanced OkHttp Client with better debugging
     private val client = OkHttpClient.Builder()
-        .connectTimeout(10, TimeUnit.SECONDS)
-        .readTimeout(10, TimeUnit.SECONDS)
-        .writeTimeout(10, TimeUnit.SECONDS)
+        .connectTimeout(30, TimeUnit.SECONDS) // Increased from 10 to 30
+        .readTimeout(30, TimeUnit.SECONDS)    // Increased from 10 to 30
+        .writeTimeout(30, TimeUnit.SECONDS)   // Increased from 10 to 30
         .addInterceptor(HttpLoggingInterceptor { msg -> 
             Log.d("NetworkLog", "🔗 $msg") 
         }.apply { 
             level = HttpLoggingInterceptor.Level.BODY 
         })
-        .addInterceptor(ErrorInterceptor()) // Custom error interceptor
-        .build()
+        .addInterceptor(ErrorInterceptor())
+            .build()
 
     // Data Classes
     data class DeductCreditRequest(val user_id: String)
@@ -312,29 +312,31 @@ class ApiService(private val context: Context) {
     // WarmUp Server
 
 suspend fun warmUpServer(): ApiResult<JSONObject> {
-    Log.d("WarmUp", "🔥 Warming up server...")
+    Log.d("WarmUp", "🔥 Starting server warm-up...")
+    
+    return try {
+        // Simple health check - no complex retry logic here
+        val healthUrl = "$baseUrl/health"
+        val request = Request.Builder()
+            .url(healthUrl)
+            .get()
+            .addHeader("User-Agent", "ResumeWriter-Android-WarmUp")
+            .build()
 
-    val maxWarmupAttempts = 5
-    var lastError: Exception? = null
-
-    repeat(maxWarmupAttempts) { attempt ->
-        try {
-            Log.d("WarmUp", "Attempt ${attempt + 1}/$maxWarmupAttempts")
-
-            // Try health endpoint first
-            val healthUrl = "$baseUrl/health"
-            val healthRequest = Request.Builder()
-                .url(healthUrl)
-                .get()
-                .addHeader("User-Agent", "ResumeWriter-Android-WarmUp")
-                .build()
-
-            client.newCall(healthRequest).execute().use { response ->
-                if (response.isSuccessful) {
-                    Log.d("WarmUp", "✅ Server is warm (health check passed)")
-                    return ApiResult.Success(JSONObject().put("status", "warm").put("attempt", attempt + 1))
-                }
+        client.newCall(request).execute().use { response ->
+            if (response.isSuccessful) {
+                Log.d("WarmUp", "✅ Server is ready")
+                ApiResult.Success(JSONObject().put("status", "ready"))
+            } else {
+                Log.w("WarmUp", "⚠️ Server not ready yet: HTTP ${response.code}")
+                ApiResult.Error("Server warming up", response.code)
             }
+        }
+    } catch (e: Exception) {
+        Log.w("WarmUp", "🌡️ Server cold start: ${e.message}")
+        ApiResult.Error("Server is starting up", 0, e.message)
+    }
+}
 
             // If health check fails, try a lightweight credits check
             Log.d("WarmUp", "Health check failed, trying lightweight endpoint...")
@@ -378,25 +380,7 @@ suspend fun warmUpServer(): ApiResult<JSONObject> {
     )
 }
 
-// Enhanced API methods with automatic warm-up
-suspend fun generateResumeWithWarmUp(
-    resumeText: String, 
-    jobDescription: String, 
-    tone: String = "Professional"
-): ApiResult<JSONObject> {
-    // Warm up first, then proceed with actual call
-    warmUpServer()
-    return generateResume(resumeText, jobDescription, tone)
-}
 
-suspend fun generateResumeFromFilesWithWarmUp(
-    resumeUri: Uri, 
-    jobDescUri: Uri, 
-    tone: String = "Professional"
-): ApiResult<JSONObject> {
-    warmUpServer()
-    return generateResumeFromFiles(resumeUri, jobDescUri, tone)
-}
 
     
     // Utilities
