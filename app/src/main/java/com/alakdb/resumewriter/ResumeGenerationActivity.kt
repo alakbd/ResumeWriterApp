@@ -463,7 +463,7 @@ private fun updateCreditDisplay() {
                         binding.tvCreditInfo.text = "Credits: Unable to load"
                         Log.e(
                             "ResumeGeneration",
-                            "Error loading credits: ${result.message "Unknown error"}"
+                            "Error loading credits: ${result.message}"
                         )
                     }
                 }
