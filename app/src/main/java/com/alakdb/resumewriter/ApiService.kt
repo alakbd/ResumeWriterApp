@@ -14,7 +14,6 @@ import org.json.JSONObject
 import java.io.File
 import okhttp3.Interceptor
 import okhttp3.Response
-import android.util.Log
 import java.io.IOException
 import java.util.concurrent.TimeUnit
 
