@@ -306,14 +306,14 @@ class ApiService(private val context: Context) {
 
 suspend fun warmUpServer(): ApiResult<JSONObject> {
     Log.d("WarmUp", "🔥 Warming up server...")
-    
+
     val maxWarmupAttempts = 5
     var lastError: Exception? = null
-    
+
     repeat(maxWarmupAttempts) { attempt ->
         try {
             Log.d("WarmUp", "Attempt ${attempt + 1}/$maxWarmupAttempts")
-            
+
             // Try health endpoint first
             val healthUrl = "$baseUrl/health"
             val healthRequest = Request.Builder()
@@ -321,17 +321,17 @@ suspend fun warmUpServer(): ApiResult<JSONObject> {
                 .get()
                 .addHeader("User-Agent", "ResumeWriter-Android-WarmUp")
                 .build()
-            
+
             client.newCall(healthRequest).execute().use { response ->
                 if (response.isSuccessful) {
                     Log.d("WarmUp", "✅ Server is warm (health check passed)")
                     return ApiResult.Success(JSONObject().put("status", "warm").put("attempt", attempt + 1))
                 }
             }
-            
+
             // If health check fails, try a lightweight credits check
             Log.d("WarmUp", "Health check failed, trying lightweight endpoint...")
-            
+
             val creditsResult = getUserCredits()
             when (creditsResult) {
                 is ApiResult.Success -> {
@@ -340,35 +340,34 @@ suspend fun warmUpServer(): ApiResult<JSONObject> {
                 }
                 is ApiResult.Error -> {
                     lastError = Exception(creditsResult.message)
-                    // Don't retry for auth errors
                     if (creditsResult.code == 401) {
-                        throw lastError
+                        throw lastError as Exception
                     }
                 }
             }
-            
-            // Wait before next attempt with exponential backoff
+
             if (attempt < maxWarmupAttempts - 1) {
-                val delay = 2000L * (attempt + 1) // 2s, 4s, 6s, 8s
+                val delay = 2000L * (attempt + 1)
                 Log.d("WarmUp", "⏳ Waiting ${delay}ms before next attempt...")
                 kotlinx.coroutines.delay(delay)
             }
-            
+
         } catch (e: Exception) {
             lastError = e
             Log.w("WarmUp", "Warm-up attempt ${attempt + 1} failed: ${e.message}")
-            
+
             if (attempt < maxWarmupAttempts - 1) {
                 val delay = 2000L * (attempt + 1)
                 kotlinx.coroutines.delay(delay)
             }
         }
     }
-    
+
     Log.w("WarmUp", "🔥 Server warm-up failed after $maxWarmupAttempts attempts")
+    val finalError = lastError
     return ApiResult.Error(
         "Server is taking longer than expected to start. Please try again in a moment.",
-        details = lastError?.message
+        details = finalError?.message
     )
 }
 
