@@ -327,38 +327,48 @@ class ResumeGenerationActivity : AppCompatActivity() {
     }
 
     // Add this retry helper function
-    private suspend fun <T> retryApiCall(
-        maxRetries: Int = MAX_RETRIES,
-        delay: Long = RETRY_DELAY_MS,
-        block: suspend () -> ApiService.ApiResult<T>
-    ): ApiService.ApiResult<T> {
-        var lastError: Exception? = null
-        
-        repeat(maxRetries) { attempt ->
-            try {
-                val result = block()
-                if (result is ApiService.ApiResult.Success) {
+private suspend fun <T> retryApiCall(
+    maxRetries: Int = MAX_RETRIES,
+    delayMs: Long = RETRY_DELAY_MS,
+    block: suspend () -> ApiService.ApiResult<T>
+): ApiService.ApiResult<T> {
+    var lastError: Exception? = null
+
+    repeat(maxRetries) { attempt ->
+        try {
+            val result = block()
+            if (result is ApiService.ApiResult.Success) {
+                return result
+            } else if (result is ApiService.ApiResult.Error) {
+                lastError = Exception(result.message)
+
+                // Don't retry for authentication or bad requests
+                if (result.code == 401 || result.code == 400) {
+                    Log.w("RetryApi", "Non-retriable error: ${result.code}")
                     return result
-                } else if (result is ApiService.ApiResult.Error) {
-                    lastError = Exception(result.message)
-                    // Don't retry for authentication errors
-                    if (result.code == 401) {
-                        return result
-                    }
                 }
-            } catch (e: Exception) {
-                lastError = e
             }
-            
-            if (attempt < maxRetries - 1) {
-                delay(delay * (attempt + 1)) // Exponential backoff
-            }
+        } catch (e: Exception) {
+            lastError = e
         }
-        
-        return ApiService.ApiResult.Error(
-            "Request failed after $maxRetries attempts: ${lastError?.message ?: "Unknown error"}"
-        )
+
+        if (attempt < maxRetries - 1) {
+            val backoff = delayMs * (attempt + 1)
+            Log.w("RetryApi", "Retrying in ${backoff}ms (attempt ${attempt + 2}/$maxRetries)...")
+            kotlinx.coroutines.delay(backoff)
+        }
     }
+
+    Log.e(
+        "RetryApi",
+        "All $maxRetries attempts failed: ${lastError?.message ?: "Unknown network error"}"
+    )
+
+    return ApiService.ApiResult.Error(
+        "Request failed after $maxRetries attempts: ${lastError?.message ?: "Unknown error"}"
+    )
+}
+
 
 
     
