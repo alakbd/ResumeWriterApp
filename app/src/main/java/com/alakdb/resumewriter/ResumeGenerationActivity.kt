@@ -464,9 +464,10 @@ class ResumeGenerationActivity : AppCompatActivity() {
     private fun updateConnectionStatus(message: String, isError: Boolean = false) {
         binding.tvConnectionStatus.text = message
         binding.tvConnectionStatus.setTextColor(
-            if (isError) getColor(android.R.color.holo_red_dark) 
+            if (isError) getColor(android.R.color.holo_red_dark)
             else getColor(android.R.color.holo_green_dark)
-        )
+            )
+        }    
 
     private fun showErrorAndReset(msg: String) {
         showError(msg)
