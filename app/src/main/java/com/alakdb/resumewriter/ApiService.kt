@@ -70,7 +70,7 @@ class ApiService(private val context: Context) {
         }
     }
 
-    suspend fun generateResume(
+    suspend fun generateResumeWithWarmUp(
         resumeText: String, 
         jobDescription: String, 
         tone: String = "Professional"
