@@ -57,7 +57,7 @@ class ApiService(private val context: Context) {
                 
                 return response
             } catch (e: Exception) {
-                Log.e("NetworkError", "Request failed: ${e.message}", e)
+                Log.e("NetworkError", "🚨 Request failed for ${request.url}: ${e.javaClass.simpleName} - ${e.message}", e)
                 throw e
             }
         }
