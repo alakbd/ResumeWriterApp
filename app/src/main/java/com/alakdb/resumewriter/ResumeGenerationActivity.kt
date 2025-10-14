@@ -20,6 +20,10 @@ import kotlinx.coroutines.launch
 import org.json.JSONObject
 import java.io.File
 import kotlinx.coroutines.delay
+import android.view.View
+import kotlinx.coroutines.CancellationException
+import kotlinx.coroutines.Dispatchers
+import kotlinx.coroutines.withContext
 
 class ResumeGenerationActivity : AppCompatActivity() {
 
