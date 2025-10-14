@@ -307,41 +307,69 @@ class ApiService(private val context: Context) {
 suspend fun warmUpServer(): ApiResult<JSONObject> {
     Log.d("WarmUp", "🔥 Warming up server...")
     
-    return try {
-        // Try health endpoint first (lightweight)
-        val healthUrl = "$baseUrl/health"
-        val healthRequest = Request.Builder()
-            .url(healthUrl)
-            .get()
-            .addHeader("User-Agent", "ResumeWriter-Android-WarmUp")
-            .build()
-        
-        client.newCall(healthRequest).execute().use { response ->
-            if (response.isSuccessful) {
-                Log.d("WarmUp", "✅ Server is already warm")
-                return ApiResult.Success(JSONObject().put("status", "warm"))
+    val maxWarmupAttempts = 5
+    var lastError: Exception? = null
+    
+    repeat(maxWarmupAttempts) { attempt ->
+        try {
+            Log.d("WarmUp", "Attempt ${attempt + 1}/$maxWarmupAttempts")
+            
+            // Try health endpoint first
+            val healthUrl = "$baseUrl/health"
+            val healthRequest = Request.Builder()
+                .url(healthUrl)
+                .get()
+                .addHeader("User-Agent", "ResumeWriter-Android-WarmUp")
+                .build()
+            
+            client.newCall(healthRequest).execute().use { response ->
+                if (response.isSuccessful) {
+                    Log.d("WarmUp", "✅ Server is warm (health check passed)")
+                    return ApiResult.Success(JSONObject().put("status", "warm").put("attempt", attempt + 1))
+                }
+            }
+            
+            // If health check fails, try a lightweight credits check
+            Log.d("WarmUp", "Health check failed, trying lightweight endpoint...")
+            
+            val creditsResult = getUserCredits()
+            when (creditsResult) {
+                is ApiResult.Success -> {
+                    Log.d("WarmUp", "✅ Server warmed up successfully via credits endpoint")
+                    return ApiResult.Success(JSONObject().put("status", "warm").put("attempt", attempt + 1))
+                }
+                is ApiResult.Error -> {
+                    lastError = Exception(creditsResult.message)
+                    // Don't retry for auth errors
+                    if (creditsResult.code == 401) {
+                        throw lastError
+                    }
+                }
+            }
+            
+            // Wait before next attempt with exponential backoff
+            if (attempt < maxWarmupAttempts - 1) {
+                val delay = 2000L * (attempt + 1) // 2s, 4s, 6s, 8s
+                Log.d("WarmUp", "⏳ Waiting ${delay}ms before next attempt...")
+                kotlinx.coroutines.delay(delay)
+            }
+            
+        } catch (e: Exception) {
+            lastError = e
+            Log.w("WarmUp", "Warm-up attempt ${attempt + 1} failed: ${e.message}")
+            
+            if (attempt < maxWarmupAttempts - 1) {
+                val delay = 2000L * (attempt + 1)
+                kotlinx.coroutines.delay(delay)
             }
         }
-        
-        // If health check fails or we want to ensure full warm-up, try a lightweight API call
-        Log.d("WarmUp", "⚠️ Health check didn't confirm warm state, trying credits endpoint...")
-        
-        val creditsResult = getUserCredits()
-        when (creditsResult) {
-            is ApiResult.Success -> {
-                Log.d("WarmUp", "✅ Server warmed up successfully")
-                creditsResult
-            }
-            is ApiResult.Error -> {
-                // Even if it fails, we tried to wake up the server
-                Log.w("WarmUp", "⚠️ Warm-up attempt completed (server may be waking up)")
-                ApiResult.Success(JSONObject().put("warmup_attempt", "completed"))
-            }
-        }
-    } catch (e: Exception) {
-        Log.w("WarmUp", "⚠️ Warm-up encountered error but may have woken server: ${e.message}")
-        ApiResult.Success(JSONObject().put("warmup_attempt", "completed_with_error"))
     }
+    
+    Log.w("WarmUp", "🔥 Server warm-up failed after $maxWarmupAttempts attempts")
+    return ApiResult.Error(
+        "Server is taking longer than expected to start. Please try again in a moment.",
+        details = lastError?.message
+    )
 }
 
 // Enhanced API methods with automatic warm-up
