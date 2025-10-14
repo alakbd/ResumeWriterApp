@@ -455,10 +455,23 @@ class ResumeGenerationActivity : AppCompatActivity() {
         checkGenerateButtonState()
     }
 
+    private fun showServerStartingMessage() {
+        binding.tvConnectionStatus.text = "🔄 Server is starting up..."
+        binding.tvConnectionStatus.setTextColor(getColor(android.R.color.holo_orange_dark))
+        showError("Server is waking up. This may take 30-60 seconds. Please wait...")
+    }    
+
+    private fun updateConnectionStatus(message: String, isError: Boolean = false) {
+        binding.tvConnectionStatus.text = message
+        binding.tvConnectionStatus.setTextColor(
+            if (isError) getColor(android.R.color.holo_red_dark) 
+            else getColor(android.R.color.holo_green_dark)
+        )
+
     private fun showErrorAndReset(msg: String) {
         showError(msg)
         resetGenerateButton()
-    }
+        }
 
     private fun getFileName(uri: Uri): String? {
         return try {
