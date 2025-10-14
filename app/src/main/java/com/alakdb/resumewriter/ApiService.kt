@@ -61,10 +61,16 @@ class ApiService(private val context: Context) {
             } catch (e: Exception) {
                 Log.e(
                     "NetworkError",
-                    "🚨 Request failed for ${request.url}: ${e.javaClass.simpleName} - ${e.message}",
-                    e
-                )
-                throw e
+                    "🚨 Request failed for ${request.url}: ${e.javaClass.simpleName} - ${e.message}", e)
+                    
+            // Do NOT throw for testing
+            Response.Builder()
+                .request(request)
+                .protocol(Protocol.HTTP_1_1)
+                .code(500)
+                .message("Interceptor caught")
+                .body("{}".toResponseBody("application/json".toMediaType()))
+                .build()
             }
         }
     }
