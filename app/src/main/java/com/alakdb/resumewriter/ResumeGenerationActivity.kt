@@ -145,7 +145,7 @@ class ResumeGenerationActivity : AppCompatActivity() {
         binding.layoutConnectionStatus.visibility = View.VISIBLE
         binding.tvConnectionStatus.text = "Testing connection..."
         binding.progressConnection.visibility = View.VISIBLE
-            binding.btnRetryConnection.isEnabled = false
+        binding.btnRetryConnection.isEnabled = false
 
     lifecycleScope.launch {
         if (!isNetworkAvailable()) {
@@ -157,7 +157,7 @@ class ResumeGenerationActivity : AppCompatActivity() {
         }
         
         try {
-            // Step 1: Simple warm-up check
+            // Simple warm-up check first
             binding.tvConnectionStatus.text = "Checking server status..."
             val warmUpResult = apiService.warmUpServer()
             
@@ -165,7 +165,7 @@ class ResumeGenerationActivity : AppCompatActivity() {
                 is ApiService.ApiResult.Success -> {
                     // Server is ready, now test actual API
                     binding.tvConnectionStatus.text = "Testing API endpoints..."
-                    val connectionResult = retryApiCall { apiService.testConnection() }
+                    val connectionResult = apiService.testConnection()
                     
                     when (connectionResult) {
                         is ApiService.ApiResult.Success -> {
