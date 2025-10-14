@@ -327,31 +327,30 @@ class ApiService(private val context: Context) {
 
     // Enhanced WarmUp Server with retry logic
     suspend fun warmUpServer(): ApiResult<JSONObject> {
-        Log.d("WarmUp", "🔥 Starting server warm-up...")
-        val maxWarmupAttempts = 3
-        var lastError: Exception? = null
+    Log.d("WarmUp", "🔥 Starting basic server warm-up...")
+    
+    return try {
+        val healthUrl = "$baseUrl/health"
+        val request = Request.Builder()
+            .url(healthUrl)
+            .get()
+            .addHeader("User-Agent", "ResumeWriter-Android-WarmUp")
+            .build()
 
-        for (attempt in 0 until maxWarmupAttempts) {
-            try {
-                Log.d("WarmUp", "Attempt ${attempt + 1} of $maxWarmupAttempts")
-                
-                // Simple health check
-                val healthUrl = "$baseUrl/health"
-                val request = Request.Builder()
-                    .url(healthUrl)
-                    .get()
-                    .addHeader("User-Agent", "ResumeWriter-Android-WarmUp")
-                    .build()
-
-                client.newCall(request).execute().use { response ->
-                    if (response.isSuccessful) {
-                        Log.d("WarmUp", "✅ Server is ready")
-                        return ApiResult.Success(JSONObject().put("status", "ready"))
-                    } else {
-                        Log.w("WarmUp", "⚠️ Server not ready yet: HTTP ${response.code}")
-                        lastError = Exception("HTTP ${response.code}")
-                    }
-                }
+        client.newCall(request).execute().use { response ->
+            if (response.isSuccessful) {
+                Log.d("WarmUp", "✅ Basic health check passed.")
+                ApiResult.Success(JSONObject().put("status", "ready"))
+            } else {
+                Log.w("WarmUp", "⚠️ Health check failed: HTTP ${response.code}")
+                ApiResult.Error("Server not ready", response.code)
+            }
+        }
+    } catch (e: Exception) {
+        Log.e("WarmUp", "❌ Basic warm-up failed: ${e.message}")
+        ApiResult.Error("Network error: ${e.message}")
+    }
+}
 
                 // If health check fails, try a lightweight credits check
                 Log.d("WarmUp", "Health check failed, trying lightweight endpoint...")
