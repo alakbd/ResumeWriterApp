@@ -42,9 +42,18 @@ class ResumeGenerationActivity : AppCompatActivity() {
 
         registerFilePickers()
         setupUI()
-        checkGenerateButtonState()
-        testApiConnection()
-        updateCreditDisplay() // Initialize credit display
+        checkGenerateButtonState()     
+    }
+
+    // Call these in onResume instead
+    override fun onResume() {
+        super.onResume()
+        lifecycleScope.launch {
+            // Delay the API calls to avoid ANR
+            delay(1000)
+            updateCreditDisplay()
+            testApiConnection()
+        }
     }
 
     /** ---------------- File Picker Setup ---------------- **/
