@@ -5,6 +5,7 @@ import android.net.Uri
 import android.util.Log
 import com.google.firebase.auth.FirebaseAuth
 import com.google.gson.Gson
+import kotlinx.coroutines.delay
 import kotlinx.coroutines.tasks.await
 import okhttp3.*
 import okhttp3.MediaType.Companion.toMediaType
@@ -34,7 +35,7 @@ class ApiService(private val context: Context) {
             level = HttpLoggingInterceptor.Level.BODY 
         })
         .addInterceptor(ErrorInterceptor())
-            .build()
+        .build()
 
     // Data Classes
     data class DeductCreditRequest(val user_id: String)
@@ -48,27 +49,26 @@ class ApiService(private val context: Context) {
 
     // Custom Interceptor for better error handling
     class ErrorInterceptor : Interceptor {
-    override fun intercept(chain: Interceptor.Chain): Response {
-        val request = chain.request()
-        try {
-            val response = chain.proceed(request)
+        override fun intercept(chain: Interceptor.Chain): Response {
+            val request = chain.request()
+            try {
+                val response = chain.proceed(request)
 
-            if (!response.isSuccessful) {
-                Log.e("NetworkError", "HTTP ${response.code} for ${request.url}")
+                if (!response.isSuccessful) {
+                    Log.e("NetworkError", "HTTP ${response.code} for ${request.url}")
+                }
+
+                return response
+            } catch (e: Exception) {
+                Log.e(
+                    "NetworkError",
+                    "🚨 Request failed for ${request.url}: ${e.javaClass.simpleName} - ${e.message}",
+                    e
+                )
+                throw e
             }
-
-            return response
-        } catch (e: Exception) {
-            Log.e(
-                "NetworkError",
-                "🚨 Request failed for ${request.url}: ${e.javaClass.simpleName} - ${e.message}",
-                e
-            )
-            throw e
         }
     }
-}
-    
 
     // Current User Token with better error handling
     suspend fun getCurrentUserToken(): String? {
@@ -309,79 +309,75 @@ class ApiService(private val context: Context) {
         }
     }
 
-    // WarmUp Server
+    // Enhanced WarmUp Server with retry logic
+    suspend fun warmUpServer(): ApiResult<JSONObject> {
+        Log.d("WarmUp", "🔥 Starting server warm-up...")
+        val maxWarmupAttempts = 3
+        var lastError: Exception? = null
 
-suspend fun warmUpServer(): ApiResult<JSONObject> {
-    Log.d("WarmUp", "🔥 Starting server warm-up...")
-    
-    return try {
-        // Simple health check - no complex retry logic here
-        val healthUrl = "$baseUrl/health"
-        val request = Request.Builder()
-            .url(healthUrl)
-            .get()
-            .addHeader("User-Agent", "ResumeWriter-Android-WarmUp")
-            .build()
+        for (attempt in 0 until maxWarmupAttempts) {
+            try {
+                Log.d("WarmUp", "Attempt ${attempt + 1} of $maxWarmupAttempts")
+                
+                // Simple health check
+                val healthUrl = "$baseUrl/health"
+                val request = Request.Builder()
+                    .url(healthUrl)
+                    .get()
+                    .addHeader("User-Agent", "ResumeWriter-Android-WarmUp")
+                    .build()
 
-        client.newCall(request).execute().use { response ->
-            if (response.isSuccessful) {
-                Log.d("WarmUp", "✅ Server is ready")
-                ApiResult.Success(JSONObject().put("status", "ready"))
-            } else {
-                Log.w("WarmUp", "⚠️ Server not ready yet: HTTP ${response.code}")
-                ApiResult.Error("Server warming up", response.code)
-            }
-        }
-    } catch (e: Exception) {
-        Log.w("WarmUp", "🌡️ Server cold start: ${e.message}")
-        ApiResult.Error("Server is starting up", 0, e.message)
-    }
-}
-
-            // If health check fails, try a lightweight credits check
-            Log.d("WarmUp", "Health check failed, trying lightweight endpoint...")
-
-            val creditsResult = getUserCredits()
-            when (creditsResult) {
-                is ApiResult.Success -> {
-                    Log.d("WarmUp", "✅ Server warmed up successfully via credits endpoint")
-                    return ApiResult.Success(JSONObject().put("status", "warm").put("attempt", attempt + 1))
-                }
-                is ApiResult.Error -> {
-                    lastError = Exception(creditsResult.message)
-                    if (creditsResult.code == 401) {
-                        throw lastError as Exception
+                client.newCall(request).execute().use { response ->
+                    if (response.isSuccessful) {
+                        Log.d("WarmUp", "✅ Server is ready")
+                        return ApiResult.Success(JSONObject().put("status", "ready"))
+                    } else {
+                        Log.w("WarmUp", "⚠️ Server not ready yet: HTTP ${response.code}")
+                        lastError = Exception("HTTP ${response.code}")
                     }
                 }
-            }
 
-            if (attempt < maxWarmupAttempts - 1) {
-                val delay = 2000L * (attempt + 1)
-                Log.d("WarmUp", "⏳ Waiting ${delay}ms before next attempt...")
-                kotlinx.coroutines.delay(delay)
-            }
+                // If health check fails, try a lightweight credits check
+                Log.d("WarmUp", "Health check failed, trying lightweight endpoint...")
 
-        } catch (e: Exception) {
-            lastError = e
-            Log.w("WarmUp", "Warm-up attempt ${attempt + 1} failed: ${e.message}")
+                val creditsResult = getUserCredits()
+                when (creditsResult) {
+                    is ApiResult.Success -> {
+                        Log.d("WarmUp", "✅ Server warmed up successfully via credits endpoint")
+                        return ApiResult.Success(JSONObject().put("status", "warm").put("attempt", attempt + 1))
+                    }
+                    is ApiResult.Error -> {
+                        lastError = Exception(creditsResult.message)
+                        if (creditsResult.code == 401) {
+                            throw lastError as Exception
+                        }
+                    }
+                }
 
-            if (attempt < maxWarmupAttempts - 1) {
-                val delay = 2000L * (attempt + 1)
-                kotlinx.coroutines.delay(delay)
+                if (attempt < maxWarmupAttempts - 1) {
+                    val delay = 2000L * (attempt + 1)
+                    Log.d("WarmUp", "⏳ Waiting ${delay}ms before next attempt...")
+                    delay(delay)
+                }
+
+            } catch (e: Exception) {
+                lastError = e
+                Log.w("WarmUp", "Warm-up attempt ${attempt + 1} failed: ${e.message}")
+
+                if (attempt < maxWarmupAttempts - 1) {
+                    val delay = 2000L * (attempt + 1)
+                    delay(delay)
+                }
             }
         }
+
+        Log.w("WarmUp", "🔥 Server warm-up failed after $maxWarmupAttempts attempts")
+        val finalError = lastError
+        return ApiResult.Error(
+            "Server is taking longer than expected to start. Please try again in a moment.",
+            details = finalError?.message
+        )
     }
-
-    Log.w("WarmUp", "🔥 Server warm-up failed after $maxWarmupAttempts attempts")
-    val finalError = lastError
-    return ApiResult.Error(
-        "Server is taking longer than expected to start. Please try again in a moment.",
-        details = finalError?.message
-    )
-}
-
-
-
     
     // Utilities
     private fun uriToFile(uri: Uri): File {
