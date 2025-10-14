@@ -12,6 +12,9 @@ import okhttp3.RequestBody.Companion.toRequestBody
 import okhttp3.logging.HttpLoggingInterceptor
 import org.json.JSONObject
 import java.io.File
+import okhttp3.Interceptor
+import okhttp3.Response
+import android.util.Log
 import java.io.IOException
 import java.util.concurrent.TimeUnit
 
@@ -45,14 +48,27 @@ class ApiService(private val context: Context) {
     }
 
     // Custom Interceptor for better error handling
-    class ErrorInterceptor: Interceptor {
-      return try {
-        chain.proceed(chain.request())
-            } catch (e: Exception) {
-                Log.e("NetworkError", "🚨 Request failed for ${request.url}: ${e.javaClass.simpleName} - ${e.message}", e)
-                throw e
+    class ErrorInterceptor : Interceptor {
+    override fun intercept(chain: Interceptor.Chain): Response {
+        val request = chain.request()
+        try {
+            val response = chain.proceed(request)
+
+            if (!response.isSuccessful) {
+                Log.e("NetworkError", "HTTP ${response.code} for ${request.url}")
             }
+
+            return response
+        } catch (e: Exception) {
+            Log.e(
+                "NetworkError",
+                "🚨 Request failed for ${request.url}: ${e.javaClass.simpleName} - ${e.message}",
+                e
+            )
+            throw e
         }
+    }
+}
     
 
     // Current User Token with better error handling
