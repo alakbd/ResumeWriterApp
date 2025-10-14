@@ -46,7 +46,12 @@ class ResumeGenerationActivity : AppCompatActivity() {
         setupUI()
         checkGenerateButtonState()     
     }
-
+    // Add these constants
+    private companion object {
+        const val MAX_RETRIES = 3
+        const val RETRY_DELAY_MS = 2000L
+    }
+    
     // Call these in onResume instead
     override fun onResume() {
         super.onResume()
@@ -139,7 +144,6 @@ class ResumeGenerationActivity : AppCompatActivity() {
         binding.btnRetryConnection.isEnabled = false
 
         lifecycleScope.launch {
-            // Test basic connectivity first
             if (!isNetworkAvailable()) {
                 binding.tvConnectionStatus.text = "❌ No internet connection"
                 binding.tvConnectionStatus.setTextColor(getColor(android.R.color.holo_red_dark))
@@ -149,30 +153,43 @@ class ResumeGenerationActivity : AppCompatActivity() {
                 return@launch
             }
             
-            when (val result = apiService.testConnection()) {
+            // Try to warm up server first
+            val warmUpResult = retryApiCall { apiService.warmUpServer() }
+            
+            when (warmUpResult) {
                 is ApiService.ApiResult.Success -> {
-                    binding.tvConnectionStatus.text = "✅ API Connected Successfully"
+                    binding.tvConnectionStatus.text = "✅ Server is ready"
                     binding.tvConnectionStatus.setTextColor(getColor(android.R.color.holo_green_dark))
-                    binding.progressConnection.visibility = android.view.View.GONE
-                    binding.btnRetryConnection.isEnabled = true
-                    showSuccess("API connection successful")
+                    showSuccess("Server warmed up successfully")
                     
-                    // Update credits display after successful connection
-                    updateCreditDisplay()
+                    // Now test actual connection
+                    when (val result = retryApiCall { apiService.testConnection() }) {
+                        is ApiService.ApiResult.Success -> {
+                            binding.tvConnectionStatus.text = "✅ API Connected Successfully"
+                            binding.progressConnection.visibility = android.view.View.GONE
+                            binding.btnRetryConnection.isEnabled = true
+                            updateCreditDisplay()
+                        }
+                        is ApiService.ApiResult.Error -> {
+                            binding.tvConnectionStatus.text = "❌ Connection Failed"
+                            binding.tvConnectionStatus.setTextColor(getColor(android.R.color.holo_red_dark))
+                            binding.progressConnection.visibility = android.view.View.GONE
+                            binding.btnRetryConnection.isEnabled = true
+                            showError("API connection failed after retries")
+                        }
+                    }
                 }
                 is ApiService.ApiResult.Error -> {
-                    binding.tvConnectionStatus.text = "❌ Connection Failed: ${result.message}"
-                    binding.tvConnectionStatus.setTextColor(getColor(android.R.color.holo_red_dark))
+                    binding.tvConnectionStatus.text = "⚠️ Server is waking up..."
+                    binding.tvConnectionStatus.setTextColor(getColor(android.R.color.holo_orange_dark))
                     binding.progressConnection.visibility = android.view.View.GONE
                     binding.btnRetryConnection.isEnabled = true
-                    showError("API connection failed: ${result.message}")
-                    
-                    // Provide helpful suggestions based on error
-                    provideConnectionHelp(result.message)
+                    showError("Server is starting up. Please try again in a moment.")
                 }
             }
         }
     }
+
 
     fun isNetworkAvailable(): Boolean {
         val connectivityManager = getSystemService(Context.CONNECTIVITY_SERVICE) as ConnectivityManager
@@ -209,8 +226,10 @@ class ResumeGenerationActivity : AppCompatActivity() {
         lifecycleScope.launch {
             val user = auth.currentUser ?: return@launch showErrorAndReset("User not logged in")
 
-            // First check if user has credits
-            when (val creditResult = apiService.getUserCredits()) {
+            // First check if user has credits with retry logic
+            val creditResult = retryApiCall { apiService.getUserCredits() }
+            
+            when (creditResult) {
                 is ApiService.ApiResult.Success -> {
                     try {
                         val credits = creditResult.data.getInt("credits")
@@ -219,16 +238,20 @@ class ResumeGenerationActivity : AppCompatActivity() {
                             return@launch
                         }
                         
-                        // User has credits, proceed with generation
-                        when (val gen = apiService.generateResumeFromFiles(resumeUri, jobDescUri)) {
+                        // User has credits, proceed with generation with retry
+                        val genResult = retryApiCall { 
+                            apiService.generateResumeFromFilesWithWarmUp(resumeUri, jobDescUri) 
+                        }
+                        
+                        when (genResult) {
                             is ApiService.ApiResult.Success -> {
-                                currentGeneratedResume = gen.data
-                                displayGeneratedResume(gen.data)
+                                currentGeneratedResume = genResult.data
+                                displayGeneratedResume(genResult.data)
                                 showSuccess("Resume generated successfully!")
-                                updateCreditDisplay() // Refresh credit display
+                                updateCreditDisplay()
                             }
                             is ApiService.ApiResult.Error -> {
-                                showError("Generation failed: ${gen.message}")
+                                showError("Generation failed: ${genResult.message}")
                             }
                         }
                     } catch (e: Exception) {
@@ -258,8 +281,10 @@ class ResumeGenerationActivity : AppCompatActivity() {
         lifecycleScope.launch {
             val user = auth.currentUser ?: return@launch showErrorAndReset("User not logged in")
 
-            // First check if user has credits
-            when (val creditResult = apiService.getUserCredits()) {
+            // First check if user has credits with retry logic
+            val creditResult = retryApiCall { apiService.getUserCredits() }
+            
+            when (creditResult) {
                 is ApiService.ApiResult.Success -> {
                     try {
                         val credits = creditResult.data.getInt("credits")
@@ -268,16 +293,20 @@ class ResumeGenerationActivity : AppCompatActivity() {
                             return@launch
                         }
                         
-                        // User has credits, proceed with generation
-                        when (val gen = apiService.generateResume(resumeText, jobDesc)) {
+                        // User has credits, proceed with generation with retry
+                        val genResult = retryApiCall { 
+                            apiService.generateResumeWithWarmUp(resumeText, jobDesc) 
+                        }
+                        
+                        when (genResult) {
                             is ApiService.ApiResult.Success -> {
-                                currentGeneratedResume = gen.data
-                                displayGeneratedResume(gen.data)
+                                currentGeneratedResume = genResult.data
+                                displayGeneratedResume(genResult.data)
                                 showSuccess("Resume generated successfully!")
-                                updateCreditDisplay() // Refresh credit display
+                                updateCreditDisplay()
                             }
                             is ApiService.ApiResult.Error -> {
-                                showError("Generation failed: ${gen.message}")
+                                showError("Generation failed: ${genResult.message}")
                             }
                         }
                     } catch (e: Exception) {
@@ -293,6 +322,42 @@ class ResumeGenerationActivity : AppCompatActivity() {
         }
     }
 
+    // Add this retry helper function
+    private suspend fun <T> retryApiCall(
+        maxRetries: Int = MAX_RETRIES,
+        delay: Long = RETRY_DELAY_MS,
+        block: suspend () -> ApiService.ApiResult<T>
+    ): ApiService.ApiResult<T> {
+        var lastError: Exception? = null
+        
+        repeat(maxRetries) { attempt ->
+            try {
+                val result = block()
+                if (result is ApiService.ApiResult.Success) {
+                    return result
+                } else if (result is ApiService.ApiResult.Error) {
+                    lastError = Exception(result.message)
+                    // Don't retry for authentication errors
+                    if (result.code == 401) {
+                        return result
+                    }
+                }
+            } catch (e: Exception) {
+                lastError = e
+            }
+            
+            if (attempt < maxRetries - 1) {
+                delay(delay * (attempt + 1)) // Exponential backoff
+            }
+        }
+        
+        return ApiService.ApiResult.Error(
+            "Request failed after $maxRetries attempts: ${lastError?.message ?: "Unknown error"}"
+        )
+    }
+
+
+    
     /** ---------------- Display & Download ---------------- **/
     private fun displayGeneratedResume(resumeData: JSONObject) {
         try {
