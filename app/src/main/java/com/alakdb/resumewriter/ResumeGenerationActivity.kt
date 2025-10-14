@@ -282,7 +282,7 @@ private fun generateResumeFromFiles() {
                         
                         // User has credits, proceed with generation with retry
                         val genResult = retryApiCall { 
-                            apiService.generateResumeWithWarmUp(resumeText, jobDesc) 
+                            apiService.generateResume(resumeText, jobDesc) 
                         }
                         
                         when (genResult) {
