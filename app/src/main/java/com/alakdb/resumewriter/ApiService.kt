@@ -154,10 +154,16 @@ class ApiService(private val context: Context) {
     }
 
     // Simple warm-up server method
-    suspend fun warmUpServer(): ApiResult<JSONObject> {
-        Log.d("WarmUp", "🔥 Starting basic server warm-up...")
-        
-        return try {
+    suspend fun warmUpServer(
+    maxRetries: Int = 3,
+    delayMs: Long = 2000
+): ApiResult<JSONObject> {
+    Log.d("WarmUp", "🔥 Starting server warm-up...")
+
+    var lastError: Exception? = null
+
+    repeat(maxRetries) { attempt ->
+        try {
             val healthUrl = "$baseUrl/health"
             val request = Request.Builder()
                 .url(healthUrl)
@@ -166,19 +172,39 @@ class ApiService(private val context: Context) {
                 .build()
 
             client.newCall(request).execute().use { response ->
-                if (response.isSuccessful) {
-                    Log.d("WarmUp", "✅ Basic health check passed.")
-                    ApiResult.Success(JSONObject().put("status", "ready"))
+                val body = response.body?.string()
+
+                if (response.isSuccessful && body != null) {
+                    Log.d("WarmUp", "✅ Server is ready on attempt ${attempt + 1}")
+                    return ApiResult.Success(JSONObject(body))
                 } else {
-                    Log.w("WarmUp", "⚠️ Health check failed: HTTP ${response.code}")
-                    ApiResult.Error("Server not ready", response.code)
+                    Log.w(
+                        "WarmUp",
+                        "⚠️ Server not ready on attempt ${attempt + 1}: HTTP ${response.code}"
+                    )
                 }
             }
         } catch (e: Exception) {
-            Log.e("WarmUp", "❌ Basic warm-up failed: ${e.message}")
-            ApiResult.Error("Network error: ${e.message}")
+            lastError = e
+            Log.w(
+                "WarmUp",
+                "🌡️ Warm-up attempt ${attempt + 1} failed: ${e.javaClass.simpleName} - ${e.message}"
+            )
+        }
+
+        if (attempt < maxRetries - 1) {
+            val waitTime = delayMs * (attempt + 1)
+            Log.d("WarmUp", "⏳ Waiting ${waitTime}ms before next attempt...")
+            kotlinx.coroutines.delay(waitTime)
         }
     }
+
+    Log.e("WarmUp", "🔥 Server warm-up failed after $maxRetries attempts")
+    return ApiResult.Error(
+        "Server is taking longer than expected to start",
+        details = lastError?.message
+    )
+}
 
     // Enhanced API Methods with better error handling
     suspend fun deductCredit(userId: String): ApiResult<JSONObject> {
