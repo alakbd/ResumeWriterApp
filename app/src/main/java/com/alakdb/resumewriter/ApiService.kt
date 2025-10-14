@@ -5,7 +5,6 @@ import android.net.Uri
 import android.util.Log
 import com.google.firebase.auth.FirebaseAuth
 import com.google.gson.Gson
-import kotlinx.coroutines.delay
 import kotlinx.coroutines.tasks.await
 import okhttp3.*
 import okhttp3.MediaType.Companion.toMediaType
@@ -34,7 +33,7 @@ class ApiService(private val context: Context) {
         }.apply { 
             level = HttpLoggingInterceptor.Level.BODY 
         })
-        .addInterceptor(ErrorInterceptor())
+        .addInterceptor(ErrorInterceptor()) // Custom error interceptor
         .build()
 
     // Data Classes
@@ -70,22 +69,6 @@ class ApiService(private val context: Context) {
         }
     }
 
-    suspend fun generateResumeWithWarmUp(
-        resumeText: String, 
-        jobDescription: String, 
-        tone: String = "Professional"
-    ): ApiResult<JSONObject> {
-        // First warm up the server
-            val warmUpResult = warmUpServer()
-            if (warmUpResult is ApiResult.Error) {
-                Log.w("ApiService", "Warm-up failed but proceeding: ${warmUpResult.message}")
-        }
-    
-    // Then generate resume
-    return generateResume(resumeText, jobDescription, tone)
-}
-
-    
     // Current User Token with better error handling
     suspend fun getCurrentUserToken(): String? {
         return try {
@@ -168,6 +151,33 @@ class ApiService(private val context: Context) {
             0, 
             "Could not connect to any server endpoint"
         )
+    }
+
+    // Simple warm-up server method
+    suspend fun warmUpServer(): ApiResult<JSONObject> {
+        Log.d("WarmUp", "🔥 Starting basic server warm-up...")
+        
+        return try {
+            val healthUrl = "$baseUrl/health"
+            val request = Request.Builder()
+                .url(healthUrl)
+                .get()
+                .addHeader("User-Agent", "ResumeWriter-Android-WarmUp")
+                .build()
+
+            client.newCall(request).execute().use { response ->
+                if (response.isSuccessful) {
+                    Log.d("WarmUp", "✅ Basic health check passed.")
+                    ApiResult.Success(JSONObject().put("status", "ready"))
+                } else {
+                    Log.w("WarmUp", "⚠️ Health check failed: HTTP ${response.code}")
+                    ApiResult.Error("Server not ready", response.code)
+                }
+            }
+        } catch (e: Exception) {
+            Log.e("WarmUp", "❌ Basic warm-up failed: ${e.message}")
+            ApiResult.Error("Network error: ${e.message}")
+        }
     }
 
     // Enhanced API Methods with better error handling
@@ -325,75 +335,6 @@ class ApiService(private val context: Context) {
         }
     }
 
-    // Enhanced WarmUp Server with retry logic
-    suspend fun warmUpServer(): ApiResult<JSONObject> {
-    Log.d("WarmUp", "🔥 Starting basic server warm-up...")
-    
-    return try {
-        val healthUrl = "$baseUrl/health"
-        val request = Request.Builder()
-            .url(healthUrl)
-            .get()
-            .addHeader("User-Agent", "ResumeWriter-Android-WarmUp")
-            .build()
-
-        client.newCall(request).execute().use { response ->
-            if (response.isSuccessful) {
-                Log.d("WarmUp", "✅ Basic health check passed.")
-                ApiResult.Success(JSONObject().put("status", "ready"))
-            } else {
-                Log.w("WarmUp", "⚠️ Health check failed: HTTP ${response.code}")
-                ApiResult.Error("Server not ready", response.code)
-            }
-        }
-    } catch (e: Exception) {
-        Log.e("WarmUp", "❌ Basic warm-up failed: ${e.message}")
-        ApiResult.Error("Network error: ${e.message}")
-    }
-}
-
-                // If health check fails, try a lightweight credits check
-                Log.d("WarmUp", "Health check failed, trying lightweight endpoint...")
-
-                val creditsResult = getUserCredits()
-                when (creditsResult) {
-                    is ApiResult.Success -> {
-                        Log.d("WarmUp", "✅ Server warmed up successfully via credits endpoint")
-                        return ApiResult.Success(JSONObject().put("status", "warm").put("attempt", attempt + 1))
-                    }
-                    is ApiResult.Error -> {
-                        lastError = Exception(creditsResult.message)
-                        if (creditsResult.code == 401) {
-                            throw lastError as Exception
-                        }
-                    }
-                }
-
-                if (attempt < maxWarmupAttempts - 1) {
-                    val delay = 2000L * (attempt + 1)
-                    Log.d("WarmUp", "⏳ Waiting ${delay}ms before next attempt...")
-                    delay(delay)
-                }
-
-            } catch (e: Exception) {
-                lastError = e
-                Log.w("WarmUp", "Warm-up attempt ${attempt + 1} failed: ${e.message}")
-
-                if (attempt < maxWarmupAttempts - 1) {
-                    val delay = 2000L * (attempt + 1)
-                    delay(delay)
-                }
-            }
-        }
-
-        Log.w("WarmUp", "🔥 Server warm-up failed after $maxWarmupAttempts attempts")
-        val finalError = lastError
-        return ApiResult.Error(
-            "Server is taking longer than expected to start. Please try again in a moment.",
-            details = finalError?.message
-        )
-    }
-    
     // Utilities
     private fun uriToFile(uri: Uri): File {
         return try {
