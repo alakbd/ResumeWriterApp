@@ -302,6 +302,69 @@ class ApiService(private val context: Context) {
         }
     }
 
+    // WarmUp Server
+
+suspend fun warmUpServer(): ApiResult<JSONObject> {
+    Log.d("WarmUp", "🔥 Warming up server...")
+    
+    return try {
+        // Try health endpoint first (lightweight)
+        val healthUrl = "$baseUrl/health"
+        val healthRequest = Request.Builder()
+            .url(healthUrl)
+            .get()
+            .addHeader("User-Agent", "ResumeWriter-Android-WarmUp")
+            .build()
+        
+        client.newCall(healthRequest).execute().use { response ->
+            if (response.isSuccessful) {
+                Log.d("WarmUp", "✅ Server is already warm")
+                return ApiResult.Success(JSONObject().put("status", "warm"))
+            }
+        }
+        
+        // If health check fails or we want to ensure full warm-up, try a lightweight API call
+        Log.d("WarmUp", "⚠️ Health check didn't confirm warm state, trying credits endpoint...")
+        
+        val creditsResult = getUserCredits()
+        when (creditsResult) {
+            is ApiResult.Success -> {
+                Log.d("WarmUp", "✅ Server warmed up successfully")
+                creditsResult
+            }
+            is ApiResult.Error -> {
+                // Even if it fails, we tried to wake up the server
+                Log.w("WarmUp", "⚠️ Warm-up attempt completed (server may be waking up)")
+                ApiResult.Success(JSONObject().put("warmup_attempt", "completed"))
+            }
+        }
+    } catch (e: Exception) {
+        Log.w("WarmUp", "⚠️ Warm-up encountered error but may have woken server: ${e.message}")
+        ApiResult.Success(JSONObject().put("warmup_attempt", "completed_with_error"))
+    }
+}
+
+// Enhanced API methods with automatic warm-up
+suspend fun generateResumeWithWarmUp(
+    resumeText: String, 
+    jobDescription: String, 
+    tone: String = "Professional"
+): ApiResult<JSONObject> {
+    // Warm up first, then proceed with actual call
+    warmUpServer()
+    return generateResume(resumeText, jobDescription, tone)
+}
+
+suspend fun generateResumeFromFilesWithWarmUp(
+    resumeUri: Uri, 
+    jobDescUri: Uri, 
+    tone: String = "Professional"
+): ApiResult<JSONObject> {
+    warmUpServer()
+    return generateResumeFromFiles(resumeUri, jobDescUri, tone)
+}
+
+    
     // Utilities
     private fun uriToFile(uri: Uri): File {
         return try {
