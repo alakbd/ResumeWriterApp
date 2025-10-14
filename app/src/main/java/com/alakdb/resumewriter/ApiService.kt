@@ -23,9 +23,9 @@ class ApiService(private val context: Context) {
 
     // Enhanced OkHttp Client with better debugging
     private val client = OkHttpClient.Builder()
-        .connectTimeout(60, TimeUnit.SECONDS)
-        .readTimeout(120, TimeUnit.SECONDS)
-        .writeTimeout(60, TimeUnit.SECONDS)
+        .connectTimeout(10, TimeUnit.SECONDS)
+        .readTimeout(10, TimeUnit.SECONDS)
+        .writeTimeout(10, TimeUnit.SECONDS)
         .addInterceptor(HttpLoggingInterceptor { msg -> 
             Log.d("NetworkLog", "🔗 $msg") 
         }.apply { 
@@ -45,23 +45,15 @@ class ApiService(private val context: Context) {
     }
 
     // Custom Interceptor for better error handling
-    class ErrorInterceptor : Interceptor {
-        override fun intercept(chain: Interceptor.Chain): Response {
-            val request = chain.request()
-            try {
-                val response = chain.proceed(request)
-                
-                if (!response.isSuccessful) {
-                    Log.e("NetworkError", "HTTP ${response.code} for ${request.url}")
-                }
-                
-                return response
+    class ErrorInterceptor: Interceptor {
+      return try {
+        chain.proceed(chain.request())
             } catch (e: Exception) {
                 Log.e("NetworkError", "🚨 Request failed for ${request.url}: ${e.javaClass.simpleName} - ${e.message}", e)
                 throw e
             }
         }
-    }
+    
 
     // Current User Token with better error handling
     suspend fun getCurrentUserToken(): String? {
