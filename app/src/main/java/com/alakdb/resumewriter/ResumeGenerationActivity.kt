@@ -174,7 +174,7 @@ class ResumeGenerationActivity : AppCompatActivity() {
         }
     }
 
-    fun isNetworkConnected(context: Context): Boolean {
+    fun isConnected(context: Context): Boolean {
         val connectivityManager = context.getSystemService(Context.CONNECTIVITY_SERVICE) as ConnectivityManager
         val network = connectivityManager.activeNetwork ?: return false
         val capabilities = connectivityManager.getNetworkCapabilities(network) ?: return false
