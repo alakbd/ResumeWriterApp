@@ -418,28 +418,53 @@ class ResumeGenerationActivity : AppCompatActivity() {
     }
 
     /** ---------------- Credit Display ---------------- **/
-    private fun updateCreditDisplay() {
-        lifecycleScope.launch {
+private fun updateCreditDisplay() {
+    lifecycleScope.launch {
+        try {
+            // Show a loading message if the view is visible
             binding.tvCreditInfo.text = "Loading credits..."
-        
-            when (val result = apiService.getUserCredits()) {
-                is ApiService.ApiResult.Success -> {
-                    try {
-                        val credits = result.data.getInt("credits")
-                        binding.tvCreditInfo.text = "Available credits: $credits"
-                        binding.tvCreditInfo.visibility = android.view.View.VISIBLE
-                    } catch (e: Exception) {
-                        binding.tvCreditInfo.text = "Credits: Error parsing data"
-                        Log.e("ResumeGeneration", "Error parsing credit data: ${e.message}")
+            binding.tvCreditInfo.visibility = View.VISIBLE
+
+            // Call API safely
+            val result = withContext(Dispatchers.IO) { apiService.getUserCredits() }
+
+            withContext(Dispatchers.Main) {
+                when (result) {
+                    is ApiService.ApiResult.Success -> {
+                        val credits = try {
+                            result.data.optInt("credits", -1)
+                        } catch (e: Exception) {
+                            Log.e("ResumeGeneration", "JSON parsing error: ${e.message}")
+                            -1
+                        }
+
+                        if (credits >= 0) {
+                            binding.tvCreditInfo.text = "Available credits: $credits"
+                        } else {
+                            binding.tvCreditInfo.text = "Credits: Data unavailable"
+                        }
+                    }
+
+                    is ApiService.ApiResult.Error -> {
+                        binding.tvCreditInfo.text = "Credits: Unable to load"
+                        Log.e(
+                            "ResumeGeneration",
+                            "Error loading credits: ${result.message ?: "Unknown error"}"
+                        )
                     }
                 }
-                is ApiService.ApiResult.Error -> {
-                    binding.tvCreditInfo.text = "Credits: Unable to load"
-                    Log.e("ResumeGeneration", "Error loading credits: ${result.message}")
-                }
+            }
+        } catch (e: CancellationException) {
+            // Coroutine was canceled (e.g., Activity closed) — ignore
+        } catch (e: Exception) {
+            Log.e("ResumeGeneration", "Unexpected error while fetching credits", e)
+            withContext(Dispatchers.Main) {
+                binding.tvCreditInfo.text = "Credits: Error"
             }
         }
     }
+}
+
 
     /** ---------------- Helpers ---------------- **/
     private fun disableGenerateButton(text: String) {
