@@ -18,6 +18,7 @@ import com.google.firebase.auth.FirebaseAuth
 import kotlinx.coroutines.launch
 import org.json.JSONObject
 import java.io.File
+import kotlinx.coroutines.delay
 
 class ResumeGenerationActivity : AppCompatActivity() {
 
@@ -412,8 +413,5 @@ class ResumeGenerationActivity : AppCompatActivity() {
         Toast.makeText(this, "✅ $message", Toast.LENGTH_SHORT).show()
     }
 
-    override fun onResume() {
-        super.onResume()
-        updateCreditDisplay()
-    }
+
 }
