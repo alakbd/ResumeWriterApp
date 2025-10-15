@@ -58,14 +58,17 @@ class ResumeGenerationActivity : AppCompatActivity() {
     
     // Call these in onResume instead
     override fun onResume() {
-        super.onResume()
-        lifecycleScope.launch {
-            // Delay the API calls to avoid ANR
-            delay(1000)
-            updateCreditDisplay()
-            testApiConnection()
+    super.onResume()
+    lifecycleScope.launch {
+        delay(1000) // prevent ANR
+        // Only call one API at a time
+        updateCreditDisplay() // safe, calls getUserCredits only
+        val apiResult = apiService.warmUpServer() // safe, does not call getUserCredits
+        if (apiResult is ApiResult.Error) {
+            Log.e("ResumeActivity", "Server warm-up failed: ${apiResult.message}")
         }
     }
+}
 
     /** ---------------- File Picker Setup ---------------- **/
     private fun registerFilePickers() {
