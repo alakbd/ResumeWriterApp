@@ -95,12 +95,13 @@ class ApiService(private val context: Context) {
     class AuthInterceptor(private val context: Context) : Interceptor {
     override fun intercept(chain: Interceptor.Chain): Response {
         val token = UserManager(context).getUserToken()
+        val requestBuilder = chain.request().newBuilder()
 
-        val request = chain.request().newBuilder()
-            .addHeader("X-Auth-Token", token ?: "")
-            .build()
+        if (!token.isNullOrBlank()) {
+            requestBuilder.addHeader("X-Auth-Token", "Bearer $token")
+        }
 
-        return chain.proceed(request)
+        return chain.proceed(requestBuilder.build())
     }
 }
 
@@ -205,7 +206,6 @@ class ApiService(private val context: Context) {
             val request = Request.Builder()
                 .url("$baseUrl/deduct-credit")
                 .post(body)
-                .addHeader("X-Auth-Token", auth)
                 .addHeader("Content-Type", "application/json")
                 .addHeader("User-Agent", "ResumeWriter-Android")
                 .build()
@@ -242,7 +242,6 @@ class ApiService(private val context: Context) {
             val request = Request.Builder()
                 .url("$baseUrl/generate-resume")
                 .post(body)
-                .addHeader("X-Auth-Token", auth)
                 .addHeader("Content-Type", "application/json")
                 .addHeader("User-Agent", "ResumeWriter-Android")
                 .build()
@@ -290,7 +289,6 @@ class ApiService(private val context: Context) {
             val request = Request.Builder()
                 .url("$baseUrl/generate-resume-from-files")
                 .post(body)
-                .addHeader("X-Auth-Token", auth)
                 .addHeader("User-Agent", "ResumeWriter-Android")
                 .build()
 
@@ -327,7 +325,6 @@ class ApiService(private val context: Context) {
         val request = Request.Builder()
             .url("$baseUrl/user/credits")
             .get()
-            .addHeader("X-Auth-Token", auth)
             .addHeader("User-Agent", "ResumeWriter-Android")
             .build()
 
