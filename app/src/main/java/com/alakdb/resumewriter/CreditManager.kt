@@ -18,6 +18,58 @@ class CreditManager(private val context: Context) {
         private const val TOTAL_CREDITS_KEY = "total_credits"
         private const val ADMIN_MODE_KEY = "admin_mode"
         private const val LAST_RESUME_TIME_KEY = "last_resume_time"
+        
+        // 🔒 Admin emails - keep this centralized
+        private val ADMIN_EMAILS = listOf("alakbd2009@gmail.com", "admin@resumewriter.com")
+    }
+
+    // -----------------------
+    // ADMIN SECURITY FUNCTIONS
+    // -----------------------
+
+    /**
+     * 🔒 SECURE: Only set admin mode through explicit admin login
+     */
+    fun setAdminMode(isAdmin: Boolean) {
+        prefs.edit().putBoolean(ADMIN_MODE_KEY, isAdmin).apply()
+        Log.d("AdminSecurity", "Admin mode set to: $isAdmin")
+    }
+
+    /**
+     * 🔒 SECURE: Check if current user is authorized for admin access
+     */
+    fun isUserAuthorizedAdmin(): Boolean {
+        val currentUser = auth.currentUser
+        val userEmail = currentUser?.email ?: return false
+        
+        return ADMIN_EMAILS.contains(userEmail.toLowerCase().trim())
+    }
+
+    /**
+     * 🔒 SECURE: Comprehensive admin mode check
+     */
+    fun isAdminMode(): Boolean {
+        val isAdminFlag = prefs.getBoolean(ADMIN_MODE_KEY, false)
+        
+        // Double-check: if admin flag is set, verify user is still authorized
+        if (isAdminFlag && !isUserAuthorizedAdmin()) {
+            // Auto-revoke admin access if user is no longer authorized
+            setAdminMode(false)
+            Log.w("AdminSecurity", "Auto-revoked admin access for unauthorized user")
+            return false
+        }
+        
+        return isAdminFlag
+    }
+
+    /**
+     * 🔒 DEPRECATED: Remove this auto-grant function to prevent security issues
+     */
+    @Deprecated("Use explicit admin login flow instead - security risk")
+    fun loginAsAdmin(email: String): Boolean {
+        // This function is dangerous - remove or make it do nothing
+        Log.w("Security", "loginAsAdmin called - this should only be used in AdminLoginActivity")
+        return false
     }
 
     // -----------------------
@@ -140,40 +192,14 @@ class CreditManager(private val context: Context) {
     }
 
     // -----------------------
-    // Admin mode handling
-    // -----------------------
-    /**
-     * Persist admin mode flag. Use this from AdminLoginActivity on successful admin auth,
-     * and call setAdminMode(false) on logout.
-     */
-    fun setAdminMode(isAdmin: Boolean) {
-        prefs.edit().putBoolean(ADMIN_MODE_KEY, isAdmin).apply()
-    }
-
-    /**
-     * Returns true only when the explicit admin flag is set.
-     * (No implicit Firebase-email auto-grant here — keep admin sessions explicit.)
-     */
-    fun isAdminMode(): Boolean {
-        return prefs.getBoolean(ADMIN_MODE_KEY, false)
-    }
-
-    /**
-     * Convenience helper: mark admin if the email is in your hardcoded admin list.
-     * Call this from your login flow if you prefer a single-line check.
-     */
-    fun loginAsAdmin(email: String): Boolean {
-        val adminEmails = listOf("alakbd2009@gmail.com", "admin@resumewriter.com")
-        return if (adminEmails.contains(email)) {
-            setAdminMode(true)
-            true
-        } else false
-    }
-
-    // -----------------------
-    // Admin Firestore operations
+    // Admin Firestore operations with security checks
     // -----------------------
     fun adminAddCreditsToUser(userId: String, amount: Int, onComplete: (Boolean) -> Unit) {
+        if (!isAdminMode()) {
+            onComplete(false)
+            return
+        }
+        
         db.collection("users").document(userId).update(
             mapOf(
                 "availableCredits" to FieldValue.increment(amount.toLong()),
@@ -184,6 +210,11 @@ class CreditManager(private val context: Context) {
     }
 
     fun adminSetUserCredits(userId: String, amount: Int, onComplete: (Boolean) -> Unit) {
+        if (!isAdminMode()) {
+            onComplete(false)
+            return
+        }
+        
         db.collection("users").document(userId).update(
             mapOf(
                 "availableCredits" to amount,
@@ -194,6 +225,11 @@ class CreditManager(private val context: Context) {
     }
 
     fun adminResetUserCredits(userId: String, onComplete: (Boolean) -> Unit) {
+        if (!isAdminMode()) {
+            onComplete(false)
+            return
+        }
+        
         db.collection("users").document(userId).update(
             mapOf(
                 "availableCredits" to 0,
