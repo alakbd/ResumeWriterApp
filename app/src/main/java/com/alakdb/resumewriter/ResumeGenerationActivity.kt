@@ -61,15 +61,23 @@ class ResumeGenerationActivity : AppCompatActivity() {
         lifecycleScope.launch {
             delay(1000) // prevent ANR
             Log.d("ResumeActivity", "onResume: Updating credits and warming up server")
-            updateCreditDisplay()
-            val warmUpResult = apiService.warmUpServer()
-            if (warmUpResult is ApiService.ApiResult.Error) {
-                Log.e("ResumeActivity", "Server warm-up failed: ${warmUpResult.message}")
-            } else {
+
+        // First, update the user's credits
+        updateCreditDisplay()
+
+        // Then, warm up the server and handle result safely
+        val warmUpResult = apiService.warmUpServer()
+        when (warmUpResult) {
+            is ApiService.ApiResult.Success<*> -> {
                 Log.d("ResumeActivity", "Server warm-up successful")
+            }
+            is ApiService.ApiResult.Error -> {
+                Log.e("ResumeActivity", "Server warm-up failed: ${warmUpResult.message}")
+                showError("Server warm-up failed: ${warmUpResult.message}")
             }
         }
     }
+}
 
     /** ---------------- File Picker Setup ---------------- **/
     private fun registerFilePickers() {
