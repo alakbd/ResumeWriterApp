@@ -430,18 +430,22 @@ class ResumeGenerationActivity : AppCompatActivity() {
     }
 
     private fun handleGenerationResult(result: ApiService.ApiResult<JSONObject>) {
-        when (result) {
-            is ApiService.ApiResult.Success -> {
-                Log.d("ResumeActivity", "Resume generation success: ${result.data}")
-                currentGeneratedResume = result.data
-                displayGeneratedResume(result.data)
-                showSuccess("Resume generated successfully!")
+    when (result) {
+        is ApiService.ApiResult.Success -> {
+            Log.d("ResumeActivity", "Resume generation success: ${result.data}")
+            currentGeneratedResume = result.data
+            displayGeneratedResume(result.data)
+            showSuccess("Resume generated successfully!")
+
+            // ✅ Wrap in coroutine
+            lifecycleScope.launch {
                 updateCreditDisplay()
             }
-            is ApiService.ApiResult.Error -> {
-                Log.e("ResumeActivity", "Resume generation failed: ${result.message}")
-                showError("Generation failed: ${result.message}")
-            }
+        }
+        is ApiService.ApiResult.Error -> {
+            Log.e("ResumeActivity", "Resume generation failed: ${result.message}")
+            showError("Generation failed: ${result.message}")
         }
     }
+}
 }
