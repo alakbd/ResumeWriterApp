@@ -294,17 +294,23 @@ class ResumeGenerationActivity : AppCompatActivity() {
             try {
                 binding.tvCreditInfo.text = "Loading credits..."
                 binding.tvCreditInfo.visibility = View.VISIBLE
-                val result = withContext(Dispatchers.IO) { apiService.getUserCredits() }
+                val result = withContext(Dispatchers.IO) { 
+                    Log.d("ResumeGeneration", "Fetching user credits from API")
+                    apiService.getUserCredits() 
+             }
                 when (result) {
-                    is ApiService.ApiResult.Success -> binding.tvCreditInfo.text = "Available credits: ${result.data.optInt("credits", -1)}"
-                    is ApiService.ApiResult.Error -> binding.tvCreditInfo.text = "Credits: Unable to load"
+                    is ApiService.ApiResult.Success -> {
+                        Log.d("ResumeGeneration", "Credits fetched successfully: ${result.data}")
+                        binding.tvCreditInfo.text = "Available credits: ${result.data.optInt("credits", -1)}"
                 }
-            } catch (e: Exception) {
-                binding.tvCreditInfo.text = "Credits: Error"
+                    is ApiService.ApiResult.Error -> {
+                        Log.e("ResumeGeneration", "Error fetching credits: ${result.message}")
+                        binding.tvCreditInfo.text = "Credits: Unable to load"
+                }
             }
         }
     }
-
+}
     /** ---------------- Helpers ---------------- **/
     private fun disableGenerateButton(text: String) {
         binding.btnGenerateResume.isEnabled = false
