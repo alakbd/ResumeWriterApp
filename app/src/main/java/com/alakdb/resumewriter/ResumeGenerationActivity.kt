@@ -59,22 +59,24 @@ class ResumeGenerationActivity : AppCompatActivity() {
     override fun onResume() {
         super.onResume()
         lifecycleScope.launch {
-            delay(1000) // prevent ANR
+            delay(1000)
             Log.d("ResumeActivity", "onResume: Updating credits and warming up server")
 
-        // First, update the user's credits
-        updateCreditDisplay()
+        // Update credits
+        val creditsResult = apiService.getUserCredits()
+        if (creditsResult is ApiResult.Success) {
+            val credits = creditsResult.data.optInt("credits", 0)
+            Log.d("ResumeActivity", "Credits loaded: $credits")
+        } else if (creditsResult is ApiResult.Error) {
+            Log.e("ResumeActivity", "Failed to load credits: ${creditsResult.message}")
+        }
 
-        // Then, warm up the server and handle result safely
+        // Warm up server
         val warmUpResult = apiService.warmUpServer()
-        when (warmUpResult) {
-            is ApiService.ApiResult.Success<*> -> {
-                Log.d("ResumeActivity", "Server warm-up successful")
-            }
-            is ApiService.ApiResult.Error -> {
-                Log.e("ResumeActivity", "Server warm-up failed: ${warmUpResult.message}")
-                showError("Server warm-up failed: ${warmUpResult.message}")
-            }
+        if (warmUpResult is ApiResult.Success) {
+            Log.d("ResumeActivity", "Server warm-up successful")
+        } else if (warmUpResult is ApiResult.Error) {
+            Log.e("ResumeActivity", "Server warm-up failed: ${warmUpResult.message}")
         }
     }
 }
