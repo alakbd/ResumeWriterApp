@@ -54,14 +54,15 @@ class ApiService(private val context: Context) {
 
 
 
-        // Warm up the server
-    suspend fun warmUpServer() {
-        try {
-            warmUp() // actual network call
+        suspend fun warmUpServer(): ApiResult<JSONObject> {
+            return try {
+            // Your server ping logic here
+            val response = api.get("/warmup") // pseudo-code
+            ApiResult.Success(response)
         } catch (e: Exception) {
-            Log.e("NetworkError", "Server warm-up failed", e)
-        }
+            ApiResult.Error(e.message ?: "Warm-up failed")
     }
+}
 
     
     // Custom Interceptor for better error handling
