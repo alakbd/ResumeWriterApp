@@ -42,27 +42,54 @@ class ApiService(private val context: Context) {
     data class DeductCreditRequest(val user_id: String)
     data class GenerateResumeRequest(val resume_text: String, val job_description: String, val tone: String = "Professional")
 
-    // API Result Wrapper
+  
+    // API Result wrapper
     sealed class ApiResult<out T> {
         data class Success<out T>(val data: T) : ApiResult<T>()
-        data class Error(
-            val message: String,
-            val code: Int = 0,
-            val details: String? = null
-        ) : ApiResult<Nothing>()
+        data class Error(val message: String, val code: Int = 0, val details: String? = null) : ApiResult<Nothing>()
     }
 
+    // Example: warm up server
+    suspend fun warmUpServer(): ApiResult<JSONObject> {
+        return try {
+            val request = Request.Builder()
+                .url("$baseUrl/warmup")
+                .get()
+                .build()
 
-
-        suspend fun warmUpServer(): ApiResult<JSONObject> {
-            return try {
-            // Your server ping logic here
-            val response = api.get("/warmup") // pseudo-code
-            ApiResult.Success(response)
+            client.newCall(request).execute().use { response ->
+                val body = response.body?.string() ?: "{}"
+                if (!response.isSuccessful) {
+                    return ApiResult.Error("Warm-up failed", response.code)
+                }
+                ApiResult.Success(JSONObject(body))
+            }
         } catch (e: Exception) {
-            ApiResult.Error(e.message ?: "Warm-up failed")
+            ApiResult.Error(e.message ?: "Warm-up exception")
+        }
     }
-}
+
+    // Example: get user credits
+    suspend fun getUserCredits(): ApiResult<JSONObject> {
+        return try {
+            val auth = getAuthIdentifier() ?: return ApiResult.Error("User auth unavailable")
+            val request = Request.Builder()
+                .url("$baseUrl/user/credits")
+                .get()
+                .addHeader("X-Auth-Token", auth)
+                .build()
+
+            client.newCall(request).execute().use { response ->
+                val body = response.body?.string() ?: "{}"
+                if (!response.isSuccessful) {
+                    return ApiResult.Error("Failed to get credits", response.code)
+                }
+                ApiResult.Success(JSONObject(body))
+            }
+        } catch (e: Exception) {
+            ApiResult.Error(e.message ?: "Exception while getting credits")
+        }
+    }
 
     
     // Custom Interceptor for better error handling
