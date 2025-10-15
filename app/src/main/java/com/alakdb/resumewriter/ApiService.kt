@@ -301,6 +301,7 @@ class ApiService(private val context: Context) {
     }
 
     suspend fun getUserCredits(): ApiResult<JSONObject> {
+        Log.e("ApiService", "getUserCredits called")  // <-- must appear in Logcat
         return try {
             val auth = getAuthIdentifier()
                 if (auth.isNullOrEmpty()) {
