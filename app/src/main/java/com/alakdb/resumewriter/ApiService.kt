@@ -44,19 +44,13 @@ class ApiService(private val context: Context) {
 
     // API Result Wrapper
     sealed class ApiResult<out T> {
-
-        data class Success<out T>(val data: T) : ApiResult<T>() {
-            override fun toString(): String = "ApiResult.Success(data=$data)"
-        }
-
+        data class Success<out T>(val data: T) : ApiResult<T>()
         data class Error(
             val message: String,
-        v    al code: Int = 0,
+            val code: Int = 0,
             val details: String? = null
-        ) : ApiResult<Nothing>() {
-            override fun toString(): String = "ApiResult.Error(message=$message, code=$code, details=$details)"
+        ) : ApiResult<Nothing>()
     }
-}
 
 
 
@@ -300,35 +294,35 @@ class ApiService(private val context: Context) {
     }
 
     suspend fun getUserCredits(): ApiResult<JSONObject> {
-    Log.d("ApiService", "Getting user credits")
+        return try {
+            val auth = getAuthIdentifier() ?: return ApiResult.Error(
+                message = "User authentication unavailable",
+                code = 401
+        )
 
-    return try {
-        val auth = getAuthIdentifier()
-            ?: return ApiResult.Error("User authentication unavailable", 401, "No auth token")
-
-        val request = Request.Builder()
-            .url("$baseUrl/user/credits")
-            .get()
-            .addHeader("X-Auth-Token", auth)
-            .addHeader("User-Agent", "ResumeWriter-Android")
-            .build()
+            val request = Request.Builder()
+                .url("$baseUrl/user/credits")
+                .get()
+                .addHeader("X-Auth-Token", auth)
+                .addHeader("User-Agent", "ResumeWriter-Android")
+                .build()
 
         client.newCall(request).execute().use { response ->
             val respBody = response.body?.string() ?: "{}"
-            Log.d("ApiService", "Get credits response: ${response.code}")
-
             if (!response.isSuccessful) {
-                val errorMsg = handleErrorResponse(response)
-                Log.e("ApiService", "Get credits failed: $errorMsg")
-                return ApiResult.Error(errorMsg, response.code)
+                return ApiResult.Error(
+                    message = "Get credits failed: ${response.message}",
+                    code = response.code
+                )
             }
-
             ApiResult.Success(JSONObject(respBody))
         }
     } catch (e: Exception) {
-        val errorCode = getErrorCode(e)
-        Log.e("ApiService", "Get credits exception: ${e.message}", e)
-        ApiResult.Error("Get credits failed: ${e.message}", errorCode, e.stackTraceToString())
+        ApiResult.Error(
+            message = "Get credits exception: ${e.message}",
+            code = -1,
+            details = e.stackTraceToString()
+        )
     }
 }
 
