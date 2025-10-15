@@ -348,19 +348,21 @@ class ResumeGenerationActivity : AppCompatActivity() {
 
     /** ---------------- Credit Display ---------------- **/
     private suspend fun updateCreditDisplay() {
-        Log.d("ResumeActivity", "Fetching user credits...")
-        when (val result = apiService.getUserCredits()) {
-            is ApiService.ApiResult.Success -> {
-                val credits = result.data.optInt("credits", 0)
-                Log.d("ResumeActivity", "Credits retrieved: $credits")
-                runOnUiThread {
-                    findViewById<TextView>(R.id.creditText).text = "Credits: $credits"
-                }
+    Log.d("ResumeActivity", "Fetching user credits...")
+
+    when (val result = apiService.getUserCredits()) {
+        is ApiService.ApiResult.Success -> {
+            val credits = result.data.optInt("credits", 0)
+            Log.d("ResumeActivity", "Credits retrieved: $credits")
+            runOnUiThread {
+                findViewById<TextView>(R.id.creditText).text = "Credits: $credits"
             }
-            is ApiService.ApiResult.Error -> {
-                Log.e("ResumeActivity", "Failed to fetch credits: ${result.message}")
-                runOnUiThread {
-                    findViewById<TextView>(R.id.creditText).text = "Credits: --"
+        }
+
+        is ApiService.ApiResult.Error -> {
+            Log.e("ResumeActivity", "Failed to fetch credits: ${result.message}")
+            runOnUiThread {
+                findViewById<TextView>(R.id.creditText).text = "Credits: --"
             }
         }
     }
