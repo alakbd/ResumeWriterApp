@@ -301,18 +301,15 @@ class ApiService(private val context: Context) {
     }
 
     suspend fun getUserCredits(): ApiResult<JSONObject> {
-        Log.e("ApiService", "getUserCredits called")  // <-- must appear in Logcat
-        return try {
-            val auth = getAuthIdentifier()
-                if (auth.isNullOrEmpty()) {
-                Log.e("ApiService", "Auth token is null or empty")
-                return ApiResult.Error(
-                message = "User authentication unavailable",
+    return try {
+        val auth = getAuthIdentifier()
+        if (auth.isNullOrEmpty()) {
+            Log.e("ApiService", "Auth token is null or empty")
+            return ApiResult.Error(
+                message = "User authentication unavailable. Please log in.",
                 code = 401
             )
         }
-
-        Log.d("ApiService", "Using Auth token: $auth")
 
         val request = Request.Builder()
             .url("$baseUrl/user/credits")
@@ -323,21 +320,17 @@ class ApiService(private val context: Context) {
 
         client.newCall(request).execute().use { response ->
             val respBody = response.body?.string() ?: "{}"
-            Log.d("ApiService", "Response code: ${response.code}, body: $respBody")
-
             if (!response.isSuccessful) {
                 return ApiResult.Error(
-                    message = "Get credits failed: ${response.message}",
+                    message = "Failed to get credits: ${response.message}",
                     code = response.code
                 )
             }
-
             ApiResult.Success(JSONObject(respBody))
         }
     } catch (e: Exception) {
-        Log.e("ApiService", "Exception in getUserCredits: ${e.message}", e)
         ApiResult.Error(
-            message = "Get credits exception: ${e.message}",
+            message = "Exception while fetching credits: ${e.message}",
             code = -1,
             details = e.stackTraceToString()
         )
