@@ -69,27 +69,6 @@ class ApiService(private val context: Context) {
         }
     }
 
-    // Example: get user credits
-    suspend fun getUserCredits(): ApiResult<JSONObject> {
-        return try {
-            val auth = getAuthIdentifier() ?: return ApiResult.Error("User auth unavailable")
-            val request = Request.Builder()
-                .url("$baseUrl/user/credits")
-                .get()
-                .addHeader("X-Auth-Token", auth)
-                .build()
-
-            client.newCall(request).execute().use { response ->
-                val body = response.body?.string() ?: "{}"
-                if (!response.isSuccessful) {
-                    return ApiResult.Error("Failed to get credits", response.code)
-                }
-                ApiResult.Success(JSONObject(body))
-            }
-        } catch (e: Exception) {
-            ApiResult.Error(e.message ?: "Exception while getting credits")
-        }
-    }
 
     
     // Custom Interceptor for better error handling
