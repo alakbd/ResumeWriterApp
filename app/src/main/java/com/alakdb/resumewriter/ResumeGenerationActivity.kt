@@ -354,14 +354,16 @@ class ResumeGenerationActivity : AppCompatActivity() {
         is ApiService.ApiResult.Success -> {
             val credits = result.data.optInt("credits", 0)
             Log.d("ResumeActivity", "Credits retrieved: $credits")
-            runOnUiThread {
+
+            withContext(Dispatchers.Main) {
                 findViewById<TextView>(R.id.creditText).text = "Credits: $credits"
             }
         }
 
         is ApiService.ApiResult.Error -> {
             Log.e("ResumeActivity", "Failed to fetch credits: ${result.message}")
-            runOnUiThread {
+
+            withContext(Dispatchers.Main) {
                 findViewById<TextView>(R.id.creditText).text = "Credits: --"
             }
         }
