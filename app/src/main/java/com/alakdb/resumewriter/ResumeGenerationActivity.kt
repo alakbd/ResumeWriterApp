@@ -53,12 +53,17 @@ class ResumeGenerationActivity : AppCompatActivity() {
     }
 
     override fun onResume() {
-        super.onResume()
-        lifecycleScope.launch {
-            delay(1000)
-            Log.d("ResumeActivity", "onResume: Updating credits and warming up server")
-            updateCreditDisplay()
-            val warmUpResult = try {
+    super.onResume()
+
+    // launch a coroutine since updateCreditDisplay() is suspend
+    lifecycleScope.launch {
+        delay(1000) // prevent ANR
+        Log.d("ResumeActivity", "onResume: Updating credits and warming up server")
+
+        // ✅ Safe coroutine call
+        updateCreditDisplay()
+
+        val warmUpResult = try {
             apiService.warmUpServer()
         } catch (e: Exception) {
             Log.e("ResumeActivity", "Warm-up failed with exception: ${e.message}", e)
@@ -66,9 +71,12 @@ class ResumeGenerationActivity : AppCompatActivity() {
         }
 
         when (warmUpResult) {
-            is ApiService.ApiResult.Success -> Log.d("ResumeActivity", "Server warm-up successful")
-            is ApiService.ApiResult.Error -> Log.e("ResumeActivity", "Server warm-up failed: ${warmUpResult.message}")
-            null -> Log.e("ResumeActivity", "Server warm-up returned null")
+            is ApiService.ApiResult.Success ->
+                Log.d("ResumeActivity", "Server warm-up successful")
+            is ApiService.ApiResult.Error ->
+                Log.e("ResumeActivity", "Server warm-up failed: ${warmUpResult.message}")
+            null ->
+                Log.e("ResumeActivity", "Server warm-up returned null")
         }
     }
 }
