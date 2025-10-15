@@ -53,7 +53,7 @@ class ApiService(private val context: Context) {
         // Warm up the server
     suspend fun warmUpServer() {
         try {
-            api.warmUp() // actual network call
+            warmUp() // actual network call
         } catch (e: Exception) {
             Log.e("NetworkError", "Server warm-up failed", e)
         }
