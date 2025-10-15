@@ -36,6 +36,7 @@ class ApiService(private val context: Context) {
             level = HttpLoggingInterceptor.Level.BODY 
         })
         .addInterceptor(ErrorInterceptor()) // Custom error interceptor
+        .addInterceptor(AuthInterceptor(context)) 
         .build()
 
     // Data Classes
@@ -88,6 +89,18 @@ class ApiService(private val context: Context) {
             Log.e("NetworkError", "Network request failed", e)
             throw e
         }
+    }
+}
+
+    class AuthInterceptor(private val context: Context) : Interceptor {
+    override fun intercept(chain: Interceptor.Chain): Response {
+        val token = UserManager(context).getUserToken()
+
+        val request = chain.request().newBuilder()
+            .addHeader("X-Auth-Token", token ?: "")
+            .build()
+
+        return chain.proceed(request)
     }
 }
 
