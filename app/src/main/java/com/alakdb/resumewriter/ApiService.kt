@@ -44,9 +44,19 @@ class ApiService(private val context: Context) {
 
     // API Result Wrapper
     sealed class ApiResult<out T> {
-        data class Success<out T>(val data: T) : ApiResult<T>()
-        data class Error(val message: String, val code: Int = 0, val details: String? = null) : ApiResult<Nothing>()
+
+        data class Success<out T>(val data: T) : ApiResult<T>() {
+            override fun toString(): String = "ApiResult.Success(data=$data)"
+        }
+
+        data class Error(
+            val message: String,
+        v    al code: Int = 0,
+            val details: String? = null
+        ) : ApiResult<Nothing>() {
+            override fun toString(): String = "ApiResult.Error(message=$message, code=$code, details=$details)"
     }
+}
 
 
 
