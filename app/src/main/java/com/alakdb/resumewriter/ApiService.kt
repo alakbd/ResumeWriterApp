@@ -48,28 +48,31 @@ class ApiService(private val context: Context) {
     }
 
     // Custom Interceptor for better error handling
-    class ErrorInterceptor: Interceptor {
+    class ErrorInterceptor : Interceptor {
         override fun intercept(chain: Interceptor.Chain): Response {
-            val request = chain.request()
-        return try {
-            val response = chain.proceed(request)
-            if (!response.isSuccessful) {
+            return try {
+                val request = chain.request()
+                val response = chain.proceed(request)
+
+                if (!response.isSuccessful) {
                 Log.e("NetworkError", "HTTP ${response.code} for ${request.url}")
             }
+
             response
         } catch (e: Exception) {
+            // Log the exception
             Log.e(
                 "NetworkError",
-                "🚨 Request failed for ${request.url}: ${e.javaClass.simpleName} - ${e.message}",
+                "🚨 Request failed for ${chain.request().url}: ${e.javaClass.simpleName} - ${e.message}",
                 e
             )
-            // Return a fake 500 response so it doesn't crash
+            // Instead of throwing, return a dummy error response
             Response.Builder()
-                .request(request)
+                .request(chain.request())
                 .protocol(Protocol.HTTP_1_1)
-                .code(500)
-                .message("Interceptor caught")
-                .body("{}".toResponseBody("application/json".toMediaType()))
+                .code(500) // generic server error
+                .message(e.message ?: "Network error")
+                .body("{}".toResponseBody("application/json".toMediaTypeOrNull()))
                 .build()
         }
     }
@@ -160,55 +163,56 @@ class ApiService(private val context: Context) {
     }
 
     // Simple warm-up server method
-    suspend fun warmUpServer(
-    maxRetries: Int = 3,
-    delayMs: Long = 2000
-): ApiResult<JSONObject> {
-    Log.d("WarmUp", "🔥 Starting server warm-up...")
+    suspend fun warmUpServer(maxAttempts: Int = 3): ApiResult<JSONObject> {
+        var lastError: Exception? = null
 
-    var lastError: Exception? = null
+        repeat(maxAttempts) { attempt ->
+            try {
+                Log.d("WarmUp", "🔥 Warm-up attempt ${attempt + 1} of $maxAttempts")
 
-    repeat(maxRetries) { attempt ->
-        try {
-            val healthUrl = "$baseUrl/health"
-            val request = Request.Builder()
-                .url(healthUrl)
-                .get()
-                .addHeader("User-Agent", "ResumeWriter-Android-WarmUp")
-                .build()
+            // Health check
+                val request = Request.Builder()
+                    .url("$baseUrl/health")
+                    .get()
+                    .addHeader("User-Agent", "ResumeWriter-Android-WarmUp")
+                    .build()
 
-            client.newCall(request).execute().use { response ->
-                val body = response.body?.string()
+                val response = client.newCall(request).execute()
+                val body = response.body?.string() ?: "{}"
 
-                if (response.isSuccessful && body != null) {
-                    Log.d("WarmUp", "✅ Server is ready on attempt ${attempt + 1}")
+                if (response.isSuccessful) {
+                    Log.d("WarmUp", "✅ Server ready: $body")
                     return ApiResult.Success(JSONObject(body))
                 } else {
-                    Log.w(
-                        "WarmUp",
-                        "⚠️ Server not ready on attempt ${attempt + 1}: HTTP ${response.code}"
-                    )
-                }
+                Log.w("WarmUp", "⚠️ Health check failed: HTTP ${response.code}")
             }
+
+            // Lightweight fallback: get user credits
+            val creditsResult = getUserCredits()
+            if (creditsResult is ApiResult.Success) {
+                Log.d("WarmUp", "✅ Server warmed via credits endpoint")
+                return ApiResult.Success(JSONObject().put("status", "warm").put("attempt", attempt + 1))
+            } else if (creditsResult is ApiResult.Error) {
+                lastError = Exception(creditsResult.message)
+                Log.w("WarmUp", "Credits check failed: ${creditsResult.message}")
+            }
+
+            // Wait before next attempt
+            val delayMillis = 2000L * (attempt + 1)
+            Log.d("WarmUp", "⏳ Waiting $delayMillis ms before retry...")
+            kotlinx.coroutines.delay(delayMillis)
+
         } catch (e: Exception) {
             lastError = e
-            Log.w(
-                "WarmUp",
-                "🌡️ Warm-up attempt ${attempt + 1} failed: ${e.javaClass.simpleName} - ${e.message}"
-            )
-        }
-
-        if (attempt < maxRetries - 1) {
-            val waitTime = delayMs * (attempt + 1)
-            Log.d("WarmUp", "⏳ Waiting ${waitTime}ms before next attempt...")
-            kotlinx.coroutines.delay(waitTime)
+            Log.w("WarmUp", "Attempt ${attempt + 1} failed: ${e.message}")
         }
     }
 
-    Log.e("WarmUp", "🔥 Server warm-up failed after $maxRetries attempts")
+    // After all attempts failed
     return ApiResult.Error(
-        "Server is taking longer than expected to start",
-        details = lastError?.message
+        "Server is taking longer than expected to start. Please try again.",
+        0,
+        lastError?.message
     )
 }
 
