@@ -119,7 +119,7 @@ class ApiService(private val context: Context) {
     }
 
     // Enhanced Authentication Helper
-    private suspend fun getAuthIdentifier(): String? {
+    suspend fun getAuthIdentifier(): String? {
         return try {
             val token = getCurrentUserToken()
             if (token != null) {
