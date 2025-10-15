@@ -354,9 +354,31 @@ class ResumeGenerationActivity : AppCompatActivity() {
     }
 
     /** ---------------- Credit Display ---------------- **/
-    private suspend fun updateCreditDisplay() {
+private suspend fun updateCreditDisplay() {
     Log.d("ResumeActivity", "Fetching user credits...")
 
+    // ✅ Step 1: Ensure token is available and valid before making API call
+    var token = userManager.getUserToken()
+    if (token.isNullOrEmpty()) {
+        Log.w("ResumeActivity", "No auth token found — attempting to refresh.")
+        FirebaseAuth.getInstance().currentUser?.getIdToken(true)?.addOnSuccessListener {
+            it.token?.let { newToken ->
+                userManager.saveUserToken(newToken)
+                Log.d("ResumeActivity", "Token refreshed successfully.")
+            }
+        }
+        // Optional: short delay to give the refresh a moment (or skip)
+        token = userManager.getUserToken()
+        if (token.isNullOrEmpty()) {
+            Log.e("ResumeActivity", "Still no token available, aborting credit fetch.")
+            withContext(Dispatchers.Main) {
+                binding.creditText.text = "Credits: --"
+            }
+            return
+        }
+    }
+
+    // ✅ Step 2: Proceed with normal API call
     when (val result = apiService.getUserCredits()) {
         is ApiService.ApiResult.Success -> {
             val credits = result.data.optInt("credits", 0)
@@ -369,10 +391,8 @@ class ResumeGenerationActivity : AppCompatActivity() {
 
         is ApiService.ApiResult.Error -> {
             Log.e("ResumeActivity", "Failed to fetch credits: ${result.message}")
-
             withContext(Dispatchers.Main) {
                 binding.creditText.text = "Credits: --"
-                // Optionally, show a Toast or Snackbar
                 Toast.makeText(
                     this@ResumeGenerationActivity,
                     result.message,
