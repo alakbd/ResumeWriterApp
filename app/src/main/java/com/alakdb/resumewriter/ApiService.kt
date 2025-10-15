@@ -48,33 +48,42 @@ class ApiService(private val context: Context) {
         data class Error(val message: String, val code: Int = 0, val details: String? = null) : ApiResult<Nothing>()
     }
 
+    // Example: fetch user credits
+    suspend fun getUserCredits(): Int {
+        return try {
+            api.getCredits()  // actual network call
+        } catch (e: Exception) {
+            Log.e("NetworkError", "Failed to get user credits", e)
+            0
+        }
+    }
+
+        // Warm up the server
+    suspend fun warmUpServer() {
+        try {
+            api.warmUp() // actual network call
+        } catch (e: Exception) {
+            Log.e("NetworkError", "Server warm-up failed", e)
+        }
+    }
+
+    
     // Custom Interceptor for better error handling
     class ErrorInterceptor : Interceptor {
-        override fun intercept(chain: Interceptor.Chain): Response {
-            return try {
-                val request = chain.request()
-                val response = chain.proceed(request)
+    override fun intercept(chain: Interceptor.Chain): Response {
+        return try {
+            val request = chain.request()
+            val response = chain.proceed(request)
 
-                if (!response.isSuccessful) {
-                Log.e("NetworkError", "HTTP ${response.code} for ${request.url}")
+            if (!response.isSuccessful) {
+                // Handle error codes if needed
+                Log.e("NetworkError", "HTTP error: ${response.code}")
             }
 
             response
-        } catch (e: Exception) {
-            // Log the exception
-            Log.e(
-                "NetworkError",
-                "🚨 Request failed for ${chain.request().url}: ${e.javaClass.simpleName} - ${e.message}",
-                e
-            )
-            // Instead of throwing, return a dummy error response
-            Response.Builder()
-                .request(chain.request())
-                .protocol(Protocol.HTTP_1_1)
-                .code(500) // generic server error
-                .message(e.message ?: "Network error")
-                .body("{}".toResponseBody("application/json".toMediaTypeOrNull()))
-                .build()
+        } catch (e: IOException) {
+            Log.e("NetworkError", "Network request failed", e)
+            throw e
         }
     }
 }
@@ -164,58 +173,7 @@ class ApiService(private val context: Context) {
     }
 
     // Simple warm-up server method
-    suspend fun warmUpServer(maxAttempts: Int = 3): ApiResult<JSONObject> {
-        var lastError: Exception? = null
-
-        repeat(maxAttempts) { attempt ->
-            try {
-                Log.d("WarmUp", "🔥 Warm-up attempt ${attempt + 1} of $maxAttempts")
-
-            // Health check
-                val request = Request.Builder()
-                    .url("$baseUrl/health")
-                    .get()
-                    .addHeader("User-Agent", "ResumeWriter-Android-WarmUp")
-                    .build()
-
-                val response = client.newCall(request).execute()
-                val body = response.body?.string() ?: "{}"
-
-                if (response.isSuccessful) {
-                    Log.d("WarmUp", "✅ Server ready: $body")
-                    return ApiResult.Success(JSONObject(body))
-                } else {
-                Log.w("WarmUp", "⚠️ Health check failed: HTTP ${response.code}")
-            }
-
-            // Lightweight fallback: get user credits
-            val creditsResult = getUserCredits()
-            if (creditsResult is ApiResult.Success) {
-                Log.d("WarmUp", "✅ Server warmed via credits endpoint")
-                return ApiResult.Success(JSONObject().put("status", "warm").put("attempt", attempt + 1))
-            } else if (creditsResult is ApiResult.Error) {
-                lastError = Exception(creditsResult.message)
-                Log.w("WarmUp", "Credits check failed: ${creditsResult.message}")
-            }
-
-            // Wait before next attempt
-            val delayMillis = 2000L * (attempt + 1)
-            Log.d("WarmUp", "⏳ Waiting $delayMillis ms before retry...")
-            kotlinx.coroutines.delay(delayMillis)
-
-        } catch (e: Exception) {
-            lastError = e
-            Log.w("WarmUp", "Attempt ${attempt + 1} failed: ${e.message}")
-        }
-    }
-
-    // After all attempts failed
-    return ApiResult.Error(
-        "Server is taking longer than expected to start. Please try again.",
-        0,
-        lastError?.message
-    )
-}
+    
 
     // Enhanced API Methods with better error handling
     suspend fun deductCredit(userId: String): ApiResult<JSONObject> {
@@ -340,37 +298,37 @@ class ApiService(private val context: Context) {
     }
 
     suspend fun getUserCredits(): ApiResult<JSONObject> {
-        Log.d("ApiService", "Getting user credits")
-        
-        return try {
-            val auth = getAuthIdentifier() 
-                ?: return ApiResult.Error("User authentication unavailable", 401, "No auth token")
-            
-            val request = Request.Builder()
-                .url("$baseUrl/user/credits")
-                .get()
-                .addHeader("X-Auth-Token", auth)
-                .addHeader("User-Agent", "ResumeWriter-Android")
-                .build()
-            
-            client.newCall(request).execute().use { response ->
-                val respBody = response.body?.string() ?: "{}"
-                Log.d("ApiService", "Get credits response: ${response.code}")
-                
-                if (!response.isSuccessful) {
-                    val errorMsg = handleErrorResponse(response)
-                    Log.e("ApiService", "Get credits failed: $errorMsg")
-                    return ApiResult.Error(errorMsg, response.code)
-                }
-                
-                ApiResult.Success(JSONObject(respBody))
+    Log.d("ApiService", "Getting user credits")
+
+    return try {
+        val auth = getAuthIdentifier()
+            ?: return ApiResult.Error("User authentication unavailable", 401, "No auth token")
+
+        val request = Request.Builder()
+            .url("$baseUrl/user/credits")
+            .get()
+            .addHeader("X-Auth-Token", auth)
+            .addHeader("User-Agent", "ResumeWriter-Android")
+            .build()
+
+        client.newCall(request).execute().use { response ->
+            val respBody = response.body?.string() ?: "{}"
+            Log.d("ApiService", "Get credits response: ${response.code}")
+
+            if (!response.isSuccessful) {
+                val errorMsg = handleErrorResponse(response)
+                Log.e("ApiService", "Get credits failed: $errorMsg")
+                return ApiResult.Error(errorMsg, response.code)
             }
-        } catch (e: Exception) {
-            val errorCode = getErrorCode(e)
-            Log.e("ApiService", "Get credits exception: ${e.message}", e)
-            ApiResult.Error("Get credits failed: ${e.message}", errorCode, e.stackTraceToString())
+
+            ApiResult.Success(JSONObject(respBody))
         }
+    } catch (e: Exception) {
+        val errorCode = getErrorCode(e)
+        Log.e("ApiService", "Get credits exception: ${e.message}", e)
+        ApiResult.Error("Get credits failed: ${e.message}", errorCode, e.stackTraceToString())
     }
+}
 
     // Utilities
     private fun uriToFile(uri: Uri): File {
