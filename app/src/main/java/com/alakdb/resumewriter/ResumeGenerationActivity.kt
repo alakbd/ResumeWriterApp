@@ -38,11 +38,6 @@ class ResumeGenerationActivity : AppCompatActivity() {
     private lateinit var resumePicker: ActivityResultLauncher<String>
     private lateinit var jobDescPicker: ActivityResultLauncher<String>
 
-    private companion object {
-        const val MAX_RETRIES = 3
-        const val RETRY_DELAY_MS = 2000L
-    }
-
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
         binding = ActivityResumeGenerationBinding.inflate(layoutInflater)
@@ -56,30 +51,28 @@ class ResumeGenerationActivity : AppCompatActivity() {
         checkGenerateButtonState()
     }
 
+    /** ---------------- onResume ---------------- **/
     override fun onResume() {
         super.onResume()
         lifecycleScope.launch {
-            delay(1000)
+            delay(1000) // prevent ANR
             Log.d("ResumeActivity", "onResume: Updating credits and warming up server")
 
-        // Update credits
-        val creditsResult = apiService.getUserCredits()
-        if (creditsResult is ApiResult.Success) {
-            val credits = creditsResult.data.optInt("credits", 0)
-            Log.d("ResumeActivity", "Credits loaded: $credits")
-        } else if (creditsResult is ApiResult.Error) {
-            Log.e("ResumeActivity", "Failed to load credits: ${creditsResult.message}")
-        }
+            // Update credits
+            updateCreditDisplay()
 
-        // Warm up server
-        val warmUpResult = apiService.warmUpServer()
-        if (warmUpResult is ApiResult.Success) {
-            Log.d("ResumeActivity", "Server warm-up successful")
-        } else if (warmUpResult is ApiResult.Error) {
-            Log.e("ResumeActivity", "Server warm-up failed: ${warmUpResult.message}")
+            // Warm up server
+            val warmUpResult = apiService.warmUpServer()
+            when (warmUpResult) {
+                is ApiService.ApiResult.Success -> {
+                    Log.d("ResumeActivity", "Server warm-up successful")
+                }
+                is ApiService.ApiResult.Error -> {
+                    Log.e("ResumeActivity", "Server warm-up failed: ${warmUpResult.message}")
+                }
+            }
         }
     }
-}
 
     /** ---------------- File Picker Setup ---------------- **/
     private fun registerFilePickers() {
@@ -94,7 +87,6 @@ class ResumeGenerationActivity : AppCompatActivity() {
 
     private fun handleSelectedFile(uri: Uri, textView: TextView, setUri: (Uri) -> Unit) {
         val name = getFileName(uri) ?: ""
-        Log.d("ResumeActivity", "Selected file: $name")
         if (name.endsWith(".pdf", true) || name.endsWith(".docx", true) || name.endsWith(".txt", true)) {
             setUri(uri)
             textView.text = name
@@ -167,36 +159,31 @@ class ResumeGenerationActivity : AppCompatActivity() {
             }
 
             try {
-                Log.d("ResumeActivity", "Testing server warm-up")
                 binding.tvConnectionStatus.text = "Checking server status..."
                 val warmUpResult = apiService.warmUpServer()
                 when (warmUpResult) {
                     is ApiService.ApiResult.Success -> {
-                        Log.d("ResumeActivity", "Server warm-up success")
                         binding.tvConnectionStatus.text = "Testing API endpoints..."
                         val connectionResult = apiService.testConnection()
                         when (connectionResult) {
                             is ApiService.ApiResult.Success -> {
-                                Log.d("ResumeActivity", "API connection successful")
-                                updateConnectionStatus("✅ API Connected", false)
+                                updateConnectionStatus("✅ API Connected")
                                 updateCreditDisplay()
                             }
                             is ApiService.ApiResult.Error -> {
-                                Log.e("ResumeActivity", "API endpoints not responding: ${connectionResult.message}")
                                 updateConnectionStatus("❌ API Connection Failed", true)
                                 showError("API endpoints not responding")
                             }
                         }
                     }
                     is ApiService.ApiResult.Error -> {
-                        Log.w("ResumeActivity", "Server is starting: ${warmUpResult.message}")
                         updateConnectionStatus("🔄 Server is starting...", true)
                         showError("Server is waking up. This may take 30-60 seconds. Please wait...")
                     }
                 }
             } catch (e: Exception) {
                 updateConnectionStatus("❌ Connection Error", true)
-                Log.e("ResumeActivity", "Connection test failed", e)
+                Log.e("ConnectionTest", "Connection test failed", e)
             } finally {
                 binding.progressConnection.visibility = View.GONE
                 binding.btnRetryConnection.isEnabled = true
@@ -217,28 +204,27 @@ class ResumeGenerationActivity : AppCompatActivity() {
         val jobDescUri = selectedJobDescUri ?: return showError("Please select job description file")
 
         disableGenerateButton("Processing...")
-        Log.d("ResumeActivity", "Generating resume from files")
 
         lifecycleScope.launch {
             try {
                 val creditResult = apiService.getUserCredits()
-                Log.d("ResumeActivity", "Credit check result: $creditResult")
-                if (creditResult is ApiService.ApiResult.Success) {
-                    val credits = creditResult.data.optInt("credits", 0)
-                    if (credits <= 0) {
-                        showErrorAndReset("Insufficient credits. Please purchase more.")
-                        return@launch
+                when (creditResult) {
+                    is ApiService.ApiResult.Success -> {
+                        val credits = creditResult.data.optInt("credits", 0)
+                        Log.d("ResumeActivity", "User credits: $credits")
+                        if (credits <= 0) {
+                            showErrorAndReset("Insufficient credits. Please purchase more.")
+                            return@launch
+                        }
+
+                        val genResult = apiService.generateResumeFromFiles(resumeUri, jobDescUri)
+                        handleGenerationResult(genResult)
                     }
-                    val genResult = retryApiCall {
-                        apiService.generateResumeFromFiles(resumeUri, jobDescUri)
+                    is ApiService.ApiResult.Error -> {
+                        showErrorAndReset("Failed to check credits: ${creditResult.message}")
                     }
-                    handleGenerationResult(genResult)
-                } else if (creditResult is ApiService.ApiResult.Error) {
-                    Log.e("ResumeActivity", "Credit check failed: ${creditResult.message}")
-                    showErrorAndReset("Failed to check credits: ${creditResult.message}")
                 }
             } catch (e: Exception) {
-                Log.e("ResumeActivity", "Generation failed", e)
                 showErrorAndReset("Generation failed: ${e.message}")
             } finally {
                 resetGenerateButton()
@@ -249,102 +235,86 @@ class ResumeGenerationActivity : AppCompatActivity() {
     private fun generateResumeFromText() {
         val resumeText = binding.etResumeText.text.toString().trim()
         val jobDesc = binding.etJobDescription.text.toString().trim()
-
-        if (resumeText.isEmpty() || jobDesc.isEmpty()) {
-            showError("Please enter both resume text and job description")
-            return
-        }
+        if (resumeText.isEmpty() || jobDesc.isEmpty()) return showError("Please enter both resume text and job description")
 
         disableGenerateButton("Processing...")
-        Log.d("ResumeActivity", "Generating resume from text")
 
         lifecycleScope.launch {
-            val user = auth.currentUser ?: return@launch showErrorAndReset("User not logged in")
-            val creditResult = retryApiCall { apiService.getUserCredits() }
-            Log.d("ResumeActivity", "Credit check result: $creditResult")
-
-            when (creditResult) {
-                is ApiService.ApiResult.Success -> {
-                    try {
+            try {
+                val creditResult = apiService.getUserCredits()
+                when (creditResult) {
+                    is ApiService.ApiResult.Success -> {
                         val credits = creditResult.data.optInt("credits", 0)
+                        Log.d("ResumeActivity", "User credits: $credits")
                         if (credits <= 0) {
                             showErrorAndReset("Insufficient credits. Please purchase more.")
                             return@launch
                         }
 
-                        val genResult = retryApiCall { apiService.generateResume(resumeText, jobDesc) }
+                        val genResult = apiService.generateResume(resumeText, jobDesc)
                         handleGenerationResult(genResult)
-
-                    } catch (e: Exception) {
-                        Log.e("ResumeActivity", "Error checking credits", e)
-                        showErrorAndReset("Error checking credits: ${e.message}")
+                    }
+                    is ApiService.ApiResult.Error -> {
+                        showErrorAndReset("Failed to check credits: ${creditResult.message}")
                     }
                 }
-                is ApiService.ApiResult.Error -> {
-                    Log.e("ResumeActivity", "Credit check API error: ${creditResult.message}")
-                    showErrorAndReset("Failed to check credits: ${creditResult.message}")
-                }
-            }
-
-            resetGenerateButton()
-        }
-    }
-
-    /** ---------------- Retry Helper ---------------- **/
-    private suspend fun <T> retryApiCall(
-        maxRetries: Int = 2,
-        initialDelay: Long = 1000L,
-        block: suspend () -> ApiService.ApiResult<T>
-    ): ApiService.ApiResult<T> {
-        var lastResult: ApiService.ApiResult<T>? = null
-        repeat(maxRetries) { attempt ->
-            val result = block()
-            Log.d("RetryApi", "Attempt ${attempt + 1}: $result")
-            if (result is ApiService.ApiResult.Success) return result
-            lastResult = result
-            if (attempt < maxRetries - 1) {
-                val delayMs = initialDelay * (attempt + 1)
-                Log.d("RetryApi", "Retrying in $delayMs ms")
-                delay(delayMs)
+            } catch (e: Exception) {
+                showErrorAndReset("Generation failed: ${e.message}")
+            } finally {
+                resetGenerateButton()
             }
         }
-        Log.e("RetryApi", "All retry attempts failed")
-        return lastResult ?: ApiService.ApiResult.Error("All retry attempts failed")
     }
 
     /** ---------------- Display & Download ---------------- **/
+    private fun handleGenerationResult(result: ApiService.ApiResult<JSONObject>) {
+        when (result) {
+            is ApiService.ApiResult.Success -> {
+                currentGeneratedResume = result.data
+                displayGeneratedResume(result.data)
+                showSuccess("Resume generated successfully!")
+                updateCreditDisplay()
+            }
+            is ApiService.ApiResult.Error -> {
+                showError("Generation failed: ${result.message}")
+            }
+        }
+    }
+
     private fun displayGeneratedResume(resumeData: JSONObject) {
         try {
             binding.tvGeneratedResume.text = resumeData.getString("resume_text")
             binding.layoutDownloadButtons.visibility = View.VISIBLE
+
             if (resumeData.has("remaining_credits")) {
                 val remaining = resumeData.getInt("remaining_credits")
                 binding.tvCreditInfo.text = "Remaining credits: $remaining"
                 binding.tvCreditInfo.visibility = View.VISIBLE
             }
+
         } catch (e: Exception) {
-            Log.e("ResumeActivity", "Error displaying resume", e)
             showError("Error displaying resume: ${e.message}")
         }
     }
 
     private fun downloadFile(format: String) {
         val resumeData = currentGeneratedResume ?: return showError("No resume generated yet")
+
         lifecycleScope.launch {
             try {
                 val fileName = "generated_resume.${format.lowercase()}"
                 val base64Key = "${format.lowercase()}_data"
+
                 if (!resumeData.has(base64Key)) {
                     showError("$format format not available for download")
                     return@launch
                 }
+
                 val base64Data = resumeData.getString(base64Key)
-                Log.d("ResumeActivity", "Downloading $format file")
                 val fileData = apiService.decodeBase64File(base64Data)
                 val file = apiService.saveFileToStorage(fileData, fileName)
                 showDownloadSuccess(file, format.uppercase())
             } catch (e: Exception) {
-                Log.e("ResumeActivity", "Download failed", e)
                 showError("Download failed: ${e.message}")
             }
         }
@@ -362,40 +332,35 @@ class ResumeGenerationActivity : AppCompatActivity() {
             putExtra(Intent.EXTRA_TEXT, "Here's your generated resume in $format format")
             addFlags(Intent.FLAG_GRANT_READ_URI_PERMISSION)
         }
+
         Toast.makeText(this, "$format file saved successfully!", Toast.LENGTH_LONG).show()
         startActivity(Intent.createChooser(shareIntent, "Share Resume"))
     }
 
-    /** ---------------- Credit Display ---------------- **/
+    /** ---------------- Credits ---------------- **/
     private fun updateCreditDisplay() {
         lifecycleScope.launch {
             try {
                 binding.tvCreditInfo.text = "Loading credits..."
                 binding.tvCreditInfo.visibility = View.VISIBLE
 
-                val result = withContext(Dispatchers.IO) {
-                    Log.d("ResumeActivity", "Fetching user credits from API")
-                    apiService.getUserCredits()
-                }
-
-                withContext(Dispatchers.Main) {
-                    when (result) {
-                        is ApiService.ApiResult.Success -> {
-                            Log.d("ResumeActivity", "Credits fetched successfully: ${result.data}")
-                            val credits = result.data.optInt("credits", -1)
-                            binding.tvCreditInfo.text = if (credits >= 0) "Available credits: $credits" else "Credits: Data unavailable"
-                        }
-                        is ApiService.ApiResult.Error -> {
-                            Log.e("ResumeActivity", "Error fetching credits: ${result.message}")
-                            binding.tvCreditInfo.text = "Credits: Unable to load"
-                        }
+                val result = withContext(Dispatchers.IO) { apiService.getUserCredits() }
+                when (result) {
+                    is ApiService.ApiResult.Success -> {
+                        val credits = result.data.optInt("credits", -1)
+                        binding.tvCreditInfo.text = if (credits >= 0) "Available credits: $credits" else "Credits: Data unavailable"
+                        Log.d("ResumeActivity", "Credits updated: $credits")
+                    }
+                    is ApiService.ApiResult.Error -> {
+                        binding.tvCreditInfo.text = "Credits: Unable to load"
+                        Log.e("ResumeActivity", "Error loading credits: ${result.message}")
                     }
                 }
             } catch (e: CancellationException) {
-                Log.w("ResumeActivity", "Credit fetch cancelled", e)
+                // ignore
             } catch (e: Exception) {
                 Log.e("ResumeActivity", "Unexpected error while fetching credits", e)
-                withContext(Dispatchers.Main) { binding.tvCreditInfo.text = "Credits: Error" }
+                binding.tvCreditInfo.text = "Credits: Error"
             }
         }
     }
@@ -435,7 +400,6 @@ class ResumeGenerationActivity : AppCompatActivity() {
                 cursor.getString(nameIndex)
             }
         } catch (e: Exception) {
-            Log.e("ResumeActivity", "Failed to get file name", e)
             null
         }
     }
@@ -451,18 +415,19 @@ class ResumeGenerationActivity : AppCompatActivity() {
     }
 
     private fun handleGenerationResult(result: ApiService.ApiResult<JSONObject>) {
-        when (result) {
-            is ApiService.ApiResult.Success -> {
-                Log.d("ResumeActivity", "Resume generation success: ${result.data}")
-                currentGeneratedResume = result.data
-                displayGeneratedResume(result.data)
-                showSuccess("Resume generated successfully!")
-                updateCreditDisplay()
-            }
-            is ApiService.ApiResult.Error -> {
-                Log.e("ResumeActivity", "Resume generation failed: ${result.message}")
-                showError("Generation failed: ${result.message}")
+    when (result) {
+        is ApiService.ApiResult.Success -> {
+            Log.d("ResumeActivity", "Resume generation success: ${result.data}")
+            currentGeneratedResume = result.data
+            displayGeneratedResume(result.data)
+            showSuccess("Resume generated successfully!")
+            updateCreditDisplay()
+        }
+        is ApiService.ApiResult.Error -> {
+            Log.e("ResumeActivity", "Resume generation failed: ${result.message}")
+            showError("Generation failed: ${result.message}")
             }
         }
     }
+
 }
