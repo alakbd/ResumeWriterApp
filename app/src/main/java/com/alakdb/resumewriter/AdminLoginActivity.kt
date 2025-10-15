@@ -10,8 +10,7 @@ import com.google.firebase.auth.FirebaseAuth
 class AdminLoginActivity : AppCompatActivity() {
     private lateinit var binding: ActivityAdminLoginBinding
     private lateinit var auth: FirebaseAuth
-    private lateinit var creditManager: CreditManager  // <-- Add this
-    // other declarations...
+    private lateinit var creditManager: CreditManager
 
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
@@ -20,6 +19,9 @@ class AdminLoginActivity : AppCompatActivity() {
         
         auth = FirebaseAuth.getInstance()
         creditManager = CreditManager(this)
+
+        // 🔒 Ensure no admin mode is active when starting admin login
+        creditManager.setAdminMode(false)
 
         binding.btnAdminLogin.setOnClickListener {
             val email = binding.etAdminEmail.text.toString().trim()
@@ -63,17 +65,28 @@ class AdminLoginActivity : AppCompatActivity() {
                     val adminEmails = listOf("alakbd2009@gmail.com", "admin@resumewriter.com")
                     
                     if (user != null && adminEmails.contains(user.email)) {
-                        // ✅ Mark admin mode ON
+                        // ✅ SECURE: Only set admin mode after successful admin authentication
                         creditManager.setAdminMode(true)
                         
                         showMessage("Admin access granted!")
-                        startActivity(Intent(this, AdminPanelActivity::class.java))
-                        finish()
+                        
+                        // 🔒 Verify admin mode is actually set before proceeding
+                        if (creditManager.isAdminMode()) {
+                            startActivity(Intent(this, AdminPanelActivity::class.java))
+                            finish()
+                        } else {
+                            showMessage("Security error: Admin mode not set")
+                            auth.signOut()
+                        }
                     } else {
+                        // 🔒 Explicitly disable admin mode for unauthorized users
+                        creditManager.setAdminMode(false)
                         showMessage("Access denied: Not an admin account")
                         auth.signOut()
                     }
                 } else {
+                    // 🔒 Ensure admin mode is disabled on login failure
+                    creditManager.setAdminMode(false)
                     showMessage("Login failed: ${task.exception?.message}")
                 }
             }
