@@ -357,22 +357,39 @@ class ResumeGenerationActivity : AppCompatActivity() {
     private suspend fun updateCreditDisplay() {
     Log.d("ResumeActivity", "Fetching user credits...")
 
-    when (val result = apiService.getUserCredits()) {
-        is ApiService.ApiResult.Success -> {
-            val credits = result.data.optInt("credits", 0)
-            Log.d("ResumeActivity", "Credits retrieved: $credits")
+    val auth = apiService.getAuthIdentifier()
+    if (auth.isNullOrEmpty()) {
+        Log.w("ResumeActivity", "No auth token available")
+        withContext(Dispatchers.Main) {
+            binding.creditText.text = "Credits: -- (login required)"
+        }
+        return
+    }
 
-            withContext(Dispatchers.Main) {
-                binding.creditText.text = "Credits: $credits"
+    try {
+        // Optional: log headers for debugging
+        Log.d("ApiService", "Using X-Auth-Token: $auth")
+
+        when (val result = apiService.getUserCredits()) {
+            is ApiService.ApiResult.Success -> {
+                val credits = result.data.optInt("credits", 0)
+                Log.d("ResumeActivity", "Credits retrieved: $credits")
+                withContext(Dispatchers.Main) {
+                    binding.creditText.text = "Credits: $credits"
+                }
+            }
+
+            is ApiService.ApiResult.Error -> {
+                Log.e("ResumeActivity", "Failed to fetch credits: ${result.message}")
+                withContext(Dispatchers.Main) {
+                    binding.creditText.text = "Credits: -- (error)"
+                }
             }
         }
-
-        is ApiService.ApiResult.Error -> {
-            Log.e("ResumeActivity", "Failed to fetch credits: ${result.message}")
-
-            withContext(Dispatchers.Main) {
-                binding.creditText.text = "Credits: --"
-            }
+    } catch (e: Exception) {
+        Log.e("ResumeActivity", "Exception while fetching credits", e)
+        withContext(Dispatchers.Main) {
+            binding.creditText.text = "Credits: -- (exception)"
         }
     }
 }
