@@ -16,6 +16,7 @@ import okhttp3.Interceptor
 import okhttp3.Response
 import java.io.IOException
 import java.util.concurrent.TimeUnit
+import okhttp3.MediaType.Companion.toMediaTypeOrNull
 import okhttp3.ResponseBody.Companion.toResponseBody
 
 class ApiService(private val context: Context) {
