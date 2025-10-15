@@ -347,30 +347,24 @@ class ResumeGenerationActivity : AppCompatActivity() {
     }
 
     /** ---------------- Credit Display ---------------- **/
-    private fun updateCreditDisplay() {
-        lifecycleScope.launch {
-            try {
-                binding.tvCreditInfo.text = "Loading credits..."
-                binding.tvCreditInfo.visibility = View.VISIBLE
-
-                val result = withContext(Dispatchers.IO) { apiService.getUserCredits() }
-                when (result) {
-                    is ApiService.ApiResult.Success -> {
-                        val credits = result.data.optInt("credits", -1)
-                        binding.tvCreditInfo.text = if (credits >= 0) "Available credits: $credits" else "Credits: Data unavailable"
-                        Log.d("ResumeActivity", "Credit display updated: $credits")
-                    }
-                    is ApiService.ApiResult.Error -> {
-                        binding.tvCreditInfo.text = "Credits: Unable to load"
-                        Log.e("ResumeActivity", "Error loading credits: ${result.message}")
-                    }
+    private suspend fun updateCreditDisplay() {
+        Log.d("ResumeActivity", "Fetching user credits...")
+        when (val result = apiService.getUserCredits()) {
+            is ApiService.ApiResult.Success -> {
+                val credits = result.data.optInt("credits", 0)
+                Log.d("ResumeActivity", "Credits retrieved: $credits")
+                runOnUiThread {
+                    findViewById<TextView>(R.id.creditText).text = "Credits: $credits"
                 }
-            } catch (e: Exception) {
-                Log.e("ResumeActivity", "Unexpected error fetching credits", e)
-                binding.tvCreditInfo.text = "Credits: Error"
+            }
+            is ApiService.ApiResult.Error -> {
+                Log.e("ResumeActivity", "Failed to fetch credits: ${result.message}")
+                runOnUiThread {
+                    findViewById<TextView>(R.id.creditText).text = "Credits: --"
             }
         }
     }
+}
 
     /** ---------------- Helpers ---------------- **/
     private fun disableGenerateButton(text: String) {
