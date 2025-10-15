@@ -357,43 +357,31 @@ class ResumeGenerationActivity : AppCompatActivity() {
     private suspend fun updateCreditDisplay() {
     Log.d("ResumeActivity", "Fetching user credits...")
 
-    val auth = apiService.getAuthIdentifier()
-    if (auth.isNullOrEmpty()) {
-        Log.w("ResumeActivity", "No auth token available")
-        withContext(Dispatchers.Main) {
-            binding.creditText.text = "Credits: -- (login required)"
-        }
-        return
-    }
+    when (val result = apiService.getUserCredits()) {
+        is ApiService.ApiResult.Success -> {
+            val credits = result.data.optInt("credits", 0)
+            Log.d("ResumeActivity", "Credits retrieved: $credits")
 
-    try {
-        // Optional: log headers for debugging
-        Log.d("ApiService", "Using X-Auth-Token: $auth")
-
-        when (val result = apiService.getUserCredits()) {
-            is ApiService.ApiResult.Success -> {
-                val credits = result.data.optInt("credits", 0)
-                Log.d("ResumeActivity", "Credits retrieved: $credits")
-                withContext(Dispatchers.Main) {
-                    binding.creditText.text = "Credits: $credits"
-                }
-            }
-
-            is ApiService.ApiResult.Error -> {
-                Log.e("ResumeActivity", "Failed to fetch credits: ${result.message}")
-                withContext(Dispatchers.Main) {
-                    binding.creditText.text = "Credits: -- (error)"
-                }
+            withContext(Dispatchers.Main) {
+                binding.creditText.text = "Credits: $credits"
             }
         }
-    } catch (e: Exception) {
-        Log.e("ResumeActivity", "Exception while fetching credits", e)
-        withContext(Dispatchers.Main) {
-            binding.creditText.text = "Credits: -- (exception)"
+
+        is ApiService.ApiResult.Error -> {
+            Log.e("ResumeActivity", "Failed to fetch credits: ${result.message}")
+
+            withContext(Dispatchers.Main) {
+                binding.creditText.text = "Credits: --"
+                // Optionally, show a Toast or Snackbar
+                Toast.makeText(
+                    this@ResumeGenerationActivity,
+                    result.message,
+                    Toast.LENGTH_SHORT
+                ).show()
+            }
         }
     }
 }
-
     /** ---------------- Helpers ---------------- **/
     private fun disableGenerateButton(text: String) {
         binding.btnGenerateResume.isEnabled = false
