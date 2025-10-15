@@ -55,23 +55,23 @@ class ResumeGenerationActivity : AppCompatActivity() {
     override fun onResume() {
         super.onResume()
         lifecycleScope.launch {
-            delay(1000) // prevent ANR
+            delay(1000)
             Log.d("ResumeActivity", "onResume: Updating credits and warming up server")
             updateCreditDisplay()
             val warmUpResult = try {
-                apiService.warmUpServer()
-            } catch (e: Exception) {
-                Log.e("ResumeActivity", "Warm-up failed with exception: ${e.message}", e)
-                null
-            }
+            apiService.warmUpServer()
+        } catch (e: Exception) {
+            Log.e("ResumeActivity", "Warm-up failed with exception: ${e.message}", e)
+            null
+        }
 
-            when (warmUpResult) {
-                is ApiService.ApiResult.Success -> Log.d("ResumeActivity", "Server warm-up successful")
-                is ApiService.ApiResult.Error -> Log.e("ResumeActivity", "Server warm-up failed: ${warmUpResult.message}")
-                null -> Log.e("ResumeActivity", "Server warm-up returned null")
-            }
+        when (warmUpResult) {
+            is ApiService.ApiResult.Success -> Log.d("ResumeActivity", "Server warm-up successful")
+            is ApiService.ApiResult.Error -> Log.e("ResumeActivity", "Server warm-up failed: ${warmUpResult.message}")
+            null -> Log.e("ResumeActivity", "Server warm-up returned null")
         }
     }
+}
 
     /** ---------------- File Picker Setup ---------------- **/
     private fun registerFilePickers() {
@@ -356,7 +356,7 @@ class ResumeGenerationActivity : AppCompatActivity() {
             Log.d("ResumeActivity", "Credits retrieved: $credits")
 
             withContext(Dispatchers.Main) {
-                findViewById<TextView>(R.id.creditText).text = "Credits: $credits"
+                binding.creditText.text = "Credits: $credits"
             }
         }
 
@@ -364,7 +364,7 @@ class ResumeGenerationActivity : AppCompatActivity() {
             Log.e("ResumeActivity", "Failed to fetch credits: ${result.message}")
 
             withContext(Dispatchers.Main) {
-                findViewById<TextView>(R.id.creditText).text = "Credits: --"
+                binding.creditText.text = "Credits: --"
             }
         }
     }
