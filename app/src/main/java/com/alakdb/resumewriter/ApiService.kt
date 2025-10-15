@@ -48,15 +48,7 @@ class ApiService(private val context: Context) {
         data class Error(val message: String, val code: Int = 0, val details: String? = null) : ApiResult<Nothing>()
     }
 
-    // Example: fetch user credits
-    suspend fun getUserCredits(): Int {
-        return try {
-            api.getCredits()  // actual network call
-        } catch (e: Exception) {
-            Log.e("NetworkError", "Failed to get user credits", e)
-            0
-        }
-    }
+
 
         // Warm up the server
     suspend fun warmUpServer() {
