@@ -109,28 +109,34 @@ class ApiService(private val context: Context) {
     suspend fun getCurrentUserToken(): String? {
         return try {
             // Try to get cached token first
-            userManager.getUserToken()?.let { return it }
-            
-            // Fetch new token from Firebase
-            val currentUser = FirebaseAuth.getInstance().currentUser 
-                ?: return null.also { Log.d("Auth", "No current user") }
-                
-            val tokenResult = currentUser.getIdToken(true).await()
-            val token = tokenResult.token
-            
-            if (token != null) {
-                userManager.saveUserToken(token)
-                Log.d("Auth", "Token obtained successfully")
-                token
-            } else {
-                Log.e("Auth", "Token is null")
-                null
-            }
-        } catch (e: Exception) {
-            Log.e("Auth", "Error fetching Firebase token: ${e.message}", e)
+            userManager.getUserToken()?.let {
+                Log.d("AuthDebug", "Using cached token")
+                    return it
+                }
+
+        // Fetch new token from Firebase
+        val currentUser = FirebaseAuth.getInstance().currentUser
+        if (currentUser == null) {
+            Log.e("AuthDebug", "No user signed in! Can't fetch token.")
+            return null
+        }
+
+        val tokenResult = currentUser.getIdToken(true).await()
+        val token = tokenResult.token
+
+        if (!token.isNullOrBlank()) {
+            userManager.saveUserToken(token)
+            Log.d("AuthDebug", "Token obtained successfully: ${token.take(20)}...")
+            token
+        } else {
+            Log.e("AuthDebug", "Token is null or empty")
             null
         }
+    } catch (e: Exception) {
+        Log.e("AuthDebug", "Error fetching Firebase token: ${e.message}", e)
+        null
     }
+}
 
     // Enhanced Authentication Helper
     suspend fun getAuthIdentifier(): String? {
