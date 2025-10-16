@@ -37,6 +37,7 @@ private val client = OkHttpClient.Builder()
     .build()
 
 // Add this new interceptor class
+// Add this class inside your ApiService class
 class DetailedLoggingInterceptor : Interceptor {
     override fun intercept(chain: Interceptor.Chain): Response {
         val request = chain.request()
@@ -55,17 +56,6 @@ class DetailedLoggingInterceptor : Interceptor {
         Log.d("Network", "⬇️ RESPONSE: ${response.code} ${response.message} (${endTime - startTime}ms)")
         response.headers.forEach { name, value ->
             Log.d("Network", "   $name: $value")
-        }
-        
-        // Log response body (for debugging)
-        val responseBody = response.body
-        val source = responseBody?.source()
-        source?.request(Long.MAX_VALUE)
-        val buffer = source?.buffer?.clone()
-        val responseText = buffer?.readUtf8()
-        
-        responseText?.let {
-            Log.d("Network", "Response Body: $it")
         }
         
         return response
