@@ -49,7 +49,7 @@ class ResumeGenerationActivity : AppCompatActivity() {
         apiService = ApiService(this)
         auth = FirebaseAuth.getInstance()
         
-
+        debugAuthState()
         registerFilePickers()
         setupUI()
         checkGenerateButtonState()
@@ -455,7 +455,44 @@ private suspend fun updateCreditDisplay() {
         )
         Log.d("ResumeActivity", "Connection status updated: $message")
     }
+    
+    private fun debugAuthState() {
+    val userManager = UserManager(this)
+    
+    Log.d("AuthDebug", "=== AUTHENTICATION DEBUG ===")
+    Log.d("AuthDebug", "Firebase current user: ${FirebaseAuth.getInstance().currentUser?.uid ?: "NULL"}")
+    Log.d("AuthDebug", "UserManager logged in: ${userManager.isUserLoggedIn()}")
+    Log.d("AuthDebug", "Token valid: ${userManager.isTokenValid()}")
+    Log.d("AuthDebug", "Cached token: ${userManager.getUserToken()?.take(10) ?: "NULL"}...")
+    
+    userManager.debugStoredData()
+    
+    lifecycleScope.launch {
+        try {
+            Log.d("AuthDebug", "Testing token retrieval...")
+            val token = getCurrentUserToken()
+            Log.d("AuthDebug", "Current token: ${token?.take(10) ?: "NULL"}...")
+            
+            Log.d("AuthDebug", "Testing credits API...")
+            val creditsResult = apiService.getUserCredits()
+            when (creditsResult) {
+                is ApiService.ApiResult.Success -> {
+                    Log.d("AuthDebug", "✅ Credits API success - Auth is working")
+                    val credits = creditsResult.data.optInt("credits", 0)
+                    Log.d("AuthDebug", "Available credits: $credits")
+                }
+                is ApiService.ApiResult.Error -> {
+                    Log.e("AuthDebug", "❌ Credits API failed: ${creditsResult.message}")
+                    Log.e("AuthDebug", "Error code: ${creditsResult.code}")
+                }
+            }
+        } catch (e: Exception) {
+            Log.e("AuthDebug", "❌ Debug exception: ${e.message}", e)
+        }
+    }
+}
 
+    
     private fun handleGenerationResult(result: ApiService.ApiResult<JSONObject>) {
     when (result) {
         is ApiService.ApiResult.Success -> {
