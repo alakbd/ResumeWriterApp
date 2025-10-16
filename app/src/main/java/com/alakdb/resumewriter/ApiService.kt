@@ -74,21 +74,26 @@ class ApiService(private val context: Context) {
 
     
     // Custom Interceptor for better error handling
-    class ErrorInterceptor : Interceptor {
-    override fun intercept(chain: Interceptor.Chain): Response {
-        return try {
-            val request = chain.request()
-            val response = chain.proceed(request)
+    class ErrorInterceptor(private val context: Context) : Interceptor {
+        override fun intercept(chain: Interceptor.Chain): Response {
+            val userManager = UserManager(context)
+            val token = userManager.getUserToken()
 
-            if (!response.isSuccessful) {
-                // Handle error codes if needed
-                Log.e("NetworkError", "HTTP error: ${response.code}")
-            }
+            val request = chain.request().newBuilder()
+                .addHeader("X-Auth-Token", token ?: "")
+                .build()
 
-            response
-        } catch (e: IOException) {
-            Log.e("NetworkError", "Network request failed", e)
-            throw e
+            return try {
+                val response = chain.proceed(request)
+
+                if (!response.isSuccessful) {
+                    Log.e("NetworkError", "HTTP error: ${response.code}")
+                }
+
+                response
+            } catch (e: IOException) {
+                Log.e("NetworkError", "Network request failed", e)
+                throw e
         }
     }
 }
