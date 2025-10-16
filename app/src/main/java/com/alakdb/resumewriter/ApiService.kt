@@ -52,7 +52,7 @@ class ApiService(private val context: Context) {
         override fun intercept(chain: Interceptor.Chain): Response {
             return try {
                 val userManager = UserManager(context)
-                val token = userManager.getUserToken()
+                val token = runBlocking { userManager.refreshTokenIfNeeded() }
 
                 val requestBuilder = chain.request().newBuilder()
 
