@@ -49,9 +49,9 @@ class ApiService(private val context: Context) {
 
     // Fixed AuthInterceptor - Use the same UserManager instance and proper header format
     class AuthInterceptor(private val userManager: UserManager) : Interceptor {
-        override fun intercept(chain: Interceptor.Chain): Response {
-            return try {
-                val originalRequest = chain.request()
+    override fun intercept(chain: Interceptor.Chain): Response {
+        return try {
+            val originalRequest = chain.request()
             
             // Skip auth for public endpoints
             if (isPublicEndpoint(originalRequest.url.toString())) {
@@ -63,12 +63,11 @@ class ApiService(private val context: Context) {
             val requestBuilder = originalRequest.newBuilder()
 
             if (!token.isNullOrBlank()) {
-                // ✅ FIX: Add "Bearer " prefix as expected by server
+                // ✅ FIX: Use X-Auth-Token header with Bearer prefix
                 requestBuilder.addHeader("X-Auth-Token", "Bearer $token")
-                Log.d("AuthInterceptor", "✅ Added X-Auth-Token header with Bearer prefix")
+                Log.d("AuthInterceptor", "✅ Added X-Auth-Token: Bearer ${token.take(10)}...")
             } else {
                 Log.w("AuthInterceptor", "⚠️ No token found — request will be unauthenticated")
-                // Don't throw exception, just proceed without token (will get 401 from server)
             }
 
             val request = requestBuilder.build()
@@ -76,7 +75,6 @@ class ApiService(private val context: Context) {
             
         } catch (e: Exception) {
             Log.e("AuthInterceptor", "🚨 Exception in AuthInterceptor: ${e.message}")
-            // Create a mock error response instead of throwing
             Response.Builder()
                 .request(chain.request())
                 .protocol(Protocol.HTTP_1_1)
@@ -88,7 +86,7 @@ class ApiService(private val context: Context) {
     }
 
     private fun isPublicEndpoint(url: String): Boolean {
-        return url.contains("/health") || url.contains("/warmup") || url.endsWith("/")
+        return url.contains("/health") || url.contains("/warmup") || url.endsWith("/") || url.contains("/test")
     }
 }
     
