@@ -26,6 +26,7 @@ class ResumeGenerationActivity : AppCompatActivity() {
     private lateinit var binding: ActivityResumeGenerationBinding
     private lateinit var apiService: ApiService
     private lateinit var auth: FirebaseAuth
+    private lateinit var userManager: UserManager
 
     private var selectedResumeUri: Uri? = null
     private var selectedJobDescUri: Uri? = null
@@ -44,8 +45,10 @@ class ResumeGenerationActivity : AppCompatActivity() {
         binding = ActivityResumeGenerationBinding.inflate(layoutInflater)
         setContentView(binding.root)
 
+        userManager = UserManager(this)
         apiService = ApiService(this)
         auth = FirebaseAuth.getInstance()
+        
 
         registerFilePickers()
         setupUI()
