@@ -335,9 +335,10 @@ class ApiService(private val context: Context) {
     }
 
     suspend fun getUserCredits(): ApiResult<JSONObject> {
-    return try {
-        val auth = getAuthIdentifier()
-        if (auth.isNullOrEmpty()) {
+        return try {
+        // Fetch the current user token (cached or fresh)
+        val token = getCurrentUserToken()
+        if (token.isNullOrEmpty()) {
             Log.e("ApiService", "Auth token is null or empty")
             return ApiResult.Error(
                 message = "User authentication unavailable. Please log in.",
@@ -345,23 +346,31 @@ class ApiService(private val context: Context) {
             )
         }
 
+        // Build the request with the auth token
         val request = Request.Builder()
             .url("$baseUrl/user/credits")
             .get()
             .addHeader("User-Agent", "ResumeWriter-Android")
+            .addHeader("X-Auth-Token", token)  // ⚡ This is required by the API
             .build()
 
+        // Execute request
         client.newCall(request).execute().use { response ->
             val respBody = response.body?.string() ?: "{}"
+
             if (!response.isSuccessful) {
+                Log.e("ApiService", "Failed to fetch credits: HTTP ${response.code}")
                 return ApiResult.Error(
                     message = "Failed to get credits: ${response.message}",
                     code = response.code
                 )
             }
+
+            // Return successful result
             ApiResult.Success(JSONObject(respBody))
         }
     } catch (e: Exception) {
+        Log.e("ApiService", "Exception while fetching credits", e)
         ApiResult.Error(
             message = "Exception while fetching credits: ${e.message}",
             code = -1,
