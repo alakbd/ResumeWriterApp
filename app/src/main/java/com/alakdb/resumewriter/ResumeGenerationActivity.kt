@@ -59,6 +59,8 @@ class ResumeGenerationActivity : AppCompatActivity() {
         setupUI()
         checkGenerateButtonState()
          
+    }
+
     private fun comprehensiveAuthDebug() {
     lifecycleScope.launch {
         Log.d("DEBUG", "=== COMPREHENSIVE AUTH DEBUG ===")
@@ -116,7 +118,6 @@ class ResumeGenerationActivity : AppCompatActivity() {
             }
         }
 
-    }
     
     override fun onResume() {
     super.onResume()
