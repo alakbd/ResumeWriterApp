@@ -8,6 +8,8 @@ import com.google.firebase.auth.FirebaseAuthInvalidCredentialsException
 import com.google.firebase.auth.FirebaseAuthInvalidUserException
 import com.google.firebase.auth.FirebaseAuthUserCollisionException
 import com.google.firebase.auth.FirebaseAuthWeakPasswordException
+import android.util.Log
+
 
 class UserManager(private val context: Context) {
 
@@ -20,6 +22,9 @@ class UserManager(private val context: Context) {
         private const val USER_EMAIL_KEY = "user_email"
         private const val USER_ID_KEY = "user_id"
         private const val IS_REGISTERED_KEY = "is_registered"
+        private const val FIREBASE_TOKEN_KEY = "firebase_token"
+        private const val TOKEN_TIMESTAMP_KEY = "token_timestamp"
+        private const val AVAILABLE_CREDITS_KEY = "available_credits"
     }
 
     /** Register a new user */
@@ -60,11 +65,13 @@ class UserManager(private val context: Context) {
                         .addOnSuccessListener {
                             // Save registration state locally
                             saveUserDataLocally(email, uid)
+                            Log.d("UserManager", "User registered successfully: $email")
                             onComplete(true, null)
                         }
                         .addOnFailureListener { e ->
                             // Delete the auth user if Firestore fails
                             user.delete()
+                            Log.e("UserManager", "Firestore registration failed: ${e.message}")
                             onComplete(false, "Database error: ${e.message}")
                         }
 
@@ -75,6 +82,7 @@ class UserManager(private val context: Context) {
                         is FirebaseAuthWeakPasswordException -> "Password is too weak"
                         else -> "Registration failed: ${task.exception?.message}"
                     }
+                    Log.e("UserManager", "Registration failed: $error")
                     onComplete(false, error)
                 }
             }
@@ -92,8 +100,10 @@ class UserManager(private val context: Context) {
                     val user = auth.currentUser
                     if (user != null) {
                         saveUserDataLocally(user.email ?: "", user.uid)
+                        Log.d("UserManager", "User logged in successfully: $email")
                         onComplete(true, null)
                     } else {
+                        Log.e("UserManager", "Login failed: No user data after successful auth")
                         onComplete(false, "Login failed: No user data")
                     }
                 } else {
@@ -102,29 +112,81 @@ class UserManager(private val context: Context) {
                         is FirebaseAuthInvalidCredentialsException -> "Invalid password"
                         else -> "Login failed: ${task.exception?.message}"
                     }
+                    Log.e("UserManager", "Login failed: $error")
                     onComplete(false, error)
                 }
             }
     }
 
-
-
-    /** Usertoken stored in UserManager */
+    /** User token stored in consistent SharedPreferences */
     fun saveUserToken(token: String) {
-        val prefs = context.getSharedPreferences("app_prefs", Context.MODE_PRIVATE)
-        prefs.edit().putString("firebase_token", token).apply()
+        prefs.edit().apply {
+            putString(FIREBASE_TOKEN_KEY, token)
+            putLong(TOKEN_TIMESTAMP_KEY, System.currentTimeMillis())
+            apply()
+        }
+        Log.d("UserManager", "Token saved successfully - timestamp: ${System.currentTimeMillis()}")
     }
 
     fun getUserToken(): String? {
-        val prefs = context.getSharedPreferences("app_prefs", Context.MODE_PRIVATE)
-        return prefs.getString("firebase_token", null)
+        return prefs.getString(FIREBASE_TOKEN_KEY, null).also { token ->
+            if (token == null) {
+                Log.d("UserManager", "No token found in SharedPreferences")
+            } else {
+                Log.d("UserManager", "Token retrieved from SharedPreferences")
+            }
+        }
     }
 
-    
-    /** Check if user is logged in */
-    fun isUserLoggedIn(): Boolean {
-        return auth.currentUser != null && prefs.getBoolean(IS_REGISTERED_KEY, false)
+    /** Enhanced token management with expiration check */
+    fun isTokenValid(): Boolean {
+        val token = getUserToken()
+        val timestamp = prefs.getLong(TOKEN_TIMESTAMP_KEY, 0L)
+        
+        if (token == null) {
+            Log.d("UserManager", "Token is null")
+            return false
+        }
+        
+        // Check if token is older than 55 minutes (Firebase tokens typically expire in 1 hour)
+        val tokenAge = System.currentTimeMillis() - timestamp
+        val isExpired = tokenAge > 55 * 60 * 1000 // 55 minutes in milliseconds
+        
+        if (isExpired) {
+            Log.d("UserManager", "Token is expired (age: ${tokenAge / 1000 / 60} minutes)")
+            clearUserToken()
+            return false
+        }
+        
+        Log.d("UserManager", "Token is valid (age: ${tokenAge / 1000 / 60} minutes)")
+        return true
     }
+
+    fun clearUserToken() {
+        prefs.edit().remove(FIREBASE_TOKEN_KEY).remove(TOKEN_TIMESTAMP_KEY).apply()
+        Log.d("UserManager", "Token cleared from SharedPreferences")
+    }
+
+    /** Check if user is logged in with token validation */
+    fun isUserLoggedIn(): Boolean {
+        val hasFirebaseUser = auth.currentUser != null
+        val isRegistered = prefs.getBoolean(IS_REGISTERED_KEY, false)
+        val hasValidToken = isTokenValid()
+        
+        Log.d("UserManager", "Login check - Firebase: $hasFirebaseUser, Registered: $isRegistered, ValidToken: $hasValidToken")
+        
+        return hasFirebaseUser && isRegistered && hasValidToken
+    }
+
+    suspend fun refreshTokenIfNeeded(): String? {
+    return if (isTokenValid()) {
+        getUserToken()
+    } else {
+        val user = auth.currentUser ?: return null
+        val tokenResult = user.getIdToken(true).await()
+        tokenResult.token?.also { saveUserToken(it) }
+    }
+}
 
     /** Get current user email */
     fun getCurrentUserEmail(): String? {
@@ -136,10 +198,15 @@ class UserManager(private val context: Context) {
         return prefs.getString(USER_ID_KEY, null)
     }
 
-    /** Logout user */
+    /** Get current user from Firebase Auth */
+    fun getCurrentFirebaseUser() = auth.currentUser
+
+    /** Logout user - clear everything */
     fun logout() {
+        Log.d("UserManager", "Logging out user: ${getCurrentUserEmail()}")
         auth.signOut()
         prefs.edit().clear().apply()
+        Log.d("UserManager", "User logged out and all data cleared")
     }
 
     /** Sync user credits from Firestore */
@@ -148,6 +215,7 @@ class UserManager(private val context: Context) {
         val user = auth.currentUser
 
         if (userId == null || user == null) {
+            Log.e("UserManager", "Cannot sync credits: No user ID or Firebase user")
             onComplete(false, null)
             return
         }
@@ -158,15 +226,29 @@ class UserManager(private val context: Context) {
                 if (document.exists()) {
                     val credits = document.getLong("availableCredits")?.toInt() ?: 0
                     // Update local preferences
-                    prefs.edit().putInt("available_credits", credits).apply()
+                    prefs.edit().putInt(AVAILABLE_CREDITS_KEY, credits).apply()
+                    Log.d("UserManager", "Credits synced successfully: $credits")
                     onComplete(true, credits)
                 } else {
+                    Log.e("UserManager", "User document does not exist in Firestore")
                     onComplete(false, null)
                 }
             }
-            .addOnFailureListener {
+            .addOnFailureListener { e ->
+                Log.e("UserManager", "Failed to sync credits: ${e.message}")
                 onComplete(false, null)
             }
+    }
+
+    /** Get locally cached credits (use syncUserCredits for fresh data) */
+    fun getCachedCredits(): Int {
+        return prefs.getInt(AVAILABLE_CREDITS_KEY, 0)
+    }
+
+    /** Update local credits cache (called after successful credit deduction) */
+    fun updateLocalCredits(newCredits: Int) {
+        prefs.edit().putInt(AVAILABLE_CREDITS_KEY, newCredits).apply()
+        Log.d("UserManager", "Local credits updated to: $newCredits")
     }
 
     /** Save user data locally in SharedPreferences */
@@ -177,5 +259,58 @@ class UserManager(private val context: Context) {
             putBoolean(IS_REGISTERED_KEY, true)
             apply()
         }
+        Log.d("UserManager", "User data saved locally: $email")
+    }
+
+    /** Debug method to check all stored data */
+    fun debugStoredData() {
+        val allEntries = prefs.all
+        Log.d("UserManager", "=== Stored User Data ===")
+        allEntries.forEach { (key, value) ->
+            Log.d("UserManager", "$key: $value")
+        }
+        Log.d("UserManager", "Firebase current user: ${auth.currentUser?.uid ?: "null"}")
+        Log.d("UserManager", "Token valid: ${isTokenValid()}")
+        Log.d("UserManager", "User logged in: ${isUserLoggedIn()}")
+        Log.d("UserManager", "=== End Stored Data ===")
+    }
+
+    /** Check if user exists in Firestore */
+    fun checkUserExists(userId: String, onComplete: (Boolean) -> Unit) {
+        db.collection("users").document(userId)
+            .get()
+            .addOnSuccessListener { document ->
+                onComplete(document.exists())
+            }
+            .addOnFailureListener {
+                onComplete(false)
+            }
+    }
+
+    /** Force refresh Firebase token */
+    fun refreshFirebaseToken(onComplete: (String?) -> Unit) {
+        val user = auth.currentUser
+        if (user == null) {
+            onComplete(null)
+            return
+        }
+
+        user.getIdToken(true)
+            .addOnCompleteListener { task ->
+                if (task.isSuccessful) {
+                    val token = task.result?.token
+                    if (token != null) {
+                        saveUserToken(token)
+                        Log.d("UserManager", "Firebase token refreshed successfully")
+                        onComplete(token)
+                    } else {
+                        Log.e("UserManager", "Refreshed token is null")
+                        onComplete(null)
+                    }
+                } else {
+                    Log.e("UserManager", "Failed to refresh token: ${task.exception?.message}")
+                    onComplete(null)
+                }
+            }
     }
 }
