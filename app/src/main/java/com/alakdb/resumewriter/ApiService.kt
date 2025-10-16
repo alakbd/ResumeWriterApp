@@ -9,7 +9,6 @@ import kotlinx.coroutines.tasks.await
 import okhttp3.*
 import okhttp3.MediaType.Companion.toMediaType
 import okhttp3.RequestBody.Companion.toRequestBody
-import okhttp3.ResponseBody.Companion.toResponseBody
 import okhttp3.logging.HttpLoggingInterceptor
 import org.json.JSONObject
 import java.io.File
@@ -34,7 +33,7 @@ class ApiService(private val context: Context) {
         }.apply { 
             level = HttpLoggingInterceptor.Level.BODY 
         })
-        .addInterceptor(AuthInterceptor(context))  // Single auth interceptor
+        .addInterceptor(AuthInterceptor(context))
         .build()
 
     // Data Classes
@@ -47,7 +46,7 @@ class ApiService(private val context: Context) {
         data class Error(val message: String, val code: Int = 0, val details: String? = null) : ApiResult<Nothing>()
     }
 
-    // Single Auth Interceptor to handle token management
+    // Fixed AuthInterceptor - No more throwing exceptions
     class AuthInterceptor(private val context: Context) : Interceptor {
         override fun intercept(chain: Interceptor.Chain): Response {
             return try {
@@ -66,15 +65,16 @@ class ApiService(private val context: Context) {
 
                 val request = requestBuilder.build()
                 chain.proceed(request)
+                
             } catch (e: Exception) {
-                Log.e("AuthInterceptor", "🚨 Exception in AuthInterceptor: ${e.message}", e)
+                Log.e("AuthInterceptor", "🚨 Exception in AuthInterceptor: ${e.message}")
                 // Create a mock error response instead of throwing
                 Response.Builder()
                     .request(chain.request())
                     .protocol(Protocol.HTTP_1_1)
                     .code(500)
-                    .message("Authentication error: ${e.message}")
-                    .body("{\"error\": \"Authentication failed\"}".toResponseBody("application/json".toMediaType()))
+                    .message("Authentication error")
+                    .body("{\"error\": \"Authentication failed: ${e.message}\"}".toResponseBody("application/json".toMediaType()))
                     .build()
             }
         }
@@ -110,7 +110,7 @@ class ApiService(private val context: Context) {
                 null
             }
         } catch (e: Exception) {
-            Log.e("AuthDebug", "Error fetching Firebase token: ${e.message}", e)
+            Log.e("AuthDebug", "Error fetching Firebase token: ${e.message}")
             null
         }
     }
@@ -203,7 +203,7 @@ class ApiService(private val context: Context) {
             }
         } catch (e: Exception) {
             val errorCode = getErrorCode(e)
-            Log.e("ApiService", "Deduct credit exception: ${e.message}", e)
+            Log.e("ApiService", "Deduct credit exception: ${e.message}")
             ApiResult.Error("Deduct credit failed: ${e.message}", errorCode)
         }
     }
@@ -236,7 +236,7 @@ class ApiService(private val context: Context) {
             }
         } catch (e: Exception) {
             val errorCode = getErrorCode(e)
-            Log.e("ApiService", "Generate resume exception: ${e.message}", e)
+            Log.e("ApiService", "Generate resume exception: ${e.message}")
             ApiResult.Error("Resume generation failed: ${e.message}", errorCode)
         }
     }
@@ -279,14 +279,14 @@ class ApiService(private val context: Context) {
             }
         } catch (e: Exception) {
             val errorCode = getErrorCode(e)
-            Log.e("ApiService", "File resume generation exception: ${e.message}", e)
+            Log.e("ApiService", "File resume generation exception: ${e.message}")
             ApiResult.Error("File resume generation failed: ${e.message}", errorCode)
         }
     }
 
     suspend fun getUserCredits(): ApiResult<JSONObject> {
         return try {
-            // Let the AuthInterceptor handle the token
+            // Let the AuthInterceptor handle the token automatically
             val request = Request.Builder()
                 .url("$baseUrl/user/credits")
                 .get()
@@ -328,7 +328,7 @@ class ApiService(private val context: Context) {
             }
             file
         } catch (e: Exception) {
-            Log.e("ApiService", "Error converting URI to file: ${e.message}", e)
+            Log.e("ApiService", "Error converting URI to file: ${e.message}")
             throw e
         }
     }
