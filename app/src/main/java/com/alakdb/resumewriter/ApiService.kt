@@ -37,7 +37,6 @@ class ApiService(private val context: Context) {
         })
         .addInterceptor(ErrorInterceptor(context))  // Custom error interceptor
         .addInterceptor(AuthInterceptor(context))
-        .addHeader("X-Auth-Token", userManager.getUserToken() ?: "")
         .build()
 
     // Data Classes
@@ -100,8 +99,9 @@ class ApiService(private val context: Context) {
 
     class AuthInterceptor(private val context: Context) : Interceptor {
         override fun intercept(chain: Interceptor.Chain): Response {
-            val requestBuilder = chain.request().newBuilder()
+            val userManager = UserManager(context)
             val token = UserManager(context).getUserToken()
+            val requestBuilder = chain.request().newBuilder()
 
             if (!token.isNullOrBlank()) {
                 requestBuilder.addHeader("X-Auth-Token", "Bearer $token")
