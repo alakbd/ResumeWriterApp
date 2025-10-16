@@ -59,27 +59,20 @@ class ResumeGenerationActivity : AppCompatActivity() {
     super.onResume()
 
     lifecycleScope.launch {
-        // Debug: check auth token
-        val token = apiService.getCurrentUserToken()
-        Log.d("ResumeActivity", "Current token = $token")
-
-        // Wait a bit to prevent ANR
-        delay(1000)
-
-        Log.d("ResumeActivity", "onResume: Updating credits and warming up server")
+        // ✅ Use UserManager to check token instead of calling private ApiService method
+        val userManager = UserManager(this@ResumeGenerationActivity)
+        val token = userManager.getUserToken()
+        val tokenValid = userManager.isTokenValid()
+        
+        Log.d("ResumeActivity", "Token exists: ${token != null}")
+        Log.d("ResumeActivity", "Token valid: $tokenValid")
+        Log.d("ResumeActivity", "User logged in: ${userManager.isUserLoggedIn()}")
+        
+        // Update credits display (this will test if auth is working)
         updateCreditDisplay()
-        val warmUpResult = try {
-            apiService.warmUpServer()
-        } catch (e: Exception) {
-            Log.e("ResumeActivity", "Warm-up failed with exception: ${e.message}", e)
-            null
-        }
-
-        when (warmUpResult) {
-            is ApiService.ApiResult.Success -> Log.d("ResumeActivity", "Server warm-up successful")
-            is ApiService.ApiResult.Error -> Log.e("ResumeActivity", "Server warm-up failed: ${warmUpResult.message}")
-            null -> Log.e("ResumeActivity", "Server warm-up returned null")
-        }
+        
+        // Test server connection
+        testApiConnection()
     }
 }
 
@@ -492,25 +485,22 @@ private suspend fun updateCreditDisplay() {
     
     lifecycleScope.launch {
         try {
-            Log.d("AuthDebug", "Testing token retrieval...")
-            val token = getCurrentUserToken()
-            Log.d("AuthDebug", "Current token: ${token?.take(10) ?: "NULL"}...")
-            
             Log.d("AuthDebug", "Testing credits API...")
             val creditsResult = apiService.getUserCredits()
+
             when (creditsResult) {
                 is ApiService.ApiResult.Success -> {
-                    Log.d("AuthDebug", "✅ Credits API success - Auth is working")
+                    Log.d("AuthDebug", "✅ Credits API SUCCESS - Auth is working")
                     val credits = creditsResult.data.optInt("credits", 0)
                     Log.d("AuthDebug", "Available credits: $credits")
                 }
                 is ApiService.ApiResult.Error -> {
-                    Log.e("AuthDebug", "❌ Credits API failed: ${creditsResult.message}")
+                    Log.e("AuthDebug", "❌ Credits API FAILED: ${creditsResult.message}")
                     Log.e("AuthDebug", "Error code: ${creditsResult.code}")
                 }
             }
         } catch (e: Exception) {
-            Log.e("AuthDebug", "❌ Debug exception: ${e.message}", e)
+            Log.e("AuthDebug", "❌ Exception during auth test: ${e.message}")
         }
     }
 }
