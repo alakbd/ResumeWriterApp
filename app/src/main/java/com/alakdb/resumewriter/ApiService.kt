@@ -99,25 +99,31 @@ class ApiService(private val context: Context) {
 
     class AuthInterceptor(private val context: Context) : Interceptor {
         override fun intercept(chain: Interceptor.Chain): Response {
-            val userManager = UserManager(context)
-            val token = UserManager(context).getUserToken()
-            val requestBuilder = chain.request().newBuilder()
+            return try {
+                val userManager = UserManager(context)
+                val token = userManager.getUserToken()
 
-            if (!token.isNullOrBlank()) {
-                requestBuilder.addHeader("X-Auth-Token", "Bearer $token")
-                Log.d("AuthInterceptor", "Adding X-Auth-Token header: ${token.take(20)}...") // show first 20 chars
-            } else {
-                Log.w("AuthInterceptor", "No token found! Requests will be unauthenticated")
-            }
+                val requestBuilder = chain.request().newBuilder()
 
-            val request = requestBuilder.build()
-            val response = chain.proceed(request)
+                if (!token.isNullOrBlank()) {
+                    requestBuilder.addHeader("X-Auth-Token", token)
+                    Log.d("AuthInterceptor", "✅ Added X-Auth-Token header (first 20 chars): ${token.take(20)}...")
+                } else {
+                    Log.w("AuthInterceptor", "⚠️ No token found — request will be unauthenticated")
+                }
 
-            if (!response.isSuccessful) {
-                Log.e("AuthInterceptor", "Request failed: HTTP ${response.code} ${response.message}")
-            }    
+                val request = requestBuilder.build()
+                val response = chain.proceed(request)
 
-            return response
+                if (!response.isSuccessful) {
+                    Log.e("AuthInterceptor", "❌ Request failed — HTTP ${response.code} ${response.message}")
+                }
+
+                response
+            } catch (e: Exception) {
+            Log.e("AuthInterceptor", "🚨 Exception in AuthInterceptor: ${e.message}", e)
+            throw e
+        }
     }
 }
 
