@@ -93,17 +93,28 @@ class ApiService(private val context: Context) {
 }
 
     class AuthInterceptor(private val context: Context) : Interceptor {
-    override fun intercept(chain: Interceptor.Chain): Response {
-        val token = UserManager(context).getUserToken()
-        val requestBuilder = chain.request().newBuilder()
+        override fun intercept(chain: Interceptor.Chain): Response {
+            val requestBuilder = chain.request().newBuilder()
+            val token = UserManager(context).getUserToken()
 
-        if (!token.isNullOrBlank()) {
-            requestBuilder.addHeader("X-Auth-Token", "Bearer $token")
-        }
+            if (!token.isNullOrBlank()) {
+                requestBuilder.addHeader("X-Auth-Token", "Bearer $token")
+                Log.d("AuthInterceptor", "Adding X-Auth-Token header: ${token.take(20)}...") // show first 20 chars
+            } else {
+                Log.w("AuthInterceptor", "No token found! Requests will be unauthenticated")
+            }
 
-        return chain.proceed(requestBuilder.build())
+            val request = requestBuilder.build()
+            val response = chain.proceed(request)
+
+            if (!response.isSuccessful) {
+                Log.e("AuthInterceptor", "Request failed: HTTP ${response.code} ${response.message}")
+            }    
+
+            return response
     }
 }
+
 
     // Current User Token with better error handling
     suspend fun getCurrentUserToken(): String? {
