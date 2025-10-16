@@ -63,9 +63,9 @@ class ApiService(private val context: Context) {
             val requestBuilder = originalRequest.newBuilder()
 
             if (!token.isNullOrBlank()) {
-                // ✅ FIX: Use X-Auth-Token header instead of Authorization Bearer
-                requestBuilder.addHeader("X-Auth-Token", token)
-                Log.d("AuthInterceptor", "✅ Added X-Auth-Token header with Firebase token")
+                // ✅ FIX: Add "Bearer " prefix as expected by server
+                requestBuilder.addHeader("X-Auth-Token", "Bearer $token")
+                Log.d("AuthInterceptor", "✅ Added X-Auth-Token header with Bearer prefix")
             } else {
                 Log.w("AuthInterceptor", "⚠️ No token found — request will be unauthenticated")
                 // Don't throw exception, just proceed without token (will get 401 from server)
@@ -91,6 +91,7 @@ class ApiService(private val context: Context) {
         return url.contains("/health") || url.contains("/warmup") || url.endsWith("/")
     }
 }
+    
     // Improved token fetching with better error handling and token validation
     suspend fun getCurrentUserToken(): String? {
         return try {
