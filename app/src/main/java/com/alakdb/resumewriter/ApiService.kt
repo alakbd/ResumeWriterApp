@@ -52,46 +52,45 @@ class ApiService(private val context: Context) {
         override fun intercept(chain: Interceptor.Chain): Response {
             return try {
                 val originalRequest = chain.request()
-                
-                // Skip auth for public endpoints
-                if (isPublicEndpoint(originalRequest.url.toString())) {
-                    Log.d("AuthInterceptor", "Skipping auth for public endpoint")
-                    return chain.proceed(originalRequest)
-                }
-
-                val token = userManager.getUserToken()
-                val requestBuilder = originalRequest.newBuilder()
-
-                if (!token.isNullOrBlank()) {
-                    // Use Bearer token format as expected by your server
-                    requestBuilder.addHeader("Authorization", "Bearer $token")
-                    Log.d("AuthInterceptor", "✅ Added Authorization header with Bearer token")
-                } else {
-                    Log.w("AuthInterceptor", "⚠️ No token found — request will be unauthenticated")
-                    // Don't throw exception, just proceed without token (will get 401 from server)
-                }
-
-                val request = requestBuilder.build()
-                chain.proceed(request)
-                
-            } catch (e: Exception) {
-                Log.e("AuthInterceptor", "🚨 Exception in AuthInterceptor: ${e.message}")
-                // Create a mock error response instead of throwing
-                Response.Builder()
-                    .request(chain.request())
-                    .protocol(Protocol.HTTP_1_1)
-                    .code(500)
-                    .message("Authentication error")
-                    .body("{\"error\": \"Authentication failed: ${e.message}\"}".toResponseBody("application/json".toMediaType()))
-                    .build()
+            
+            // Skip auth for public endpoints
+            if (isPublicEndpoint(originalRequest.url.toString())) {
+                Log.d("AuthInterceptor", "Skipping auth for public endpoint")
+                return chain.proceed(originalRequest)
             }
-        }
 
-        private fun isPublicEndpoint(url: String): Boolean {
-            return url.contains("/health") || url.contains("/warmup") || url.endsWith("/")
+            val token = userManager.getUserToken()
+            val requestBuilder = originalRequest.newBuilder()
+
+            if (!token.isNullOrBlank()) {
+                // ✅ FIX: Use X-Auth-Token header instead of Authorization Bearer
+                requestBuilder.addHeader("X-Auth-Token", token)
+                Log.d("AuthInterceptor", "✅ Added X-Auth-Token header with Firebase token")
+            } else {
+                Log.w("AuthInterceptor", "⚠️ No token found — request will be unauthenticated")
+                // Don't throw exception, just proceed without token (will get 401 from server)
+            }
+
+            val request = requestBuilder.build()
+            chain.proceed(request)
+            
+        } catch (e: Exception) {
+            Log.e("AuthInterceptor", "🚨 Exception in AuthInterceptor: ${e.message}")
+            // Create a mock error response instead of throwing
+            Response.Builder()
+                .request(chain.request())
+                .protocol(Protocol.HTTP_1_1)
+                .code(500)
+                .message("Authentication error")
+                .body("{\"error\": \"Authentication failed: ${e.message}\"}".toResponseBody("application/json".toMediaType()))
+                .build()
         }
     }
 
+    private fun isPublicEndpoint(url: String): Boolean {
+        return url.contains("/health") || url.contains("/warmup") || url.endsWith("/")
+    }
+}
     // Improved token fetching with better error handling and token validation
     suspend fun getCurrentUserToken(): String? {
         return try {
