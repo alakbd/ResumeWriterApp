@@ -504,7 +504,27 @@ private suspend fun updateCreditDisplay() {
         }
     }
 }
+    private fun testAuthHeader() {
+    lifecycleScope.launch {
+        val token = userManager.getUserToken()
+        Log.d("AuthDebug", "Token: ${token?.take(10)}...")
+        Log.d("AuthDebug", "Header will be: X-Auth-Token: Bearer ${token?.take(10)}...")
+        
+        val result = apiService.getUserCredits()
+        when (result) {
+            is ApiService.ApiResult.Success -> {
+                Log.d("AuthDebug", "✅ SUCCESS! Credits: ${result.data}")
+                val credits = result.data.optInt("available_credits", 0)
+                binding.creditText.text = "Credits: $credits"
+            }
+            is ApiService.ApiResult.Error -> {
+                Log.e("AuthDebug", "❌ FAILED: ${result.message} (Code: ${result.code})")
+            }
+        }
+    }
+}
 
+    
     
     private fun handleGenerationResult(result: ApiService.ApiResult<JSONObject>) {
     when (result) {
