@@ -24,18 +24,55 @@ class ApiService(private val context: Context) {
     private val baseUrl = "https://resume-writer-api.onrender.com"
     private val userManager = UserManager(context)
 
-    // Enhanced OkHttp Client with better debugging
-    private val client = OkHttpClient.Builder()
-        .connectTimeout(30, TimeUnit.SECONDS)
-        .readTimeout(30, TimeUnit.SECONDS)
-        .writeTimeout(30, TimeUnit.SECONDS)
-        .addInterceptor(HttpLoggingInterceptor { msg -> 
-            Log.d("NetworkLog", "🔗 $msg") 
-        }.apply { 
-            level = HttpLoggingInterceptor.Level.BODY 
-        })
-        .addInterceptor(AuthInterceptor(userManager)) // Pass the same UserManager instance
-        .build()
+    // Enhanced OkHttp Client with request/response logging
+private val client = OkHttpClient.Builder()
+    .connectTimeout(30, TimeUnit.SECONDS)
+    .readTimeout(30, TimeUnit.SECONDS)
+    .writeTimeout(30, TimeUnit.SECONDS)
+    .addInterceptor(HttpLoggingInterceptor { msg -> 
+        Log.d("Network", "🔗 $msg") 
+    }.apply { 
+        level = HttpLoggingInterceptor.Level.HEADERS 
+    })
+    .addInterceptor(DetailedLoggingInterceptor()) // Add this new interceptor
+    .addInterceptor(AuthInterceptor(userManager))
+    .build()
+
+// Add this new interceptor class
+class DetailedLoggingInterceptor : Interceptor {
+    override fun intercept(chain: Interceptor.Chain): Response {
+        val request = chain.request()
+        
+        // Log request details
+        Log.d("Network", "⬆️ REQUEST: ${request.method} ${request.url}")
+        request.headers.forEach { name, value ->
+            Log.d("Network", "   $name: $value")
+        }
+        
+        val startTime = System.currentTimeMillis()
+        val response = chain.proceed(request)
+        val endTime = System.currentTimeMillis()
+        
+        // Log response details
+        Log.d("Network", "⬇️ RESPONSE: ${response.code} ${response.message} (${endTime - startTime}ms)")
+        response.headers.forEach { name, value ->
+            Log.d("Network", "   $name: $value")
+        }
+        
+        // Log response body (for debugging)
+        val responseBody = response.body
+        val source = responseBody?.source()
+        source?.request(Long.MAX_VALUE)
+        val buffer = source?.buffer?.clone()
+        val responseText = buffer?.readUtf8()
+        
+        responseText?.let {
+            Log.d("Network", "Response Body: $it")
+        }
+        
+        return response
+    }
+}
 
     // Data Classes
     data class DeductCreditRequest(val user_id: String)
