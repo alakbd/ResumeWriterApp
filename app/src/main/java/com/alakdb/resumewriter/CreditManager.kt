@@ -1,6 +1,7 @@
 package com.alakdb.resumewriter
 
 import android.content.Context
+import android.util.Log
 import android.content.SharedPreferences
 import com.google.firebase.auth.FirebaseAuth
 import com.google.firebase.firestore.FirebaseFirestore
