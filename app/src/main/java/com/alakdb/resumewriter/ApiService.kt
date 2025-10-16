@@ -29,12 +29,10 @@ private val client = OkHttpClient.Builder()
     .connectTimeout(30, TimeUnit.SECONDS)
     .readTimeout(30, TimeUnit.SECONDS)
     .writeTimeout(30, TimeUnit.SECONDS)
-    .addInterceptor(HttpLoggingInterceptor { msg -> 
-        Log.d("Network", "🔗 $msg") 
-    }.apply { 
-        level = HttpLoggingInterceptor.Level.HEADERS 
+    .addInterceptor(HttpLoggingInterceptor().apply { 
+        level = HttpLoggingInterceptor.Level.BODY 
     })
-    .addInterceptor(DetailedLoggingInterceptor()) // Add this new interceptor
+    .addInterceptor(DetailedLoggingInterceptor()) // Add this if you want custom logging
     .addInterceptor(AuthInterceptor(userManager))
     .build()
 
