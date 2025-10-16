@@ -60,7 +60,7 @@ class ResumeGenerationActivity : AppCompatActivity() {
 
     lifecycleScope.launch {
         // Debug: check auth token
-        val token = apiService.getAuthIdentifier()
+        val token = apiService.getCurrentUserToken()
         Log.d("ResumeActivity", "Current token = $token")
 
         // Wait a bit to prevent ANR
