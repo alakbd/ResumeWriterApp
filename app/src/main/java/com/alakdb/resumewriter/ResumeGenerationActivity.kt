@@ -53,11 +53,69 @@ class ResumeGenerationActivity : AppCompatActivity() {
         registerFilePickers()
         setupUI()
         checkGenerateButtonState()
-    }
+    
 
+    private fun comprehensiveAuthDebug() {
+    lifecycleScope.launch {
+        Log.d("DEBUG", "=== COMPREHENSIVE AUTH DEBUG ===")
+        
+        // 1. Check Firebase Auth state
+        val firebaseUser = FirebaseAuth.getInstance().currentUser
+        Log.d("DEBUG", "Firebase User: ${firebaseUser?.uid ?: "NULL"}")
+        Log.d("DEBUG", "Firebase Email: ${firebaseUser?.email ?: "NULL"}")
+        
+        // 2. Check UserManager state
+        val userManager = UserManager(this@ResumeGenerationActivity)
+        Log.d("DEBUG", "UserManager logged in: ${userManager.isUserLoggedIn()}")
+        Log.d("DEBUG", "UserManager token valid: ${userManager.isTokenValid()}")
+        Log.d("DEBUG", "UserManager token: ${userManager.getUserToken()?.take(10) ?: "NULL"}...")
+        Log.d("DEBUG", "UserManager user ID: ${userManager.getCurrentUserId()}")
+        Log.d("DEBUG", "UserManager email: ${userManager.getCurrentUserEmail()}")
+        
+        // 3. Check network connectivity
+        Log.d("DEBUG", "Network available: ${isNetworkAvailable()}")
+        
+        // 4. Test server connection without auth
+        Log.d("DEBUG", "Testing server connection...")
+        val connectionResult = apiService.testConnection()
+        when (connectionResult) {
+            is ApiService.ApiResult.Success -> {
+                Log.d("DEBUG", "✅ Server connection successful")
+                Log.d("DEBUG", "Response: ${connectionResult.data}")
+            }
+            is ApiService.ApiResult.Error -> {
+                Log.e("DEBUG", "❌ Server connection failed: ${connectionResult.message}")
+            }
+        }
+        
+        // 5. Test authentication with server
+        Log.d("DEBUG", "Testing authentication...")
+        val token = userManager.getUserToken()
+        if (!token.isNullOrBlank()) {
+            Log.d("DEBUG", "Token available, testing API call...")
+            val creditsResult = apiService.getUserCredits()
+            when (creditsResult) {
+                is ApiService.ApiResult.Success -> {
+                    Log.d("DEBUG", "✅ Authentication SUCCESS!")
+                    Log.d("DEBUG", "Credits data: ${creditsResult.data}")
+                }
+                is ApiService.ApiResult.Error -> {
+                    Log.e("DEBUG", "❌ Authentication FAILED: ${creditsResult.message}")
+                    Log.e("DEBUG", "Error code: ${creditsResult.code}")
+                }
+            }
+        } else {
+            Log.e("DEBUG", "❌ No token available for testing")
+        }
+        
+        Log.d("DEBUG", "=== END DEBUG ===")
+            }
+        }
+
+    }
+    
     override fun onResume() {
     super.onResume()
-
     lifecycleScope.launch {
         // ✅ Use UserManager to check token instead of calling private ApiService method
         val userManager = UserManager(this@ResumeGenerationActivity)
