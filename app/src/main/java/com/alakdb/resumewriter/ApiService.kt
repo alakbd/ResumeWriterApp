@@ -16,8 +16,6 @@ import okhttp3.Interceptor
 import okhttp3.Response
 import java.io.IOException
 import java.util.concurrent.TimeUnit
-import okhttp3.MediaType.Companion.toMediaTypeOrNull
-import okhttp3.ResponseBody.Companion.toResponseBody
 
 class ApiService(private val context: Context) {
 
@@ -27,76 +25,28 @@ class ApiService(private val context: Context) {
 
     // Enhanced OkHttp Client with better debugging
     private val client = OkHttpClient.Builder()
-        .connectTimeout(30, TimeUnit.SECONDS) // Increased from 10 to 30
-        .readTimeout(30, TimeUnit.SECONDS)    // Increased from 10 to 30
-        .writeTimeout(30, TimeUnit.SECONDS)   // Increased from 10 to 30
+        .connectTimeout(30, TimeUnit.SECONDS)
+        .readTimeout(30, TimeUnit.SECONDS)
+        .writeTimeout(30, TimeUnit.SECONDS)
         .addInterceptor(HttpLoggingInterceptor { msg -> 
             Log.d("NetworkLog", "🔗 $msg") 
         }.apply { 
             level = HttpLoggingInterceptor.Level.BODY 
         })
-        .addInterceptor(ErrorInterceptor(context))  // Custom error interceptor
-        .addInterceptor(AuthInterceptor(context))
+        .addInterceptor(AuthInterceptor(context))  // Single auth interceptor
         .build()
 
     // Data Classes
     data class DeductCreditRequest(val user_id: String)
     data class GenerateResumeRequest(val resume_text: String, val job_description: String, val tone: String = "Professional")
 
-  
     // API Result wrapper
     sealed class ApiResult<out T> {
         data class Success<out T>(val data: T) : ApiResult<T>()
         data class Error(val message: String, val code: Int = 0, val details: String? = null) : ApiResult<Nothing>()
     }
 
-    // Example: warm up server
-    suspend fun warmUpServer(): ApiResult<JSONObject> {
-        return try {
-            val request = Request.Builder()
-                .url("$baseUrl/warmup")
-                .get()
-                .build()
-
-            client.newCall(request).execute().use { response ->
-                val body = response.body?.string() ?: "{}"
-                if (!response.isSuccessful) {
-                    return ApiResult.Error("Warm-up failed", response.code)
-                }
-                ApiResult.Success(JSONObject(body))
-            }
-        } catch (e: Exception) {
-            ApiResult.Error(e.message ?: "Warm-up exception")
-        }
-    }
-
-
-    
-    // Custom Interceptor for better error handling
-    class ErrorInterceptor(private val context: Context) : Interceptor {
-        override fun intercept(chain: Interceptor.Chain): Response {
-            val userManager = UserManager(context)
-            val token = userManager.getUserToken()
-
-            val request = chain.request().newBuilder()
-                .addHeader("X-Auth-Token", token ?: "")
-                .build()
-
-            return try {
-                val response = chain.proceed(request)
-
-                if (!response.isSuccessful) {
-                    Log.e("NetworkError", "HTTP error: ${response.code}")
-                }
-
-                response
-            } catch (e: IOException) {
-                Log.e("NetworkError", "Network request failed", e)
-                throw e
-        }
-    }
-}
-
+    // Single Auth Interceptor to handle token management
     class AuthInterceptor(private val context: Context) : Interceptor {
         override fun intercept(chain: Interceptor.Chain): Response {
             return try {
@@ -107,83 +57,68 @@ class ApiService(private val context: Context) {
 
                 if (!token.isNullOrBlank()) {
                     requestBuilder.addHeader("X-Auth-Token", token)
-                    Log.d("AuthInterceptor", "✅ Added X-Auth-Token header (first 20 chars): ${token.take(20)}...")
+                    Log.d("AuthInterceptor", "✅ Added X-Auth-Token header")
                 } else {
                     Log.w("AuthInterceptor", "⚠️ No token found — request will be unauthenticated")
+                    // Don't throw exception, just proceed without token
                 }
 
                 val request = requestBuilder.build()
-                val response = chain.proceed(request)
-
-                if (!response.isSuccessful) {
-                    Log.e("AuthInterceptor", "❌ Request failed — HTTP ${response.code} ${response.message}")
-                }
-
-                response
+                chain.proceed(request)
             } catch (e: Exception) {
-            Log.e("AuthInterceptor", "🚨 Exception in AuthInterceptor: ${e.message}", e)
-            throw e
+                Log.e("AuthInterceptor", "🚨 Exception in AuthInterceptor: ${e.message}", e)
+                // Create a mock error response instead of throwing
+                Response.Builder()
+                    .request(chain.request())
+                    .protocol(Protocol.HTTP_1_1)
+                    .code(500)
+                    .message("Authentication error: ${e.message}")
+                    .body("{\"error\": \"Authentication failed\"}".toResponseBody("application/json".toMediaType()))
+                    .build()
+            }
         }
     }
-}
 
-
-    // Current User Token with better error handling
+    // Improved token fetching with better error handling
     suspend fun getCurrentUserToken(): String? {
         return try {
             // Try to get cached token first
-            userManager.getUserToken()?.let {
-                Log.d("AuthDebug", "Using cached token")
-                    return it
+            userManager.getUserToken()?.let { cachedToken ->
+                if (cachedToken.isNotBlank()) {
+                    Log.d("AuthDebug", "Using cached token")
+                    return cachedToken
                 }
+            }
 
-        // Fetch new token from Firebase
-        val currentUser = FirebaseAuth.getInstance().currentUser
-        if (currentUser == null) {
-            Log.e("AuthDebug", "No user signed in! Can't fetch token.")
-            return null
-        }
+            // Fetch new token from Firebase
+            val currentUser = FirebaseAuth.getInstance().currentUser
+            if (currentUser == null) {
+                Log.e("AuthDebug", "No user signed in! Can't fetch token.")
+                return null
+            }
 
-        val tokenResult = currentUser.getIdToken(true).await()
-        val token = tokenResult.token
+            val tokenResult = currentUser.getIdToken(true).await()
+            val token = tokenResult.token
 
-        if (!token.isNullOrBlank()) {
-            userManager.saveUserToken(token)
-            Log.d("AuthDebug", "Token obtained successfully: ${token.take(20)}...")
-            token
-        } else {
-            Log.e("AuthDebug", "Token is null or empty")
-            null
-        }
-    } catch (e: Exception) {
-        Log.e("AuthDebug", "Error fetching Firebase token: ${e.message}", e)
-        null
-    }
-}
-
-    // Enhanced Authentication Helper
-    suspend fun getAuthIdentifier(): String? {
-        return try {
-            val token = getCurrentUserToken()
-            if (token != null) {
-                "Bearer $token".also { 
-                    Log.d("Auth", "Using auth token: ${it.take(20)}...") 
-                }
+            if (!token.isNullOrBlank()) {
+                userManager.saveUserToken(token)
+                Log.d("AuthDebug", "Token obtained successfully")
+                token
             } else {
-                Log.e("Auth", "No auth token available")
+                Log.e("AuthDebug", "Token is null or empty")
                 null
             }
         } catch (e: Exception) {
-            Log.e("Auth", "Auth identifier error: ${e.message}", e)
+            Log.e("AuthDebug", "Error fetching Firebase token: ${e.message}", e)
             null
         }
     }
 
-    // Enhanced Test Connection with detailed logging
+    // Enhanced Test Connection with better error handling
     suspend fun testConnection(): ApiResult<JSONObject> {
         Log.d("NetworkTest", "Testing connection to: $baseUrl")
         
-        val endpoints = listOf("/health", "/", "/user/credits")
+        val endpoints = listOf("/health", "/")
         
         for (endpoint in endpoints) {
             try {
@@ -207,7 +142,7 @@ class ApiService(private val context: Context) {
                     Log.w("NetworkTest", "❌ Failed with endpoint $endpoint: HTTP ${response.code}")
                 }
             } catch (e: Exception) {
-                Log.e("NetworkTest", "❌ Error with endpoint $endpoint: ${e.message}", e)
+                Log.e("NetworkTest", "❌ Error with endpoint $endpoint: ${e.message}")
             }
         }
         
@@ -218,17 +153,31 @@ class ApiService(private val context: Context) {
         )
     }
 
-    // Simple warm-up server method
-    
+    // Warm up server
+    suspend fun warmUpServer(): ApiResult<JSONObject> {
+        return try {
+            val request = Request.Builder()
+                .url("$baseUrl/warmup")
+                .get()
+                .build()
+
+            client.newCall(request).execute().use { response ->
+                val body = response.body?.string() ?: "{}"
+                if (!response.isSuccessful) {
+                    return ApiResult.Error("Warm-up failed", response.code)
+                }
+                ApiResult.Success(JSONObject(body))
+            }
+        } catch (e: Exception) {
+            ApiResult.Error(e.message ?: "Warm-up exception")
+        }
+    }
 
     // Enhanced API Methods with better error handling
     suspend fun deductCredit(userId: String): ApiResult<JSONObject> {
         Log.d("ApiService", "Deducting credit for user: $userId")
         
         return try {
-            val auth = getAuthIdentifier() 
-                ?: return ApiResult.Error("User authentication unavailable", 401, "No auth token")
-            
             val requestBody = DeductCreditRequest(userId)
             val body = gson.toJson(requestBody).toRequestBody("application/json".toMediaType())
             
@@ -254,7 +203,7 @@ class ApiService(private val context: Context) {
         } catch (e: Exception) {
             val errorCode = getErrorCode(e)
             Log.e("ApiService", "Deduct credit exception: ${e.message}", e)
-            ApiResult.Error("Deduct credit failed: ${e.message}", errorCode, e.stackTraceToString())
+            ApiResult.Error("Deduct credit failed: ${e.message}", errorCode)
         }
     }
 
@@ -262,9 +211,6 @@ class ApiService(private val context: Context) {
         Log.d("ApiService", "Generating resume with tone: $tone")
         
         return try {
-            val auth = getAuthIdentifier() 
-                ?: return ApiResult.Error("User authentication unavailable", 401, "No auth token")
-            
             val requestBody = GenerateResumeRequest(resumeText, jobDescription, tone)
             val body = gson.toJson(requestBody).toRequestBody("application/json".toMediaType())
             
@@ -290,7 +236,7 @@ class ApiService(private val context: Context) {
         } catch (e: Exception) {
             val errorCode = getErrorCode(e)
             Log.e("ApiService", "Generate resume exception: ${e.message}", e)
-            ApiResult.Error("Resume generation failed: ${e.message}", errorCode, e.stackTraceToString())
+            ApiResult.Error("Resume generation failed: ${e.message}", errorCode)
         }
     }
 
@@ -298,9 +244,6 @@ class ApiService(private val context: Context) {
         Log.d("ApiService", "Generating resume from files")
         
         return try {
-            val auth = getAuthIdentifier() 
-                ?: return ApiResult.Error("User authentication unavailable", 401, "No auth token")
-            
             val resumeFile = uriToFile(resumeUri)
             val jobDescFile = uriToFile(jobDescUri)
 
@@ -336,54 +279,40 @@ class ApiService(private val context: Context) {
         } catch (e: Exception) {
             val errorCode = getErrorCode(e)
             Log.e("ApiService", "File resume generation exception: ${e.message}", e)
-            ApiResult.Error("File resume generation failed: ${e.message}", errorCode, e.stackTraceToString())
+            ApiResult.Error("File resume generation failed: ${e.message}", errorCode)
         }
     }
 
     suspend fun getUserCredits(): ApiResult<JSONObject> {
         return try {
-        // Fetch the current user token (cached or fresh)
-        val token = getCurrentUserToken()
-        if (token.isNullOrEmpty()) {
-            Log.e("ApiService", "Auth token is null or empty")
-            return ApiResult.Error(
-                message = "User authentication unavailable. Please log in.",
-                code = 401
+            // Let the AuthInterceptor handle the token
+            val request = Request.Builder()
+                .url("$baseUrl/user/credits")
+                .get()
+                .addHeader("User-Agent", "ResumeWriter-Android")
+                .build()
+
+            client.newCall(request).execute().use { response ->
+                val respBody = response.body?.string() ?: "{}"
+
+                if (!response.isSuccessful) {
+                    Log.e("ApiService", "Failed to fetch credits: HTTP ${response.code}")
+                    return ApiResult.Error(
+                        message = "Failed to get credits: ${response.message}",
+                        code = response.code
+                    )
+                }
+
+                ApiResult.Success(JSONObject(respBody))
+            }
+        } catch (e: Exception) {
+            Log.e("ApiService", "Exception while fetching credits", e)
+            ApiResult.Error(
+                message = "Exception while fetching credits: ${e.message}",
+                code = -1
             )
         }
-
-        // Build the request with the auth token
-        val request = Request.Builder()
-            .url("$baseUrl/user/credits")
-            .get()
-            .addHeader("User-Agent", "ResumeWriter-Android")
-            .addHeader("X-Auth-Token", token)  // ⚡ This is required by the API
-            .build()
-
-        // Execute request
-        client.newCall(request).execute().use { response ->
-            val respBody = response.body?.string() ?: "{}"
-
-            if (!response.isSuccessful) {
-                Log.e("ApiService", "Failed to fetch credits: HTTP ${response.code}")
-                return ApiResult.Error(
-                    message = "Failed to get credits: ${response.message}",
-                    code = response.code
-                )
-            }
-
-            // Return successful result
-            ApiResult.Success(JSONObject(respBody))
-        }
-    } catch (e: Exception) {
-        Log.e("ApiService", "Exception while fetching credits", e)
-        ApiResult.Error(
-            message = "Exception while fetching credits: ${e.message}",
-            code = -1,
-            details = e.stackTraceToString()
-        )
     }
-}
 
     // Utilities
     private fun uriToFile(uri: Uri): File {
@@ -420,32 +349,16 @@ class ApiService(private val context: Context) {
     private fun handleErrorResponse(response: Response): String {
         return try {
             val body = response.body?.string()
-            val errorMessage = "HTTP ${response.code}: ${response.message}. Body: $body"
-            Log.e("NetworkError", errorMessage)
-            errorMessage
+            "HTTP ${response.code}: ${response.message}. Body: $body"
         } catch (e: Exception) {
-            val errorMessage = "HTTP ${response.code}: ${response.message}"
-            Log.e("NetworkError", errorMessage)
-            errorMessage
+            "HTTP ${response.code}: ${response.message}"
         }
     }
 
     private fun getErrorCode(e: Exception): Int = when (e) {
-        is java.net.SocketTimeoutException -> {
-            Log.e("NetworkError", "Socket timeout", e)
-            1002
-        }
-        is java.net.UnknownHostException -> {
-            Log.e("NetworkError", "Unknown host - check internet connection", e)
-            1003
-        }
-        is IOException -> {
-            Log.e("NetworkError", "IO Exception", e)
-            1001
-        }
-        else -> {
-            Log.e("NetworkError", "Unknown error: ${e::class.java.name}", e)
-            1000
-        }
+        is java.net.SocketTimeoutException -> 1002
+        is java.net.UnknownHostException -> 1003
+        is IOException -> 1001
+        else -> 1000
     }
 }
