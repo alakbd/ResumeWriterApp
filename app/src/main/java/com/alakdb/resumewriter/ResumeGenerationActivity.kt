@@ -151,6 +151,29 @@ class ResumeGenerationActivity : AppCompatActivity() {
         }
     }
 
+    private fun testAuthentication() {
+    lifecycleScope.launch {
+        val debugInfo = apiService.debugAuthState()
+        Log.d("AuthTest", debugInfo)
+        
+        // Test credits API
+        val result = apiService.getUserCredits()
+        when (result) {
+            is ApiService.ApiResult.Success -> {
+                Log.d("AuthTest", "✅ Credits API success!")
+                val credits = result.data.optInt("credits", 0)
+                binding.creditText.text = "Credits: $credits"
+            }
+            is ApiService.ApiResult.Error -> {
+                Log.e("AuthTest", "❌ Credits API failed: ${result.message}")
+                if (result.code == 401) {
+                    showError("Authentication failed. Please log in again.")
+                }
+            }
+        }
+    }
+}
+
     /** ---------------- API Connection Test ---------------- **/
     private fun testApiConnection() {
         binding.layoutConnectionStatus.visibility = View.VISIBLE
