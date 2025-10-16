@@ -18,7 +18,6 @@ import okhttp3.Response
 import java.io.IOException
 import java.util.concurrent.TimeUnit
 
-
 class ApiService(private val context: Context) {
 
     private val gson = Gson()
@@ -35,7 +34,7 @@ class ApiService(private val context: Context) {
         }.apply { 
             level = HttpLoggingInterceptor.Level.BODY 
         })
-        .addInterceptor(AuthInterceptor(context))
+        .addInterceptor(AuthInterceptor(userManager)) // Pass the same UserManager instance
         .build()
 
     // Data Classes
@@ -48,21 +47,28 @@ class ApiService(private val context: Context) {
         data class Error(val message: String, val code: Int = 0, val details: String? = null) : ApiResult<Nothing>()
     }
 
-    // Fixed AuthInterceptor - No more throwing exceptions
-    class AuthInterceptor(private val context: Context) : Interceptor {
+    // Fixed AuthInterceptor - Use the same UserManager instance and proper header format
+    class AuthInterceptor(private val userManager: UserManager) : Interceptor {
         override fun intercept(chain: Interceptor.Chain): Response {
             return try {
-                val userManager = UserManager(context)
-                val token = userManager.getUserToken()
+                val originalRequest = chain.request()
+                
+                // Skip auth for public endpoints
+                if (isPublicEndpoint(originalRequest.url.toString())) {
+                    Log.d("AuthInterceptor", "Skipping auth for public endpoint")
+                    return chain.proceed(originalRequest)
+                }
 
-                val requestBuilder = chain.request().newBuilder()
+                val token = userManager.getUserToken()
+                val requestBuilder = originalRequest.newBuilder()
 
                 if (!token.isNullOrBlank()) {
-                    requestBuilder.addHeader("X-Auth-Token", token)
-                    Log.d("AuthInterceptor", "✅ Added X-Auth-Token header")
+                    // Use Bearer token format as expected by your server
+                    requestBuilder.addHeader("Authorization", "Bearer $token")
+                    Log.d("AuthInterceptor", "✅ Added Authorization header with Bearer token")
                 } else {
                     Log.w("AuthInterceptor", "⚠️ No token found — request will be unauthenticated")
-                    // Don't throw exception, just proceed without token
+                    // Don't throw exception, just proceed without token (will get 401 from server)
                 }
 
                 val request = requestBuilder.build()
@@ -80,39 +86,50 @@ class ApiService(private val context: Context) {
                     .build()
             }
         }
+
+        private fun isPublicEndpoint(url: String): Boolean {
+            return url.contains("/health") || url.contains("/warmup") || url.endsWith("/")
+        }
     }
 
-    // Improved token fetching with better error handling
+    // Improved token fetching with better error handling and token validation
     suspend fun getCurrentUserToken(): String? {
         return try {
-            // Try to get cached token first
-            userManager.getUserToken()?.let { cachedToken ->
-                if (cachedToken.isNotBlank()) {
-                    Log.d("AuthDebug", "Using cached token")
-                    return cachedToken
+            // Check if user is actually logged in first
+            val currentUser = FirebaseAuth.getInstance().currentUser
+            if (currentUser == null) {
+                Log.e("AuthDebug", "❌ No user signed in! Can't fetch token.")
+                userManager.clearUserToken()
+                return null
+            }
+
+            // Check if we have a valid cached token
+            if (userManager.isTokenValid()) {
+                userManager.getUserToken()?.let { cachedToken ->
+                    if (cachedToken.isNotBlank()) {
+                        Log.d("AuthDebug", "✅ Using cached token")
+                        return cachedToken
+                    }
                 }
             }
 
             // Fetch new token from Firebase
-            val currentUser = FirebaseAuth.getInstance().currentUser
-            if (currentUser == null) {
-                Log.e("AuthDebug", "No user signed in! Can't fetch token.")
-                return null
-            }
-
+            Log.d("AuthDebug", "🔄 Fetching fresh token from Firebase for user: ${currentUser.uid}")
             val tokenResult = currentUser.getIdToken(true).await()
             val token = tokenResult.token
 
             if (!token.isNullOrBlank()) {
                 userManager.saveUserToken(token)
-                Log.d("AuthDebug", "Token obtained successfully")
+                Log.d("AuthDebug", "✅ New token obtained and saved successfully")
                 token
             } else {
-                Log.e("AuthDebug", "Token is null or empty")
+                Log.e("AuthDebug", "❌ Token is null or empty")
+                userManager.clearUserToken()
                 null
             }
         } catch (e: Exception) {
-            Log.e("AuthDebug", "Error fetching Firebase token: ${e.message}")
+            Log.e("AuthDebug", "❌ Error fetching Firebase token: ${e.message}")
+            userManager.clearUserToken()
             null
         }
     }
@@ -181,6 +198,12 @@ class ApiService(private val context: Context) {
         Log.d("ApiService", "Deducting credit for user: $userId")
         
         return try {
+            // Ensure we have a valid token before making the request
+            val token = getCurrentUserToken()
+            if (token == null) {
+                return ApiResult.Error("Authentication required - please log in again", 401)
+            }
+
             val requestBody = DeductCreditRequest(userId)
             val body = gson.toJson(requestBody).toRequestBody("application/json".toMediaType())
             
@@ -198,6 +221,12 @@ class ApiService(private val context: Context) {
                 if (!response.isSuccessful) {
                     val errorMsg = handleErrorResponse(response)
                     Log.e("ApiService", "Deduct credit failed: $errorMsg")
+                    
+                    // If it's an auth error, clear the token
+                    if (response.code == 401) {
+                        userManager.clearUserToken()
+                    }
+                    
                     return ApiResult.Error(errorMsg, response.code)
                 }
                 
@@ -214,6 +243,12 @@ class ApiService(private val context: Context) {
         Log.d("ApiService", "Generating resume with tone: $tone")
         
         return try {
+            // Ensure we have a valid token before making the request
+            val token = getCurrentUserToken()
+            if (token == null) {
+                return ApiResult.Error("Authentication required - please log in again", 401)
+            }
+
             val requestBody = GenerateResumeRequest(resumeText, jobDescription, tone)
             val body = gson.toJson(requestBody).toRequestBody("application/json".toMediaType())
             
@@ -231,6 +266,12 @@ class ApiService(private val context: Context) {
                 if (!response.isSuccessful) {
                     val errorMsg = handleErrorResponse(response)
                     Log.e("ApiService", "Generate resume failed: $errorMsg")
+                    
+                    // If it's an auth error, clear the token
+                    if (response.code == 401) {
+                        userManager.clearUserToken()
+                    }
+                    
                     return ApiResult.Error(errorMsg, response.code)
                 }
                 
@@ -247,6 +288,12 @@ class ApiService(private val context: Context) {
         Log.d("ApiService", "Generating resume from files")
         
         return try {
+            // Ensure we have a valid token before making the request
+            val token = getCurrentUserToken()
+            if (token == null) {
+                return ApiResult.Error("Authentication required - please log in again", 401)
+            }
+
             val resumeFile = uriToFile(resumeUri)
             val jobDescFile = uriToFile(jobDescUri)
 
@@ -274,6 +321,12 @@ class ApiService(private val context: Context) {
                 if (!response.isSuccessful) {
                     val errorMsg = handleErrorResponse(response)
                     Log.e("ApiService", "File resume generation failed: $errorMsg")
+                    
+                    // If it's an auth error, clear the token
+                    if (response.code == 401) {
+                        userManager.clearUserToken()
+                    }
+                    
                     return ApiResult.Error(errorMsg, response.code)
                 }
                 
@@ -288,7 +341,12 @@ class ApiService(private val context: Context) {
 
     suspend fun getUserCredits(): ApiResult<JSONObject> {
         return try {
-            // Let the AuthInterceptor handle the token automatically
+            // Ensure we have a valid token before making the request
+            val token = getCurrentUserToken()
+            if (token == null) {
+                return ApiResult.Error("Authentication required - please log in again", 401)
+            }
+
             val request = Request.Builder()
                 .url("$baseUrl/user/credits")
                 .get()
@@ -300,6 +358,13 @@ class ApiService(private val context: Context) {
 
                 if (!response.isSuccessful) {
                     Log.e("ApiService", "Failed to fetch credits: HTTP ${response.code}")
+                    
+                    // If it's an auth error, clear the token
+                    if (response.code == 401) {
+                        userManager.clearUserToken()
+                        return ApiResult.Error("Authentication failed - please log in again", 401)
+                    }
+                    
                     return ApiResult.Error(
                         message = "Failed to get credits: ${response.message}",
                         code = response.code
@@ -315,6 +380,23 @@ class ApiService(private val context: Context) {
                 code = -1
             )
         }
+    }
+
+    // Debug method to check authentication state
+    suspend fun debugAuthState(): String {
+        val currentUser = FirebaseAuth.getInstance().currentUser
+        val token = getCurrentUserToken()
+        val tokenValid = userManager.isTokenValid()
+        val userLoggedIn = userManager.isUserLoggedIn()
+        
+        return """
+            === AUTH DEBUG ===
+            Firebase User: ${currentUser?.uid ?: "NULL"}
+            UserManager Logged In: $userLoggedIn
+            Token Valid: $tokenValid
+            Token Present: ${!token.isNullOrBlank()}
+            Token Preview: ${token?.take(10) ?: "NULL"}...
+        """.trimIndent()
     }
 
     // Utilities
