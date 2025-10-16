@@ -18,6 +18,7 @@ import okhttp3.Response
 import java.io.IOException
 import java.util.concurrent.TimeUnit
 
+
 class ApiService(private val context: Context) {
 
     private val gson = Gson()
@@ -52,7 +53,7 @@ class ApiService(private val context: Context) {
         override fun intercept(chain: Interceptor.Chain): Response {
             return try {
                 val userManager = UserManager(context)
-                val token = runBlocking { userManager.refreshTokenIfNeeded() }
+                val token = userManager.getUserToken()
 
                 val requestBuilder = chain.request().newBuilder()
 
