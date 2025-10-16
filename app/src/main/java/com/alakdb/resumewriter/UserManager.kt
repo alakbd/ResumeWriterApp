@@ -180,14 +180,16 @@ class UserManager(private val context: Context) {
     }
 
     suspend fun refreshTokenIfNeeded(): String? {
-    return if (isTokenValid()) {
-        getUserToken()
-    } else {
-        val user = auth.currentUser ?: return null
-        val tokenResult = user.getIdToken(true).await()
-        tokenResult.token?.also { saveUserToken(it) }
+        return if (isTokenValid()) {
+            getUserToken()
+        } else {
+            val user = auth.currentUser ?: return null
+            val tokenResult = user.getIdToken(true).await()
+            val token = tokenResult.token
+            token?.let { saveUserToken(it) } // 'it' refers to token
+            token
+        }
     }
-}
 
     /** Get current user email */
     fun getCurrentUserEmail(): String? {
