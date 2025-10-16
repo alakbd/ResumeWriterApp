@@ -48,13 +48,17 @@ class ResumeGenerationActivity : AppCompatActivity() {
         userManager = UserManager(this)
         apiService = ApiService(this)
         auth = FirebaseAuth.getInstance()
-        
+
+        // ✅ ADD THESE DEBUG CALLS HERE:
+        comprehensiveAuthDebug()
+        testServerDirectly()
+        forceTokenRefreshAndTest()
+    
         debugAuthState()
         registerFilePickers()
         setupUI()
         checkGenerateButtonState()
-    
-
+         
     private fun comprehensiveAuthDebug() {
     lifecycleScope.launch {
         Log.d("DEBUG", "=== COMPREHENSIVE AUTH DEBUG ===")
@@ -508,6 +512,73 @@ private suspend fun updateCreditDisplay() {
         )
         Log.d("ResumeActivity", "Connection status updated: $message")
     }
+
+    private fun testServerDirectly() {
+    lifecycleScope.launch {
+        Log.d("DirectTest", "Testing server endpoints directly...")
+        
+        // Test public endpoints
+        val endpoints = listOf(
+            "https://resume-writer-api.onrender.com/health",
+            "https://resume-writer-api.onrender.com/test",
+            "https://resume-writer-api.onrender.com/"
+        )
+        
+        for (endpoint in endpoints) {
+            try {
+                val request = Request.Builder()
+                    .url(endpoint)
+                    .get()
+                    .build()
+                
+                val response = OkHttpClient().newCall(request).execute()
+                Log.d("DirectTest", "$endpoint → ${response.code}")
+                response.body?.string()?.let { body ->
+                    Log.d("DirectTest", "Response: $body")
+                }
+            } catch (e: Exception) {
+                Log.e("DirectTest", "$endpoint → ERROR: ${e.message}")
+            }
+        }
+    }
+}
+
+    private fun forceTokenRefreshAndTest() {
+    lifecycleScope.launch {
+        Log.d("TokenDebug", "Forcing token refresh...")
+        
+        val user = FirebaseAuth.getInstance().currentUser
+        if (user != null) {
+            try {
+                val tokenResult = user.getIdToken(true).await()
+                val newToken = tokenResult.token
+                
+                if (!newToken.isNullOrBlank()) {
+                    userManager.saveUserToken(newToken)
+                    Log.d("TokenDebug", "✅ New token saved: ${newToken.take(10)}...")
+                    
+                    // Test with new token
+                    val creditsResult = apiService.getUserCredits()
+                    when (creditsResult) {
+                        is ApiService.ApiResult.Success -> {
+                            Log.d("TokenDebug", "✅ SUCCESS with new token!")
+                        }
+                        is ApiService.ApiResult.Error -> {
+                            Log.e("TokenDebug", "❌ FAILED with new token: ${creditsResult.message}")
+                        }
+                    }
+                } else {
+                    Log.e("TokenDebug", "❌ New token is null")
+                }
+            } catch (e: Exception) {
+                Log.e("TokenDebug", "❌ Token refresh failed: ${e.message}")
+            }
+        } else {
+            Log.e("TokenDebug", "❌ No Firebase user")
+        }
+    }
+}
+    
     
     private fun debugAuthState() {
     val userManager = UserManager(this)
