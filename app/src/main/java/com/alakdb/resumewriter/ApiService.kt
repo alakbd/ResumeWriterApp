@@ -36,7 +36,8 @@ class ApiService(private val context: Context) {
             level = HttpLoggingInterceptor.Level.BODY 
         })
         .addInterceptor(ErrorInterceptor()) // Custom error interceptor
-        .addInterceptor(AuthInterceptor(context)) 
+        .addInterceptor(AuthInterceptor(context))
+        .addHeader("X-Auth-Token", userManager.getUserToken() ?: "")
         .build()
 
     // Data Classes
