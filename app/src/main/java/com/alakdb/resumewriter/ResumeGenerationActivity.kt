@@ -230,6 +230,21 @@ class ResumeGenerationActivity : AppCompatActivity() {
         }
     }
 
+    // Add this to your setupUI() method in ResumeGenerationActivity.kt
+binding.btnDebugAuth.setOnClickListener {
+    lifecycleScope.launch {
+        try {
+            val debugInfo = apiService.debugAuthenticationFlow()
+            Log.d("AuthDebug", debugInfo)
+            
+            // Show in UI for easy viewing
+            binding.tvGeneratedResume.text = debugInfo
+            binding.layoutDownloadButtons.visibility = View.GONE
+        } catch (e: Exception) {
+            Log.e("AuthDebug", "Debug failed: ${e.message}")
+        }
+    }
+}
  
 
 /** ---------------- API Connection Test ---------------- **/
