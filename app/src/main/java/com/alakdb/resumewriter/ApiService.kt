@@ -114,7 +114,7 @@ class DetailedLoggingInterceptor : Interceptor {
     }
 
     private fun isPublicEndpoint(url: String): Boolean {
-        return url.contains("/health") || url.contains("/warmup") || url.endsWith("/") || url.contains("/test")
+        return url.contains("/health") || url.contains("/test") || url.endsWith("/") || url.contains("/api")
     }
 }
     
@@ -164,7 +164,7 @@ class DetailedLoggingInterceptor : Interceptor {
     suspend fun testConnection(): ApiResult<JSONObject> {
         Log.d("NetworkTest", "Testing connection to: $baseUrl")
         
-        val endpoints = listOf("/health", "/")
+        val endpoints = listOf("/health", "/", "/test", "/api")
         
         for (endpoint in endpoints) {
             try {
@@ -199,25 +199,7 @@ class DetailedLoggingInterceptor : Interceptor {
         )
     }
 
-    // Warm up server
-    suspend fun warmUpServer(): ApiResult<JSONObject> {
-        return try {
-            val request = Request.Builder()
-                .url("$baseUrl/warmup")
-                .get()
-                .build()
-
-            client.newCall(request).execute().use { response ->
-                val body = response.body?.string() ?: "{}"
-                if (!response.isSuccessful) {
-                    return ApiResult.Error("Warm-up failed", response.code)
-                }
-                ApiResult.Success(JSONObject(body))
-            }
-        } catch (e: Exception) {
-            ApiResult.Error(e.message ?: "Warm-up exception")
-        }
-    }
+    // ✅ FIXED: Remove warmUpServer function (endpoint doesn't exist in API)
 
     // Enhanced API Methods with better error handling
     suspend fun deductCredit(userId: String): ApiResult<JSONObject> {
