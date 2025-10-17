@@ -14,7 +14,8 @@ import android.util.Log
 
 class UserManager(private val context: Context) {
 
-    private val sharedPreferences: SharedPreferences = context.getSharedPreferences("user_prefs", Context.MODE_PRIVATE)
+    private val prefs: SharedPreferences =
+    context.getSharedPreferences("user_prefs", Context.MODE_PRIVATE)
     private val auth: FirebaseAuth = FirebaseAuth.getInstance()
     private val db: FirebaseFirestore = FirebaseFirestore.getInstance()
 
