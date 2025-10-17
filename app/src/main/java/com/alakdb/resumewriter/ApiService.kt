@@ -78,41 +78,37 @@ class DetailedLoggingInterceptor : Interceptor {
 
     // Fixed AuthInterceptor - Use the same UserManager instance and proper header format
     class AuthInterceptor(private val userManager: UserManager) : Interceptor {
-    override fun intercept(chain: Interceptor.Chain): Response {
-        return try {
+        override fun intercept(chain: Interceptor.Chain): Response {
             val originalRequest = chain.request()
-            
-            // Skip auth for public endpoints
-            if (isPublicEndpoint(originalRequest.url.toString())) {
-                Log.d("AuthInterceptor", "Skipping auth for public endpoint")
-                return chain.proceed(originalRequest)
-            }
-
-            val token = userManager.getUserToken()
-            val requestBuilder = originalRequest.newBuilder()
-
-            if (!token.isNullOrBlank()) {
-                // ✅ FIX: Use X-Auth-Token header with Bearer prefix
-                requestBuilder.addHeader("X-Auth-Token", "Bearer $token")
-                Log.d("AuthInterceptor", "✅ Added X-Auth-Token: Bearer ${token.take(10)}...")
-            } else {
-                Log.w("AuthInterceptor", "⚠️ No token found — request will be unauthenticated")
-            }
-
-            val request = requestBuilder.build()
-            chain.proceed(request)
-            
-        } catch (e: Exception) {
-            Log.e("AuthInterceptor", "🚨 Exception in AuthInterceptor: ${e.message}")
-            Response.Builder()
-                .request(chain.request())
-                .protocol(Protocol.HTTP_1_1)
-                .code(500)
-                .message("Authentication error")
-                .body("{\"error\": \"Authentication failed: ${e.message}\"}".toResponseBody("application/json".toMediaType()))
+            val url = originalRequest.url.toString()
+        
+        Log.d("AuthInterceptor", "Processing: $url")
+        
+        // Skip auth for public endpoints
+        val publicEndpoints = listOf("/health", "/test", "/", "/api")
+        val isPublic = publicEndpoints.any { url.endsWith(it) }
+        
+        if (isPublic) {
+            Log.d("AuthInterceptor", "✅ Public endpoint - no auth needed")
+            return chain.proceed(originalRequest)
+        }
+        
+        // For authenticated endpoints, get token
+        val token = userManager.getUserToken()
+        
+        return if (!token.isNullOrBlank()) {
+            Log.d("AuthInterceptor", "✅ Adding auth token to: $url")
+            val requestWithAuth = originalRequest.newBuilder()
+                .addHeader("X-Auth-Token", "Bearer $token")
                 .build()
+            chain.proceed(requestWithAuth)
+        } else {
+            Log.w("AuthInterceptor", "⚠️ No token available for: $url")
+            // Proceed without token - let server handle authentication failure
+            chain.proceed(originalRequest)
         }
     }
+}
 
     private fun isPublicEndpoint(url: String): Boolean {
         return url.contains("/health") || url.contains("/test") || url.endsWith("/") || url.contains("/api")
