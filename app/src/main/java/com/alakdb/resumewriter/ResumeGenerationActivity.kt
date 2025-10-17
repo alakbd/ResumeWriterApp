@@ -161,7 +161,59 @@ class ResumeGenerationActivity : AppCompatActivity() {
         checkAndShowConnectionIfNeeded()
     }
 }
+    private fun testAuthenticationStepByStep() {
+    lifecycleScope.launch {
+        Log.d("AuthTest", "=== STEP BY STEP AUTH TEST ===")
+        
+        // Step 1: Check Firebase
+        val firebaseUser = FirebaseAuth.getInstance().currentUser
+        Log.d("AuthTest", "Step 1 - Firebase User: ${firebaseUser?.uid ?: "NULL"}")
+        
+        if (firebaseUser == null) {
+            showError("No Firebase user - please login again")
+            return@launch
+        }
+        
+        // Step 2: Get fresh token
+        Log.d("AuthTest", "Step 2 - Getting fresh token...")
+        try {
+            val tokenResult = firebaseUser.getIdToken(true).await()
+            val token = tokenResult.token
+            Log.d("AuthTest", "Step 2 - Token: ${token?.take(20) ?: "NULL"}")
+            
+            if (token.isNullOrBlank()) {
+                showError("Failed to get Firebase token")
+                return@launch
+            }
+            
+            // Step 3: Save token
+            userManager.saveUserToken(token)
+            Log.d("AuthTest", "Step 3 - Token saved to UserManager")
+            
+            // Step 4: Test API call manually
+            Log.d("AuthTest", "Step 4 - Testing API call...")
+            val creditsResult = apiService.getUserCredits()
+            
+            when (creditsResult) {
+                is ApiService.ApiResult.Success -> {
+                    Log.d("AuthTest", "Step 4 - ✅ SUCCESS! Credits: ${creditsResult.data}")
+                    showSuccess("Authentication working!")
+                }
+                is ApiService.ApiResult.Error -> {
+                    Log.e("AuthTest", "Step 4 - ❌ FAILED: ${creditsResult.message}")
+                    showError("API call failed: ${creditsResult.message}")
+                }
+            }
+            
+        } catch (e: Exception) {
+            Log.e("AuthTest", "Step 2 - Token error: ${e.message}")
+            showError("Token error: ${e.message}")
+        }
+    }
+}
 
+
+    
     /** ---------------- File Picker Setup ---------------- **/
     private fun registerFilePickers() {
         resumePicker = registerForActivityResult(ActivityResultContracts.GetContent()) { uri ->
