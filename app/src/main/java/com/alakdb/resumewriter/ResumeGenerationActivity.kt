@@ -223,58 +223,58 @@ class ResumeGenerationActivity : AppCompatActivity() {
         binding.progressConnection.visibility = View.VISIBLE
         binding.btnRetryConnection.isEnabled = false
 
-        lifecycleScope.launch {
-            if (!isNetworkAvailable()) {
-                updateConnectionStatus("❌ No internet connection", true)
-                binding.progressConnection.visibility = View.GONE
-                binding.btnRetryConnection.isEnabled = true
-                showError("Please check your internet connection")
-                return@launch
-            }
+    lifecycleScope.launch {
+        if (!isNetworkAvailable()) {
+            updateConnectionStatus("❌ No internet connection", true)
+            binding.progressConnection.visibility = View.GONE
+            binding.btnRetryConnection.isEnabled = true
+            showError("Please check your internet connection")
+            return@launch
+        }
 
-            try {
-                Log.d("ResumeActivity", "Testing API connection...")
-                
-                // First, test basic connection
-                val connectionResult = apiService.testConnection()
-                
-                when (connectionResult) {
-                    is ApiService.ApiResult.Success -> {
-                        updateConnectionStatus("✅ API Connected", false)
-                        updateCreditDisplay()
-                    }
-                    is ApiService.ApiResult.Error -> {
-                        // Check if it's a server wake-up issue
-                        if (connectionResult.code in 500..599 || connectionResult.code == 0) {
-                            updateConnectionStatus("🔄 Server is waking up...", true)
-                            showServerWakeupMessage()
-                            
-                            // Wait for server to wake up
-                            val serverAwake = apiService.waitForServerWakeUp(maxAttempts = 8, delayBetweenAttempts = 5000L)
-                            
-                            if (serverAwake) {
-                                updateConnectionStatus("✅ Server is ready!", false)
-                                updateCreditDisplay()
-                            } else {
-                                updateConnectionStatus("⏰ Server taking too long", true)
-                                showError("Render server is taking longer than expected. Please try again in a minute.")
-                            }
+        try {
+            Log.d("ResumeActivity", "Testing API connection...")
+            
+            // First, test basic connection
+            val connectionResult = apiService.testConnection()
+            
+            when (connectionResult) {
+                is ApiService.ApiResult.Success -> {
+                    updateConnectionStatus("✅ API Connected", false)
+                    updateCreditDisplay()
+                }
+                is ApiService.ApiResult.Error -> {
+                    // Check if it's a server wake-up issue
+                    if (connectionResult.code in 500..599 || connectionResult.code == 0) {
+                        updateConnectionStatus("🔄 Server is waking up...", true)
+                        showServerWakeupMessage()
+                        
+                        // Wait for server to wake up with fewer attempts
+                        val serverAwake = apiService.waitForServerWakeUp(maxAttempts = 5, delayBetweenAttempts = 3000L)
+                        
+                        if (serverAwake) {
+                            updateConnectionStatus("✅ Server is ready!", false)
+                            updateCreditDisplay()
                         } else {
-                            updateConnectionStatus("❌ API Connection Failed", true)
-                            showError("API error: ${connectionResult.message}")
+                            updateConnectionStatus("⏰ Server taking too long", true)
+                            showError("Server is taking longer than expected. Please try again in a minute.")
                         }
+                    } else {
+                        updateConnectionStatus("❌ API Connection Failed", true)
+                        showError("API error: ${connectionResult.message}")
                     }
                 }
-            } catch (e: Exception) {
-                updateConnectionStatus("❌ Connection Error", true)
-                Log.e("ResumeActivity", "Connection test failed", e)
-                showError("Connection failed: ${e.message}")
-            } finally {
-                binding.progressConnection.visibility = View.GONE
-                binding.btnRetryConnection.isEnabled = true
             }
+        } catch (e: Exception) {
+            updateConnectionStatus("❌ Connection Error", true)
+            Log.e("ResumeActivity", "Connection test failed", e)
+            showError("Connection failed: ${e.message}")
+        } finally {
+            binding.progressConnection.visibility = View.GONE
+            binding.btnRetryConnection.isEnabled = true
         }
     }
+}
 
     fun isNetworkAvailable(): Boolean {
         val connectivityManager = getSystemService(Context.CONNECTIVITY_SERVICE) as ConnectivityManager
@@ -283,6 +283,46 @@ class ResumeGenerationActivity : AppCompatActivity() {
         return capabilities.hasCapability(NetworkCapabilities.NET_CAPABILITY_INTERNET)
     }
 
+    private fun testDirectConnection() {
+    lifecycleScope.launch {
+        Log.d("DirectTest", "Testing direct connection without interceptors...")
+        
+        val simpleClient = OkHttpClient.Builder()
+            .connectTimeout(10, TimeUnit.SECONDS)
+            .readTimeout(10, TimeUnit.SECONDS)
+            .build()
+        
+        val endpoints = listOf(
+            "https://resume-writer-api.onrender.com/health",
+            "https://resume-writer-api.onrender.com/test", 
+            "https://resume-writer-api.onrender.com/"
+        )
+        
+        for (endpoint in endpoints) {
+            try {
+                val request = Request.Builder()
+                    .url(endpoint)
+                    .get()
+                    .build()
+                
+                val response = simpleClient.newCall(request).execute()
+                Log.d("DirectTest", "$endpoint → ${response.code}")
+                
+                if (response.isSuccessful) {
+                    val body = response.body?.string()
+                    Log.d("DirectTest", "✅ SUCCESS: $body")
+                    withContext(Dispatchers.Main) {
+                        Toast.makeText(this@ResumeGenerationActivity, "Server connected!", Toast.LENGTH_SHORT).show()
+                    }
+                    break
+                }
+            } catch (e: Exception) {
+                Log.e("DirectTest", "$endpoint → ERROR: ${e.message}")
+            }
+        }
+    }
+}
+    
     /** ---------------- Resume Generation ---------------- **/
     private fun generateResumeFromFiles() {
         val resumeUri = selectedResumeUri ?: return showError("Please select resume file")
