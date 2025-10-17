@@ -53,12 +53,15 @@ class ResumeGenerationActivity : AppCompatActivity() {
         auth = FirebaseAuth.getInstance()
 
         // Debug calls
-    
-    
-
         registerFilePickers()
         setupUI()
         checkGenerateButtonState()
+
+        // Test connection safely
+    lifecycleScope.launch {
+        delay(1000) // Wait for initialization
+        testApiConnection()
+        }
     }
 
     private fun comprehensiveAuthDebug() {
@@ -118,23 +121,27 @@ class ResumeGenerationActivity : AppCompatActivity() {
     }
     
     override fun onResume() {
-        super.onResume()
-        lifecycleScope.launch {
-            val userManager = UserManager(this@ResumeGenerationActivity)
-            val token = userManager.getUserToken()
-            val tokenValid = userManager.isTokenValid()
-            
-            Log.d("ResumeActivity", "Token exists: ${token != null}")
-            Log.d("ResumeActivity", "Token valid: $tokenValid")
-            Log.d("ResumeActivity", "User logged in: ${userManager.isUserLoggedIn()}")
-            
-            // Update credits display (this will test if auth is working)
-            updateCreditDisplay()
-            
-            // Test server connection
-            testApiConnection()
-        }
+    super.onResume()
+    
+    lifecycleScope.launch {
+        // Use the existing userManager instance, don't create a new one!
+        val token = userManager.getUserToken()
+        val tokenValid = userManager.isTokenValid()
+        
+        Log.d("ResumeActivity", "Token exists: ${token != null}")
+        Log.d("ResumeActivity", "Token valid: $tokenValid")
+        Log.d("ResumeActivity", "User logged in: ${userManager.isUserLoggedIn()}")
+        
+        // Add a small delay to ensure everything is initialized
+        delay(500)
+        
+        // Update credits display (this will test if auth is working)
+        updateCreditDisplay()
+        
+        // Test server connection
+        testApiConnection()
     }
+}
 
     /** ---------------- File Picker Setup ---------------- **/
     private fun registerFilePickers() {
@@ -430,54 +437,54 @@ class ResumeGenerationActivity : AppCompatActivity() {
 
     /** ---------------- Credit Display ---------------- **/
     private suspend fun updateCreditDisplay() {
-        Log.d("ResumeActivity", "Fetching user credits...")
+    Log.d("ResumeActivity", "Fetching user credits...")
 
-        // ✅ Step 1: Ensure token is available and valid before making API call
-        var token = userManager.getUserToken()
-        if (token.isNullOrEmpty()) {
-            Log.w("ResumeActivity", "No auth token found — attempting to refresh.")
-            FirebaseAuth.getInstance().currentUser?.getIdToken(true)?.addOnSuccessListener {
-                it.token?.let { newToken ->
-                    userManager.saveUserToken(newToken)
-                    Log.d("ResumeActivity", "Token refreshed successfully.")
-                }
+    // Use the class-level userManager, not a new instance
+    var token = userManager.getUserToken()
+    if (token.isNullOrEmpty()) {
+        Log.w("ResumeActivity", "No auth token found — attempting to refresh.")
+        FirebaseAuth.getInstance().currentUser?.getIdToken(true)?.addOnSuccessListener {
+            it.token?.let { newToken ->
+                userManager.saveUserToken(newToken) // Using class-level userManager
+                Log.d("ResumeActivity", "Token refreshed successfully.")
             }
-            // Optional: short delay to give the refresh a moment (or skip)
-            token = userManager.getUserToken()
-            if (token.isNullOrEmpty()) {
-                Log.e("ResumeActivity", "Still no token available, aborting credit fetch.")
-                withContext(Dispatchers.Main) {
-                    binding.creditText.text = "Credits: --"
-                }
-                return
+        }
+        // Optional: short delay to give the refresh a moment
+        delay(500)
+        token = userManager.getUserToken()
+        if (token.isNullOrEmpty()) {
+            Log.e("ResumeActivity", "Still no token available, aborting credit fetch.")
+            withContext(Dispatchers.Main) {
+                binding.creditText.text = "Credits: --"
+            }
+            return
+        }
+    }
+
+    // ✅ Proceed with normal API call
+    when (val result = apiService.getUserCredits()) {
+        is ApiService.ApiResult.Success -> {
+            val credits = result.data.optInt("available_credits", 0)
+            Log.d("ResumeActivity", "Credits retrieved: $credits")
+
+            withContext(Dispatchers.Main) {
+                binding.creditText.text = "Credits: $credits"
             }
         }
 
-        // ✅ Step 2: Proceed with normal API call
-        when (val result = apiService.getUserCredits()) {
-            is ApiService.ApiResult.Success -> {
-                // ✅ FIXED: Use correct field name
-                val credits = result.data.optInt("available_credits", 0)
-                Log.d("ResumeActivity", "Credits retrieved: $credits")
-
-                withContext(Dispatchers.Main) {
-                    binding.creditText.text = "Credits: $credits"
-                }
-            }
-
-            is ApiService.ApiResult.Error -> {
-                Log.e("ResumeActivity", "Failed to fetch credits: ${result.message}")
-                withContext(Dispatchers.Main) {
-                    binding.creditText.text = "Credits: --"
-                    Toast.makeText(
-                        this@ResumeGenerationActivity,
-                        result.message,
-                        Toast.LENGTH_SHORT
-                    ).show()
-                }
+        is ApiService.ApiResult.Error -> {
+            Log.e("ResumeActivity", "Failed to fetch credits: ${result.message}")
+            withContext(Dispatchers.Main) {
+                binding.creditText.text = "Credits: --"
+                Toast.makeText(
+                    this@ResumeGenerationActivity,
+                    result.message,
+                    Toast.LENGTH_SHORT
+                ).show()
             }
         }
     }
+}
 
     /** ---------------- Debug Methods ---------------- **/
     private fun runApiServiceDebug() {
