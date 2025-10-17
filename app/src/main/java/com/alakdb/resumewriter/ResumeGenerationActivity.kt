@@ -71,25 +71,19 @@ class ResumeGenerationActivity : AppCompatActivity() {
     lifecycleScope.launch {
         Log.d("DEBUG", "=== COMPREHENSIVE AUTH DEBUG ===")
         
-        // 1. Check Firebase Auth state
+        // 1. Your existing app-state checks
         val firebaseUser = FirebaseAuth.getInstance().currentUser
         Log.d("DEBUG", "Firebase User: ${firebaseUser?.uid ?: "NULL"}")
         Log.d("DEBUG", "Firebase Email: ${firebaseUser?.email ?: "NULL"}")
         
-        // 2. Check UserManager state
         val userManager = UserManager(this@ResumeGenerationActivity)
         Log.d("DEBUG", "UserManager logged in: ${userManager.isUserLoggedIn()}")
         Log.d("DEBUG", "UserManager token valid: ${userManager.isTokenValid()}")
         Log.d("DEBUG", "UserManager token: ${userManager.getUserToken()?.take(10) ?: "NULL"}...")
-        Log.d("DEBUG", "UserManager user ID: ${userManager.getCurrentUserId()}")
-        Log.d("DEBUG", "UserManager email: ${userManager.getCurrentUserEmail()}")
         
-        // 3. Check network connectivity
-        Log.d("DEBUG", "Network available: ${isNetworkAvailable()}")
-        
-        // 4. Test server connection without auth
-        Log.d("DEBUG", "Testing server connection...")
-        val connectionResult = apiService.testConnection()
+        // 2. Test server connection using ApiService
+        Log.d("DEBUG", "Testing server connection via ApiService...")
+        val connectionResult = apiService.testConnection() // Calls ApiService method
         when (connectionResult) {
             is ApiService.ApiResult.Success -> {
                 Log.d("DEBUG", "✅ Server connection successful")
@@ -100,12 +94,12 @@ class ResumeGenerationActivity : AppCompatActivity() {
             }
         }
         
-        // 5. Test authentication with server
-        Log.d("DEBUG", "Testing authentication...")
+        // 3. Test authentication using ApiService  
+        Log.d("DEBUG", "Testing authentication via ApiService...")
         val token = userManager.getUserToken()
         if (!token.isNullOrBlank()) {
             Log.d("DEBUG", "Token available, testing API call...")
-            val creditsResult = apiService.getUserCredits()
+            val creditsResult = apiService.getUserCredits() // Calls ApiService method
             when (creditsResult) {
                 is ApiService.ApiResult.Success -> {
                     Log.d("DEBUG", "✅ Authentication SUCCESS!")
@@ -121,8 +115,8 @@ class ResumeGenerationActivity : AppCompatActivity() {
         }
         
         Log.d("DEBUG", "=== END DEBUG ===")
-            }
-        }
+    }
+}
 
     
     override fun onResume() {
@@ -288,7 +282,10 @@ binding.btnDebugAuth.setOnClickListener {
         try {
             val debugInfo = apiService.debugAuthenticationFlow()
             Log.d("AuthDebug", debugInfo)
-            
+
+             binding.btnDebugAuth.setOnClickListener {
+                runApiServiceDebug()
+            }
             // Show in UI for easy viewing
             binding.tvGeneratedResume.text = debugInfo
             binding.layoutDownloadButtons.visibility = View.GONE
@@ -797,6 +794,29 @@ private suspend fun updateCreditDisplay() {
         }
     }
 }
+
+    private fun runApiServiceDebug() {
+    lifecycleScope.launch {
+        binding.tvGeneratedResume.text = "Running API service debug..."
+        binding.progressGenerate.visibility = View.VISIBLE
+        
+        try {
+            // This calls debugAuthenticationFlow() from ApiService.kt
+            val debugResult = apiService.debugAuthenticationFlow()
+            
+            // Display the results
+            binding.tvGeneratedResume.text = debugResult
+            binding.layoutDownloadButtons.visibility = View.GONE
+            
+        } catch (e: Exception) {
+            binding.tvGeneratedResume.text = "Debug failed: ${e.message}"
+            Log.e("Debug", "API debug failed", e)
+        } finally {
+            binding.progressGenerate.visibility = View.GONE
+        }
+    }
+}
+    
     private fun testAuthHeader() {
     lifecycleScope.launch {
         val token = userManager.getUserToken()
