@@ -70,37 +70,44 @@ class ApiService(private val context: Context) {
 
     // Fixed AuthInterceptor
     class AuthInterceptor(private val userManager: UserManager) : Interceptor {
-        override fun intercept(chain: Interceptor.Chain): Response {
-            val originalRequest = chain.request()
-            val url = originalRequest.url.toString()
+    override fun intercept(chain: Interceptor.Chain): Response {
+        val originalRequest = chain.request()
+        val url = originalRequest.url.toString()
+        
+        Log.d("AuthInterceptor", "Processing: $url")
+        
+        // Skip auth for public endpoints
+        val publicEndpoints = listOf("/health", "/test", "/", "/api")
+        val isPublic = publicEndpoints.any { url.endsWith(it) }
+        
+        if (isPublic) {
+            Log.d("AuthInterceptor", "✅ Public endpoint - no auth needed")
+            return chain.proceed(originalRequest)
+        }
+        
+        // For authenticated endpoints, get token safely
+        val token = try {
+            userManager.getUserToken()
+        } catch (e: Exception) {
+            Log.e("AuthInterceptor", "❌ Error getting token: ${e.message}", e)
+            null
+        }
+        
+        return if (!token.isNullOrBlank()) {
+            Log.d("AuthInterceptor", "✅ Adding auth token to: $url")
+            Log.d("AuthInterceptor", "Token preview: ${token.take(10)}...")
             
-            Log.d("AuthInterceptor", "Processing: $url")
-            
-            // Skip auth for public endpoints
-            val publicEndpoints = listOf("/health", "/test", "/", "/api")
-            val isPublic = publicEndpoints.any { url.endsWith(it) }
-            
-            if (isPublic) {
-                Log.d("AuthInterceptor", "✅ Public endpoint - no auth needed")
-                return chain.proceed(originalRequest)
-            }
-            
-            // For authenticated endpoints, get token
-            val token = userManager.getUserToken()
-            
-            return if (!token.isNullOrBlank()) {
-                Log.d("AuthInterceptor", "✅ Adding auth token to: $url")
-                val requestWithAuth = originalRequest.newBuilder()
-                    .addHeader("X-Auth-Token", "Bearer $token")
-                    .build()
-                chain.proceed(requestWithAuth)
-            } else {
-                Log.w("AuthInterceptor", "⚠️ No token available for: $url")
-                // Proceed without token - let server handle authentication failure
-                chain.proceed(originalRequest)
-            }
+            val requestWithAuth = originalRequest.newBuilder()
+                .addHeader("X-Auth-Token", token) // Remove "Bearer " prefix
+                .build()
+            chain.proceed(requestWithAuth)
+        } else {
+            Log.w("AuthInterceptor", "⚠️ No token available for: $url")
+            // Proceed without token - let server handle authentication failure
+            chain.proceed(originalRequest)
         }
     }
+}
     
     // Improved token fetching with better error handling and token validation
     suspend fun getCurrentUserToken(): String? {
@@ -219,6 +226,41 @@ class ApiService(private val context: Context) {
         Log.e("ServerWakeUp", "❌ Server failed to wake up after $maxAttempts attempts")
         return false
     }
+
+    
+private suspend fun getTokenSafely(): String? {
+    return try {
+        // First check cached token
+        val cachedToken = userManager.getUserToken()
+        if (!cachedToken.isNullOrBlank() && userManager.isTokenValid()) {
+            Log.d("TokenDebug", "✅ Using cached token")
+            return cachedToken
+        }
+        
+        // Fetch fresh token
+        Log.d("TokenDebug", "🔄 Fetching fresh token")
+        val currentUser = FirebaseAuth.getInstance().currentUser
+        if (currentUser == null) {
+            Log.e("TokenDebug", "❌ No user logged in")
+            return null
+        }
+        
+        val tokenResult = currentUser.getIdToken(true).await()
+        val newToken = tokenResult.token
+        
+        if (!newToken.isNullOrBlank()) {
+            userManager.saveUserToken(newToken)
+            Log.d("TokenDebug", "✅ Fresh token obtained and saved")
+            newToken
+        } else {
+            Log.e("TokenDebug", "❌ Fresh token is null")
+            null
+        }
+    } catch (e: Exception) {
+        Log.e("TokenDebug", "❌ Error getting token: ${e.message}")
+        null
+    }
+}
 
     // Enhanced API Methods with better error handling
     suspend fun deductCredit(userId: String): ApiResult<JSONObject> {
