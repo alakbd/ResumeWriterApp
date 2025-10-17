@@ -70,19 +70,19 @@ class ApiService(private val context: Context) {
 
     // Fixed AuthInterceptor
     class AuthInterceptor(private val userManager: UserManager) : Interceptor {
-        override fun intercept(chain: Interceptor.Chain): Response {
-            val originalRequest = chain.request()
-            val url = originalRequest.url.toString()
+    override fun intercept(chain: Interceptor.Chain): Response {
+        val originalRequest = chain.request()
+        val url = originalRequest.url.toString()
         
-            Log.d("AuthInterceptor", "Processing: $url")
+        Log.d("AuthInterceptor", "Processing: $url")
         
         try {
-            // Skip auth for public endpoints
-            val publicEndpoints = listOf("/health", "/test", "/", "/api")
-            val isPublic = publicEndpoints.any { url.endsWith(it) }
+            // Skip auth for public endpoints - use contains instead of endsWith
+            val publicEndpoints = listOf("/health", "/test", "/api")
+            val isPublic = publicEndpoints.any { url.contains(it) }
             
             if (isPublic) {
-                Log.d("AuthInterceptor", "✅ Public endpoint - no auth needed")
+                Log.d("AuthInterceptor", "✅ Public endpoint - no auth needed: $url")
                 return chain.proceed(originalRequest)
             }
             
@@ -90,44 +90,23 @@ class ApiService(private val context: Context) {
             val token = try {
                 userManager.getUserToken()
             } catch (e: Exception) {
-                Log.e("AuthInterceptor", "❌ Error getting token from UserManager", e)
+                Log.e("AuthInterceptor", "❌ Error getting token: ${e.message}")
                 null
             }
             
-            // Debug token content
-            Log.d("AuthInterceptor", "Raw token length: ${token?.length ?: 0}")
-            Log.d("AuthInterceptor", "Token is null: ${token == null}")
-            Log.d("AuthInterceptor", "Token is blank: ${token.isNullOrBlank()}")
-            
-            if (!token.isNullOrBlank()) {
-                // Clean the token - remove any unexpected characters
-                val cleanToken = token.trim().replace("\\s+".toRegex(), " ")
-                
-                Log.d("AuthInterceptor", "Cleaned token length: ${cleanToken.length}")
-                Log.d("AuthInterceptor", "Token preview: '${cleanToken.take(50)}'")
-                
-                // Check if token looks like a JWT (should contain dots)
-                val isJwtFormat = cleanToken.contains(".") && cleanToken.split(".").size == 3
-                Log.d("AuthInterceptor", "Looks like JWT: $isJwtFormat")
-                
-                if (isJwtFormat) {
-                    Log.d("AuthInterceptor", "✅ Adding JWT token to: $url")
-                    val requestWithAuth = originalRequest.newBuilder()
-                        .addHeader("X-Auth-Token", cleanToken)
-                        .build()
-                    return chain.proceed(requestWithAuth)
-                } else {
-                    Log.w("AuthInterceptor", "⚠️ Token doesn't look like valid JWT format")
-                }
+            return if (!token.isNullOrBlank()) {
+                Log.d("AuthInterceptor", "✅ Adding auth token to: $url")
+                val requestWithAuth = originalRequest.newBuilder()
+                    .addHeader("X-Auth-Token", token)
+                    .build()
+                chain.proceed(requestWithAuth)
+            } else {
+                Log.w("AuthInterceptor", "⚠️ No token available for: $url - proceeding without auth")
+                chain.proceed(originalRequest)
             }
-            
-            Log.w("AuthInterceptor", "⚠️ No valid token available for: $url - proceeding without auth")
-            // Proceed without token - let server handle authentication failure
-            return chain.proceed(originalRequest)
-            
         } catch (e: Exception) {
-            Log.e("AuthInterceptor", "❌ Critical error in interceptor: ${e.message}", e)
-            // Even if interceptor fails, proceed with the request
+            Log.e("AuthInterceptor", "❌ Critical error: ${e.message}")
+            // Fallback - proceed without auth
             return chain.proceed(originalRequest)
         }
     }
@@ -183,78 +162,83 @@ class ApiService(private val context: Context) {
     // Enhanced Test Connection with better error handling
     suspend fun testConnection(): ApiResult<JSONObject> {
         Log.d("NetworkTest", "Testing connection to: $baseUrl")
-        
-        val endpoints = listOf("/health", "/", "/test", "/api")
-        
-        for (endpoint in endpoints) {
-            try {
-                Log.d("NetworkTest", "Trying endpoint: $endpoint")
-                val url = "$baseUrl$endpoint"
-                val request = Request.Builder()
-                    .url(url)
-                    .get()
-                    .addHeader("User-Agent", "ResumeWriter-Android")
-                    .build()
-                
-                val response = client.newCall(request).execute()
-                val body = response.body?.string()
-                
-                Log.d("NetworkTest", "Response for $endpoint: ${response.code}")
-                
-                if (response.isSuccessful && body != null) {
-                    Log.d("NetworkTest", "✅ Success with endpoint: $endpoint")
-                    return ApiResult.Success(JSONObject(body))
-                } else {
-                    Log.w("NetworkTest", "❌ Failed with endpoint $endpoint: HTTP ${response.code}")
-                }
-            } catch (e: Exception) {
-                Log.e("NetworkTest", "❌ Error with endpoint $endpoint: ${e.message}")
-            }
-        }
-        
-        return ApiResult.Error(
-            "All endpoints failed", 
-            0, 
-            "Could not connect to any server endpoint"
-        )
-    }
-
-    suspend fun waitForServerWakeUp(maxAttempts: Int = 12, delayBetweenAttempts: Long = 5000L): Boolean {
-        Log.d("ServerWakeUp", "🔄 Waiting for server to wake up...")
-        
-        repeat(maxAttempts) { attempt ->
-            try {
-                Log.d("ServerWakeUp", "Attempt ${attempt + 1}/$maxAttempts")
-                val result = testConnection()
-                
-                when (result) {
-                    is ApiResult.Success -> {
-                        Log.d("ServerWakeUp", "✅ Server is awake and responding!")
-                        return true
-                    }
-                    is ApiResult.Error -> {
-                        // Check if it's a server wake-up issue (5xx errors)
-                        if (result.code in 500..599) {
-                            Log.w("ServerWakeUp", "⏳ Server still waking up (HTTP ${result.code}), waiting...")
-                        } else {
-                            Log.w("ServerWakeUp", "⚠️ Server error (HTTP ${result.code}): ${result.message}")
-                        }
-                    }
-                }
-            } catch (e: Exception) {
-                Log.w("ServerWakeUp", "🚨 Connection attempt ${attempt + 1} failed: ${e.message}")
-            }
+    
+    // Use a simple client without interceptors for connection testing
+    val simpleClient = OkHttpClient.Builder()
+        .connectTimeout(10, TimeUnit.SECONDS)
+        .readTimeout(10, TimeUnit.SECONDS)
+        .build()
+    
+    val endpoints = listOf("/health", "/test", "/", "/api")
+    
+    for (endpoint in endpoints) {
+        try {
+            Log.d("NetworkTest", "Trying endpoint: $endpoint")
+            val url = "$baseUrl$endpoint"
+            val request = Request.Builder()
+                .url(url)
+                .get()
+                .addHeader("User-Agent", "ResumeWriter-Android")
+                .build()
             
-            // Wait before next attempt (except on last attempt)
-            if (attempt < maxAttempts - 1) {
-                Log.d("ServerWakeUp", "⏰ Waiting ${delayBetweenAttempts}ms before next attempt...")
-                kotlinx.coroutines.delay(delayBetweenAttempts)
+            val response = simpleClient.newCall(request).execute()
+            val body = response.body?.string()
+            
+            Log.d("NetworkTest", "Response for $endpoint: ${response.code}")
+            
+            if (response.isSuccessful && body != null) {
+                Log.d("NetworkTest", "✅ Success with endpoint: $endpoint")
+                return ApiResult.Success(JSONObject(body))
+            } else {
+                Log.w("NetworkTest", "❌ Failed with endpoint $endpoint: HTTP ${response.code}")
             }
+        } catch (e: Exception) {
+            Log.e("NetworkTest", "❌ Error with endpoint $endpoint: ${e.message}")
+        }
+    }
+    
+    return ApiResult.Error(
+        "All endpoints failed", 
+        0, 
+        "Could not connect to any server endpoint"
+    )
+}
+
+    suspend fun waitForServerWakeUp(maxAttempts: Int = 8, delayBetweenAttempts: Long = 5000L): Boolean {
+    Log.d("ServerWakeUp", "🔄 Waiting for server to wake up...")
+    
+    repeat(maxAttempts) { attempt ->
+        try {
+            Log.d("ServerWakeUp", "Attempt ${attempt + 1}/$maxAttempts")
+            val result = testConnection()
+            
+            when (result) {
+                is ApiResult.Success -> {
+                    Log.d("ServerWakeUp", "✅ Server is awake and responding!")
+                    return true
+                }
+                is ApiResult.Error -> {
+                    if (result.code in 500..599) {
+                        Log.w("ServerWakeUp", "⏳ Server still waking up (HTTP ${result.code}), waiting...")
+                    } else {
+                        Log.w("ServerWakeUp", "⚠️ Connection issue (HTTP ${result.code}): ${result.message}")
+                    }
+                }
+            }
+        } catch (e: Exception) {
+            Log.w("ServerWakeUp", "🚨 Connection attempt ${attempt + 1} failed: ${e.message}")
         }
         
-        Log.e("ServerWakeUp", "❌ Server failed to wake up after $maxAttempts attempts")
-        return false
+        // Wait before next attempt (except on last attempt)
+        if (attempt < maxAttempts - 1) {
+            Log.d("ServerWakeUp", "⏰ Waiting ${delayBetweenAttempts}ms before next attempt...")
+            kotlinx.coroutines.delay(delayBetweenAttempts)
+        }
     }
+    
+    Log.e("ServerWakeUp", "❌ Server failed to wake up after $maxAttempts attempts")
+    return false
+}
 
     
 private suspend fun getTokenSafely(): String? {
