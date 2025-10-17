@@ -232,26 +232,17 @@ class ResumeGenerationActivity : AppCompatActivity() {
             }
 
             try {
-                Log.d("ResumeActivity", "Testing server warm-up")
-                val warmUpResult = apiService.warmUpServer()
-                when (warmUpResult) {
+                // ✅ FIXED: Remove warmUpServer call (endpoint doesn't exist)
+                Log.d("ResumeActivity", "Testing API connection directly")
+                val connectionResult = apiService.testConnection()
+                when (connectionResult) {
                     is ApiService.ApiResult.Success -> {
-                        Log.d("ResumeActivity", "Server warm-up successful")
-                        val connectionResult = apiService.testConnection()
-                        when (connectionResult) {
-                            is ApiService.ApiResult.Success -> {
-                                updateConnectionStatus("✅ API Connected", false)
-                                updateCreditDisplay()
-                            }
-                            is ApiService.ApiResult.Error -> {
-                                updateConnectionStatus("❌ API Connection Failed", true)
-                                showError("API endpoints not responding")
-                            }
-                        }
+                        updateConnectionStatus("✅ API Connected", false)
+                        updateCreditDisplay()
                     }
                     is ApiService.ApiResult.Error -> {
-                        updateConnectionStatus("🔄 Server is starting...", true)
-                        showError("Server is waking up. This may take 30-60 seconds. Please wait...")
+                        updateConnectionStatus("❌ API Connection Failed", true)
+                        showError("API endpoints not responding")
                     }
                 }
             } catch (e: Exception) {
@@ -283,7 +274,8 @@ class ResumeGenerationActivity : AppCompatActivity() {
                 Log.d("ResumeActivity", "Checking user credits")
                 val creditResult = apiService.getUserCredits()
                 if (creditResult is ApiService.ApiResult.Success) {
-                    val credits = creditResult.data.optInt("credits", 0)
+                    // ✅ FIXED: Use correct field name
+                    val credits = creditResult.data.optInt("available_credits", 0)
                     Log.d("ResumeActivity", "User has $credits credits")
                     if (credits <= 0) {
                         showErrorAndReset("Insufficient credits. Please purchase more.")
@@ -322,7 +314,8 @@ class ResumeGenerationActivity : AppCompatActivity() {
                 val creditResult = retryApiCall { apiService.getUserCredits() }
                 when (creditResult) {
                     is ApiService.ApiResult.Success -> {
-                        val credits = creditResult.data.optInt("credits", 0)
+                        // ✅ FIXED: Use correct field name
+                        val credits = creditResult.data.optInt("available_credits", 0)
                         Log.d("ResumeActivity", "User has $credits credits")
                         if (credits <= 0) {
                             showErrorAndReset("Insufficient credits. Please purchase more.")
@@ -370,6 +363,7 @@ class ResumeGenerationActivity : AppCompatActivity() {
             binding.tvGeneratedResume.text = resumeData.getString("resume_text")
             binding.layoutDownloadButtons.visibility = View.VISIBLE
 
+            // ✅ FIXED: Use correct field name
             if (resumeData.has("remaining_credits")) {
                 val remaining = resumeData.getInt("remaining_credits")
                 binding.tvCreditInfo.text = "Remaining credits: $remaining"
@@ -448,7 +442,8 @@ private suspend fun updateCreditDisplay() {
     // ✅ Step 2: Proceed with normal API call
     when (val result = apiService.getUserCredits()) {
         is ApiService.ApiResult.Success -> {
-            val credits = result.data.optInt("credits", 0)
+            // ✅ FIXED: Use correct field name
+            val credits = result.data.optInt("available_credits", 0)
             Log.d("ResumeActivity", "Credits retrieved: $credits")
 
             withContext(Dispatchers.Main) {
@@ -606,7 +601,8 @@ private suspend fun updateCreditDisplay() {
             when (creditsResult) {
                 is ApiService.ApiResult.Success -> {
                     Log.d("AuthDebug", "✅ Credits API SUCCESS - Auth is working")
-                    val credits = creditsResult.data.optInt("credits", 0)
+                    // ✅ FIXED: Use correct field name
+                    val credits = creditsResult.data.optInt("available_credits", 0)
                     Log.d("AuthDebug", "Available credits: $credits")
                 }
                 is ApiService.ApiResult.Error -> {
@@ -629,6 +625,7 @@ private suspend fun updateCreditDisplay() {
         when (result) {
             is ApiService.ApiResult.Success -> {
                 Log.d("AuthDebug", "✅ SUCCESS! Credits: ${result.data}")
+                // ✅ FIXED: Use correct field name
                 val credits = result.data.optInt("available_credits", 0)
                 binding.creditText.text = "Credits: $credits"
             }
@@ -649,9 +646,19 @@ private suspend fun updateCreditDisplay() {
             displayGeneratedResume(result.data)
             showSuccess("Resume generated successfully!")
 
-            // ✅ Wrap in coroutine
-            lifecycleScope.launch {
-                updateCreditDisplay()
+            // ✅ Update credits from response if available
+            if (result.data.has("remaining_credits")) {
+                val remaining = result.data.getInt("remaining_credits")
+                lifecycleScope.launch {
+                    withContext(Dispatchers.Main) {
+                        binding.creditText.text = "Credits: $remaining"
+                    }
+                }
+            } else {
+                // Fallback to API call
+                lifecycleScope.launch {
+                    updateCreditDisplay()
+                }
             }
         }
         is ApiService.ApiResult.Error -> {
