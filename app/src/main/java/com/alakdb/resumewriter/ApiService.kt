@@ -195,7 +195,59 @@ class DetailedLoggingInterceptor : Interceptor {
             "Could not connect to any server endpoint"
         )
     }
+        /** Test API connection with visual feedback */
+private fun testApiConnection() {
+    lifecycleScope.launch {
+        binding.layoutConnectionStatus.visibility = View.VISIBLE
+        binding.tvConnectionStatus.text = "Testing connection..."
+        binding.progressConnection.visibility = View.VISIBLE
+        
+        try {
+            val result = apiService.testConnection()
+            when (result) {
+                is ApiService.ApiResult.Success -> {
+                    binding.tvConnectionStatus.text = "✅ API Connected"
+                    updateCreditDisplay()
+                }
+                is ApiService.ApiResult.Error -> {
+                    binding.tvConnectionStatus.text = "❌ Connection Failed"
+                    // Optionally wait for server wake-up
+                    if (result.code in 500..599) {
+                        waitForServerConnection()
+                    }
+                }
+            }
+        } catch (e: Exception) {
+            binding.tvConnectionStatus.text = "❌ Connection Error"
+        } finally {
+            binding.progressConnection.visibility = View.GONE
+        }
+    }
+}
 
+    /** File download helper using ApiService methods */
+private fun downloadResumeFile(format: String) {
+    val resumeData = currentGeneratedResume ?: return
+    
+    lifecycleScope.launch {
+        try {
+            val base64Key = "${format.lowercase()}_data"
+            if (!resumeData.has(base64Key)) {
+                showError("$format format not available")
+                return@launch
+            }
+            
+            // Use ApiService methods for file handling
+            val fileData = apiService.decodeBase64File(resumeData.getString(base64Key))
+            val file = apiService.saveFileToStorage(fileData, "resume.$format")
+            
+            showDownloadSuccess(file, format.uppercase())
+            
+        } catch (e: Exception) {
+            showError("Download failed: ${e.message}")
+        }
+    }
+}
 
         // Add this method to ApiService.kt
 suspend fun debugAuthenticationFlow(): String {
@@ -351,6 +403,32 @@ suspend fun debugAuthenticationFlow(): String {
     return false
 }
 
+    /** Wait for server wake-up with visual feedback */
+private suspend fun waitForServerConnection(): Boolean {
+    binding.tvConnectionStatus.text = "🔄 Waiting for server to wake up..."
+    
+    val maxAttempts = 10
+    val delayBetweenAttempts = 3000L
+    
+    repeat(maxAttempts) { attempt ->
+        val result = apiService.testConnection()
+        if (result is ApiService.ApiResult.Success) {
+            binding.tvConnectionStatus.text = "✅ Server is ready!"
+            return true
+        }
+        
+        binding.tvConnectionStatus.text = "🔄 Server waking up... (${attempt + 1}/$maxAttempts)"
+        
+        if (attempt < maxAttempts - 1) {
+            delay(delayBetweenAttempts)
+        }
+    }
+    
+    binding.tvConnectionStatus.text = "❌ Server timeout"
+    return false
+}
+
+    
     suspend fun generateResume(resumeText: String, jobDescription: String, tone: String = "Professional"): ApiResult<JSONObject> {
         Log.d("ApiService", "Generating resume with tone: $tone")
         
@@ -494,6 +572,7 @@ suspend fun debugAuthenticationFlow(): String {
         }
     }
 
+    
     // Debug method to check authentication state
     suspend fun debugAuthState(): String {
         val currentUser = FirebaseAuth.getInstance().currentUser
