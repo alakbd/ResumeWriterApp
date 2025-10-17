@@ -200,6 +200,76 @@ class DetailedLoggingInterceptor : Interceptor {
         )
     }
 
+
+        // Add this method to ApiService.kt
+suspend fun debugAuthenticationFlow(): String {
+    val debugInfo = StringBuilder()
+    debugInfo.appendLine("=== AUTHENTICATION DEBUG ===")
+    
+    // 1. Check Firebase Auth
+    val firebaseUser = FirebaseAuth.getInstance().currentUser
+    debugInfo.appendLine("1. Firebase User: ${firebaseUser?.uid ?: "NULL"}")
+    debugInfo.appendLine("2. Firebase Email: ${firebaseUser?.email ?: "NULL"}")
+    
+    // 2. Check UserManager state
+    debugInfo.appendLine("3. UserManager Logged In: ${userManager.isUserLoggedIn()}")
+    debugInfo.appendLine("4. Token Valid: ${userManager.isTokenValid()}")
+    
+    val token = userManager.getUserToken()
+    debugInfo.appendLine("5. Token Present: ${!token.isNullOrBlank()}")
+    debugInfo.appendLine("6. Token Preview: ${token?.take(20) ?: "NULL"}")
+    
+    // 3. Test public endpoint (no auth)
+    debugInfo.appendLine("7. Testing public endpoint...")
+    try {
+        val publicRequest = Request.Builder()
+            .url("$baseUrl/health")
+            .get()
+            .build()
+        val publicResponse = client.newCall(publicRequest).execute()
+        debugInfo.appendLine("   Public /health → HTTP ${publicResponse.code}")
+        if (publicResponse.isSuccessful) {
+            debugInfo.appendLine("   ✅ Public endpoint works")
+        } else {
+            debugInfo.appendLine("   ❌ Public endpoint failed")
+        }
+    } catch (e: Exception) {
+        debugInfo.appendLine("   ❌ Public endpoint exception: ${e.message}")
+    }
+    
+    // 4. Test authenticated endpoint
+    if (!token.isNullOrBlank()) {
+        debugInfo.appendLine("8. Testing authenticated endpoint...")
+        try {
+            val authRequest = Request.Builder()
+                .url("$baseUrl/user/credits")
+                .get()
+                .addHeader("X-Auth-Token", "Bearer $token")
+                .build()
+            val authResponse = client.newCall(authRequest).execute()
+            debugInfo.appendLine("   Auth /user/credits → HTTP ${authResponse.code}")
+            debugInfo.appendLine("   Response: ${authResponse.body?.string()?.take(100)}")
+        } catch (e: Exception) {
+            debugInfo.appendLine("   ❌ Auth endpoint exception: ${e.message}")
+        }
+    } else {
+        debugInfo.appendLine("8. Skipping auth test - no token")
+    }
+    
+    // 5. Test token generation
+    debugInfo.appendLine("9. Testing token generation...")
+    try {
+        val newToken = getCurrentUserToken()
+        debugInfo.appendLine("   New token: ${!newToken.isNullOrBlank()}")
+        debugInfo.appendLine("   New token preview: ${newToken?.take(20) ?: "NULL"}")
+    } catch (e: Exception) {
+        debugInfo.appendLine("   ❌ Token generation failed: ${e.message}")
+    }
+    
+    debugInfo.appendLine("=== END DEBUG ===")
+    return debugInfo.toString()
+}
+
     // ✅ FIXED: Remove warmUpServer function (endpoint doesn't exist in API)
 
     // Enhanced API Methods with better error handling
