@@ -247,6 +247,43 @@ class DetailedLoggingInterceptor : Interceptor {
         }
     }
 
+    suspend fun waitForServerWakeUp(maxAttempts: Int = 12, delayBetweenAttempts: Long = 5000L): Boolean {
+    Log.d("ServerWakeUp", "🔄 Waiting for server to wake up...")
+    
+    repeat(maxAttempts) { attempt ->
+        try {
+            Log.d("ServerWakeUp", "Attempt ${attempt + 1}/$maxAttempts")
+            val result = testConnection()
+            
+            when (result) {
+                is ApiResult.Success -> {
+                    Log.d("ServerWakeUp", "✅ Server is awake and responding!")
+                    return true
+                }
+                is ApiResult.Error -> {
+                    // Check if it's a server wake-up issue (5xx errors)
+                    if (result.code in 500..599) {
+                        Log.w("ServerWakeUp", "⏳ Server still waking up (HTTP ${result.code}), waiting...")
+                    } else {
+                        Log.w("ServerWakeUp", "⚠️ Server error (HTTP ${result.code}): ${result.message}")
+                    }
+                }
+            }
+        } catch (e: Exception) {
+            Log.w("ServerWakeUp", "🚨 Connection attempt ${attempt + 1} failed: ${e.message}")
+        }
+        
+        // Wait before next attempt (except on last attempt)
+        if (attempt < maxAttempts - 1) {
+            Log.d("ServerWakeUp", "⏰ Waiting ${delayBetweenAttempts}ms before next attempt...")
+            delay(delayBetweenAttempts)
+        }
+    }
+    
+    Log.e("ServerWakeUp", "❌ Server failed to wake up after $maxAttempts attempts")
+    return false
+}
+
     suspend fun generateResume(resumeText: String, jobDescription: String, tone: String = "Professional"): ApiResult<JSONObject> {
         Log.d("ApiService", "Generating resume with tone: $tone")
         
