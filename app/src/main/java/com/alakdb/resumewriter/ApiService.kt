@@ -6,15 +6,18 @@ import android.util.Log
 import com.google.firebase.auth.FirebaseAuth
 import com.google.gson.Gson
 import kotlinx.coroutines.tasks.await
+import kotlinx.coroutines.runBlocking
 import okhttp3.*
 import okhttp3.MediaType.Companion.toMediaType
 import okhttp3.RequestBody.Companion.toRequestBody
 import okhttp3.ResponseBody.Companion.toResponseBody
 import okhttp3.logging.HttpLoggingInterceptor
-import org.json.JSONObject
-import java.io.File
+import okhttp3.OkHttpClient
+import okhttp3.Request
 import okhttp3.Interceptor
 import okhttp3.Response
+import org.json.JSONObject
+import java.io.File
 import java.io.IOException
 import java.util.concurrent.TimeUnit
 
@@ -44,7 +47,7 @@ class DetailedLoggingInterceptor : Interceptor {
         
         // Log request details
         Log.d("Network", "⬆️ REQUEST: ${request.method} ${request.url}")
-        request.headers.forEach { name, value ->
+        request.headers.forEach { (name, value) ->
             Log.d("Network", "   $name: $value")
         }
         
@@ -54,7 +57,7 @@ class DetailedLoggingInterceptor : Interceptor {
         
         // Log response details
         Log.d("Network", "⬇️ RESPONSE: ${response.code} ${response.message} (${endTime - startTime}ms)")
-        response.headers.forEach { name, value ->
+        response.headers.forEach { (name, value) ->
             Log.d("Network", "   $name: $value")
         }
         
