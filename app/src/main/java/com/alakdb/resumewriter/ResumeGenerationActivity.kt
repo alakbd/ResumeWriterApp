@@ -2,6 +2,7 @@ package com.alakdb.resumewriter
 
 import android.content.Context
 import android.content.Intent
+import kotlinx.coroutines.tasks.await
 import android.net.ConnectivityManager
 import android.net.NetworkCapabilities
 import android.net.Uri
@@ -20,6 +21,11 @@ import com.google.firebase.auth.FirebaseAuth
 import kotlinx.coroutines.*
 import org.json.JSONObject
 import java.io.File
+import okhttp3.OkHttpClient
+import okhttp3.Request
+import okhttp3.RequestBody.Companion.toRequestBody
+import okhttp3.MediaType.Companion.toMediaType
+import okhttp3.Response
 
 class ResumeGenerationActivity : AppCompatActivity() {
 
