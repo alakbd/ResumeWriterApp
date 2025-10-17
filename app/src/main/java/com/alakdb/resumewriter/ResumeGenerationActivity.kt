@@ -750,18 +750,7 @@ private suspend fun updateCreditDisplay() {
         }
     }
 }
-    private fun updateConnectionStatus(message: String, isError: Boolean = false, isWarning: Boolean = false) {
-    binding.tvConnectionStatus.text = message
-    
-    val color = when {
-        isError -> getColor(android.R.color.holo_red_dark)
-        isWarning -> getColor(android.R.color.holo_orange_dark)
-        else -> getColor(android.R.color.holo_green_dark)
-    }
-    
-    binding.tvConnectionStatus.setTextColor(color)
-    Log.d("ResumeActivity", "Connection status: $message")
-    }
+
     
     
     private fun handleGenerationResult(result: ApiService.ApiResult<JSONObject>) {
