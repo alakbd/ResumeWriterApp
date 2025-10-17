@@ -409,47 +409,50 @@ private suspend fun getTokenSafely(): String? {
     }
 
     suspend fun getUserCredits(): ApiResult<JSONObject> {
-        return try {
-            // Ensure we have a valid token before making the request
-            val token = getCurrentUserToken()
-            if (token == null) {
-                return ApiResult.Error("Authentication required - please log in again", 401)
-            }
-
-            val request = Request.Builder()
-                .url("$baseUrl/user/credits")
-                .get()
-                .addHeader("User-Agent", "ResumeWriter-Android")
-                .build()
-
-            client.newCall(request).execute().use { response ->
-                val respBody = response.body?.string() ?: "{}"
-
-                if (!response.isSuccessful) {
-                    Log.e("ApiService", "Failed to fetch credits: HTTP ${response.code}")
-                    
-                    // If it's an auth error, clear the token
-                    if (response.code == 401) {
-                        userManager.clearUserToken()
-                        return ApiResult.Error("Authentication failed - please log in again", 401)
-                    }
-                    
-                    return ApiResult.Error(
-                        message = "Failed to get credits: ${response.message}",
-                        code = response.code
-                    )
-                }
-
-                ApiResult.Success(JSONObject(respBody))
-            }
-        } catch (e: Exception) {
-            Log.e("ApiService", "Exception while fetching credits", e)
-            ApiResult.Error(
-                message = "Exception while fetching credits: ${e.message}",
-                code = -1
-            )
+    return try {
+        Log.d("ApiService", "Getting user credits...")
+        
+        // Get token safely without causing circular calls
+        val token = getTokenSafely()
+        if (token == null) {
+            Log.e("ApiService", "No token available for credits request")
+            return ApiResult.Error("Authentication required", 401)
         }
+
+        val request = Request.Builder()
+            .url("$baseUrl/user/credits")
+            .get()
+            .addHeader("User-Agent", "ResumeWriter-Android")
+            .build()
+
+        client.newCall(request).execute().use { response ->
+            val respBody = response.body?.string() ?: "{}"
+            Log.d("ApiService", "Credits response: ${response.code}")
+
+            if (!response.isSuccessful) {
+                Log.e("ApiService", "Failed to fetch credits: HTTP ${response.code}")
+                
+                if (response.code == 401) {
+                    userManager.clearUserToken()
+                    return ApiResult.Error("Authentication failed - please log in again", 401)
+                }
+                
+                return ApiResult.Error(
+                    message = "Failed to get credits: ${response.message}",
+                    code = response.code
+                )
+            }
+
+            ApiResult.Success(JSONObject(respBody))
+        }
+    } catch (e: Exception) {
+        Log.e("ApiService", "Exception while fetching credits", e)
+        ApiResult.Error(
+            message = "Network error: ${e.message}",
+            code = -1
+        )
     }
+}
 
     // Comprehensive Debug Method
     suspend fun debugAuthenticationFlow(): String {
