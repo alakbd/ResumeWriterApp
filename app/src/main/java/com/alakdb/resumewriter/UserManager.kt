@@ -119,14 +119,41 @@ class UserManager(private val context: Context) {
             }
     }
 
+    fun cleanAndValidateToken(token: String?): String? {
+    if (token.isNullOrBlank()) return null
+    
+    // Remove any extra whitespace, newlines, or quotes
+    var cleaned = token.trim()
+        .replace("\n", "")
+        .replace("\"", "")
+        .replace("\\s+".toRegex(), " ")
+    
+    // Check if it's a valid JWT format (should have 3 parts separated by dots)
+    val parts = cleaned.split(".")
+    if (parts.size != 3) {
+        Log.w("TokenClean", "⚠️ Token doesn't have 3 JWT parts, has: ${parts.size}")
+        return null
+    }
+    
+    Log.d("TokenClean", "✅ Token cleaned successfully")
+    Log.d("TokenClean", "Header: ${parts[0].length} chars")
+    Log.d("TokenClean", "Payload: ${parts[1].length} chars") 
+    Log.d("TokenClean", "Signature: ${parts[2].length} chars")
+    
+    return cleaned
+}
+    
     /** User token stored in consistent SharedPreferences */
     fun saveUserToken(token: String) {
-        prefs.edit().apply {
-            putString(FIREBASE_TOKEN_KEY, token)
-            putLong(TOKEN_TIMESTAMP_KEY, System.currentTimeMillis())
-            apply()
+        val cleanedToken = cleanAndValidateToken(token)
+        if (cleanedToken != null) {
+            sharedPreferences.edit().putString("user_token", cleanedToken).apply()
+            sharedPreferences.edit().putLong("token_timestamp", System.currentTimeMillis()).apply()
+            Log.d("UserManager", "✅ Token saved and cleaned: ${cleanedToken.length} chars")
+        } else {
+            Log.e("UserManager", "❌ Invalid token format, not saving")
+            clearUserToken()
         }
-        Log.d("UserManager", "Token saved successfully - timestamp: ${System.currentTimeMillis()}")
     }
 
     fun getUserToken(): String? {
