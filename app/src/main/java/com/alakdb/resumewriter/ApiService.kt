@@ -6,17 +6,11 @@ import android.util.Log
 import com.google.firebase.auth.FirebaseAuth
 import com.google.gson.Gson
 import kotlinx.coroutines.tasks.await
-import kotlinx.coroutines.delay
-import kotlinx.coroutines.runBlocking
 import okhttp3.*
 import okhttp3.MediaType.Companion.toMediaType
 import okhttp3.RequestBody.Companion.toRequestBody
 import okhttp3.ResponseBody.Companion.toResponseBody
 import okhttp3.logging.HttpLoggingInterceptor
-import okhttp3.OkHttpClient
-import okhttp3.Request
-import okhttp3.Interceptor
-import okhttp3.Response
 import org.json.JSONObject
 import java.io.File
 import java.io.IOException
@@ -29,42 +23,40 @@ class ApiService(private val context: Context) {
     private val userManager = UserManager(context)
 
     // Enhanced OkHttp Client with request/response logging
-private val client = OkHttpClient.Builder()
-    .connectTimeout(30, TimeUnit.SECONDS)
-    .readTimeout(30, TimeUnit.SECONDS)
-    .writeTimeout(30, TimeUnit.SECONDS)
-    .addInterceptor(HttpLoggingInterceptor().apply { 
-        level = HttpLoggingInterceptor.Level.BODY 
-    })
-    .addInterceptor(DetailedLoggingInterceptor()) // Add this if you want custom logging
-    .addInterceptor(AuthInterceptor(userManager))
-    .build()
+    private val client = OkHttpClient.Builder()
+        .connectTimeout(30, TimeUnit.SECONDS)
+        .readTimeout(30, TimeUnit.SECONDS)
+        .writeTimeout(30, TimeUnit.SECONDS)
+        .addInterceptor(HttpLoggingInterceptor().apply { 
+            level = HttpLoggingInterceptor.Level.BODY 
+        })
+        .addInterceptor(DetailedLoggingInterceptor())
+        .addInterceptor(AuthInterceptor(userManager))
+        .build()
 
-// Add this new interceptor class
-// Add this class inside your ApiService class
-class DetailedLoggingInterceptor : Interceptor {
-    override fun intercept(chain: Interceptor.Chain): Response {
-        val request = chain.request()
-        
-        // Log request details
-        Log.d("Network", "⬆️ REQUEST: ${request.method} ${request.url}")
-        request.headers.forEach { (name, value) ->
-            Log.d("Network", "   $name: $value")
+    class DetailedLoggingInterceptor : Interceptor {
+        override fun intercept(chain: Interceptor.Chain): Response {
+            val request = chain.request()
+            
+            // Log request details
+            Log.d("Network", "⬆️ REQUEST: ${request.method} ${request.url}")
+            request.headers.forEach { (name, value) ->
+                Log.d("Network", "   $name: $value")
+            }
+            
+            val startTime = System.currentTimeMillis()
+            val response = chain.proceed(request)
+            val endTime = System.currentTimeMillis()
+            
+            // Log response details
+            Log.d("Network", "⬇️ RESPONSE: ${response.code} ${response.message} (${endTime - startTime}ms)")
+            response.headers.forEach { (name, value) ->
+                Log.d("Network", "   $name: $value")
+            }
+            
+            return response
         }
-        
-        val startTime = System.currentTimeMillis()
-        val response = chain.proceed(request)
-        val endTime = System.currentTimeMillis()
-        
-        // Log response details
-        Log.d("Network", "⬇️ RESPONSE: ${response.code} ${response.message} (${endTime - startTime}ms)")
-        response.headers.forEach { (name, value) ->
-            Log.d("Network", "   $name: $value")
-        }
-        
-        return response
     }
-}
 
     // Data Classes
     data class DeductCreditRequest(val user_id: String)
@@ -76,44 +68,39 @@ class DetailedLoggingInterceptor : Interceptor {
         data class Error(val message: String, val code: Int = 0, val details: String? = null) : ApiResult<Nothing>()
     }
 
-    // Fixed AuthInterceptor - Use the same UserManager instance and proper header format
+    // Fixed AuthInterceptor
     class AuthInterceptor(private val userManager: UserManager) : Interceptor {
         override fun intercept(chain: Interceptor.Chain): Response {
             val originalRequest = chain.request()
             val url = originalRequest.url.toString()
-        
-        Log.d("AuthInterceptor", "Processing: $url")
-        
-        // Skip auth for public endpoints
-        val publicEndpoints = listOf("/health", "/test", "/", "/api")
-        val isPublic = publicEndpoints.any { url.endsWith(it) }
-        
-        if (isPublic) {
-            Log.d("AuthInterceptor", "✅ Public endpoint - no auth needed")
-            return chain.proceed(originalRequest)
-        }
-        
-        // For authenticated endpoints, get token
-        val token = userManager.getUserToken()
-        
-        return if (!token.isNullOrBlank()) {
-            Log.d("AuthInterceptor", "✅ Adding auth token to: $url")
-            val requestWithAuth = originalRequest.newBuilder()
-                .addHeader("X-Auth-Token", "Bearer $token")
-                .build()
-            chain.proceed(requestWithAuth)
-        } else {
-            Log.w("AuthInterceptor", "⚠️ No token available for: $url")
-            // Proceed without token - let server handle authentication failure
-            chain.proceed(originalRequest)
+            
+            Log.d("AuthInterceptor", "Processing: $url")
+            
+            // Skip auth for public endpoints
+            val publicEndpoints = listOf("/health", "/test", "/", "/api")
+            val isPublic = publicEndpoints.any { url.endsWith(it) }
+            
+            if (isPublic) {
+                Log.d("AuthInterceptor", "✅ Public endpoint - no auth needed")
+                return chain.proceed(originalRequest)
+            }
+            
+            // For authenticated endpoints, get token
+            val token = userManager.getUserToken()
+            
+            return if (!token.isNullOrBlank()) {
+                Log.d("AuthInterceptor", "✅ Adding auth token to: $url")
+                val requestWithAuth = originalRequest.newBuilder()
+                    .addHeader("X-Auth-Token", "Bearer $token")
+                    .build()
+                chain.proceed(requestWithAuth)
+            } else {
+                Log.w("AuthInterceptor", "⚠️ No token available for: $url")
+                // Proceed without token - let server handle authentication failure
+                chain.proceed(originalRequest)
+            }
         }
     }
-}
-
-    private fun isPublicEndpoint(url: String): Boolean {
-        return url.contains("/health") || url.contains("/test") || url.endsWith("/") || url.contains("/api")
-    }
-}
     
     // Improved token fetching with better error handling and token validation
     suspend fun getCurrentUserToken(): String? {
@@ -195,130 +182,43 @@ class DetailedLoggingInterceptor : Interceptor {
             "Could not connect to any server endpoint"
         )
     }
-        /** Test API connection with visual feedback */
-private fun testApiConnection() {
-    lifecycleScope.launch {
-        binding.layoutConnectionStatus.visibility = View.VISIBLE
-        binding.tvConnectionStatus.text = "Testing connection..."
-        binding.progressConnection.visibility = View.VISIBLE
+
+    suspend fun waitForServerWakeUp(maxAttempts: Int = 12, delayBetweenAttempts: Long = 5000L): Boolean {
+        Log.d("ServerWakeUp", "🔄 Waiting for server to wake up...")
         
-        try {
-            val result = apiService.testConnection()
-            when (result) {
-                is ApiService.ApiResult.Success -> {
-                    binding.tvConnectionStatus.text = "✅ API Connected"
-                    updateCreditDisplay()
-                }
-                is ApiService.ApiResult.Error -> {
-                    binding.tvConnectionStatus.text = "❌ Connection Failed"
-                    // Optionally wait for server wake-up
-                    if (result.code in 500..599) {
-                        waitForServerConnection()
+        repeat(maxAttempts) { attempt ->
+            try {
+                Log.d("ServerWakeUp", "Attempt ${attempt + 1}/$maxAttempts")
+                val result = testConnection()
+                
+                when (result) {
+                    is ApiResult.Success -> {
+                        Log.d("ServerWakeUp", "✅ Server is awake and responding!")
+                        return true
+                    }
+                    is ApiResult.Error -> {
+                        // Check if it's a server wake-up issue (5xx errors)
+                        if (result.code in 500..599) {
+                            Log.w("ServerWakeUp", "⏳ Server still waking up (HTTP ${result.code}), waiting...")
+                        } else {
+                            Log.w("ServerWakeUp", "⚠️ Server error (HTTP ${result.code}): ${result.message}")
+                        }
                     }
                 }
-            }
-        } catch (e: Exception) {
-            binding.tvConnectionStatus.text = "❌ Connection Error"
-        } finally {
-            binding.progressConnection.visibility = View.GONE
-        }
-    }
-}
-
-    /** File download helper using ApiService methods */
-private fun downloadResumeFile(format: String) {
-    val resumeData = currentGeneratedResume ?: return
-    
-    lifecycleScope.launch {
-        try {
-            val base64Key = "${format.lowercase()}_data"
-            if (!resumeData.has(base64Key)) {
-                showError("$format format not available")
-                return@launch
+            } catch (e: Exception) {
+                Log.w("ServerWakeUp", "🚨 Connection attempt ${attempt + 1} failed: ${e.message}")
             }
             
-            // Use ApiService methods for file handling
-            val fileData = apiService.decodeBase64File(resumeData.getString(base64Key))
-            val file = apiService.saveFileToStorage(fileData, "resume.$format")
-            
-            showDownloadSuccess(file, format.uppercase())
-            
-        } catch (e: Exception) {
-            showError("Download failed: ${e.message}")
+            // Wait before next attempt (except on last attempt)
+            if (attempt < maxAttempts - 1) {
+                Log.d("ServerWakeUp", "⏰ Waiting ${delayBetweenAttempts}ms before next attempt...")
+                kotlinx.coroutines.delay(delayBetweenAttempts)
+            }
         }
+        
+        Log.e("ServerWakeUp", "❌ Server failed to wake up after $maxAttempts attempts")
+        return false
     }
-}
-
-        // Add this method to ApiService.kt
-suspend fun debugAuthenticationFlow(): String {
-    val debugInfo = StringBuilder()
-    debugInfo.appendLine("=== AUTHENTICATION DEBUG ===")
-    
-    // 1. Check Firebase Auth
-    val firebaseUser = FirebaseAuth.getInstance().currentUser
-    debugInfo.appendLine("1. Firebase User: ${firebaseUser?.uid ?: "NULL"}")
-    debugInfo.appendLine("2. Firebase Email: ${firebaseUser?.email ?: "NULL"}")
-    
-    // 2. Check UserManager state
-    debugInfo.appendLine("3. UserManager Logged In: ${userManager.isUserLoggedIn()}")
-    debugInfo.appendLine("4. Token Valid: ${userManager.isTokenValid()}")
-    
-    val token = userManager.getUserToken()
-    debugInfo.appendLine("5. Token Present: ${!token.isNullOrBlank()}")
-    debugInfo.appendLine("6. Token Preview: ${token?.take(20) ?: "NULL"}")
-    
-    // 3. Test public endpoint (no auth)
-    debugInfo.appendLine("7. Testing public endpoint...")
-    try {
-        val publicRequest = Request.Builder()
-            .url("$baseUrl/health")
-            .get()
-            .build()
-        val publicResponse = client.newCall(publicRequest).execute()
-        debugInfo.appendLine("   Public /health → HTTP ${publicResponse.code}")
-        if (publicResponse.isSuccessful) {
-            debugInfo.appendLine("   ✅ Public endpoint works")
-        } else {
-            debugInfo.appendLine("   ❌ Public endpoint failed")
-        }
-    } catch (e: Exception) {
-        debugInfo.appendLine("   ❌ Public endpoint exception: ${e.message}")
-    }
-    
-    // 4. Test authenticated endpoint
-    if (!token.isNullOrBlank()) {
-        debugInfo.appendLine("8. Testing authenticated endpoint...")
-        try {
-            val authRequest = Request.Builder()
-                .url("$baseUrl/user/credits")
-                .get()
-                .addHeader("X-Auth-Token", "Bearer $token")
-                .build()
-            val authResponse = client.newCall(authRequest).execute()
-            debugInfo.appendLine("   Auth /user/credits → HTTP ${authResponse.code}")
-            debugInfo.appendLine("   Response: ${authResponse.body?.string()?.take(100)}")
-        } catch (e: Exception) {
-            debugInfo.appendLine("   ❌ Auth endpoint exception: ${e.message}")
-        }
-    } else {
-        debugInfo.appendLine("8. Skipping auth test - no token")
-    }
-    
-    // 5. Test token generation
-    debugInfo.appendLine("9. Testing token generation...")
-    try {
-        val newToken = getCurrentUserToken()
-        debugInfo.appendLine("   New token: ${!newToken.isNullOrBlank()}")
-        debugInfo.appendLine("   New token preview: ${newToken?.take(20) ?: "NULL"}")
-    } catch (e: Exception) {
-        debugInfo.appendLine("   ❌ Token generation failed: ${e.message}")
-    }
-    
-    debugInfo.appendLine("=== END DEBUG ===")
-    return debugInfo.toString()
-}
-
-    // ✅ FIXED: Remove warmUpServer function (endpoint doesn't exist in API)
 
     // Enhanced API Methods with better error handling
     suspend fun deductCredit(userId: String): ApiResult<JSONObject> {
@@ -366,69 +266,6 @@ suspend fun debugAuthenticationFlow(): String {
         }
     }
 
-    suspend fun waitForServerWakeUp(maxAttempts: Int = 12, delayBetweenAttempts: Long = 5000L): Boolean {
-    Log.d("ServerWakeUp", "🔄 Waiting for server to wake up...")
-    
-    repeat(maxAttempts) { attempt ->
-        try {
-            Log.d("ServerWakeUp", "Attempt ${attempt + 1}/$maxAttempts")
-            val result = testConnection()
-            
-            when (result) {
-                is ApiResult.Success -> {
-                    Log.d("ServerWakeUp", "✅ Server is awake and responding!")
-                    return true
-                }
-                is ApiResult.Error -> {
-                    // Check if it's a server wake-up issue (5xx errors)
-                    if (result.code in 500..599) {
-                        Log.w("ServerWakeUp", "⏳ Server still waking up (HTTP ${result.code}), waiting...")
-                    } else {
-                        Log.w("ServerWakeUp", "⚠️ Server error (HTTP ${result.code}): ${result.message}")
-                    }
-                }
-            }
-        } catch (e: Exception) {
-            Log.w("ServerWakeUp", "🚨 Connection attempt ${attempt + 1} failed: ${e.message}")
-        }
-        
-        // Wait before next attempt (except on last attempt)
-        if (attempt < maxAttempts - 1) {
-            Log.d("ServerWakeUp", "⏰ Waiting ${delayBetweenAttempts}ms before next attempt...")
-            delay(delayBetweenAttempts)
-        }
-    }
-    
-    Log.e("ServerWakeUp", "❌ Server failed to wake up after $maxAttempts attempts")
-    return false
-}
-
-    /** Wait for server wake-up with visual feedback */
-private suspend fun waitForServerConnection(): Boolean {
-    binding.tvConnectionStatus.text = "🔄 Waiting for server to wake up..."
-    
-    val maxAttempts = 10
-    val delayBetweenAttempts = 3000L
-    
-    repeat(maxAttempts) { attempt ->
-        val result = apiService.testConnection()
-        if (result is ApiService.ApiResult.Success) {
-            binding.tvConnectionStatus.text = "✅ Server is ready!"
-            return true
-        }
-        
-        binding.tvConnectionStatus.text = "🔄 Server waking up... (${attempt + 1}/$maxAttempts)"
-        
-        if (attempt < maxAttempts - 1) {
-            delay(delayBetweenAttempts)
-        }
-    }
-    
-    binding.tvConnectionStatus.text = "❌ Server timeout"
-    return false
-}
-
-    
     suspend fun generateResume(resumeText: String, jobDescription: String, tone: String = "Professional"): ApiResult<JSONObject> {
         Log.d("ApiService", "Generating resume with tone: $tone")
         
@@ -572,22 +409,108 @@ private suspend fun waitForServerConnection(): Boolean {
         }
     }
 
-    
-    // Debug method to check authentication state
-    suspend fun debugAuthState(): String {
-        val currentUser = FirebaseAuth.getInstance().currentUser
-        val token = getCurrentUserToken()
-        val tokenValid = userManager.isTokenValid()
-        val userLoggedIn = userManager.isUserLoggedIn()
+    // Comprehensive Debug Method
+    suspend fun debugAuthenticationFlow(): String {
+        val debugInfo = StringBuilder()
+        debugInfo.appendLine("=== AUTHENTICATION FLOW DEBUG ===")
         
-        return """
-            === AUTH DEBUG ===
-            Firebase User: ${currentUser?.uid ?: "NULL"}
-            UserManager Logged In: $userLoggedIn
-            Token Valid: $tokenValid
-            Token Present: ${!token.isNullOrBlank()}
-            Token Preview: ${token?.take(10) ?: "NULL"}...
-        """.trimIndent()
+        // 1. Check Firebase Auth State
+        val firebaseUser = FirebaseAuth.getInstance().currentUser
+        debugInfo.appendLine("1. FIREBASE AUTH STATE:")
+        debugInfo.appendLine("   • User ID: ${firebaseUser?.uid ?: "NULL"}")
+        debugInfo.appendLine("   • Email: ${firebaseUser?.email ?: "NULL"}")
+        
+        // 2. Check UserManager State
+        debugInfo.appendLine("2. USER MANAGER STATE:")
+        debugInfo.appendLine("   • Is User Logged In: ${userManager.isUserLoggedIn()}")
+        debugInfo.appendLine("   • Is Token Valid: ${userManager.isTokenValid()}")
+        
+        val cachedToken = userManager.getUserToken()
+        debugInfo.appendLine("   • Cached Token: ${if (!cachedToken.isNullOrBlank()) "PRESENT (${cachedToken.length} chars)" else "NULL"}")
+        debugInfo.appendLine("   • Cached Token Preview: ${cachedToken?.take(30) ?: "NULL"}...")
+        
+        // 3. Test Token Generation
+        debugInfo.appendLine("3. TOKEN GENERATION TEST:")
+        try {
+            val newToken = getCurrentUserToken()
+            debugInfo.appendLine("   • New Token Generated: ${!newToken.isNullOrBlank()}")
+            debugInfo.appendLine("   • New Token Preview: ${newToken?.take(30) ?: "NULL"}...")
+            
+            // Compare with cached token
+            if (cachedToken != null && newToken != null) {
+                debugInfo.appendLine("   • Token Changed: ${cachedToken != newToken}")
+            }
+        } catch (e: Exception) {
+            debugInfo.appendLine("   • ❌ Token Generation Failed: ${e.message}")
+        }
+        
+        // 4. Test Public Endpoints (No Auth Required)
+        debugInfo.appendLine("4. PUBLIC ENDPOINT TEST:")
+        val publicEndpoints = listOf("/health", "/test", "/", "/api")
+        for (endpoint in publicEndpoints) {
+            try {
+                val request = Request.Builder()
+                    .url("$baseUrl$endpoint")
+                    .get()
+                    .build()
+                
+                val response = client.newCall(request).execute()
+                debugInfo.appendLine("   • $endpoint → HTTP ${response.code} ${if (response.isSuccessful) "✅" else "❌"}")
+                
+                if (!response.isSuccessful) {
+                    debugInfo.appendLine("     Error: ${response.body?.string()?.take(100)}")
+                }
+            } catch (e: Exception) {
+                debugInfo.appendLine("   • $endpoint → ❌ Exception: ${e.message}")
+            }
+        }
+        
+        // 5. Test Authenticated Endpoint with Manual HTTP
+        debugInfo.appendLine("5. MANUAL AUTHENTICATED TEST:")
+        val currentToken = getCurrentUserToken()
+        if (!currentToken.isNullOrBlank()) {
+            try {
+                // Test without interceptor (raw HTTP)
+                val simpleClient = OkHttpClient()
+                val authRequest = Request.Builder()
+                    .url("$baseUrl/user/credits")
+                    .get()
+                    .addHeader("X-Auth-Token", "Bearer $currentToken")
+                    .addHeader("User-Agent", "Manual-Debug")
+                    .build()
+                
+                val response = simpleClient.newCall(authRequest).execute()
+                debugInfo.appendLine("   • Manual /user/credits → HTTP ${response.code}")
+                debugInfo.appendLine("   • Response Body: ${response.body?.string()?.take(200)}")
+                
+            } catch (e: Exception) {
+                debugInfo.appendLine("   • ❌ Manual Test Failed: ${e.message}")
+            }
+            
+            // Test with our API service (through interceptor)
+            debugInfo.appendLine("6. API SERVICE TEST (Through Interceptor):")
+            try {
+                val creditsResult = getUserCredits()
+                when (creditsResult) {
+                    is ApiResult.Success -> {
+                        debugInfo.appendLine("   • ✅ SUCCESS! Data: ${creditsResult.data.toString().take(100)}")
+                    }
+                    is ApiResult.Error -> {
+                        debugInfo.appendLine("   • ❌ FAILED: Code ${creditsResult.code} - ${creditsResult.message}")
+                    }
+                }
+            } catch (e: Exception) {
+                debugInfo.appendLine("   • ❌ API Service Exception: ${e.message}")
+            }
+        } else {
+            debugInfo.appendLine("   • ⚠️ Skipping - No token available")
+        }
+        
+        debugInfo.appendLine("=== END DEBUG ===")
+        
+        val result = debugInfo.toString()
+        Log.d("AuthDebug", result)
+        return result
     }
 
     // Utilities
