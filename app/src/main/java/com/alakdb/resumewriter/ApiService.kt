@@ -70,86 +70,115 @@ class ApiService(private val context: Context) {
 
     // Fixed AuthInterceptor
     class AuthInterceptor(private val userManager: UserManager) : Interceptor {
-    override fun intercept(chain: Interceptor.Chain): Response {
-        val originalRequest = chain.request()
-        val url = originalRequest.url.toString()
+        override fun intercept(chain: Interceptor.Chain): Response {
+            val originalRequest = chain.request()
+            val url = originalRequest.url.toString()
         
-        Log.d("AuthInterceptor", "Processing: $url")
+            Log.d("AuthInterceptor", "Processing: $url")
         
-        // Skip auth for public endpoints
-        val publicEndpoints = listOf("/health", "/test", "/", "/api")
-        val isPublic = publicEndpoints.any { url.endsWith(it) }
-        
-        if (isPublic) {
-            Log.d("AuthInterceptor", "✅ Public endpoint - no auth needed")
-            return chain.proceed(originalRequest)
-        }
-        
-        // For authenticated endpoints, get token safely
-        val token = try {
-            userManager.getUserToken()
-        } catch (e: Exception) {
-            Log.e("AuthInterceptor", "❌ Error getting token: ${e.message}", e)
-            null
-        }
-        
-        return if (!token.isNullOrBlank()) {
-            Log.d("AuthInterceptor", "✅ Adding auth token to: $url")
-            Log.d("AuthInterceptor", "Token preview: ${token.take(10)}...")
+        try {
+            // Skip auth for public endpoints
+            val publicEndpoints = listOf("/health", "/test", "/", "/api")
+            val isPublic = publicEndpoints.any { url.endsWith(it) }
             
-            val requestWithAuth = originalRequest.newBuilder()
-                .addHeader("X-Auth-Token", token) // Remove "Bearer " prefix
-                .build()
-            chain.proceed(requestWithAuth)
-        } else {
-            Log.w("AuthInterceptor", "⚠️ No token available for: $url")
+            if (isPublic) {
+                Log.d("AuthInterceptor", "✅ Public endpoint - no auth needed")
+                return chain.proceed(originalRequest)
+            }
+            
+            // For authenticated endpoints, get token safely
+            val token = try {
+                userManager.getUserToken()
+            } catch (e: Exception) {
+                Log.e("AuthInterceptor", "❌ Error getting token from UserManager", e)
+                null
+            }
+            
+            // Debug token content
+            Log.d("AuthInterceptor", "Raw token length: ${token?.length ?: 0}")
+            Log.d("AuthInterceptor", "Token is null: ${token == null}")
+            Log.d("AuthInterceptor", "Token is blank: ${token.isNullOrBlank()}")
+            
+            if (!token.isNullOrBlank()) {
+                // Clean the token - remove any unexpected characters
+                val cleanToken = token.trim().replace("\\s+".toRegex(), " ")
+                
+                Log.d("AuthInterceptor", "Cleaned token length: ${cleanToken.length}")
+                Log.d("AuthInterceptor", "Token preview: '${cleanToken.take(50)}'")
+                
+                // Check if token looks like a JWT (should contain dots)
+                val isJwtFormat = cleanToken.contains(".") && cleanToken.split(".").size == 3
+                Log.d("AuthInterceptor", "Looks like JWT: $isJwtFormat")
+                
+                if (isJwtFormat) {
+                    Log.d("AuthInterceptor", "✅ Adding JWT token to: $url")
+                    val requestWithAuth = originalRequest.newBuilder()
+                        .addHeader("X-Auth-Token", cleanToken)
+                        .build()
+                    return chain.proceed(requestWithAuth)
+                } else {
+                    Log.w("AuthInterceptor", "⚠️ Token doesn't look like valid JWT format")
+                }
+            }
+            
+            Log.w("AuthInterceptor", "⚠️ No valid token available for: $url - proceeding without auth")
             // Proceed without token - let server handle authentication failure
-            chain.proceed(originalRequest)
+            return chain.proceed(originalRequest)
+            
+        } catch (e: Exception) {
+            Log.e("AuthInterceptor", "❌ Critical error in interceptor: ${e.message}", e)
+            // Even if interceptor fails, proceed with the request
+            return chain.proceed(originalRequest)
         }
     }
 }
     
     // Improved token fetching with better error handling and token validation
     suspend fun getCurrentUserToken(): String? {
-        return try {
-            // Check if user is actually logged in first
-            val currentUser = FirebaseAuth.getInstance().currentUser
-            if (currentUser == null) {
-                Log.e("AuthDebug", "❌ No user signed in! Can't fetch token.")
-                userManager.clearUserToken()
-                return null
-            }
+    return try {
+        // Check if user is actually logged in first
+        val currentUser = FirebaseAuth.getInstance().currentUser
+        if (currentUser == null) {
+            Log.e("AuthDebug", "❌ No user signed in! Can't fetch token.")
+            userManager.clearUserToken()
+            return null
+        }
 
-            // Check if we have a valid cached token
-            if (userManager.isTokenValid()) {
-                userManager.getUserToken()?.let { cachedToken ->
-                    if (cachedToken.isNotBlank()) {
-                        Log.d("AuthDebug", "✅ Using cached token")
+        // Check if we have a valid cached token
+        if (userManager.isTokenValid()) {
+            userManager.getUserToken()?.let { cachedToken ->
+                if (cachedToken.isNotBlank()) {
+                    Log.d("AuthDebug", "✅ Using cached token: ${cachedToken.length} chars")
+                    // Verify it's a valid JWT
+                    if (cachedToken.split(".").size == 3) {
                         return cachedToken
+                    } else {
+                        Log.w("AuthDebug", "⚠️ Cached token has invalid JWT format, fetching new one")
                     }
                 }
             }
+        }
 
-            // Fetch new token from Firebase
-            Log.d("AuthDebug", "🔄 Fetching fresh token from Firebase for user: ${currentUser.uid}")
-            val tokenResult = currentUser.getIdToken(true).await()
-            val token = tokenResult.token
+        // Fetch new token from Firebase
+        Log.d("AuthDebug", "🔄 Fetching fresh token from Firebase for user: ${currentUser.uid}")
+        val tokenResult = currentUser.getIdToken(true).await()
+        val token = tokenResult.token
 
-            if (!token.isNullOrBlank()) {
-                userManager.saveUserToken(token)
-                Log.d("AuthDebug", "✅ New token obtained and saved successfully")
-                token
-            } else {
-                Log.e("AuthDebug", "❌ Token is null or empty")
-                userManager.clearUserToken()
-                null
-            }
-        } catch (e: Exception) {
-            Log.e("AuthDebug", "❌ Error fetching Firebase token: ${e.message}")
+        if (!token.isNullOrBlank()) {
+            Log.d("AuthDebug", "✅ New token obtained: ${token.length} chars")
+            userManager.saveUserToken(token) // This will clean and validate
+            userManager.getUserToken() // Return the cleaned version
+        } else {
+            Log.e("AuthDebug", "❌ Token is null or empty")
             userManager.clearUserToken()
             null
         }
+    } catch (e: Exception) {
+        Log.e("AuthDebug", "❌ Error fetching Firebase token: ${e.message}")
+        userManager.clearUserToken()
+        null
     }
+}
 
     // Enhanced Test Connection with better error handling
     suspend fun testConnection(): ApiResult<JSONObject> {
@@ -259,6 +288,23 @@ private suspend fun getTokenSafely(): String? {
     } catch (e: Exception) {
         Log.e("TokenDebug", "❌ Error getting token: ${e.message}")
         null
+    }
+}
+
+    private suspend fun testServerImmediately(): Boolean {
+    return try {
+        val request = Request.Builder()
+            .url("$baseUrl/health")
+            .get()
+            .build()
+        
+        val response = client.newCall(request).execute()
+        val isSuccess = response.isSuccessful
+        Log.d("ServerTest", "Immediate health check: $isSuccess (${response.code})")
+        isSuccess
+    } catch (e: Exception) {
+        Log.e("ServerTest", "Immediate health check failed: ${e.message}")
+        false
     }
 }
 
@@ -458,39 +504,72 @@ private suspend fun getTokenSafely(): String? {
     suspend fun debugAuthenticationFlow(): String {
         val debugInfo = StringBuilder()
         debugInfo.appendLine("=== AUTHENTICATION FLOW DEBUG ===")
+    
+    // 1. Check Firebase Auth State
+    val firebaseUser = FirebaseAuth.getInstance().currentUser
+    debugInfo.appendLine("1. FIREBASE AUTH STATE:")
+    debugInfo.appendLine("   • User ID: ${firebaseUser?.uid ?: "NULL"}")
+    debugInfo.appendLine("   • Email: ${firebaseUser?.email ?: "NULL"}")
+    debugInfo.appendLine("   • Is Email Verified: ${firebaseUser?.isEmailVerified ?: false}")
+    
+    // 2. Check UserManager State with detailed token analysis
+    debugInfo.appendLine("2. USER MANAGER STATE:")
+    debugInfo.appendLine("   • Is User Logged In: ${userManager.isUserLoggedIn()}")
+    debugInfo.appendLine("   • Is Token Valid: ${userManager.isTokenValid()}")
+    
+    val cachedToken = userManager.getUserToken()
+    debugInfo.appendLine("   • Cached Token: ${if (!cachedToken.isNullOrBlank()) "PRESENT (${cachedToken.length} chars)" else "NULL"}")
+    
+    // Detailed token analysis
+    if (!cachedToken.isNullOrBlank()) {
+        debugInfo.appendLine("   • Token Preview (first 50): '${cachedToken.take(50)}'")
+        debugInfo.appendLine("   • Token Preview (last 50): '${cachedToken.takeLast(50)}'")
+        debugInfo.appendLine("   • Contains dots: ${cachedToken.contains(".")}")
+        debugInfo.appendLine("   • Dot count: ${cachedToken.count { it == '.' }}")
+        debugInfo.appendLine("   • Contains spaces: ${cachedToken.contains(" ")}")
+        debugInfo.appendLine("   • Contains newlines: ${cachedToken.contains("\n")}")
         
-        // 1. Check Firebase Auth State
-        val firebaseUser = FirebaseAuth.getInstance().currentUser
-        debugInfo.appendLine("1. FIREBASE AUTH STATE:")
-        debugInfo.appendLine("   • User ID: ${firebaseUser?.uid ?: "NULL"}")
-        debugInfo.appendLine("   • Email: ${firebaseUser?.email ?: "NULL"}")
-        
-        // 2. Check UserManager State
-        debugInfo.appendLine("2. USER MANAGER STATE:")
-        debugInfo.appendLine("   • Is User Logged In: ${userManager.isUserLoggedIn()}")
-        debugInfo.appendLine("   • Is Token Valid: ${userManager.isTokenValid()}")
-        
-        val cachedToken = userManager.getUserToken()
-        debugInfo.appendLine("   • Cached Token: ${if (!cachedToken.isNullOrBlank()) "PRESENT (${cachedToken.length} chars)" else "NULL"}")
-        debugInfo.appendLine("   • Cached Token Preview: ${cachedToken?.take(30) ?: "NULL"}...")
-        
-        // 3. Test Token Generation
-        debugInfo.appendLine("3. TOKEN GENERATION TEST:")
-        try {
-            val newToken = getCurrentUserToken()
-            debugInfo.appendLine("   • New Token Generated: ${!newToken.isNullOrBlank()}")
-            debugInfo.appendLine("   • New Token Preview: ${newToken?.take(30) ?: "NULL"}...")
+        // Check JWT structure
+        val parts = cachedToken.split(".")
+        debugInfo.appendLine("   • JWT Parts: ${parts.size}")
+        if (parts.size == 3) {
+            debugInfo.appendLine("   • Header length: ${parts[0].length}")
+            debugInfo.appendLine("   • Payload length: ${parts[1].length}")
+            debugInfo.appendLine("   • Signature length: ${parts[2].length}")
+        }
+    } else {
+        debugInfo.appendLine("   • Cached Token Preview: NULL")
+    }
+    
+    // 3. Test Token Generation
+    debugInfo.appendLine("3. TOKEN GENERATION TEST:")
+    try {
+        val newToken = getCurrentUserToken()
+        debugInfo.appendLine("   • New Token Generated: ${!newToken.isNullOrBlank()}")
+        if (!newToken.isNullOrBlank()) {
+            debugInfo.appendLine("   • New Token Length: ${newToken.length} chars")
+            debugInfo.appendLine("   • New Token Preview: '${newToken.take(50)}'")
             
             // Compare with cached token
             if (cachedToken != null && newToken != null) {
                 debugInfo.appendLine("   • Token Changed: ${cachedToken != newToken}")
+                debugInfo.appendLine("   • Same Length: ${cachedToken.length == newToken.length}")
             }
-        } catch (e: Exception) {
-            debugInfo.appendLine("   • ❌ Token Generation Failed: ${e.message}")
+        } else {
+            debugInfo.appendLine("   • New Token Preview: NULL")
         }
-        
-        // 4. Test Public Endpoints (No Auth Required)
-        debugInfo.appendLine("4. PUBLIC ENDPOINT TEST:")
+    } catch (e: Exception) {
+        debugInfo.appendLine("   • ❌ Token Generation Failed: ${e.message}")
+    }
+    
+    // 4. Test Server Connection First
+    debugInfo.appendLine("4. SERVER CONNECTION TEST:")
+    val serverAwake = waitForServerWakeUp(maxAttempts = 3, delayBetweenAttempts = 3000L)
+    debugInfo.appendLine("   • Server Ready: $serverAwake")
+    
+    if (serverAwake) {
+        // 5. Test Public Endpoints (No Auth Required)
+        debugInfo.appendLine("5. PUBLIC ENDPOINT TEST:")
         val publicEndpoints = listOf("/health", "/test", "/", "/api")
         for (endpoint in publicEndpoints) {
             try {
@@ -502,38 +581,45 @@ private suspend fun getTokenSafely(): String? {
                 val response = client.newCall(request).execute()
                 debugInfo.appendLine("   • $endpoint → HTTP ${response.code} ${if (response.isSuccessful) "✅" else "❌"}")
                 
-                if (!response.isSuccessful) {
-                    debugInfo.appendLine("     Error: ${response.body?.string()?.take(100)}")
+                if (response.isSuccessful) {
+                    val body = response.body?.string()?.take(100)
+                    debugInfo.appendLine("     Response: $body")
                 }
             } catch (e: Exception) {
                 debugInfo.appendLine("   • $endpoint → ❌ Exception: ${e.message}")
             }
         }
         
-        // 5. Test Authenticated Endpoint with Manual HTTP
-        debugInfo.appendLine("5. MANUAL AUTHENTICATED TEST:")
+        // 6. Test Authentication with Server
+        debugInfo.appendLine("6. AUTHENTICATION TEST:")
         val currentToken = getCurrentUserToken()
         if (!currentToken.isNullOrBlank()) {
             try {
-                // Test without interceptor (raw HTTP)
-                val simpleClient = OkHttpClient()
+                // Test the debug-auth endpoint specifically
                 val authRequest = Request.Builder()
-                    .url("$baseUrl/user/credits")
+                    .url("$baseUrl/debug-auth")
                     .get()
-                    .addHeader("X-Auth-Token", "Bearer $currentToken")
-                    .addHeader("User-Agent", "Manual-Debug")
+                    .addHeader("X-Auth-Token", currentToken)
+                    .addHeader("User-Agent", "Debug-Auth-Test")
                     .build()
                 
-                val response = simpleClient.newCall(authRequest).execute()
-                debugInfo.appendLine("   • Manual /user/credits → HTTP ${response.code}")
-                debugInfo.appendLine("   • Response Body: ${response.body?.string()?.take(200)}")
+                val response = client.newCall(authRequest).execute()
+                debugInfo.appendLine("   • Debug Auth Endpoint → HTTP ${response.code}")
+                
+                if (response.isSuccessful) {
+                    val body = response.body?.string()
+                    debugInfo.appendLine("   • ✅ AUTH SUCCESS! Response: $body")
+                } else {
+                    debugInfo.appendLine("   • ❌ AUTH FAILED: ${response.message}")
+                    debugInfo.appendLine("   • Response Body: ${response.body?.string()}")
+                }
                 
             } catch (e: Exception) {
-                debugInfo.appendLine("   • ❌ Manual Test Failed: ${e.message}")
+                debugInfo.appendLine("   • ❌ Auth Test Exception: ${e.message}")
             }
             
             // Test with our API service (through interceptor)
-            debugInfo.appendLine("6. API SERVICE TEST (Through Interceptor):")
+            debugInfo.appendLine("7. API SERVICE TEST (Through Interceptor):")
             try {
                 val creditsResult = getUserCredits()
                 when (creditsResult) {
@@ -550,13 +636,16 @@ private suspend fun getTokenSafely(): String? {
         } else {
             debugInfo.appendLine("   • ⚠️ Skipping - No token available")
         }
-        
-        debugInfo.appendLine("=== END DEBUG ===")
-        
-        val result = debugInfo.toString()
-        Log.d("AuthDebug", result)
-        return result
+    } else {
+        debugInfo.appendLine("   • ⚠️ Skipping further tests - Server not ready")
     }
+    
+    debugInfo.appendLine("=== END DEBUG ===")
+    
+    val result = debugInfo.toString()
+    Log.d("AuthDebug", result)
+    return result
+}
 
     // Utilities
     private fun uriToFile(uri: Uri): File {
