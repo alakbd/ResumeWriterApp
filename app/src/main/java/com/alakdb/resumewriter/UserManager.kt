@@ -147,8 +147,8 @@ class UserManager(private val context: Context) {
     fun saveUserToken(token: String) {
         val cleanedToken = cleanAndValidateToken(token)
         if (cleanedToken != null) {
-            sharedPreferences.edit().putString("user_token", cleanedToken).apply()
-            sharedPreferences.edit().putLong("token_timestamp", System.currentTimeMillis()).apply()
+            prefs.edit().putString(FIREBASE_TOKEN_KEY, cleanedToken).apply()
+            prefs.edit().putLong("token_timestamp", System.currentTimeMillis()).apply()
             Log.d("UserManager", "✅ Token saved and cleaned: ${cleanedToken.length} chars")
         } else {
             Log.e("UserManager", "❌ Invalid token format, not saving")
