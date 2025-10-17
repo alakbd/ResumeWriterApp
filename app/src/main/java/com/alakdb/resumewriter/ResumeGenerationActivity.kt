@@ -53,11 +53,9 @@ class ResumeGenerationActivity : AppCompatActivity() {
         auth = FirebaseAuth.getInstance()
 
         // Debug calls
-        comprehensiveAuthDebug()
-        testServerDirectly()
-        forceTokenRefreshAndTest()
     
-        debugAuthState()
+    
+
         registerFilePickers()
         setupUI()
         checkGenerateButtonState()
