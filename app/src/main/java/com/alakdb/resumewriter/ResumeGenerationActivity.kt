@@ -20,6 +20,7 @@ import com.alakdb.resumewriter.databinding.ActivityResumeGenerationBinding
 import com.google.firebase.auth.FirebaseAuth
 import kotlinx.coroutines.*
 import org.json.JSONObject
+import java.util.concurrent.TimeUnit
 import java.io.File
 import okhttp3.OkHttpClient
 import okhttp3.Request
