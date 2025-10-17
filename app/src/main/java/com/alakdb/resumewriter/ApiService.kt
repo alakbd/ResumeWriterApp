@@ -551,10 +551,10 @@ private suspend fun getTokenSafely(): String? {
             debugInfo.appendLine("   • New Token Preview: '${newToken.take(50)}'")
             
             // Compare with cached token
-            if (cachedToken != null && newToken != null) {
+            if (cachedToken != null) {
                 debugInfo.appendLine("   • Token Changed: ${cachedToken != newToken}")
                 debugInfo.appendLine("   • Same Length: ${cachedToken.length == newToken.length}")
-            }
+                }
         } else {
             debugInfo.appendLine("   • New Token Preview: NULL")
         }
