@@ -128,7 +128,6 @@ class ResumeGenerationActivity : AppCompatActivity() {
     override fun onResume() {
     super.onResume()
     lifecycleScope.launch {
-        // ✅ Use UserManager to check token instead of calling private ApiService method
         val userManager = UserManager(this@ResumeGenerationActivity)
         val token = userManager.getUserToken()
         val tokenValid = userManager.isTokenValid()
@@ -137,11 +136,29 @@ class ResumeGenerationActivity : AppCompatActivity() {
         Log.d("ResumeActivity", "Token valid: $tokenValid")
         Log.d("ResumeActivity", "User logged in: ${userManager.isUserLoggedIn()}")
         
+        // Quick pre-warm server without UI updates
+        if (isNetworkAvailable()) {
+            launch {
+                try {
+                    // Silent server ping to wake up Render if needed
+                    val result = apiService.testConnection()
+                    if (result is ApiService.ApiResult.Success) {
+                        Log.d("ResumeActivity", "✅ Server is already awake")
+                    } else {
+                        Log.d("ResumeActivity", "🔄 Server might be waking up...")
+                    }
+                } catch (e: Exception) {
+                    Log.d("ResumeActivity", "Pre-warm attempt: ${e.message}")
+                    // Silent fail - this is just for warming up
+                }
+            }
+        }
+        
         // Update credits display (this will test if auth is working)
         updateCreditDisplay()
         
-        // Test server connection
-        testApiConnection()
+        // Only show connection test UI if there's a specific issue
+        checkAndShowConnectionIfNeeded()
     }
 }
 
@@ -215,45 +232,118 @@ class ResumeGenerationActivity : AppCompatActivity() {
 
  
 
-    /** ---------------- API Connection Test ---------------- **/
-    private fun testApiConnection() {
-        binding.layoutConnectionStatus.visibility = View.VISIBLE
-        binding.tvConnectionStatus.text = "Testing connection..."
-        binding.progressConnection.visibility = View.VISIBLE
-        binding.btnRetryConnection.isEnabled = false
+/** ---------------- API Connection Test ---------------- **/
+/** ---------------- Smart Connection Check ---------------- **/
+private fun checkAndShowConnectionIfNeeded() {
+    lifecycleScope.launch {
+        // Only show connection UI if we haven't successfully connected recently
+        val lastSuccessTime = getLastSuccessTime()
+        val timeSinceLastSuccess = System.currentTimeMillis() - lastSuccessTime
+        
+        // If we had a successful connection in the last 5 minutes, don't show connection UI
+        if (timeSinceLastSuccess < 5 * 60 * 1000) {
+            Log.d("ResumeActivity", "Recent successful connection, skipping UI test")
+            return@launch
+        }
+        
+        // Otherwise, test connection with UI
+        testApiConnection()
+    }
+}
 
-        lifecycleScope.launch {
-            if (!isNetworkAvailable()) {
-                updateConnectionStatus("❌ No internet connection", true)
-                binding.progressConnection.visibility = View.GONE
-                binding.btnRetryConnection.isEnabled = true
-                showError("Please check your internet connection")
-                return@launch
-            }
+private fun getLastSuccessTime(): Long {
+    val prefs = getSharedPreferences("app_prefs", Context.MODE_PRIVATE)
+    return prefs.getLong("last_successful_connection", 0)
+}
 
-            try {
-                // ✅ FIXED: Remove warmUpServer call (endpoint doesn't exist)
-                Log.d("ResumeActivity", "Testing API connection directly")
-                val connectionResult = apiService.testConnection()
-                when (connectionResult) {
-                    is ApiService.ApiResult.Success -> {
-                        updateConnectionStatus("✅ API Connected", false)
-                        updateCreditDisplay()
-                    }
-                    is ApiService.ApiResult.Error -> {
+private fun saveSuccessTime() {
+    val prefs = getSharedPreferences("app_prefs", Context.MODE_PRIVATE)
+    prefs.edit().putLong("last_successful_connection", System.currentTimeMillis()).apply()
+}
+
+/** ---------------- Updated Connection Test ---------------- **/
+private fun testApiConnection() {
+    binding.layoutConnectionStatus.visibility = View.VISIBLE
+    binding.tvConnectionStatus.text = "Testing connection..."
+    binding.progressConnection.visibility = View.VISIBLE
+    binding.btnRetryConnection.isEnabled = false
+
+    lifecycleScope.launch {
+        if (!isNetworkAvailable()) {
+            updateConnectionStatus("❌ No internet connection", true)
+            binding.progressConnection.visibility = View.GONE
+            binding.btnRetryConnection.isEnabled = true
+            showError("Please check your internet connection")
+            return@launch
+        }
+
+        try {
+            Log.d("ResumeActivity", "Testing API connection...")
+            
+            // First, test basic connection
+            val connectionResult = apiService.testConnection()
+            
+            when (connectionResult) {
+                is ApiService.ApiResult.Success -> {
+                    updateConnectionStatus("✅ API Connected", false)
+                    saveSuccessTime() // Remember we had a successful connection
+                    updateCreditDisplay()
+                }
+                is ApiService.ApiResult.Error -> {
+                    // Check if it's a server wake-up issue
+                    if (connectionResult.code in 500..599 || connectionResult.code == 0) {
+                        updateConnectionStatus("🔄 Server is waking up...", true)
+                        showServerWakeupMessage()
+                        
+                        // Wait for server to wake up
+                        val serverAwake = apiService.waitForServerWakeUp(maxAttempts = 8, delayBetweenAttempts = 5000L)
+                        
+                        if (serverAwake) {
+                            updateConnectionStatus("✅ Server is ready!", false)
+                            saveSuccessTime()
+                            updateCreditDisplay()
+                        } else {
+                            updateConnectionStatus("⏰ Server taking too long", true)
+                            showError("Render server is taking longer than expected. Please try again in a minute.")
+                        }
+                    } else {
                         updateConnectionStatus("❌ API Connection Failed", true)
-                        showError("API endpoints not responding")
+                        showError("API error: ${connectionResult.message}")
                     }
                 }
-            } catch (e: Exception) {
-                updateConnectionStatus("❌ Connection Error", true)
-                Log.e("ResumeActivity", "Connection test failed", e)
-            } finally {
-                binding.progressConnection.visibility = View.GONE
-                binding.btnRetryConnection.isEnabled = true
             }
+        } catch (e: Exception) {
+            updateConnectionStatus("❌ Connection Error", true)
+            Log.e("ResumeActivity", "Connection test failed", e)
+            showError("Connection failed: ${e.message}")
+        } finally {
+            binding.progressConnection.visibility = View.GONE
+            binding.btnRetryConnection.isEnabled = true
         }
     }
+}
+
+private fun showServerWakeupMessage() {
+    Toast.makeText(
+        this, 
+        "🔄 Server is waking up... This may take 30-60 seconds on first launch.", 
+        Toast.LENGTH_LONG
+    ).show()
+}
+
+/** ---------------- Enhanced Connection Status ---------------- **/
+private fun updateConnectionStatus(message: String, isError: Boolean = false, isWarning: Boolean = false) {
+    binding.tvConnectionStatus.text = message
+    
+    val color = when {
+        isError -> getColor(android.R.color.holo_red_dark)
+        isWarning -> getColor(android.R.color.holo_orange_dark)
+        else -> getColor(android.R.color.holo_green_dark)
+    }
+    
+    binding.tvConnectionStatus.setTextColor(color)
+    Log.d("ResumeActivity", "Connection status: $message")
+}
 
     fun isNetworkAvailable(): Boolean {
         val connectivityManager = getSystemService(Context.CONNECTIVITY_SERVICE) as ConnectivityManager
@@ -339,23 +429,48 @@ class ResumeGenerationActivity : AppCompatActivity() {
     }
 
     private suspend fun <T> retryApiCall(
-        maxRetries: Int = 2,
-        initialDelay: Long = 1000L,
-        block: suspend () -> ApiService.ApiResult<T>
-    ): ApiService.ApiResult<T> {
-        var lastResult: ApiService.ApiResult<T>? = null
-        repeat(maxRetries) { attempt ->
-            val result = block()
-            if (result is ApiService.ApiResult.Success) return result
-            lastResult = result
+    maxRetries: Int = 3,
+    initialDelay: Long = 2000L,
+    block: suspend () -> ApiService.ApiResult<T>
+): ApiService.ApiResult<T> {
+    var lastResult: ApiService.ApiResult<T>? = null
+    
+    repeat(maxRetries) { attempt ->
+        val result = block()
+        
+        if (result is ApiService.ApiResult.Success) {
+            return result
+        }
+        
+        lastResult = result
+        
+        // Handle server wake-up specifically
+        if (result is ApiService.ApiResult.Error) {
+            if (result.code in 500..599) {
+                Log.w("Retry", "Server error detected, waiting for wake-up...")
+                // Wait longer for server wake-up
+                val waitTime = initialDelay * (attempt + 1) * 2 // Exponential backoff
+                Log.d("Retry", "Waiting ${waitTime}ms before retry ${attempt + 1}/$maxRetries")
+                delay(waitTime)
+            } else {
+                // Regular retry for other errors
+                if (attempt < maxRetries - 1) {
+                    val delayTime = initialDelay * (attempt + 1)
+                    Log.d("Retry", "Waiting ${delayTime}ms before retry ${attempt + 1}/$maxRetries")
+                    delay(delayTime)
+                }
+            }
+        } else {
+            // Non-error case (shouldn't happen)
             if (attempt < maxRetries - 1) {
                 val delayTime = initialDelay * (attempt + 1)
-                Log.d("ResumeActivity", "Retry ${attempt + 1}/$maxRetries in ${delayTime}ms")
                 delay(delayTime)
             }
         }
-        return lastResult ?: ApiService.ApiResult.Error("All retry attempts failed")
     }
+    
+    return lastResult ?: ApiService.ApiResult.Error("All retry attempts failed")
+}
 
     /** ---------------- Display & Download ---------------- **/
     private fun displayGeneratedResume(resumeData: JSONObject) {
@@ -635,7 +750,18 @@ private suspend fun updateCreditDisplay() {
         }
     }
 }
-
+    private fun updateConnectionStatus(message: String, isError: Boolean = false, isWarning: Boolean = false) {
+    binding.tvConnectionStatus.text = message
+    
+    val color = when {
+        isError -> getColor(android.R.color.holo_red_dark)
+        isWarning -> getColor(android.R.color.holo_orange_dark)
+        else -> getColor(android.R.color.holo_green_dark)
+    }
+    
+    binding.tvConnectionStatus.setTextColor(color)
+    Log.d("ResumeActivity", "Connection status: $message")
+    }
     
     
     private fun handleGenerationResult(result: ApiService.ApiResult<JSONObject>) {
