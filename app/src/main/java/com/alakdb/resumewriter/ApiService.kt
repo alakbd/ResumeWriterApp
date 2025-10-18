@@ -78,7 +78,7 @@ class ApiService(private val context: Context) {
         
         try {
             // Skip auth for public endpoints
-            val publicEndpoints = listOf("/health", "/test", "/api")
+            val publicEndpoints = listOf("/health", "/test")
             val isPublic = publicEndpoints.any { url.contains(it) }
             
             if (isPublic) {
@@ -242,39 +242,7 @@ class ApiService(private val context: Context) {
 }
 
     
-private suspend fun getTokenSafely(): String? {
-    return try {
-        // First check cached token
-        val cachedToken = userManager.getUserToken()
-        if (!cachedToken.isNullOrBlank() && userManager.isTokenValid()) {
-            Log.d("TokenDebug", "✅ Using cached token")
-            return cachedToken
-        }
-        
-        // Fetch fresh token
-        Log.d("TokenDebug", "🔄 Fetching fresh token")
-        val currentUser = FirebaseAuth.getInstance().currentUser
-        if (currentUser == null) {
-            Log.e("TokenDebug", "❌ No user logged in")
-            return null
-        }
-        
-        val tokenResult = currentUser.getIdToken(true).await()
-        val newToken = tokenResult.token
-        
-        if (!newToken.isNullOrBlank()) {
-            userManager.saveUserToken(newToken)
-            Log.d("TokenDebug", "✅ Fresh token obtained and saved")
-            newToken
-        } else {
-            Log.e("TokenDebug", "❌ Fresh token is null")
-            null
-        }
-    } catch (e: Exception) {
-        Log.e("TokenDebug", "❌ Error getting token: ${e.message}")
-        null
-    }
-}
+
 
     private suspend fun testServerImmediately(): Boolean {
     return try {
@@ -444,7 +412,7 @@ private suspend fun getTokenSafely(): String? {
         Log.d("ApiService", "Getting user credits...")
         
         // Get token safely without causing circular calls
-        val token = getTokenSafely()
+        val token = getCurrentUserToken()
         if (token == null) {
             Log.e("ApiService", "No token available for credits request")
             return ApiResult.Error("Authentication required", 401)
@@ -489,22 +457,6 @@ private suspend fun getTokenSafely(): String? {
     suspend fun debugAuthenticationFlow(): String {
         val debugInfo = StringBuilder()
         debugInfo.appendLine("=== AUTHENTICATION FLOW DEBUG ===")
-    
-    // 1. Check Firebase Auth State
-    val firebaseUser = FirebaseAuth.getInstance().currentUser
-    debugInfo.appendLine("1. FIREBASE AUTH STATE:")
-    debugInfo.appendLine("   • User ID: ${firebaseUser?.uid ?: "NULL"}")
-    debugInfo.appendLine("   • Email: ${firebaseUser?.email ?: "NULL"}")
-    debugInfo.appendLine("   • Is Email Verified: ${firebaseUser?.isEmailVerified ?: false}")
-    
-    // 2. Check UserManager State with detailed token analysis
-    debugInfo.appendLine("2. USER MANAGER STATE:")
-    debugInfo.appendLine("   • Is User Logged In: ${userManager.isUserLoggedIn()}")
-    debugInfo.appendLine("   • Is Token Valid: ${userManager.isTokenValid()}")
-    
-   suspend fun debugAuthenticationFlow(): String {
-    val debugInfo = StringBuilder()
-    debugInfo.appendLine("=== AUTHENTICATION FLOW DEBUG ===")
     
     // 1. Check Firebase Auth State
     val firebaseUser = FirebaseAuth.getInstance().currentUser
