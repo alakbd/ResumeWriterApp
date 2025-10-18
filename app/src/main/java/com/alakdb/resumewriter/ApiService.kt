@@ -6,6 +6,7 @@ import android.util.Log
 import com.google.firebase.auth.FirebaseAuth
 import com.google.gson.Gson
 import kotlinx.coroutines.tasks.await
+import kotlinx.coroutines.runBlocking
 import okhttp3.*
 import okhttp3.MediaType.Companion.toMediaType
 import okhttp3.RequestBody.Companion.toRequestBody
@@ -70,9 +71,9 @@ class ApiService(private val context: Context) {
 
     // Fixed AuthInterceptor
     class AuthInterceptor(private val userManager: UserManager) : Interceptor {
-    override fun intercept(chain: Interceptor.Chain): Response {
-        val originalRequest = chain.request()
-        val url = originalRequest.url.toString()
+        override fun intercept(chain: Interceptor.Chain): Response {
+            val originalRequest = chain.request()
+            val url = originalRequest.url.toString()
 
         // Skip public endpoints
         val publicEndpoints = listOf("/health", "/test")
@@ -80,27 +81,31 @@ class ApiService(private val context: Context) {
             return chain.proceed(originalRequest)
         }
 
-        // Get a valid token (refresh from Firebase if needed)
-        val token = runCatching {
-            runBlocking { // Using runBlocking since intercept is not suspend
-                val currentUser = FirebaseAuth.getInstance().currentUser
-                if (currentUser == null) {
-                    Log.e("AuthInterceptor", "❌ No user signed in")
-                    userManager.clearUserToken()
-                    null
+        // Get token safely
+        val token: String? = runBlocking {
+            val currentUser = FirebaseAuth.getInstance().currentUser
+            if (currentUser == null) {
+                Log.e("AuthInterceptor", "❌ No user signed in")
+                userManager.clearUserToken()
+                null
+            } else {
+                val cachedToken = userManager.getUserToken()
+                val isValidJwt = cachedToken?.split(".")?.size == 3
+                if (!cachedToken.isNullOrBlank() && isValidJwt) {
+                    cachedToken
                 } else {
-                    val cachedToken = userManager.getUserToken()
-                    val isValidJwt = cachedToken?.split(".")?.size == 3
-                    if (isValidJwt) {
-                        cachedToken
+                    Log.d("AuthInterceptor", "🔄 Fetching fresh token from Firebase")
+                    val tokenResult = currentUser.getIdToken(true).await()
+                    val freshToken = tokenResult.token
+                    if (!freshToken.isNullOrBlank()) {
+                        userManager.saveUserToken(freshToken)
+                        freshToken
                     } else {
-                        Log.d("AuthInterceptor", "🔄 Fetching fresh token from Firebase")
-                        val tokenResult = currentUser.getIdToken(true).await()
-                        tokenResult.token?.also { userManager.saveUserToken(it) }
+                        null
                     }
                 }
             }
-        }.getOrNull()
+        }
 
         return if (!token.isNullOrBlank()) {
             chain.proceed(originalRequest.newBuilder()
