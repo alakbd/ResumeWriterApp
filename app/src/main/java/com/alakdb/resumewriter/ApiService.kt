@@ -70,14 +70,14 @@ class ApiService(private val context: Context) {
 
     // Fixed AuthInterceptor
     class AuthInterceptor(private val userManager: UserManager) : Interceptor {
-    override fun intercept(chain: Interceptor.Chain): Response {
-        val originalRequest = chain.request()
-        val url = originalRequest.url.toString()
+        override fun intercept(chain: Interceptor.Chain): Response {
+            val originalRequest = chain.request()
+            val url = originalRequest.url.toString()
         
-        Log.d("AuthInterceptor", "Processing: $url")
+            Log.d("AuthInterceptor", "Processing: $url")
         
         try {
-            // Skip auth for public endpoints - use contains instead of endsWith
+            // Skip auth for public endpoints
             val publicEndpoints = listOf("/health", "/test", "/api")
             val isPublic = publicEndpoints.any { url.contains(it) }
             
@@ -96,6 +96,8 @@ class ApiService(private val context: Context) {
             
             return if (!token.isNullOrBlank()) {
                 Log.d("AuthInterceptor", "✅ Adding auth token to: $url")
+                Log.d("AuthInterceptor", "⚠️ Note: Email may not be verified")
+                
                 val requestWithAuth = originalRequest.newBuilder()
                     .addHeader("X-Auth-Token", token)
                     .build()
@@ -106,7 +108,6 @@ class ApiService(private val context: Context) {
             }
         } catch (e: Exception) {
             Log.e("AuthInterceptor", "❌ Critical error: ${e.message}")
-            // Fallback - proceed without auth
             return chain.proceed(originalRequest)
         }
     }
@@ -501,127 +502,35 @@ private suspend fun getTokenSafely(): String? {
     debugInfo.appendLine("   • Is User Logged In: ${userManager.isUserLoggedIn()}")
     debugInfo.appendLine("   • Is Token Valid: ${userManager.isTokenValid()}")
     
+   suspend fun debugAuthenticationFlow(): String {
+    val debugInfo = StringBuilder()
+    debugInfo.appendLine("=== AUTHENTICATION FLOW DEBUG ===")
+    
+    // 1. Check Firebase Auth State
+    val firebaseUser = FirebaseAuth.getInstance().currentUser
+    debugInfo.appendLine("1. FIREBASE AUTH STATE:")
+    debugInfo.appendLine("   • User ID: ${firebaseUser?.uid ?: "NULL"}")
+    debugInfo.appendLine("   • Email: ${firebaseUser?.email ?: "NULL"}")
+    debugInfo.appendLine("   • Is Email Verified: ${firebaseUser?.isEmailVerified ?: false} ⚠️ THIS IS THE PROBLEM!")
+    
+    // 2. Check UserManager State
+    debugInfo.appendLine("2. USER MANAGER STATE:")
+    debugInfo.appendLine("   • Is User Logged In: ${userManager.isUserLoggedIn()}")
+    debugInfo.appendLine("   • Is Token Valid: ${userManager.isTokenValid()}")
+    
     val cachedToken = userManager.getUserToken()
     debugInfo.appendLine("   • Cached Token: ${if (!cachedToken.isNullOrBlank()) "PRESENT (${cachedToken.length} chars)" else "NULL"}")
     
-    // Detailed token analysis
     if (!cachedToken.isNullOrBlank()) {
-        debugInfo.appendLine("   • Token Preview (first 50): '${cachedToken.take(50)}'")
-        debugInfo.appendLine("   • Token Preview (last 50): '${cachedToken.takeLast(50)}'")
-        debugInfo.appendLine("   • Contains dots: ${cachedToken.contains(".")}")
-        debugInfo.appendLine("   • Dot count: ${cachedToken.count { it == '.' }}")
-        debugInfo.appendLine("   • Contains spaces: ${cachedToken.contains(" ")}")
-        debugInfo.appendLine("   • Contains newlines: ${cachedToken.contains("\n")}")
-        
-        // Check JWT structure
-        val parts = cachedToken.split(".")
-        debugInfo.appendLine("   • JWT Parts: ${parts.size}")
-        if (parts.size == 3) {
-            debugInfo.appendLine("   • Header length: ${parts[0].length}")
-            debugInfo.appendLine("   • Payload length: ${parts[1].length}")
-            debugInfo.appendLine("   • Signature length: ${parts[2].length}")
-        }
-    } else {
-        debugInfo.appendLine("   • Cached Token Preview: NULL")
+        debugInfo.appendLine("   • Token Preview: '${cachedToken.take(50)}'")
     }
     
-    // 3. Test Token Generation
-    debugInfo.appendLine("3. TOKEN GENERATION TEST:")
-    try {
-        val newToken = getCurrentUserToken()
-        debugInfo.appendLine("   • New Token Generated: ${!newToken.isNullOrBlank()}")
-        if (!newToken.isNullOrBlank()) {
-            debugInfo.appendLine("   • New Token Length: ${newToken.length} chars")
-            debugInfo.appendLine("   • New Token Preview: '${newToken.take(50)}'")
-            
-            // Compare with cached token
-            if (cachedToken != null) {
-                debugInfo.appendLine("   • Token Changed: ${cachedToken != newToken}")
-                debugInfo.appendLine("   • Same Length: ${cachedToken.length == newToken.length}")
-                }
-        } else {
-            debugInfo.appendLine("   • New Token Preview: NULL")
-        }
-    } catch (e: Exception) {
-        debugInfo.appendLine("   • ❌ Token Generation Failed: ${e.message}")
-    }
-    
-    // 4. Test Server Connection First
-    debugInfo.appendLine("4. SERVER CONNECTION TEST:")
-    val serverAwake = waitForServerWakeUp(maxAttempts = 3, delayBetweenAttempts = 3000L)
-    debugInfo.appendLine("   • Server Ready: $serverAwake")
-    
-    if (serverAwake) {
-        // 5. Test Public Endpoints (No Auth Required)
-        debugInfo.appendLine("5. PUBLIC ENDPOINT TEST:")
-        val publicEndpoints = listOf("/health", "/test", "/", "/api")
-        for (endpoint in publicEndpoints) {
-            try {
-                val request = Request.Builder()
-                    .url("$baseUrl$endpoint")
-                    .get()
-                    .build()
-                
-                val response = client.newCall(request).execute()
-                debugInfo.appendLine("   • $endpoint → HTTP ${response.code} ${if (response.isSuccessful) "✅" else "❌"}")
-                
-                if (response.isSuccessful) {
-                    val body = response.body?.string()?.take(100)
-                    debugInfo.appendLine("     Response: $body")
-                }
-            } catch (e: Exception) {
-                debugInfo.appendLine("   • $endpoint → ❌ Exception: ${e.message}")
-            }
-        }
-        
-        // 6. Test Authentication with Server
-        debugInfo.appendLine("6. AUTHENTICATION TEST:")
-        val currentToken = getCurrentUserToken()
-        if (!currentToken.isNullOrBlank()) {
-            try {
-                // Test the debug-auth endpoint specifically
-                val authRequest = Request.Builder()
-                    .url("$baseUrl/debug-auth")
-                    .get()
-                    .addHeader("X-Auth-Token", currentToken)
-                    .addHeader("User-Agent", "Debug-Auth-Test")
-                    .build()
-                
-                val response = client.newCall(authRequest).execute()
-                debugInfo.appendLine("   • Debug Auth Endpoint → HTTP ${response.code}")
-                
-                if (response.isSuccessful) {
-                    val body = response.body?.string()
-                    debugInfo.appendLine("   • ✅ AUTH SUCCESS! Response: $body")
-                } else {
-                    debugInfo.appendLine("   • ❌ AUTH FAILED: ${response.message}")
-                    debugInfo.appendLine("   • Response Body: ${response.body?.string()}")
-                }
-                
-            } catch (e: Exception) {
-                debugInfo.appendLine("   • ❌ Auth Test Exception: ${e.message}")
-            }
-            
-            // Test with our API service (through interceptor)
-            debugInfo.appendLine("7. API SERVICE TEST (Through Interceptor):")
-            try {
-                val creditsResult = getUserCredits()
-                when (creditsResult) {
-                    is ApiResult.Success -> {
-                        debugInfo.appendLine("   • ✅ SUCCESS! Data: ${creditsResult.data.toString().take(100)}")
-                    }
-                    is ApiResult.Error -> {
-                        debugInfo.appendLine("   • ❌ FAILED: Code ${creditsResult.code} - ${creditsResult.message}")
-                    }
-                }
-            } catch (e: Exception) {
-                debugInfo.appendLine("   • ❌ API Service Exception: ${e.message}")
-            }
-        } else {
-            debugInfo.appendLine("   • ⚠️ Skipping - No token available")
-        }
-    } else {
-        debugInfo.appendLine("   • ⚠️ Skipping further tests - Server not ready")
+    // 3. Add critical warning about email verification
+    if (firebaseUser != null && !firebaseUser.isEmailVerified) {
+        debugInfo.appendLine("3. ⚠️ CRITICAL ISSUE DETECTED:")
+        debugInfo.appendLine("   • Email is NOT verified: ${firebaseUser.email}")
+        debugInfo.appendLine("   • Firebase tokens for unverified emails may be rejected by server")
+        debugInfo.appendLine("   • SOLUTION: Verify your email or update server to allow unverified emails")
     }
     
     debugInfo.appendLine("=== END DEBUG ===")
