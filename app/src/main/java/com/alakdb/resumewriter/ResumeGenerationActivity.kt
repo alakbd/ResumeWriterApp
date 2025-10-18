@@ -237,9 +237,8 @@ class ResumeGenerationActivity : AppCompatActivity() {
                 .setNegativeButton("Continue Anyway", DialogInterface.OnClickListener { _, _ ->
                     Toast.makeText(this, "Some features may not work without email verification", Toast.LENGTH_LONG).show()
                 })
-                .setNeutralButton("Sign Out", DialogInterface.OnClickListener { _, _ ->
+                .setNeutralButton("Sign Out") { _, _ ->
                     FirebaseAuth.getInstance().signOut()
-                    userManager.clearUserToken()
                     finish()
                 })
 
