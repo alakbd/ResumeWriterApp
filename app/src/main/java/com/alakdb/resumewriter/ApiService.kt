@@ -75,24 +75,32 @@ class ApiService(private val context: Context) {
         val originalRequest = chain.request()
         val url = originalRequest.url.toString()
 
+        // Skip auth for public endpoints
         val publicEndpoints = listOf("/health", "/test")
         if (publicEndpoints.any { url.contains(it) }) {
             return chain.proceed(originalRequest)
         }
 
-        // Get token WITHOUT using runBlocking to avoid circular dependencies
-        val token = userManager.getUserToken()
-        
+        // Get token WITHOUT any blocking operations or coroutines
+        val token = try {
+            userManager.getUserToken()
+        } catch (e: Exception) {
+            Log.e("AuthInterceptor", "Error getting token: ${e.message}")
+            null
+        }
+
+        // If no token, proceed without auth header (let server handle it)
         if (token.isNullOrBlank()) {
-            Log.w("AuthInterceptor", "No token available, request may fail: $url")
+            Log.w("AuthInterceptor", "No token available for: $url")
             return chain.proceed(originalRequest)
         }
 
-        return chain.proceed(
-            originalRequest.newBuilder()
-                .addHeader("X-Auth-Token", token)
-                .build()
-        )
+        // Add token header and proceed
+        val newRequest = originalRequest.newBuilder()
+            .addHeader("X-Auth-Token", token)
+            .build()
+            
+        return chain.proceed(newRequest)
     }
 }
     
@@ -392,7 +400,7 @@ class ApiService(private val context: Context) {
                 Log.e("ApiService", "Failed to fetch credits: HTTP ${response.code}")
                 
                 if (response.code == 401) {
-                    return ApiResult.Error("Authentication failed - please log in again", 401)
+                    return ApiResult.Error("Authentication failed", 401)
                 }
                 
                 return ApiResult.Error(
