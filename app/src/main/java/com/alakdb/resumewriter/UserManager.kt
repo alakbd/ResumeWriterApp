@@ -8,14 +8,12 @@ import com.google.firebase.auth.FirebaseAuthInvalidCredentialsException
 import com.google.firebase.auth.FirebaseAuthInvalidUserException
 import com.google.firebase.auth.FirebaseAuthUserCollisionException
 import com.google.firebase.auth.FirebaseAuthWeakPasswordException
-import kotlinx.coroutines.tasks.await
 import android.util.Log
-
 
 class UserManager(private val context: Context) {
 
     private val prefs: SharedPreferences =
-    context.getSharedPreferences("user_prefs", Context.MODE_PRIVATE)
+        context.getSharedPreferences("user_prefs", Context.MODE_PRIVATE)
     private val auth: FirebaseAuth = FirebaseAuth.getInstance()
     private val db: FirebaseFirestore = FirebaseFirestore.getInstance()
 
@@ -23,9 +21,8 @@ class UserManager(private val context: Context) {
         private const val USER_EMAIL_KEY = "user_email"
         private const val USER_ID_KEY = "user_id"
         private const val IS_REGISTERED_KEY = "is_registered"
-        private const val FIREBASE_TOKEN_KEY = "firebase_token"
-        private const val TOKEN_TIMESTAMP_KEY = "token_timestamp"
         private const val AVAILABLE_CREDITS_KEY = "available_credits"
+        // NO TOKEN CONSTANTS - WE DON'T NEED THEM ANYMORE
     }
 
     /** Register a new user */
@@ -119,103 +116,16 @@ class UserManager(private val context: Context) {
             }
     }
 
-    fun cleanAndValidateToken(token: String?): String? {
-    if (token.isNullOrBlank()) return null
-    
-    // Remove any extra whitespace, newlines, or quotes
-    var cleaned = token.trim()
-        .replace("\n", "")
-        .replace("\"", "")
-        .replace("\\s+".toRegex(), " ")
-    
-    // Check if it's a valid JWT format (should have 3 parts separated by dots)
-    val parts = cleaned.split(".")
-    if (parts.size != 3) {
-        Log.w("TokenClean", "⚠️ Token doesn't have 3 JWT parts, has: ${parts.size}")
-        return null
-    }
-    
-    Log.d("TokenClean", "✅ Token cleaned successfully")
-    Log.d("TokenClean", "Header: ${parts[0].length} chars")
-    Log.d("TokenClean", "Payload: ${parts[1].length} chars") 
-    Log.d("TokenClean", "Signature: ${parts[2].length} chars")
-    
-    return cleaned
-}
-    
-    /** User token stored in consistent SharedPreferences */
-    fun saveUserToken(token: String) {
-        val cleanedToken = cleanAndValidateToken(token)
-        if (cleanedToken != null) {
-            prefs.edit().putString(FIREBASE_TOKEN_KEY, cleanedToken).apply()
-            prefs.edit().putLong("token_timestamp", System.currentTimeMillis()).apply()
-            Log.d("UserManager", "✅ Token saved and cleaned: ${cleanedToken.length} chars")
-        } else {
-            Log.e("UserManager", "❌ Invalid token format, not saving")
-            clearUserToken()
-        }
-    }
-
-    fun getUserToken(): String? {
-        return prefs.getString(FIREBASE_TOKEN_KEY, null).also { token ->
-            if (token == null) {
-                Log.d("UserManager", "No token found in SharedPreferences")
-            } else {
-                Log.d("UserManager", "Token retrieved from SharedPreferences")
-            }
-        }
-    }
-
-    /** Enhanced token management with expiration check */
-    fun isTokenValid(): Boolean {
-        val token = getUserToken()
-        val timestamp = prefs.getLong(TOKEN_TIMESTAMP_KEY, 0L)
-        
-        if (token == null) {
-            Log.d("UserManager", "Token is null")
-            return false
-        }
-        
-        // Check if token is older than 55 minutes (Firebase tokens typically expire in 1 hour)
-        val tokenAge = System.currentTimeMillis() - timestamp
-        val isExpired = tokenAge > 55 * 60 * 1000 // 55 minutes in milliseconds
-        
-        if (isExpired) {
-            Log.d("UserManager", "Token is expired (age: ${tokenAge / 1000 / 60} minutes)")
-            clearUserToken()
-            return false
-        }
-        
-        Log.d("UserManager", "Token is valid (age: ${tokenAge / 1000 / 60} minutes)")
-        return true
-    }
-
-    fun clearUserToken() {
-        prefs.edit().remove(FIREBASE_TOKEN_KEY).remove(TOKEN_TIMESTAMP_KEY).apply()
-        Log.d("UserManager", "Token cleared from SharedPreferences")
-    }
-
-    /** Check if user is logged in with token validation */
+    /** Check if user is logged in - SIMPLIFIED for UID-based auth */
     fun isUserLoggedIn(): Boolean {
         val hasFirebaseUser = auth.currentUser != null
         val isRegistered = prefs.getBoolean(IS_REGISTERED_KEY, false)
-        val hasValidToken = isTokenValid()
+        val hasUserId = getCurrentUserId() != null
         
-        Log.d("UserManager", "Login check - Firebase: $hasFirebaseUser, Registered: $isRegistered, ValidToken: $hasValidToken")
+        Log.d("UserManager", "Login check - Firebase: $hasFirebaseUser, Registered: $isRegistered, HasUserID: $hasUserId")
         
-        return hasFirebaseUser && isRegistered && hasValidToken
-    }
-
-    suspend fun refreshTokenIfNeeded(): String? {
-        return if (isTokenValid()) {
-            getUserToken()
-        } else {
-            val user = auth.currentUser ?: return null
-            val tokenResult = user.getIdToken(true).await()
-            val token = tokenResult.token
-            token?.let { saveUserToken(it) } // 'it' refers to token
-            token
-        }
+        // For UID-based auth, we only need Firebase user and registration status
+        return hasFirebaseUser && isRegistered && hasUserId
     }
 
     /** Get current user email */
@@ -223,9 +133,15 @@ class UserManager(private val context: Context) {
         return prefs.getString(USER_EMAIL_KEY, null)
     }
 
-    /** Get current user ID */
+    /** Get current user ID - CRITICAL for UID-based auth */
     fun getCurrentUserId(): String? {
-        return prefs.getString(USER_ID_KEY, null)
+        return prefs.getString(USER_ID_KEY, null).also { userId ->
+            if (userId == null) {
+                Log.d("UserManager", "No user ID found in SharedPreferences")
+            } else {
+                Log.d("UserManager", "User ID retrieved: ${userId.take(8)}...")
+            }
+        }
     }
 
     /** Get current user from Firebase Auth */
@@ -289,7 +205,7 @@ class UserManager(private val context: Context) {
             putBoolean(IS_REGISTERED_KEY, true)
             apply()
         }
-        Log.d("UserManager", "User data saved locally: $email")
+        Log.d("UserManager", "User data saved locally: $email (UID: ${uid.take(8)}...)")
     }
 
     /** Debug method to check all stored data */
@@ -300,7 +216,6 @@ class UserManager(private val context: Context) {
             Log.d("UserManager", "$key: $value")
         }
         Log.d("UserManager", "Firebase current user: ${auth.currentUser?.uid ?: "null"}")
-        Log.d("UserManager", "Token valid: ${isTokenValid()}")
         Log.d("UserManager", "User logged in: ${isUserLoggedIn()}")
         Log.d("UserManager", "=== End Stored Data ===")
     }
@@ -317,30 +232,7 @@ class UserManager(private val context: Context) {
             }
     }
 
-    /** Force refresh Firebase token */
-    fun refreshFirebaseToken(onComplete: (String?) -> Unit) {
-        val user = auth.currentUser
-        if (user == null) {
-            onComplete(null)
-            return
-        }
-
-        user.getIdToken(true)
-            .addOnCompleteListener { task ->
-                if (task.isSuccessful) {
-                    val token = task.result?.token
-                    if (token != null) {
-                        saveUserToken(token)
-                        Log.d("UserManager", "Firebase token refreshed successfully")
-                        onComplete(token)
-                    } else {
-                        Log.e("UserManager", "Refreshed token is null")
-                        onComplete(null)
-                    }
-                } else {
-                    Log.e("UserManager", "Failed to refresh token: ${task.exception?.message}")
-                    onComplete(null)
-                }
-            }
-    }
+    // ========== NO TOKEN METHODS - COMPLETELY REMOVED ==========
+    // We don't need any token methods for UID-based authentication
+    // The SecureAuthInterceptor uses getCurrentUserId() directly
 }
