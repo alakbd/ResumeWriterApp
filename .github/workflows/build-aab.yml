@@ -92,6 +92,4 @@ jobs:
           path: app/build/outputs/bundle/release/app-release.aab
 
      
-        with:
-          name: network-log
-          path: '**/network_log.txt'
+    
