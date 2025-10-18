@@ -70,91 +70,76 @@ class ApiService(private val context: Context) {
 
     // Fixed AuthInterceptor
     class AuthInterceptor(private val userManager: UserManager) : Interceptor {
-        override fun intercept(chain: Interceptor.Chain): Response {
-            val originalRequest = chain.request()
-            val url = originalRequest.url.toString()
-        
-            Log.d("AuthInterceptor", "Processing: $url")
-        
-        try {
-            // Skip auth for public endpoints
-            val publicEndpoints = listOf("/health", "/test")
-            val isPublic = publicEndpoints.any { url.contains(it) }
-            
-            if (isPublic) {
-                Log.d("AuthInterceptor", "✅ Public endpoint - no auth needed: $url")
-                return chain.proceed(originalRequest)
-            }
-            
-            // For authenticated endpoints, get token safely
-            val token = try {
-                userManager.getUserToken()
-            } catch (e: Exception) {
-                Log.e("AuthInterceptor", "❌ Error getting token: ${e.message}")
-                null
-            }
-            
-            return if (!token.isNullOrBlank()) {
-                Log.d("AuthInterceptor", "✅ Adding auth token to: $url")
-                Log.d("AuthInterceptor", "⚠️ Note: Email may not be verified")
-                
-                val requestWithAuth = originalRequest.newBuilder()
-                    .addHeader("X-Auth-Token", token)
-                    .build()
-                chain.proceed(requestWithAuth)
-            } else {
-                Log.w("AuthInterceptor", "⚠️ No token available for: $url - proceeding without auth")
-                chain.proceed(originalRequest)
-            }
-        } catch (e: Exception) {
-            Log.e("AuthInterceptor", "❌ Critical error: ${e.message}")
+    override fun intercept(chain: Interceptor.Chain): Response {
+        val originalRequest = chain.request()
+        val url = originalRequest.url.toString()
+
+        // Skip public endpoints
+        val publicEndpoints = listOf("/health", "/test")
+        if (publicEndpoints.any { url.contains(it) }) {
             return chain.proceed(originalRequest)
+        }
+
+        // Get a valid token (refresh from Firebase if needed)
+        val token = runCatching {
+            runBlocking { // Using runBlocking since intercept is not suspend
+                val currentUser = FirebaseAuth.getInstance().currentUser
+                if (currentUser == null) {
+                    Log.e("AuthInterceptor", "❌ No user signed in")
+                    userManager.clearUserToken()
+                    null
+                } else {
+                    val cachedToken = userManager.getUserToken()
+                    val isValidJwt = cachedToken?.split(".")?.size == 3
+                    if (isValidJwt) {
+                        cachedToken
+                    } else {
+                        Log.d("AuthInterceptor", "🔄 Fetching fresh token from Firebase")
+                        val tokenResult = currentUser.getIdToken(true).await()
+                        tokenResult.token?.also { userManager.saveUserToken(it) }
+                    }
+                }
+            }
+        }.getOrNull()
+
+        return if (!token.isNullOrBlank()) {
+            chain.proceed(originalRequest.newBuilder()
+                .addHeader("X-Auth-Token", token)
+                .build()
+            )
+        } else {
+            Log.w("AuthInterceptor", "⚠️ No token available for: $url")
+            chain.proceed(originalRequest)
         }
     }
 }
     
     // Improved token fetching with better error handling and token validation
-    suspend fun getCurrentUserToken(): String? {
-    return try {
-        // Check if user is actually logged in first
-        val currentUser = FirebaseAuth.getInstance().currentUser
-        if (currentUser == null) {
-            Log.e("AuthDebug", "❌ No user signed in! Can't fetch token.")
-            userManager.clearUserToken()
+    suspend fun getCurrentUserToken(forceRefresh: Boolean = false): String? {
+        return try {
+            val currentUser = FirebaseAuth.getInstance().currentUser ?: run {
+                userManager.clearUserToken()
             return null
         }
 
-        // Check if we have a valid cached token
-        if (userManager.isTokenValid()) {
-            userManager.getUserToken()?.let { cachedToken ->
-                if (cachedToken.isNotBlank()) {
-                    Log.d("AuthDebug", "✅ Using cached token: ${cachedToken.length} chars")
-                    // Verify it's a valid JWT
-                    if (cachedToken.split(".").size == 3) {
-                        return cachedToken
-                    } else {
-                        Log.w("AuthDebug", "⚠️ Cached token has invalid JWT format, fetching new one")
-                    }
-                }
-            }
+        val cachedToken = userManager.getUserToken()
+        if (!forceRefresh && cachedToken?.split(".")?.size == 3) {
+            Log.d("AuthDebug", "Using cached token")
+            return cachedToken
         }
 
-        // Fetch new token from Firebase
-        Log.d("AuthDebug", "🔄 Fetching fresh token from Firebase for user: ${currentUser.uid}")
+        Log.d("AuthDebug", "Fetching fresh token from Firebase")
         val tokenResult = currentUser.getIdToken(true).await()
         val token = tokenResult.token
-
         if (!token.isNullOrBlank()) {
-            Log.d("AuthDebug", "✅ New token obtained: ${token.length} chars")
-            userManager.saveUserToken(token) // This will clean and validate
-            userManager.getUserToken() // Return the cleaned version
+            userManager.saveUserToken(token)
+            token
         } else {
-            Log.e("AuthDebug", "❌ Token is null or empty")
             userManager.clearUserToken()
             null
         }
     } catch (e: Exception) {
-        Log.e("AuthDebug", "❌ Error fetching Firebase token: ${e.message}")
+        Log.e("AuthDebug", "Error fetching token: ${e.message}")
         userManager.clearUserToken()
         null
     }
