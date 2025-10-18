@@ -138,6 +138,9 @@ class ResumeGenerationActivity : AppCompatActivity() {
         
         // Add a small delay to ensure everything is initialized
         delay(500)
+
+        // Refresh token first
+        refreshAuthTokenIfNeeded()
         
         // Update credits display (this will test if auth is working)
         updateCreditDisplay()
@@ -519,31 +522,8 @@ class ResumeGenerationActivity : AppCompatActivity() {
 
     /** ---------------- Credit Display ---------------- **/
     private suspend fun updateCreditDisplay() {
-    Log.d("ResumeActivity", "Fetching user credits...")
+        Log.d("ResumeActivity", "Fetching user credits...")
 
-    // Use the class-level userManager, not a new instance
-    var token = userManager.getUserToken()
-    if (token.isNullOrEmpty()) {
-        Log.w("ResumeActivity", "No auth token found — attempting to refresh.")
-        FirebaseAuth.getInstance().currentUser?.getIdToken(true)?.addOnSuccessListener {
-            it.token?.let { newToken ->
-                userManager.saveUserToken(newToken) // Using class-level userManager
-                Log.d("ResumeActivity", "Token refreshed successfully.")
-            }
-        }
-        // Optional: short delay to give the refresh a moment
-        delay(500)
-        token = userManager.getUserToken()
-        if (token.isNullOrEmpty()) {
-            Log.e("ResumeActivity", "Still no token available, aborting credit fetch.")
-            withContext(Dispatchers.Main) {
-                binding.creditText.text = "Credits: --"
-            }
-            return
-        }
-    }
-
-    // ✅ Proceed with normal API call
     when (val result = apiService.getUserCredits()) {
         is ApiService.ApiResult.Success -> {
             val credits = result.data.optInt("available_credits", 0)
@@ -558,13 +538,30 @@ class ResumeGenerationActivity : AppCompatActivity() {
             Log.e("ResumeActivity", "Failed to fetch credits: ${result.message}")
             withContext(Dispatchers.Main) {
                 binding.creditText.text = "Credits: --"
-                Toast.makeText(
-                    this@ResumeGenerationActivity,
-                    result.message,
-                    Toast.LENGTH_SHORT
-                ).show()
+                if (result.code == 401) {
+                    Toast.makeText(
+                        this@ResumeGenerationActivity,
+                        "Authentication failed. Please log in again.",
+                        Toast.LENGTH_SHORT
+                    ).show()
+                }
             }
         }
+    }
+}
+
+    private suspend fun refreshAuthTokenIfNeeded() {
+    try {
+        val currentUser = FirebaseAuth.getInstance().currentUser
+        if (currentUser != null) {
+            val tokenResult = currentUser.getIdToken(true).await()
+            tokenResult.token?.let { newToken ->
+                userManager.saveUserToken(newToken)
+                Log.d("ResumeActivity", "Token refreshed successfully")
+            }
+        }
+    } catch (e: Exception) {
+        Log.e("ResumeActivity", "Failed to refresh token: ${e.message}")
     }
 }
 
