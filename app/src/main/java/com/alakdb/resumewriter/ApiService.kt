@@ -71,51 +71,50 @@ class ApiService(private val context: Context) {
 
     // Fixed AuthInterceptor
     class AuthInterceptor(private val userManager: UserManager) : Interceptor {
-        override fun intercept(chain: Interceptor.Chain): Response {
-            val originalRequest = chain.request()
-            val url = originalRequest.url.toString()
+    override fun intercept(chain: Interceptor.Chain): Response {
+        val originalRequest = chain.request()
+        val url = originalRequest.url.toString()
 
-        // Skip public endpoints
         val publicEndpoints = listOf("/health", "/test")
         if (publicEndpoints.any { url.contains(it) }) {
             return chain.proceed(originalRequest)
         }
 
-        // Get token safely
-        val token: String? = runBlocking {
-            val currentUser = FirebaseAuth.getInstance().currentUser
-            if (currentUser == null) {
-                Log.e("AuthInterceptor", "❌ No user signed in")
-                userManager.clearUserToken()
-                null
-            } else {
-                val cachedToken = userManager.getUserToken()
-                val isValidJwt = cachedToken?.split(".")?.size == 3
-                if (!cachedToken.isNullOrBlank() && isValidJwt) {
-                    cachedToken
+        val token: String? = try {
+            runBlocking {
+                val currentUser = FirebaseAuth.getInstance().currentUser
+                if (currentUser == null) {
+                    Log.e("AuthInterceptor", "❌ No user signed in")
+                    userManager.clearUserToken()
+                    null
                 } else {
-                    Log.d("AuthInterceptor", "🔄 Fetching fresh token from Firebase")
-                    val tokenResult = currentUser.getIdToken(true).await()
-                    val freshToken = tokenResult.token
-                    if (!freshToken.isNullOrBlank()) {
-                        userManager.saveUserToken(freshToken)
-                        freshToken
-                    } else {
-                        null
+                    userManager.getUserToken() ?: run {
+                        val tokenResult = try {
+                            currentUser.getIdToken(true).await()
+                        } catch (e: Exception) {
+                            Log.e("AuthInterceptor", "Firebase token fetch failed: ${e.message}")
+                            null
+                        }
+                        tokenResult?.token?.also { userManager.saveUserToken(it) }
                     }
                 }
             }
+        } catch (e: Exception) {
+            Log.e("AuthInterceptor", "Interceptor failed: ${e.message}")
+            null
         }
 
-        return if (!token.isNullOrBlank()) {
-            chain.proceed(originalRequest.newBuilder()
+        if (token.isNullOrBlank()) {
+            Log.w("AuthInterceptor", "No token available, request may fail: $url")
+            // Optionally, you could throw an exception or proceed with a placeholder header
+            return chain.proceed(originalRequest)
+        }
+
+        return chain.proceed(
+            originalRequest.newBuilder()
                 .addHeader("X-Auth-Token", token)
                 .build()
-            )
-        } else {
-            Log.w("AuthInterceptor", "⚠️ No token available for: $url")
-            chain.proceed(originalRequest)
-        }
+        )
     }
 }
     
