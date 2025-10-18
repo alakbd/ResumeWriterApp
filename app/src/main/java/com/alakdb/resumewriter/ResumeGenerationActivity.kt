@@ -240,7 +240,7 @@ class ResumeGenerationActivity : AppCompatActivity() {
                 .setNeutralButton("Sign Out") { _, _ ->
                     FirebaseAuth.getInstance().signOut()
                     finish()
-                })
+                }
 
             val dialog = builder.create()
             dialog.show()
