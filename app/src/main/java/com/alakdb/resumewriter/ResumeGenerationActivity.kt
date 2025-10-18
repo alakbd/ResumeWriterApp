@@ -54,6 +54,7 @@ class ResumeGenerationActivity : AppCompatActivity() {
         auth = FirebaseAuth.getInstance()
 
         // Debug calls
+        checkEmailVerification()
         registerFilePickers()
         setupUI()
         checkGenerateButtonState()
@@ -216,7 +217,43 @@ class ResumeGenerationActivity : AppCompatActivity() {
             else -> "Generate Resume"
         }
     }
+ /** ---------------- Check email/email sending Verification ---------------- **/
+    private fun checkEmailVerification() {
+    val user = FirebaseAuth.getInstance().currentUser
+    if (user != null && !user.isEmailVerified) {
+        Log.w("AuthDebug", "⚠️ Email is not verified: ${user.email}")
+        
+        // Show a warning to the user
+        AlertDialog.Builder(this)
+            .setTitle("Email Verification Required")
+            .setMessage("Your email ${user.email} is not verified. Some features may not work properly. Please check your email for verification link.")
+            .setPositiveButton("Send Verification") { _, _ ->
+                sendEmailVerification()
+            }
+            .setNegativeButton("Continue Anyway") { _, _ ->
+                // User chooses to continue without verification
+                Toast.makeText(this, "Some features may not work without email verification", Toast.LENGTH_LONG).show()
+            }
+            .setNeutralButton("Sign Out") { _, _ ->
+                FirebaseAuth.getInstance().signOut()
+                userManager.clearUserToken()
+                finish()
+            }
+            .show()
+    }
+}
 
+    private fun sendEmailVerification() {
+    val user = FirebaseAuth.getInstance().currentUser
+    user?.sendEmailVerification()?.addOnCompleteListener { task ->
+        if (task.isSuccessful) {
+            Toast.makeText(this, "Verification email sent to ${user.email}", Toast.LENGTH_LONG).show()
+        } else {
+            Toast.makeText(this, "Failed to send verification email", Toast.LENGTH_SHORT).show()
+        }
+    }
+}
+    
     /** ---------------- API Connection Test ---------------- **/
     private fun testApiConnection() {
         binding.layoutConnectionStatus.visibility = View.VISIBLE
