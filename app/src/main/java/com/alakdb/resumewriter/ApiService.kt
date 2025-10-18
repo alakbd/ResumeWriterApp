@@ -3,9 +3,7 @@ package com.alakdb.resumewriter
 import android.content.Context
 import android.net.Uri
 import android.util.Log
-import com.google.firebase.auth.FirebaseAuth
 import com.google.gson.Gson
-import kotlinx.coroutines.tasks.await
 import okhttp3.*
 import okhttp3.MediaType.Companion.toMediaType
 import okhttp3.RequestBody.Companion.toRequestBody
@@ -22,8 +20,8 @@ class ApiService(private val context: Context) {
     private val baseUrl = "https://resume-writer-api.onrender.com"
     private val userManager = UserManager(context)
     
-    // Security configuration - in production, store this securely
-    private val appSecretKey = "your-secret-key-change-in-production"
+    // ✅ FIXED: Use BuildConfig as you had before
+    private val appSecretKey = BuildConfig.APP_SECRET_KEY
 
     // Enhanced OkHttp Client with request/response logging
     private val client = OkHttpClient.Builder()
@@ -34,7 +32,7 @@ class ApiService(private val context: Context) {
             level = HttpLoggingInterceptor.Level.BODY 
         })
         .addInterceptor(DetailedLoggingInterceptor())
-        .addInterceptor(SecureAuthInterceptor(userManager, appSecretKey))
+        .addInterceptor(SecureAuthInterceptor(userManager, appSecretKey)) // ✅ Pass the key here
         .build()
 
     class DetailedLoggingInterceptor : Interceptor {
@@ -64,7 +62,7 @@ class ApiService(private val context: Context) {
     // Secure Auth Interceptor for spoof-proof UID authentication
     class SecureAuthInterceptor(
         private val userManager: UserManager,
-        private val appSecretKey: String
+        private val appSecretKey: String // ✅ Receives the key from ApiService
     ) : Interceptor {
         override fun intercept(chain: Interceptor.Chain): Response {
             val originalRequest = chain.request()
@@ -83,7 +81,7 @@ class ApiService(private val context: Context) {
                 return chain.proceed(originalRequest)
             }
 
-            // Generate security headers
+            // Generate security headers using the BuildConfig key
             val timestamp = System.currentTimeMillis().toString()
             val signature = generateSignature(userId, timestamp, url, appSecretKey)
 
