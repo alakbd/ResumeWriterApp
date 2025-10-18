@@ -39,20 +39,27 @@ jobs:
             ~/.gradle/wrapper/
           key: gradle-${{ runner.os }}-${{ hashFiles('**/*.gradle*', '**/gradle-wrapper.properties') }}
 
-      # 6️⃣ Create google-services.json from secret
+      # 6️⃣ Create .env file with APP_SECRET_KEY
+      - name: Create .env file
+        run: |
+          cat <<EOF > .env
+          APP_SECRET_KEY=${{ secrets.APP_SECRET_KEY }}
+          EOF
+
+      # 7️⃣ Create google-services.json from secret
       - name: Create google-services.json
         run: |
           cat <<EOF > app/google-services.json
           ${{ secrets.GOOGLE_SERVICES_JSON }}
           EOF
 
-      # 7️⃣ Decode Base64 Keystore Secret
+      # 8️⃣ Decode Base64 Keystore Secret
       - name: Decode and save keystore
         run: |
           mkdir -p $HOME/app
           echo "${{ secrets.KEYSTORE_BASE64 }}" | base64 --decode > $HOME/app/my-release-key.jks
 
-      # 8️⃣ Build Signed Release APK
+      # 9️⃣ Build Signed Release APK
       - name: Build Signed Release APK
         run: |
           ./gradlew clean assembleRelease \
@@ -61,14 +68,14 @@ jobs:
             -Pandroid.injected.signing.key.alias=${{ secrets.KEY_ALIAS }} \
             -Pandroid.injected.signing.key.password=${{ secrets.KEY_PASSWORD }}
 
-      # 9️⃣ Upload Signed APK
+      # 🔟 Upload Signed APK
       - name: Upload Signed APK
         uses: actions/upload-artifact@v4
         with:
           name: app-release-apk
           path: app/build/outputs/apk/release/app-release.apk
 
-      # 🔟 Build Signed AAB (Play Store bundle)
+      # 11️⃣ Build Signed Release AAB
       - name: Build Signed Release AAB
         run: |
           ./gradlew clean bundleRelease \
@@ -77,18 +84,14 @@ jobs:
             -Pandroid.injected.signing.key.alias=${{ secrets.KEY_ALIAS }} \
             -Pandroid.injected.signing.key.password=${{ secrets.KEY_PASSWORD }}
 
-      # 11️⃣ Upload Signed AAB
+      # 12️⃣ Upload Signed AAB
       - name: Upload Signed AAB
         uses: actions/upload-artifact@v4
         with:
           name: app-release-aab
           path: app/build/outputs/bundle/release/app-release.aab
-          
-      # 151️⃣ Upload Network Log Errors
-      - name: Upload network log
-        if: always()
-        uses: actions/upload-artifact@v4
+
+     
         with:
           name: network-log
           path: '**/network_log.txt'
-
