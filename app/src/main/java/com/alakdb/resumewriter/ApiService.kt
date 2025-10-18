@@ -6,15 +6,14 @@ import android.util.Log
 import com.google.firebase.auth.FirebaseAuth
 import com.google.gson.Gson
 import kotlinx.coroutines.tasks.await
-import kotlinx.coroutines.runBlocking
 import okhttp3.*
 import okhttp3.MediaType.Companion.toMediaType
 import okhttp3.RequestBody.Companion.toRequestBody
-import okhttp3.ResponseBody.Companion.toResponseBody
 import okhttp3.logging.HttpLoggingInterceptor
 import org.json.JSONObject
 import java.io.File
 import java.io.IOException
+import java.security.MessageDigest
 import java.util.concurrent.TimeUnit
 
 class ApiService(private val context: Context) {
@@ -22,6 +21,9 @@ class ApiService(private val context: Context) {
     private val gson = Gson()
     private val baseUrl = "https://resume-writer-api.onrender.com"
     private val userManager = UserManager(context)
+    
+    // Security configuration - in production, store this securely
+    private val appSecretKey = "your-secret-key-change-in-production"
 
     // Enhanced OkHttp Client with request/response logging
     private val client = OkHttpClient.Builder()
@@ -32,7 +34,7 @@ class ApiService(private val context: Context) {
             level = HttpLoggingInterceptor.Level.BODY 
         })
         .addInterceptor(DetailedLoggingInterceptor())
-        .addInterceptor(AuthInterceptor(userManager))
+        .addInterceptor(SecureAuthInterceptor(userManager, appSecretKey))
         .build()
 
     class DetailedLoggingInterceptor : Interceptor {
@@ -59,6 +61,58 @@ class ApiService(private val context: Context) {
         }
     }
 
+    // Secure Auth Interceptor for spoof-proof UID authentication
+    class SecureAuthInterceptor(
+        private val userManager: UserManager,
+        private val appSecretKey: String
+    ) : Interceptor {
+        override fun intercept(chain: Interceptor.Chain): Response {
+            val originalRequest = chain.request()
+            val url = originalRequest.url.toString()
+
+            // Skip auth for public endpoints
+            val publicEndpoints = listOf("/health", "/test")
+            if (publicEndpoints.any { url.contains(it) }) {
+                return chain.proceed(originalRequest)
+            }
+
+            // Get user ID from UserManager
+            val userId = userManager.getCurrentUserId()
+            if (userId.isNullOrBlank()) {
+                Log.w("SecureAuth", "No user ID available for: $url")
+                return chain.proceed(originalRequest)
+            }
+
+            // Generate security headers
+            val timestamp = System.currentTimeMillis().toString()
+            val signature = generateSignature(userId, timestamp, url, appSecretKey)
+
+            val newRequest = originalRequest.newBuilder()
+                .addHeader("X-User-ID", userId)
+                .addHeader("X-Timestamp", timestamp)
+                .addHeader("X-Signature", signature)
+                .addHeader("X-Request-Path", url)
+                .addHeader("User-Agent", "ResumeWriter-Android")
+                .build()
+            
+            Log.d("SecureAuth", "Added secure headers for user: ${userId.take(8)}...")
+            return chain.proceed(newRequest)
+        }
+
+        private fun generateSignature(userId: String, timestamp: String, url: String, secret: String): String {
+            val data = "$userId|$timestamp|$url|$secret"
+            return data.sha256()
+        }
+    }
+
+    // Extension function for SHA-256 hashing
+    private fun String.sha256(): String {
+        val bytes = this.toByteArray()
+        val md = MessageDigest.getInstance("SHA-256")
+        val digest = md.digest(bytes)
+        return digest.fold("") { str, it -> str + "%02x".format(it) }
+    }
+
     // Data Classes
     data class DeductCreditRequest(val user_id: String)
     data class GenerateResumeRequest(val resume_text: String, val job_description: String, val tone: String = "Professional")
@@ -69,155 +123,92 @@ class ApiService(private val context: Context) {
         data class Error(val message: String, val code: Int = 0, val details: String? = null) : ApiResult<Nothing>()
     }
 
-    // Fixed AuthInterceptor
-    class AuthInterceptor(private val userManager: UserManager) : Interceptor {
-    override fun intercept(chain: Interceptor.Chain): Response {
-        val originalRequest = chain.request()
-        val url = originalRequest.url.toString()
-
-        // Skip auth for public endpoints
-        val publicEndpoints = listOf("/health", "/test")
-        if (publicEndpoints.any { url.contains(it) }) {
-            return chain.proceed(originalRequest)
-        }
-
-        // Get token WITHOUT any blocking operations or coroutines
-        val token = try {
-            userManager.getUserToken()
-        } catch (e: Exception) {
-            Log.e("AuthInterceptor", "Error getting token: ${e.message}")
-            null
-        }
-
-        // If no token, proceed without auth header (let server handle it)
-        if (token.isNullOrBlank()) {
-            Log.w("AuthInterceptor", "No token available for: $url")
-            return chain.proceed(originalRequest)
-        }
-
-        // Add token header and proceed
-        val newRequest = originalRequest.newBuilder()
-            .addHeader("X-Auth-Token", token)
-            .build()
-            
-        return chain.proceed(newRequest)
-    }
-}
-    
-    
-
     // Enhanced Test Connection with better error handling
     suspend fun testConnection(): ApiResult<JSONObject> {
         Log.d("NetworkTest", "Testing connection to: $baseUrl")
     
-    // Use a simple client without interceptors for connection testing
-    val simpleClient = OkHttpClient.Builder()
-        .connectTimeout(10, TimeUnit.SECONDS)
-        .readTimeout(10, TimeUnit.SECONDS)
-        .build()
+        // Use a simple client without interceptors for connection testing
+        val simpleClient = OkHttpClient.Builder()
+            .connectTimeout(10, TimeUnit.SECONDS)
+            .readTimeout(10, TimeUnit.SECONDS)
+            .build()
     
-    val endpoints = listOf("/health", "/test", "/", "/api")
+        val endpoints = listOf("/health", "/test", "/", "/api")
     
-    for (endpoint in endpoints) {
-        try {
-            Log.d("NetworkTest", "Trying endpoint: $endpoint")
-            val url = "$baseUrl$endpoint"
-            val request = Request.Builder()
-                .url(url)
-                .get()
-                .addHeader("User-Agent", "ResumeWriter-Android")
-                .build()
+        for (endpoint in endpoints) {
+            try {
+                Log.d("NetworkTest", "Trying endpoint: $endpoint")
+                val url = "$baseUrl$endpoint"
+                val request = Request.Builder()
+                    .url(url)
+                    .get()
+                    .addHeader("User-Agent", "ResumeWriter-Android")
+                    .build()
             
-            val response = simpleClient.newCall(request).execute()
-            val body = response.body?.string()
+                val response = simpleClient.newCall(request).execute()
+                val body = response.body?.string()
             
-            Log.d("NetworkTest", "Response for $endpoint: ${response.code}")
+                Log.d("NetworkTest", "Response for $endpoint: ${response.code}")
             
-            if (response.isSuccessful && body != null) {
-                Log.d("NetworkTest", "✅ Success with endpoint: $endpoint")
-                return ApiResult.Success(JSONObject(body))
-            } else {
-                Log.w("NetworkTest", "❌ Failed with endpoint $endpoint: HTTP ${response.code}")
+                if (response.isSuccessful && body != null) {
+                    Log.d("NetworkTest", "✅ Success with endpoint: $endpoint")
+                    return ApiResult.Success(JSONObject(body))
+                } else {
+                    Log.w("NetworkTest", "❌ Failed with endpoint $endpoint: HTTP ${response.code}")
+                }
+            } catch (e: Exception) {
+                Log.e("NetworkTest", "❌ Error with endpoint $endpoint: ${e.message}")
             }
-        } catch (e: Exception) {
-            Log.e("NetworkTest", "❌ Error with endpoint $endpoint: ${e.message}")
         }
-    }
     
-    return ApiResult.Error(
-        "All endpoints failed", 
-        0, 
-        "Could not connect to any server endpoint"
-    )
-}
+        return ApiResult.Error(
+            "All endpoints failed", 
+            0, 
+            "Could not connect to any server endpoint"
+        )
+    }
 
     suspend fun waitForServerWakeUp(maxAttempts: Int = 8, delayBetweenAttempts: Long = 5000L): Boolean {
-    Log.d("ServerWakeUp", "🔄 Waiting for server to wake up...")
+        Log.d("ServerWakeUp", "🔄 Waiting for server to wake up...")
     
-    repeat(maxAttempts) { attempt ->
-        try {
-            Log.d("ServerWakeUp", "Attempt ${attempt + 1}/$maxAttempts")
-            val result = testConnection()
+        repeat(maxAttempts) { attempt ->
+            try {
+                Log.d("ServerWakeUp", "Attempt ${attempt + 1}/$maxAttempts")
+                val result = testConnection()
             
-            when (result) {
-                is ApiResult.Success -> {
-                    Log.d("ServerWakeUp", "✅ Server is awake and responding!")
-                    return true
-                }
-                is ApiResult.Error -> {
-                    if (result.code in 500..599) {
-                        Log.w("ServerWakeUp", "⏳ Server still waking up (HTTP ${result.code}), waiting...")
-                    } else {
-                        Log.w("ServerWakeUp", "⚠️ Connection issue (HTTP ${result.code}): ${result.message}")
+                when (result) {
+                    is ApiResult.Success -> {
+                        Log.d("ServerWakeUp", "✅ Server is awake and responding!")
+                        return true
+                    }
+                    is ApiResult.Error -> {
+                        if (result.code in 500..599) {
+                            Log.w("ServerWakeUp", "⏳ Server still waking up (HTTP ${result.code}), waiting...")
+                        } else {
+                            Log.w("ServerWakeUp", "⚠️ Connection issue (HTTP ${result.code}): ${result.message}")
+                        }
                     }
                 }
+            } catch (e: Exception) {
+                Log.w("ServerWakeUp", "🚨 Connection attempt ${attempt + 1} failed: ${e.message}")
             }
-        } catch (e: Exception) {
-            Log.w("ServerWakeUp", "🚨 Connection attempt ${attempt + 1} failed: ${e.message}")
-        }
         
-        // Wait before next attempt (except on last attempt)
-        if (attempt < maxAttempts - 1) {
-            Log.d("ServerWakeUp", "⏰ Waiting ${delayBetweenAttempts}ms before next attempt...")
-            kotlinx.coroutines.delay(delayBetweenAttempts)
+            // Wait before next attempt (except on last attempt)
+            if (attempt < maxAttempts - 1) {
+                Log.d("ServerWakeUp", "⏰ Waiting ${delayBetweenAttempts}ms before next attempt...")
+                kotlinx.coroutines.delay(delayBetweenAttempts)
+            }
         }
-    }
     
-    Log.e("ServerWakeUp", "❌ Server failed to wake up after $maxAttempts attempts")
-    return false
-}
-
-    
-
-
-    private suspend fun testServerImmediately(): Boolean {
-    return try {
-        val request = Request.Builder()
-            .url("$baseUrl/health")
-            .get()
-            .build()
-        
-        val response = client.newCall(request).execute()
-        val isSuccess = response.isSuccessful
-        Log.d("ServerTest", "Immediate health check: $isSuccess (${response.code})")
-        isSuccess
-    } catch (e: Exception) {
-        Log.e("ServerTest", "Immediate health check failed: ${e.message}")
-        false
+        Log.e("ServerWakeUp", "❌ Server failed to wake up after $maxAttempts attempts")
+        return false
     }
-}
 
-    // Enhanced API Methods with better error handling
+    // Enhanced API Methods with secure UID authentication
     suspend fun deductCredit(userId: String): ApiResult<JSONObject> {
         Log.d("ApiService", "Deducting credit for user: $userId")
         
         return try {
-            // Ensure we have a valid token before making the request
-            val token = userManager.getUserToken()
-            if (token == null) {
-                return ApiResult.Error("Authentication required - please log in again", 401)
-            }
-
             val requestBody = DeductCreditRequest(userId)
             val body = gson.toJson(requestBody).toRequestBody("application/json".toMediaType())
             
@@ -225,7 +216,6 @@ class ApiService(private val context: Context) {
                 .url("$baseUrl/deduct-credit")
                 .post(body)
                 .addHeader("Content-Type", "application/json")
-                .addHeader("User-Agent", "ResumeWriter-Android")
                 .build()
             
             client.newCall(request).execute().use { response ->
@@ -235,12 +225,6 @@ class ApiService(private val context: Context) {
                 if (!response.isSuccessful) {
                     val errorMsg = handleErrorResponse(response)
                     Log.e("ApiService", "Deduct credit failed: $errorMsg")
-                    
-                    // If it's an auth error, clear the token
-                    if (response.code == 401) {
-                        userManager.clearUserToken()
-                    }
-                    
                     return ApiResult.Error(errorMsg, response.code)
                 }
                 
@@ -257,12 +241,6 @@ class ApiService(private val context: Context) {
         Log.d("ApiService", "Generating resume with tone: $tone")
         
         return try {
-            // Ensure we have a valid token before making the request
-            val token = userManager.getUserToken()
-            if (token == null) {
-                return ApiResult.Error("Authentication required - please log in again", 401)
-            }
-
             val requestBody = GenerateResumeRequest(resumeText, jobDescription, tone)
             val body = gson.toJson(requestBody).toRequestBody("application/json".toMediaType())
             
@@ -270,7 +248,6 @@ class ApiService(private val context: Context) {
                 .url("$baseUrl/generate-resume")
                 .post(body)
                 .addHeader("Content-Type", "application/json")
-                .addHeader("User-Agent", "ResumeWriter-Android")
                 .build()
             
             client.newCall(request).execute().use { response ->
@@ -280,12 +257,6 @@ class ApiService(private val context: Context) {
                 if (!response.isSuccessful) {
                     val errorMsg = handleErrorResponse(response)
                     Log.e("ApiService", "Generate resume failed: $errorMsg")
-                    
-                    // If it's an auth error, clear the token
-                    if (response.code == 401) {
-                        userManager.clearUserToken()
-                    }
-                    
                     return ApiResult.Error(errorMsg, response.code)
                 }
                 
@@ -302,12 +273,6 @@ class ApiService(private val context: Context) {
         Log.d("ApiService", "Generating resume from files")
         
         return try {
-            // Ensure we have a valid token before making the request
-            val token = userManager.getUserToken()
-            if (token == null) {
-                return ApiResult.Error("Authentication required - please log in again", 401)
-            }
-
             val resumeFile = uriToFile(resumeUri)
             val jobDescFile = uriToFile(jobDescUri)
 
@@ -325,7 +290,6 @@ class ApiService(private val context: Context) {
             val request = Request.Builder()
                 .url("$baseUrl/generate-resume-from-files")
                 .post(body)
-                .addHeader("User-Agent", "ResumeWriter-Android")
                 .build()
 
             client.newCall(request).execute().use { response ->
@@ -335,12 +299,6 @@ class ApiService(private val context: Context) {
                 if (!response.isSuccessful) {
                     val errorMsg = handleErrorResponse(response)
                     Log.e("ApiService", "File resume generation failed: $errorMsg")
-                    
-                    // If it's an auth error, clear the token
-                    if (response.code == 401) {
-                        userManager.clearUserToken()
-                    }
-                    
                     return ApiResult.Error(errorMsg, response.code)
                 }
                 
@@ -354,91 +312,100 @@ class ApiService(private val context: Context) {
     }
 
     suspend fun getUserCredits(): ApiResult<JSONObject> {
-    return try {
-        Log.d("ApiService", "Getting user credits...")
-        
-        // Get token from UserManager directly
-        val token = userManager.getUserToken()
-        if (token == null) {
-            Log.e("ApiService", "No token available for credits request")
-            return ApiResult.Error("Authentication required", 401)
-        }
+        return try {
+            Log.d("ApiService", "Getting user credits...")
 
-        val request = Request.Builder()
-            .url("$baseUrl/user/credits")
-            .get()
-            .addHeader("User-Agent", "ResumeWriter-Android")
-            .build()
+            val request = Request.Builder()
+                .url("$baseUrl/user/credits")
+                .get()
+                .build()
 
-        client.newCall(request).execute().use { response ->
-            val respBody = response.body?.string() ?: "{}"
-            Log.d("ApiService", "Credits response: ${response.code}")
+            client.newCall(request).execute().use { response ->
+                val respBody = response.body?.string() ?: "{}"
+                Log.d("ApiService", "Credits response: ${response.code}")
 
-            if (!response.isSuccessful) {
-                Log.e("ApiService", "Failed to fetch credits: HTTP ${response.code}")
-                
-                if (response.code == 401) {
-                    userManager.clearUserToken()
-                    return ApiResult.Error("Authentication failed - please log in again", 401)
+                if (!response.isSuccessful) {
+                    Log.e("ApiService", "Failed to fetch credits: HTTP ${response.code}")
+                    return ApiResult.Error(
+                        message = "Failed to get credits: ${response.message}",
+                        code = response.code
+                    )
                 }
-                
-                return ApiResult.Error(
-                    message = "Failed to get credits: ${response.message}",
-                    code = response.code
-                )
+
+                ApiResult.Success(JSONObject(respBody))
             }
-
-            ApiResult.Success(JSONObject(respBody))
+        } catch (e: Exception) {
+            Log.e("ApiService", "Exception while fetching credits", e)
+            ApiResult.Error(
+                message = "Network error: ${e.message}",
+                code = -1
+            )
         }
-    } catch (e: Exception) {
-        Log.e("ApiService", "Exception while fetching credits", e)
-        ApiResult.Error(
-            message = "Network error: ${e.message}",
-            code = -1
-        )
     }
-}
 
-    // Comprehensive Debug Method
+    // Test secure authentication
+    suspend fun testSecureAuth(): ApiResult<JSONObject> {
+        return try {
+            val request = Request.Builder()
+                .url("$baseUrl/security-test")
+                .post("".toRequestBody("application/json".toMediaType()))
+                .build()
+
+            client.newCall(request).execute().use { response ->
+                val respBody = response.body?.string() ?: "{}"
+                Log.d("ApiService", "Security test response: ${response.code}")
+
+                if (!response.isSuccessful) {
+                    return ApiResult.Error("Security test failed: ${response.message}", response.code)
+                }
+
+                ApiResult.Success(JSONObject(respBody))
+            }
+        } catch (e: Exception) {
+            Log.e("ApiService", "Security test exception", e)
+            ApiResult.Error("Security test failed: ${e.message}", -1)
+        }
+    }
+
+    // Comprehensive Debug Method (updated for new auth)
     suspend fun debugAuthenticationFlow(): String {
         val debugInfo = StringBuilder()
         debugInfo.appendLine("=== AUTHENTICATION FLOW DEBUG ===")
     
-    // 1. Check Firebase Auth State
-    val firebaseUser = FirebaseAuth.getInstance().currentUser
-    debugInfo.appendLine("1. FIREBASE AUTH STATE:")
-    debugInfo.appendLine("   • User ID: ${firebaseUser?.uid ?: "NULL"}")
-    debugInfo.appendLine("   • Email: ${firebaseUser?.email ?: "NULL"}")
-    debugInfo.appendLine("   • Is Email Verified: ${firebaseUser?.isEmailVerified ?: false} ⚠️ THIS IS THE PROBLEM!")
+        // 1. Check Firebase Auth State
+        val firebaseUser = FirebaseAuth.getInstance().currentUser
+        debugInfo.appendLine("1. FIREBASE AUTH STATE:")
+        debugInfo.appendLine("   • User ID: ${firebaseUser?.uid ?: "NULL"}")
+        debugInfo.appendLine("   • Email: ${firebaseUser?.email ?: "NULL"}")
+        debugInfo.appendLine("   • Is Email Verified: ${firebaseUser?.isEmailVerified ?: false}")
     
-    // 2. Check UserManager State
-    debugInfo.appendLine("2. USER MANAGER STATE:")
-    debugInfo.appendLine("   • Is User Logged In: ${userManager.isUserLoggedIn()}")
-    debugInfo.appendLine("   • Is Token Valid: ${userManager.isTokenValid()}")
+        // 2. Check UserManager State
+        debugInfo.appendLine("2. USER MANAGER STATE:")
+        debugInfo.appendLine("   • Is User Logged In: ${userManager.isUserLoggedIn()}")
+        debugInfo.appendLine("   • User ID: ${userManager.getCurrentUserId() ?: "NULL"}")
+        debugInfo.appendLine("   • User Email: ${userManager.getCurrentUserEmail() ?: "NULL"}")
     
-    val cachedToken = userManager.getUserToken()
-    debugInfo.appendLine("   • Cached Token: ${if (!cachedToken.isNullOrBlank()) "PRESENT (${cachedToken.length} chars)" else "NULL"}")
+        // 3. Test secure authentication
+        debugInfo.appendLine("3. SECURE AUTH TEST:")
+        val authTest = testSecureAuth()
+        when (authTest) {
+            is ApiResult.Success -> {
+                debugInfo.appendLine("   • ✅ Secure authentication SUCCESS")
+                debugInfo.appendLine("   • Response: ${authTest.data}")
+            }
+            is ApiResult.Error -> {
+                debugInfo.appendLine("   • ❌ Secure authentication FAILED: ${authTest.message}")
+            }
+        }
     
-    if (!cachedToken.isNullOrBlank()) {
-        debugInfo.appendLine("   • Token Preview: '${cachedToken.take(50)}'")
+        debugInfo.appendLine("=== END DEBUG ===")
+    
+        val result = debugInfo.toString()
+        Log.d("AuthDebug", result)
+        return result
     }
-    
-    // 3. Add critical warning about email verification
-    if (firebaseUser != null && !firebaseUser.isEmailVerified) {
-        debugInfo.appendLine("3. ⚠️ CRITICAL ISSUE DETECTED:")
-        debugInfo.appendLine("   • Email is NOT verified: ${firebaseUser.email}")
-        debugInfo.appendLine("   • Firebase tokens for unverified emails may be rejected by server")
-        debugInfo.appendLine("   • SOLUTION: Verify your email or update server to allow unverified emails")
-    }
-    
-    debugInfo.appendLine("=== END DEBUG ===")
-    
-    val result = debugInfo.toString()
-    Log.d("AuthDebug", result)
-    return result
-}
 
-    // Utilities
+    // Utilities (unchanged)
     private fun uriToFile(uri: Uri): File {
         return try {
             val input = context.contentResolver.openInputStream(uri)
