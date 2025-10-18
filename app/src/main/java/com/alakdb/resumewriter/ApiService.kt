@@ -80,33 +80,11 @@ class ApiService(private val context: Context) {
             return chain.proceed(originalRequest)
         }
 
-        val token: String? = try {
-            runBlocking {
-                val currentUser = FirebaseAuth.getInstance().currentUser
-                if (currentUser == null) {
-                    Log.e("AuthInterceptor", "❌ No user signed in")
-                    userManager.clearUserToken()
-                    null
-                } else {
-                    userManager.getUserToken() ?: run {
-                        val tokenResult = try {
-                            currentUser.getIdToken(true).await()
-                        } catch (e: Exception) {
-                            Log.e("AuthInterceptor", "Firebase token fetch failed: ${e.message}")
-                            null
-                        }
-                        tokenResult?.token?.also { userManager.saveUserToken(it) }
-                    }
-                }
-            }
-        } catch (e: Exception) {
-            Log.e("AuthInterceptor", "Interceptor failed: ${e.message}")
-            null
-        }
-
+        // Get token WITHOUT using runBlocking to avoid circular dependencies
+        val token = userManager.getUserToken()
+        
         if (token.isNullOrBlank()) {
             Log.w("AuthInterceptor", "No token available, request may fail: $url")
-            // Optionally, you could throw an exception or proceed with a placeholder header
             return chain.proceed(originalRequest)
         }
 
@@ -397,16 +375,9 @@ class ApiService(private val context: Context) {
     }
 
     suspend fun getUserCredits(): ApiResult<JSONObject> {
-    return try {
-        Log.d("ApiService", "Getting user credits...")
+        return try {
+            Log.d("ApiService", "Getting user credits...")
         
-        // Get token safely without causing circular calls
-        val token = getCurrentUserToken()
-        if (token == null) {
-            Log.e("ApiService", "No token available for credits request")
-            return ApiResult.Error("Authentication required", 401)
-        }
-
         val request = Request.Builder()
             .url("$baseUrl/user/credits")
             .get()
@@ -421,7 +392,6 @@ class ApiService(private val context: Context) {
                 Log.e("ApiService", "Failed to fetch credits: HTTP ${response.code}")
                 
                 if (response.code == 401) {
-                    userManager.clearUserToken()
                     return ApiResult.Error("Authentication failed - please log in again", 401)
                 }
                 
