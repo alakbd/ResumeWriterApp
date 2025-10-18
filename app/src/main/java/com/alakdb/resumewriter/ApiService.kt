@@ -104,36 +104,7 @@ class ApiService(private val context: Context) {
     }
 }
     
-    // Improved token fetching with better error handling and token validation
-    suspend fun getCurrentUserToken(forceRefresh: Boolean = false): String? {
-        return try {
-            val currentUser = FirebaseAuth.getInstance().currentUser ?: run {
-                userManager.clearUserToken()
-            return null
-        }
-
-        val cachedToken = userManager.getUserToken()
-        if (!forceRefresh && cachedToken?.split(".")?.size == 3) {
-            Log.d("AuthDebug", "Using cached token")
-            return cachedToken
-        }
-
-        Log.d("AuthDebug", "Fetching fresh token from Firebase")
-        val tokenResult = currentUser.getIdToken(true).await()
-        val token = tokenResult.token
-        if (!token.isNullOrBlank()) {
-            userManager.saveUserToken(token)
-            token
-        } else {
-            userManager.clearUserToken()
-            null
-        }
-    } catch (e: Exception) {
-        Log.e("AuthDebug", "Error fetching token: ${e.message}")
-        userManager.clearUserToken()
-        null
-    }
-}
+    
 
     // Enhanced Test Connection with better error handling
     suspend fun testConnection(): ApiResult<JSONObject> {
@@ -242,7 +213,7 @@ class ApiService(private val context: Context) {
         
         return try {
             // Ensure we have a valid token before making the request
-            val token = getCurrentUserToken()
+            val token = userManager.getUserToken()
             if (token == null) {
                 return ApiResult.Error("Authentication required - please log in again", 401)
             }
@@ -287,7 +258,7 @@ class ApiService(private val context: Context) {
         
         return try {
             // Ensure we have a valid token before making the request
-            val token = getCurrentUserToken()
+            val token = userManager.getUserToken()
             if (token == null) {
                 return ApiResult.Error("Authentication required - please log in again", 401)
             }
@@ -332,7 +303,7 @@ class ApiService(private val context: Context) {
         
         return try {
             // Ensure we have a valid token before making the request
-            val token = getCurrentUserToken()
+            val token = userManager.getUserToken()
             if (token == null) {
                 return ApiResult.Error("Authentication required - please log in again", 401)
             }
@@ -383,9 +354,16 @@ class ApiService(private val context: Context) {
     }
 
     suspend fun getUserCredits(): ApiResult<JSONObject> {
-        return try {
-            Log.d("ApiService", "Getting user credits...")
+    return try {
+        Log.d("ApiService", "Getting user credits...")
         
+        // Get token from UserManager directly
+        val token = userManager.getUserToken()
+        if (token == null) {
+            Log.e("ApiService", "No token available for credits request")
+            return ApiResult.Error("Authentication required", 401)
+        }
+
         val request = Request.Builder()
             .url("$baseUrl/user/credits")
             .get()
@@ -400,7 +378,8 @@ class ApiService(private val context: Context) {
                 Log.e("ApiService", "Failed to fetch credits: HTTP ${response.code}")
                 
                 if (response.code == 401) {
-                    return ApiResult.Error("Authentication failed", 401)
+                    userManager.clearUserToken()
+                    return ApiResult.Error("Authentication failed - please log in again", 401)
                 }
                 
                 return ApiResult.Error(
