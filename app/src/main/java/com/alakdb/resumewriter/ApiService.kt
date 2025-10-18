@@ -61,6 +61,12 @@ class ApiService(private val context: Context) {
         }
     }
 
+    fun String.sha256(): String {
+    val digest = MessageDigest.getInstance("SHA-256")
+    val hashBytes = digest.digest(this.toByteArray(Charsets.UTF_8))
+    return hashBytes.joinToString("") { "%02x".format(it) }
+}
+    
     // Secure Auth Interceptor for spoof-proof UID authentication
     class SecureAuthInterceptor(
         private val userManager: UserManager,
@@ -105,13 +111,7 @@ class ApiService(private val context: Context) {
         }
     }
 
-    // Extension function for SHA-256 hashing
-    private fun String.sha256(): String {
-        val bytes = this.toByteArray()
-        val md = MessageDigest.getInstance("SHA-256")
-        val digest = md.digest(bytes)
-        return digest.fold("") { str, it -> str + "%02x".format(it) }
-    }
+    
 
     // Data Classes
     data class DeductCreditRequest(val user_id: String)
