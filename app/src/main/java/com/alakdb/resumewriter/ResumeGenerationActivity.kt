@@ -224,30 +224,26 @@ class ResumeGenerationActivity : AppCompatActivity() {
     val user = FirebaseAuth.getInstance().currentUser
     if (user != null && !user.isEmailVerified) {
         Log.w("AuthDebug", "⚠️ Email is not verified: ${user.email}")
-        
-        // Show a warning to the user
+
         val builder = AlertDialog.Builder(this)
-            builder.setTitle("Email Verification Required")
-            builder.setMessage("Your email ${user.email} is not verified. Some features may not work properly. Please check your email for a verification link.")
-            builder.setPositiveButton("Send Verification", DialogInterface.OnClickListener { _, _ ->
+            .setTitle("Email Verification Required")
+            .setMessage("Your email ${user.email} is not verified. Some features may not work properly. Please check your email for a verification link.")
+
+            .setPositiveButton("Send Verification", DialogInterface.OnClickListener { _, _ ->
                 sendEmailVerification()
             })
-            builder.setNegativeButton("Cancel", DialogInterface.OnClickListener { dialog, _ ->
-            dialog.dismiss()
-            })
-
-            val dialog = builder.create()
-            dialog.show()
-            .setNegativeButton("Continue Anyway") { _, _ ->
-                // User chooses to continue without verification
+            .setNegativeButton("Continue Anyway", DialogInterface.OnClickListener { _, _ ->
                 Toast.makeText(this, "Some features may not work without email verification", Toast.LENGTH_LONG).show()
-            }
-            .setNeutralButton("Sign Out") { _, _ ->
+            })
+            .setNeutralButton("Sign Out", DialogInterface.OnClickListener { _, _ ->
                 FirebaseAuth.getInstance().signOut()
                 userManager.clearUserToken()
                 finish()
-            }
-            .show()
+            })
+
+        // Only now create and show the dialog
+        val dialog = builder.create()
+        dialog.show()
     }
 }
 
