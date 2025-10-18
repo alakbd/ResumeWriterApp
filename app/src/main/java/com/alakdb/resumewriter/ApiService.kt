@@ -15,6 +15,11 @@ import java.security.MessageDigest
 import java.util.concurrent.TimeUnit
 import com.google.firebase.auth.FirebaseAuth
 
+fun String.sha256(): String {
+    val digest = MessageDigest.getInstance("SHA-256")
+    val hashBytes = digest.digest(this.toByteArray(Charsets.UTF_8))
+    return hashBytes.joinToString("") { "%02x".format(it) }
+}
 
 class ApiService(private val context: Context) {
 
@@ -61,11 +66,7 @@ class ApiService(private val context: Context) {
         }
     }
 
-    fun String.sha256(): String {
-    val digest = MessageDigest.getInstance("SHA-256")
-    val hashBytes = digest.digest(this.toByteArray(Charsets.UTF_8))
-    return hashBytes.joinToString("") { "%02x".format(it) }
-}
+    
     
     // Secure Auth Interceptor for spoof-proof UID authentication
     class SecureAuthInterceptor(
