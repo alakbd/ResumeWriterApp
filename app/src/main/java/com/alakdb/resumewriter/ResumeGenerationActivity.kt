@@ -16,6 +16,8 @@ import androidx.activity.result.ActivityResultLauncher
 import androidx.activity.result.contract.ActivityResultContracts
 import androidx.appcompat.app.AppCompatActivity
 import androidx.lifecycle.lifecycleScope
+import androidx.appcompat.app.AlertDialog
+import android.content.DialogInterface
 import com.alakdb.resumewriter.databinding.ActivityResumeGenerationBinding
 import com.google.firebase.auth.FirebaseAuth
 import kotlinx.coroutines.*
@@ -225,11 +227,15 @@ class ResumeGenerationActivity : AppCompatActivity() {
         
         // Show a warning to the user
         AlertDialog.Builder(this)
-            .setTitle("Email Verification Required")
-            .setMessage("Your email ${user.email} is not verified. Some features may not work properly. Please check your email for verification link.")
-            .setPositiveButton("Send Verification") { _, _ ->
-                sendEmailVerification()
-            }
+        .setTitle("Email Verification Required")
+        .setMessage("Your email ${user.email} is not verified. Some features may not work properly. Please check your email for a verification link.")
+        .setPositiveButton("Send Verification", DialogInterface.OnClickListener { _, _ ->
+            sendEmailVerification()
+        })
+        .setNegativeButton("Cancel", DialogInterface.OnClickListener { dialog, _ ->
+            dialog.dismiss()
+        })
+        .show()
             .setNegativeButton("Continue Anyway") { _, _ ->
                 // User chooses to continue without verification
                 Toast.makeText(this, "Some features may not work without email verification", Toast.LENGTH_LONG).show()
