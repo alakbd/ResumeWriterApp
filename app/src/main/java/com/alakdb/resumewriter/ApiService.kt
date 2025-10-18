@@ -13,6 +13,7 @@ import java.io.File
 import java.io.IOException
 import java.security.MessageDigest
 import java.util.concurrent.TimeUnit
+import com.google.firebase.auth.FirebaseAuth
 
 class ApiService(private val context: Context) {
 
@@ -57,7 +58,7 @@ class ApiService(private val context: Context) {
             
             return response
         }
-    }
+    
 
     // Secure Auth Interceptor for spoof-proof UID authentication
     class SecureAuthInterceptor(
