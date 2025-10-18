@@ -137,10 +137,9 @@ class ResumeGenerationActivity : AppCompatActivity() {
         Log.d("ResumeActivity", "User logged in: ${userManager.isUserLoggedIn()}")
         
         // Add a small delay to ensure everything is initialized
-        delay(500)
+        delay(1000)
 
-        // Refresh token first
-        refreshAuthTokenIfNeeded()
+    
         
         // Update credits display (this will test if auth is working)
         updateCreditDisplay()
@@ -522,7 +521,10 @@ class ResumeGenerationActivity : AppCompatActivity() {
 
     /** ---------------- Credit Display ---------------- **/
     private suspend fun updateCreditDisplay() {
-        Log.d("ResumeActivity", "Fetching user credits...")
+    Log.d("ResumeActivity", "Fetching user credits...")
+
+    // First, ensure we have a valid token
+    refreshAuthTokenIfNeeded()
 
     when (val result = apiService.getUserCredits()) {
         is ApiService.ApiResult.Success -> {
@@ -539,11 +541,7 @@ class ResumeGenerationActivity : AppCompatActivity() {
             withContext(Dispatchers.Main) {
                 binding.creditText.text = "Credits: --"
                 if (result.code == 401) {
-                    Toast.makeText(
-                        this@ResumeGenerationActivity,
-                        "Authentication failed. Please log in again.",
-                        Toast.LENGTH_SHORT
-                    ).show()
+                    showError("Authentication failed. Please log in again.")
                 }
             }
         }
@@ -552,13 +550,21 @@ class ResumeGenerationActivity : AppCompatActivity() {
 
     private suspend fun refreshAuthTokenIfNeeded() {
     try {
-        val currentUser = FirebaseAuth.getInstance().currentUser
-        if (currentUser != null) {
-            val tokenResult = currentUser.getIdToken(true).await()
-            tokenResult.token?.let { newToken ->
-                userManager.saveUserToken(newToken)
-                Log.d("ResumeActivity", "Token refreshed successfully")
+        // Only refresh if token is invalid or about to expire
+        if (!userManager.isTokenValid()) {
+            val currentUser = FirebaseAuth.getInstance().currentUser
+            if (currentUser != null) {
+                Log.d("ResumeActivity", "Refreshing auth token...")
+                val tokenResult = currentUser.getIdToken(true).await()
+                tokenResult.token?.let { newToken ->
+                    userManager.saveUserToken(newToken)
+                    Log.d("ResumeActivity", "Token refreshed successfully")
+                }
+            } else {
+                Log.w("ResumeActivity", "No current user to refresh token")
             }
+        } else {
+            Log.d("ResumeActivity", "Token is still valid, no refresh needed")
         }
     } catch (e: Exception) {
         Log.e("ResumeActivity", "Failed to refresh token: ${e.message}")
