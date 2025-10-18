@@ -15,6 +15,7 @@ import java.security.MessageDigest
 import java.util.concurrent.TimeUnit
 import com.google.firebase.auth.FirebaseAuth
 
+
 class ApiService(private val context: Context) {
 
     private val gson = Gson()
@@ -122,6 +123,13 @@ class ApiService(private val context: Context) {
         data class Error(val message: String, val code: Int = 0, val details: String? = null) : ApiResult<Nothing>()
     }
 
+    fun String.sha256(): String {
+        val digest = MessageDigest.getInstance("SHA-256")
+        val hashBytes = digest.digest(this.toByteArray(Charsets.UTF_8))
+        return hashBytes.joinToString("") { "%02x".format(it) }
+        }
+
+    
     // Enhanced Test Connection with better error handling
     suspend fun testConnection(): ApiResult<JSONObject> {
         Log.d("NetworkTest", "Testing connection to: $baseUrl")
