@@ -21,7 +21,7 @@ class ApiService(private val context: Context) {
     private val baseUrl = "https://resume-writer-api.onrender.com"
     private val userManager = UserManager(context)
     
-    // ✅ FIXED: Use BuildConfig as you had before
+    // ✅ Use BuildConfig as you had before
     private val appSecretKey = BuildConfig.APP_SECRET_KEY
 
     // Enhanced OkHttp Client with request/response logging
@@ -33,7 +33,7 @@ class ApiService(private val context: Context) {
             level = HttpLoggingInterceptor.Level.BODY 
         })
         .addInterceptor(DetailedLoggingInterceptor())
-        .addInterceptor(SecureAuthInterceptor(userManager, appSecretKey)) // ✅ Pass the key here
+        .addInterceptor(SecureAuthInterceptor(userManager, appSecretKey))
         .build()
 
     class DetailedLoggingInterceptor : Interceptor {
@@ -58,12 +58,12 @@ class ApiService(private val context: Context) {
             
             return response
         }
-    
+    }
 
     // Secure Auth Interceptor for spoof-proof UID authentication
     class SecureAuthInterceptor(
         private val userManager: UserManager,
-        private val appSecretKey: String // ✅ Receives the key from ApiService
+        private val appSecretKey: String
     ) : Interceptor {
         override fun intercept(chain: Interceptor.Chain): Response {
             val originalRequest = chain.request()
@@ -404,7 +404,7 @@ class ApiService(private val context: Context) {
         return result
     }
 
-    // Utilities (unchanged)
+    // Utilities
     private fun uriToFile(uri: Uri): File {
         return try {
             val input = context.contentResolver.openInputStream(uri)
