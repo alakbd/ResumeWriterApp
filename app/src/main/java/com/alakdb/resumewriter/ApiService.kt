@@ -84,9 +84,9 @@ class ApiService(private val context: Context) {
     
     
     // Secure Auth Interceptor for spoof-proof UID authentication
-    class SecureAuthInterceptor(
-    private val userManager: UserManager,
-    private val appSecretKey: String
+    // Simplified Secure Auth Interceptor: Only sends X-User-ID
+class SecureAuthInterceptor(
+    private val userManager: UserManager
 ) : Interceptor {
     override fun intercept(chain: Interceptor.Chain): Response {
         val originalRequest = chain.request()
@@ -101,63 +101,28 @@ class ApiService(private val context: Context) {
 
         // Get user ID from UserManager
         val userId = userManager.getCurrentUserId()
-        
-        // CRITICAL FIX: Check if user ID is valid
+
+        // Check if user ID is valid
         if (userId.isNullOrBlank()) {
             Log.e("SecureAuth", "❌ BLOCKED: No user ID available for protected endpoint: $url")
-            
-            // Create a meaningful error response instead of proceeding
             return Response.Builder()
                 .request(originalRequest)
                 .protocol(Protocol.HTTP_1_1)
-                .code(401) // Unauthorized
+                .code(401)
                 .message("User not authenticated")
-                .body("{ \"error\": \"User not authenticated. Please log in again.\" }".toResponseBody("application/json".toMediaType()))
+                .body("{ \"error\": \"User not authenticated. Please log in again.\" }"
+                    .toResponseBody("application/json".toMediaType()))
                 .build()
         }
 
-        // Validate app secret key
-        if (appSecretKey.isBlank() || appSecretKey == "default_secret") {
-            Log.e("SecureAuth", "❌ BLOCKED: App secret key is not properly configured")
-            return Response.Builder()
-                .request(originalRequest)
-                .protocol(Protocol.HTTP_1_1)
-                .code(500)
-                .message("App configuration error")
-                .body("{ \"error\": \"App configuration error. Please contact support.\" }".toResponseBody("application/json".toMediaType()))
-                .build()
-        }
+        // Only add X-User-ID header now
+        val newRequest = originalRequest.newBuilder()
+            .addHeader("X-User-ID", userId)
+            .addHeader("User-Agent", "ResumeWriter-Android")
+            .build()
 
-        try {
-            // Generate security headers using the BuildConfig key
-            val timestamp = System.currentTimeMillis().toString()
-            val signature = generateSignature(userId, timestamp, url, appSecretKey)
-
-            val newRequest = originalRequest.newBuilder()
-                .addHeader("X-User-ID", userId)
-                .addHeader("X-Timestamp", timestamp)
-                .addHeader("X-Signature", signature)
-                .addHeader("X-Request-Path", url)
-                .addHeader("User-Agent", "ResumeWriter-Android")
-                .build()
-            
-            Log.d("SecureAuth", "✅ Added secure headers for user: ${userId.take(8)}... to: ${originalRequest.method} $url")
-            return chain.proceed(newRequest)
-        } catch (e: Exception) {
-            Log.e("SecureAuth", "❌ Error creating secure request: ${e.message}")
-            return Response.Builder()
-                .request(originalRequest)
-                .protocol(Protocol.HTTP_1_1)
-                .code(500)
-                .message("Security error")
-                .body("{ \"error\": \"Security configuration error: ${e.message}\" }".toResponseBody("application/json".toMediaType()))
-                .build()
-        }
-    }
-
-    private fun generateSignature(userId: String, timestamp: String, url: String, secret: String): String {
-        val data = "$userId|$timestamp|$url|$secret"
-        return data.sha256()
+        Log.d("SecureAuth", "✅ Added X-User-ID for user: ${userId.take(8)}... to: ${originalRequest.method} $url")
+        return chain.proceed(newRequest)
     }
 }
 
