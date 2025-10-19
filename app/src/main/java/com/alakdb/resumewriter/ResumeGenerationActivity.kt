@@ -470,6 +470,19 @@ class ResumeGenerationActivity : AppCompatActivity() {
             }
         }
     }
+
+    private fun showReloginPrompt() {
+    AlertDialog.Builder(this)
+        .setTitle("Authentication Issue")
+        .setMessage("There seems to be an authentication problem. Would you like to log out and log in again?")
+        .setPositiveButton("Log Out & Re-login") { _, _ ->
+            userManager.logout()
+            finish() // Go back to login screen
+        }
+        .setNegativeButton("Cancel", null)
+        .show()
+}
+
     
     /** ---------------- Resume Generation ---------------- **/
     private fun generateResumeFromFiles() {
@@ -481,7 +494,7 @@ class ResumeGenerationActivity : AppCompatActivity() {
     lifecycleScope.launch {
         try {
             // Check authentication first
-            if (!ensureUserAuthenticated()) {
+            if (!ensureAuthenticatedBeforeApiCall()) {
                 resetGenerateButton()
                 return@launch
             }
@@ -512,6 +525,8 @@ class ResumeGenerationActivity : AppCompatActivity() {
                     // If it's an auth error, suggest re-login
                     if (creditResult.code == 401) {
                         showError("Authentication failed. Please log out and log in again.")
+                        userManager.logout()
+                        checkGenerateButtonState()
                     }
                 }
             }
@@ -525,62 +540,80 @@ class ResumeGenerationActivity : AppCompatActivity() {
 }
 
     private fun generateResumeFromText() {
-        val resumeText = binding.etResumeText.text.toString().trim()
-        val jobDesc = binding.etJobDescription.text.toString().trim()
+    val resumeText = binding.etResumeText.text.toString().trim()
+    val jobDesc = binding.etJobDescription.text.toString().trim()
 
-        if (resumeText.isEmpty() || jobDesc.isEmpty()) {
-            showError("Please enter both resume text and job description")
-            return
-        }
+    if (resumeText.isEmpty() || jobDesc.isEmpty()) {
+        showError("Please enter both resume text and job description")
+        return
+    }
 
-        disableGenerateButton("Processing...")
+    disableGenerateButton("Processing...")
 
-        lifecycleScope.launch {
-            try {
-                val creditResult = retryApiCall { apiService.getUserCredits() }
-                when (creditResult) {
-                    is ApiService.ApiResult.Success -> {
-                        val credits = creditResult.data.optInt("available_credits", 0)
-                        Log.d("ResumeActivity", "User has $credits credits")
-                        if (credits <= 0) {
-                            showErrorAndReset("Insufficient credits. Please purchase more.")
-                            return@launch
-                        }
-                        val genResult = retryApiCall { apiService.generateResume(resumeText, jobDesc) }
-                        handleGenerationResult(genResult)
+    lifecycleScope.launch {
+        try {
+            // Check authentication first - ADD THIS CHECK
+            if (!ensureAuthenticatedBeforeApiCall()) {
+                resetGenerateButton()
+                return@launch
+            }
+
+            // Use the same retry pattern as generateResumeFromFiles
+            val creditResult = retryApiCall { apiService.getUserCredits() }
+            when (creditResult) {
+                is ApiService.ApiResult.Success -> {
+                    val credits = creditResult.data.optInt("available_credits", 0)
+                    Log.d("ResumeActivity", "User has $credits credits")
+                    if (credits <= 0) {
+                        showErrorAndReset("Insufficient credits. Please purchase more.")
+                        return@launch
                     }
-                    is ApiService.ApiResult.Error -> {
-                        Log.e("ResumeActivity", "Failed to check credits: ${creditResult.message}")
-                        showErrorAndReset("Failed to check credits: ${creditResult.message}")
+                    
+                    Log.d("ResumeActivity", "Generating resume from text input")
+                    val genResult = retryApiCall { 
+                        apiService.generateResume(resumeText, jobDesc) 
+                    }
+                    handleGenerationResult(genResult)
+                }
+                is ApiService.ApiResult.Error -> {
+                    Log.e("ResumeActivity", "Failed to check credits: ${creditResult.message}")
+                    showErrorAndReset("Failed to check credits: ${creditResult.message}")
+                    
+                    // Handle auth errors specifically - ADD THIS
+                    if (creditResult.code == 401) {
+                        showError("Authentication failed. Please log out and log in again.")
+                        userManager.logout()
+                        checkGenerateButtonState()
                     }
                 }
-            } catch (e: Exception) {
-                Log.e("ResumeActivity", "Exception in generateResumeFromText: ${e.message}", e)
-                showErrorAndReset("Generation failed: ${e.message}")
-            } finally {
-                resetGenerateButton()
             }
+        } catch (e: Exception) {
+            Log.e("ResumeActivity", "Exception in generateResumeFromText: ${e.message}", e)
+            showErrorAndReset("Generation failed: ${e.message}")
+        } finally {
+            resetGenerateButton()
         }
     }
+}
 
     private suspend fun <T> retryApiCall(
-        maxRetries: Int = 2,
-        initialDelay: Long = 1000L,
-        block: suspend () -> ApiService.ApiResult<T>
-    ): ApiService.ApiResult<T> {
-        var lastResult: ApiService.ApiResult<T>? = null
-        repeat(maxRetries) { attempt ->
-            val result = block()
-            if (result is ApiService.ApiResult.Success) return result
-            lastResult = result
-            if (attempt < maxRetries - 1) {
-                val delayTime = initialDelay * (attempt + 1)
-                Log.d("ResumeActivity", "Retry ${attempt + 1}/$maxRetries in ${delayTime}ms")
-                delay(delayTime)
-            }
+    maxRetries: Int = 2,
+    initialDelay: Long = 1000L,
+    block: suspend () -> ApiService.ApiResult<T>
+): ApiService.ApiResult<T> {
+    var lastResult: ApiService.ApiResult<T>? = null
+    repeat(maxRetries) { attempt ->
+        val result = block()
+        if (result is ApiService.ApiResult.Success) return result
+        lastResult = result
+        if (attempt < maxRetries - 1) {
+            val delayTime = initialDelay * (attempt + 1)
+            Log.d("ResumeActivity", "Retry ${attempt + 1}/$maxRetries in ${delayTime}ms")
+            delay(delayTime)
         }
-        return lastResult ?: ApiService.ApiResult.Error("All retry attempts failed")
     }
+    return lastResult ?: ApiService.ApiResult.Error("All retry attempts failed")
+}
 
     /** ---------------- Display & Download ---------------- **/
     private fun displayGeneratedResume(resumeData: JSONObject) {
@@ -638,31 +671,65 @@ class ResumeGenerationActivity : AppCompatActivity() {
         startActivity(Intent.createChooser(shareIntent, "Share Resume"))
     }
 
-    /** ---------------- Credit Display ---------------- **/
-    private suspend fun updateCreditDisplay() {
-        Log.d("ResumeActivity", "Fetching user credits...")
+   private suspend fun ensureAuthenticatedBeforeApiCall(): Boolean {
+    if (!userManager.isUserLoggedIn()) {
+        Log.e("ResumeActivity", "❌ User not logged in for API call")
+        withContext(Dispatchers.Main) {
+            showError("Please log in to continue")
+            binding.creditText.text = "Credits: Please log in"
+        }
+        return false
+    }
+    
+    val userId = userManager.getCurrentUserId()
+    if (userId.isNullOrBlank()) {
+        Log.e("ResumeActivity", "❌ User ID is null for API call")
+        withContext(Dispatchers.Main) {
+            showError("Authentication error. Please log out and log in again.")
+            binding.creditText.text = "Credits: Auth error"
+        }
+        return false
+    }
+    
+    Log.d("ResumeActivity", "✅ User authenticated for API call: ${userId.take(8)}...")
+    return true
+}
 
-        when (val result = apiService.getUserCredits()) {
-            is ApiService.ApiResult.Success -> {
-                val credits = result.data.optInt("available_credits", 0)
-                Log.d("ResumeActivity", "Credits retrieved: $credits")
+/** ---------------- Credit Display ---------------- **/
+private suspend fun updateCreditDisplay() {
+    Log.d("ResumeActivity", "Fetching user credits...")
 
-                withContext(Dispatchers.Main) {
-                    binding.creditText.text = "Credits: $credits"
-                }
+    // Check authentication first
+    if (!ensureAuthenticatedBeforeApiCall()) {
+        return
+    }
+
+    when (val result = apiService.getUserCredits()) {
+        is ApiService.ApiResult.Success -> {
+            val credits = result.data.optInt("available_credits", 0)
+            Log.d("ResumeActivity", "Credits retrieved: $credits")
+
+            withContext(Dispatchers.Main) {
+                binding.creditText.text = "Credits: $credits"
             }
+        }
 
-            is ApiService.ApiResult.Error -> {
-                Log.e("ResumeActivity", "Failed to fetch credits: ${result.message}")
-                withContext(Dispatchers.Main) {
-                    binding.creditText.text = "Credits: --"
-                    if (result.code == 401) {
-                        showError("Authentication failed. Please log in again.")
-                    }
+        is ApiService.ApiResult.Error -> {
+            Log.e("ResumeActivity", "Failed to fetch credits: ${result.message}")
+            withContext(Dispatchers.Main) {
+                binding.creditText.text = "Credits: Error"
+                if (result.code == 401) {
+                    showError("Authentication failed. Please log in again.")
+                    // Force logout to clear invalid state
+                    userManager.logout()
+                    checkGenerateButtonState()
+                } else {
+                    showError("Failed to load credits: ${result.message}")
                 }
             }
         }
     }
+}
 
     /** ---------------- Debug Methods ---------------- **/
     private fun runApiServiceDebug() {
