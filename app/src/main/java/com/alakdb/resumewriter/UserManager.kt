@@ -116,17 +116,28 @@ class UserManager(private val context: Context) {
             }
     }
 
-    /** Check if user is logged in - SIMPLIFIED for UID-based auth */
-    fun isUserLoggedIn(): Boolean {
-        val hasFirebaseUser = auth.currentUser != null
-        val isRegistered = prefs.getBoolean(IS_REGISTERED_KEY, false)
-        val hasUserId = getCurrentUserId() != null
-        
-        Log.d("UserManager", "Login check - Firebase: $hasFirebaseUser, Registered: $isRegistered, HasUserID: $hasUserId")
-        
-        // For UID-based auth, we only need Firebase user and registration status
-        return hasFirebaseUser && isRegistered && hasUserId
+    
+    /** Check if user is logged in - ENHANCED for UID-based auth */
+fun isUserLoggedIn(): Boolean {
+    val firebaseUser = auth.currentUser
+    val isRegistered = prefs.getBoolean(IS_REGISTERED_KEY, false)
+    val hasUserId = !getCurrentUserId().isNullOrBlank()
+    
+    Log.d("UserManager", "Login check - Firebase: ${firebaseUser != null}, Registered: $isRegistered, HasUserID: $hasUserId")
+    
+    // For UID-based auth, we need all three to be true
+    val isLoggedIn = firebaseUser != null && isRegistered && hasUserId
+    
+    if (!isLoggedIn) {
+        Log.w("UserManager", "User not properly logged in. Clearing data...")
+        // Auto-cleanup if inconsistent state
+        if (firebaseUser == null) {
+            logout()
+        }
     }
+    
+    return isLoggedIn
+}
 
     /** Get current user email */
     fun getCurrentUserEmail(): String? {
