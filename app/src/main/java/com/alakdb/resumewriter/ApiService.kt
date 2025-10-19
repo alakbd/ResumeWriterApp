@@ -77,10 +77,7 @@ class ApiService(private val context: Context) {
     Log.d("DEBUG_HTTP", "⬅️ Response ${response.code}: ${response.message}")
     response
 }
-    OkHttpClient.Builder()
-    .addInterceptor(loggingInterceptor)
-    .addInterceptor(SecureAuthInterceptor(userManager, BuildConfig.APP_SECRET_KEY))
-    .addInterceptor(DetailedLoggingInterceptor())
+   
     
     
     // Secure Auth Interceptor for spoof-proof UID authentication
