@@ -42,8 +42,8 @@ class ResumeGenerationActivity : AppCompatActivity() {
     private lateinit var jobDescPicker: ActivityResultLauncher<String>
 
     private companion object {
-        const val MAX_RETRIES = 3
-        const val RETRY_DELAY_MS = 2000L
+        const val MAX_RETRIES = 5
+        const val RETRY_DELAY_MS = 3000L
     }
 
     override fun onCreate(savedInstanceState: Bundle?) {
@@ -63,7 +63,7 @@ class ResumeGenerationActivity : AppCompatActivity() {
 
         // Test connection safely
         lifecycleScope.launch {
-            delay(1000) // Wait for initialization
+            delay(30000) // Wait for initialization
             testApiConnection()
         }
     }
