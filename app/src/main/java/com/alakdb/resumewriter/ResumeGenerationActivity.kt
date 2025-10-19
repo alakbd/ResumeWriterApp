@@ -18,7 +18,7 @@ import androidx.appcompat.app.AppCompatActivity
 import androidx.lifecycle.lifecycleScope
 import androidx.appcompat.app.AlertDialog
 import android.content.DialogInterface
-import com.alakdb.resumewriter.usermanager.UserManager
+import com.alakdb.resumewriter.UserManager
 import com.alakdb.resumewriter.BuildConfig
 import com.alakdb.resumewriter.databinding.ActivityResumeGenerationBinding
 import com.google.firebase.auth.FirebaseAuth
