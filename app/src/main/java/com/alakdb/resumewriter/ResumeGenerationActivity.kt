@@ -42,7 +42,7 @@ class ResumeGenerationActivity : AppCompatActivity() {
     private lateinit var jobDescPicker: ActivityResultLauncher<String>
 
     private companion object {
-        const val MAX_RETRIES = 5
+        const val MAX_RETRIES = 4
         const val RETRY_DELAY_MS = 3000L
     }
 
@@ -69,58 +69,136 @@ class ResumeGenerationActivity : AppCompatActivity() {
     }
 
     private fun comprehensiveAuthDebug() {
-        lifecycleScope.launch {
-            Log.d("DEBUG", "=== COMPREHENSIVE AUTH DEBUG ===")
+    lifecycleScope.launch {
+        val debugInfo = StringBuilder()
+        debugInfo.appendLine("=== COMPREHENSIVE AUTH DEBUG ===")
+        
+        // 1. Check Firebase Auth state
+        val firebaseUser = FirebaseAuth.getInstance().currentUser
+        debugInfo.appendLine("1. FIREBASE AUTH STATE:")
+        debugInfo.appendLine("   • User ID: ${firebaseUser?.uid ?: "NULL"}")
+        debugInfo.appendLine("   • Email: ${firebaseUser?.email ?: "NULL"}")
+        debugInfo.appendLine("   • Email Verified: ${firebaseUser?.isEmailVerified ?: false}")
+        
+        // 2. Check UserManager state
+        debugInfo.appendLine("2. USER MANAGER STATE:")
+        debugInfo.appendLine("   • Is User Logged In: ${userManager.isUserLoggedIn()}")
+        debugInfo.appendLine("   • User ID: ${userManager.getCurrentUserId() ?: "NULL"}")
+        debugInfo.appendLine("   • User Email: ${userManager.getCurrentUserEmail() ?: "NULL"}")
+        
+        // 3. Check SharedPreferences directly
+        debugInfo.appendLine("3. SHARED PREFERENCES:")
+        val prefs = getSharedPreferences("user_prefs", Context.MODE_PRIVATE)
+        val allEntries = prefs.all
+        allEntries.forEach { (key, value) ->
+            debugInfo.appendLine("   • $key: $value")
+        }
+        
+        // 4. Check network connectivity
+        debugInfo.appendLine("4. NETWORK:")
+        debugInfo.appendLine("   • Available: ${isNetworkAvailable()}")
+        
+        // 5. Test server connection without auth
+        debugInfo.appendLine("5. BASIC SERVER CONNECTION:")
+        val connectionResult = apiService.testConnection()
+        when (connectionResult) {
+            is ApiService.ApiResult.Success -> {
+                debugInfo.appendLine("   • ✅ Server connection successful")
+                debugInfo.appendLine("   • Response: ${connectionResult.data}")
+            }
+            is ApiService.ApiResult.Error -> {
+                debugInfo.appendLine("   • ❌ Server connection failed: ${connectionResult.message}")
+                debugInfo.appendLine("   • Error code: ${connectionResult.code}")
+            }
+        }
+        
+        // 6. Check if user ID is available for auth
+        val userId = userManager.getCurrentUserId()
+        debugInfo.appendLine("6. AUTHENTICATION READINESS:")
+        if (!userId.isNullOrBlank()) {
+            debugInfo.appendLine("   • ✅ User ID available: ${userId.take(8)}...")
             
-            // 1. Check Firebase Auth state
-            val firebaseUser = FirebaseAuth.getInstance().currentUser
-            Log.d("DEBUG", "Firebase User: ${firebaseUser?.uid ?: "NULL"}")
-            Log.d("DEBUG", "Firebase Email: ${firebaseUser?.email ?: "NULL"}")
+            // 7. Test BuildConfig app secret
+            debugInfo.appendLine("7. APP CONFIGURATION:")
+            try {
+                val appSecret = BuildConfig.APP_SECRET_KEY
+                debugInfo.appendLine("   • App Secret: ${if (appSecret.isBlank()) "BLANK" else "CONFIGURED"}")
+                debugInfo.appendLine("   • Secret length: ${appSecret.length}")
+            } catch (e: Exception) {
+                debugInfo.appendLine("   • ❌ BuildConfig error: ${e.message}")
+            }
             
-            // 2. Check UserManager state
-            Log.d("DEBUG", "UserManager logged in: ${userManager.isUserLoggedIn()}")
-            Log.d("DEBUG", "UserManager user ID: ${userManager.getCurrentUserId()}")
-            Log.d("DEBUG", "UserManager email: ${userManager.getCurrentUserEmail()}")
-            
-            // 3. Check network connectivity
-            Log.d("DEBUG", "Network available: ${isNetworkAvailable()}")
-            
-            // 4. Test server connection without auth
-            Log.d("DEBUG", "Testing server connection...")
-            val connectionResult = apiService.testConnection()
-            when (connectionResult) {
+            // 8. Test secure authentication with server
+            debugInfo.appendLine("8. SECURE AUTHENTICATION TEST:")
+            val creditsResult = apiService.getUserCredits()
+            when (creditsResult) {
                 is ApiService.ApiResult.Success -> {
-                    Log.d("DEBUG", "✅ Server connection successful")
-                    Log.d("DEBUG", "Response: ${connectionResult.data}")
+                    debugInfo.appendLine("   • ✅ Secure Authentication SUCCESS!")
+                    debugInfo.appendLine("   • Credits data: ${creditsResult.data}")
+                    val credits = creditsResult.data.optInt("available_credits", -1)
+                    debugInfo.appendLine("   • Available credits: $credits")
                 }
                 is ApiService.ApiResult.Error -> {
-                    Log.e("DEBUG", "❌ Server connection failed: ${connectionResult.message}")
+                    debugInfo.appendLine("   • ❌ Secure Authentication FAILED")
+                    debugInfo.appendLine("   • Error: ${creditsResult.message}")
+                    debugInfo.appendLine("   • Error code: ${creditsResult.code}")
+                    debugInfo.appendLine("   • Details: ${creditsResult.details ?: "None"}")
+                    
+                    // Additional diagnostic for common errors
+                    when (creditsResult.code) {
+                        401 -> debugInfo.appendLine("   • 🔍 Diagnosis: Authentication rejected by server")
+                        403 -> debugInfo.appendLine("   • 🔍 Diagnosis: Signature validation failed")
+                        500 -> debugInfo.appendLine("   • 🔍 Diagnosis: Server internal error")
+                        0 -> debugInfo.appendLine("   • 🔍 Diagnosis: Network connection failed")
+                        -1 -> debugInfo.appendLine("   • 🔍 Diagnosis: Local exception occurred")
+                    }
                 }
             }
             
-            // 5. Test secure authentication with server
-            Log.d("DEBUG", "Testing secure authentication...")
-            val userId = userManager.getCurrentUserId()
-            if (!userId.isNullOrBlank()) {
-                Log.d("DEBUG", "User ID available, testing API call...")
-                val creditsResult = apiService.getUserCredits()
-                when (creditsResult) {
-                    is ApiService.ApiResult.Success -> {
-                        Log.d("DEBUG", "✅ Secure Authentication SUCCESS!")
-                        Log.d("DEBUG", "Credits data: ${creditsResult.data}")
-                    }
-                    is ApiService.ApiResult.Error -> {
-                        Log.e("DEBUG", "❌ Secure Authentication FAILED: ${creditsResult.message}")
-                        Log.e("DEBUG", "Error code: ${creditsResult.code}")
-                    }
+            // 9. Test the security endpoint directly
+            debugInfo.appendLine("9. SECURITY ENDPOINT TEST:")
+            val securityTest = apiService.testSecureAuth()
+            when (securityTest) {
+                is ApiService.ApiResult.Success -> {
+                    debugInfo.appendLine("   • ✅ Security endpoint SUCCESS")
+                    debugInfo.appendLine("   • Response: ${securityTest.data}")
                 }
-            } else {
-                Log.e("DEBUG", "❌ No user ID available for testing")
+                is ApiService.ApiResult.Error -> {
+                    debugInfo.appendLine("   • ❌ Security endpoint FAILED: ${securityTest.message}")
+                }
             }
-            
-            Log.d("DEBUG", "=== END DEBUG ===")
+        } else {
+            debugInfo.appendLine("   • ❌ No user ID available for authentication")
+            debugInfo.appendLine("   • 🔍 Diagnosis: User needs to log in again")
+        }
+        
+        debugInfo.appendLine("10. RECOMMENDED ACTION:")
+        when {
+            userId.isNullOrBlank() -> debugInfo.appendLine("   • 👉 Please log out and log in again")
+            connectionResult is ApiService.ApiResult.Error -> debugInfo.appendLine("   • 👉 Check server connectivity")
+            creditsResult is ApiService.ApiResult.Error -> {
+                when (creditsResult.code) {
+                    401 -> debugInfo.appendLine("   • 👉 Re-authenticate: Log out and log in")
+                    403 -> debugInfo.appendLine("   • 👉 Check APP_SECRET_KEY configuration")
+                    else -> debugInfo.appendLine("   • 👉 Check server status and network")
+                }
+            }
+            else -> debugInfo.appendLine("   • ✅ Everything looks good!")
+        }
+        
+        debugInfo.appendLine("=== END DEBUG ===")
+        
+        // Log to logcat
+        Log.d("DEBUG", debugInfo.toString())
+        
+        // Also display in UI for easy viewing
+        withContext(Dispatchers.Main) {
+            binding.tvGeneratedResume.text = debugInfo.toString()
+            binding.layoutDownloadButtons.visibility = View.GONE
         }
     }
+}
+
     
     override fun onResume() {
         super.onResume()
@@ -203,9 +281,11 @@ class ResumeGenerationActivity : AppCompatActivity() {
         
         // Add debug button
         binding.btnDebugAuth.setOnClickListener {
-            runApiServiceDebug()
+            binding.progressGenerate.visibility = View.VISIBLE
+            binding.tvGeneratedResume.text = "Running comprehensive debug..."
+            comprehensiveAuthDebug()
+            }
         }
-    }
 
     private fun checkGenerateButtonState() {
         val hasFiles = selectedResumeUri != null && selectedJobDescUri != null
@@ -662,6 +742,63 @@ class ResumeGenerationActivity : AppCompatActivity() {
         ).show()
     }
 
+    private fun testAuthStepByStep() {
+    lifecycleScope.launch {
+        binding.tvGeneratedResume.text = "Testing authentication step by step..."
+        
+        val steps = StringBuilder()
+        steps.appendLine("🔍 AUTHENTICATION STEP-BY-STEP TEST")
+        steps.appendLine()
+        
+        // Step 1: Check local authentication
+        steps.appendLine("1. LOCAL AUTHENTICATION")
+        val userId = userManager.getCurrentUserId()
+        if (!userId.isNullOrBlank()) {
+            steps.appendLine("   ✅ User ID: ${userId.take(8)}...")
+        } else {
+            steps.appendLine("   ❌ No user ID - cannot proceed")
+            updateUIWithResults(steps)
+            return@launch
+        }
+        
+        // Step 2: Test basic connection
+        steps.appendLine("2. BASIC CONNECTION")
+        val connection = apiService.testConnection()
+        if (connection is ApiService.ApiResult.Success) {
+            steps.appendLine("   ✅ Server is reachable")
+        } else {
+            steps.appendLine("   ❌ Server unreachable: ${(connection as ApiService.ApiResult.Error).message}")
+            updateUIWithResults(steps)
+            return@launch
+        }
+        
+        // Step 3: Test secure authentication
+        steps.appendLine("3. SECURE AUTHENTICATION")
+        val credits = apiService.getUserCredits()
+        when (credits) {
+            is ApiService.ApiResult.Success -> {
+                steps.appendLine("   ✅ Authentication SUCCESS!")
+                val creditCount = credits.data.optInt("available_credits", 0)
+                steps.appendLine("   📊 Available credits: $creditCount")
+            }
+            is ApiService.ApiResult.Error -> {
+                steps.appendLine("   ❌ Authentication FAILED")
+                steps.appendLine("   💡 Error: ${credits.message} (Code: ${credits.code})")
+            }
+        }
+        
+        updateUIWithResults(steps)
+    }
+}
+
+    private fun updateUIWithResults(steps: StringBuilder) {
+        lifecycleScope.launch(Dispatchers.Main) {
+            binding.tvGeneratedResume.text = steps.toString()
+            binding.layoutDownloadButtons.visibility = View.GONE
+    }
+}
+
+    
     private fun testServerDirectly() {
         lifecycleScope.launch {
             Log.d("DirectTest", "Testing server endpoints directly...")
