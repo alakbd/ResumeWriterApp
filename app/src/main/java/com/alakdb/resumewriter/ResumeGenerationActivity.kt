@@ -110,7 +110,13 @@ class ResumeGenerationActivity : AppCompatActivity() {
 
             // 4. Check network connectivity
             debugInfo.appendLine("4. NETWORK:")
-            debugInfo.appendLine("   • Available: ${isNetworkAvailable()}")
+                try {
+                val networkAvailable = isNetworkAvailable()  // uses the modern version
+                debugInfo.appendLine("   • Available: $networkAvailable")
+            } catch (e: Exception) {
+                debugInfo.appendLine("   • ⚠️ Error checking network: ${e.message}")
+                    Log.e("DEBUG", "Network check failed", e)
+                    }
 
             // 5. Test server connection without auth
             debugInfo.appendLine("5. BASIC SERVER CONNECTION:")
@@ -222,20 +228,7 @@ class ResumeGenerationActivity : AppCompatActivity() {
         }
     }
 
-    @Suppress("DEPRECATION")
-private fun isNetworkAvailable(): Boolean {
-    val connectivityManager = getSystemService(Context.CONNECTIVITY_SERVICE) as ConnectivityManager
-    return if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.M) {
-        val network = connectivityManager.activeNetwork ?: return false
-        val capabilities = connectivityManager.getNetworkCapabilities(network) ?: return false
-        capabilities.hasTransport(NetworkCapabilities.TRANSPORT_WIFI) ||
-                capabilities.hasTransport(NetworkCapabilities.TRANSPORT_CELLULAR) ||
-                capabilities.hasTransport(NetworkCapabilities.TRANSPORT_ETHERNET)
-    } else {
-        val networkInfo = connectivityManager.activeNetworkInfo
-        networkInfo != null && networkInfo.isConnected
-    }
-}
+
 
     
     override fun onResume() {
