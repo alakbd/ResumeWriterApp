@@ -123,9 +123,9 @@ class SecureAuthInterceptor(
 
         Log.d("SecureAuth", "✅ Added X-User-ID for user: ${userId.take(8)}... to: ${originalRequest.method} $url")
         return chain.proceed(newRequest)
+        }
     }
 }
-
     
 
     // Data Classes
