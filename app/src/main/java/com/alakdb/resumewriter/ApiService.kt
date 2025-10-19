@@ -70,47 +70,55 @@ class ApiService(private val context: Context) {
     
     // Secure Auth Interceptor for spoof-proof UID authentication
     class SecureAuthInterceptor(
-        private val userManager: UserManager,
-        private val appSecretKey: String
-    ) : Interceptor {
-        override fun intercept(chain: Interceptor.Chain): Response {
-            val originalRequest = chain.request()
-            val url = originalRequest.url.toString()
+    private val userManager: UserManager,
+    private val appSecretKey: String
+) : Interceptor {
+    override fun intercept(chain: Interceptor.Chain): Response {
+        val originalRequest = chain.request()
+        val url = originalRequest.url.toString()
 
-            // Skip auth for public endpoints
-            val publicEndpoints = listOf("/health", "/test")
-            if (publicEndpoints.any { url.contains(it) }) {
-                return chain.proceed(originalRequest)
-            }
-
-            // Get user ID from UserManager
-            val userId = userManager.getCurrentUserId()
-            if (userId.isNullOrBlank()) {
-                Log.w("SecureAuth", "No user ID available for: $url")
-                return chain.proceed(originalRequest)
-            }
-
-            // Generate security headers using the BuildConfig key
-            val timestamp = System.currentTimeMillis().toString()
-            val signature = generateSignature(userId, timestamp, url, appSecretKey)
-
-            val newRequest = originalRequest.newBuilder()
-                .addHeader("X-User-ID", userId)
-                .addHeader("X-Timestamp", timestamp)
-                .addHeader("X-Signature", signature)
-                .addHeader("X-Request-Path", url)
-                .addHeader("User-Agent", "ResumeWriter-Android")
-                .build()
-            
-            Log.d("SecureAuth", "Added secure headers for user: ${userId.take(8)}...")
-            return chain.proceed(newRequest)
+        // Skip auth for public endpoints
+        val publicEndpoints = listOf("/health", "/test", "/")
+        if (publicEndpoints.any { url.contains(it) }) {
+            Log.d("SecureAuth", "Skipping auth for public endpoint: $url")
+            return chain.proceed(originalRequest)
         }
 
-        private fun generateSignature(userId: String, timestamp: String, url: String, secret: String): String {
-            val data = "$userId|$timestamp|$url|$secret"
-            return data.sha256()
+        // Get user ID from UserManager
+        val userId = userManager.getCurrentUserId()
+        if (userId.isNullOrBlank()) {
+            Log.e("SecureAuth", "❌ No user ID available for protected endpoint: $url")
+            // Instead of proceeding, throw a meaningful exception
+            throw IOException("User not authenticated. Please log in again.")
         }
+
+        // Validate app secret key
+        if (appSecretKey.isBlank() || appSecretKey == "default_secret") {
+            Log.e("SecureAuth", "❌ App secret key is not properly configured")
+            throw IOException("App configuration error. Please contact support.")
+        }
+
+        // Generate security headers using the BuildConfig key
+        val timestamp = System.currentTimeMillis().toString()
+        val signature = generateSignature(userId, timestamp, url, appSecretKey)
+
+        val newRequest = originalRequest.newBuilder()
+            .addHeader("X-User-ID", userId)
+            .addHeader("X-Timestamp", timestamp)
+            .addHeader("X-Signature", signature)
+            .addHeader("X-Request-Path", url)
+            .addHeader("User-Agent", "ResumeWriter-Android")
+            .build()
+        
+        Log.d("SecureAuth", "✅ Added secure headers for user: ${userId.take(8)}... to: $url")
+        return chain.proceed(newRequest)
     }
+
+    private fun generateSignature(userId: String, timestamp: String, url: String, secret: String): String {
+        val data = "$userId|$timestamp|$url|$secret"
+        return data.sha256()
+    }
+}
 
     
 
@@ -320,36 +328,49 @@ class ApiService(private val context: Context) {
     }
 
     suspend fun getUserCredits(): ApiResult<JSONObject> {
-        return try {
-            Log.d("ApiService", "Getting user credits...")
+    return try {
+        Log.d("ApiService", "Getting user credits...")
 
-            val request = Request.Builder()
-                .url("$baseUrl/user/credits")
-                .get()
-                .build()
+        val request = Request.Builder()
+            .url("$baseUrl/user/credits")
+            .get()
+            .build()
 
-            client.newCall(request).execute().use { response ->
-                val respBody = response.body?.string() ?: "{}"
-                Log.d("ApiService", "Credits response: ${response.code}")
+        client.newCall(request).execute().use { response ->
+            val respBody = response.body?.string() ?: "{}"
+            Log.d("ApiService", "Credits response: ${response.code}")
 
-                if (!response.isSuccessful) {
-                    Log.e("ApiService", "Failed to fetch credits: HTTP ${response.code}")
-                    return ApiResult.Error(
-                        message = "Failed to get credits: ${response.message}",
-                        code = response.code
-                    )
-                }
-
-                ApiResult.Success(JSONObject(respBody))
+            if (!response.isSuccessful) {
+                Log.e("ApiService", "Failed to fetch credits: HTTP ${response.code}")
+                return ApiResult.Error(
+                    message = "Failed to get credits: ${response.message}",
+                    code = response.code,
+                    details = respBody
+                )
             }
-        } catch (e: Exception) {
-            Log.e("ApiService", "Exception while fetching credits", e)
-            ApiResult.Error(
-                message = "Network error: ${e.message}",
-                code = -1
-            )
+
+            // Parse the response to ensure it's valid JSON
+            try {
+                val jsonResponse = JSONObject(respBody)
+                ApiResult.Success(jsonResponse)
+            } catch (e: Exception) {
+                Log.e("ApiService", "Invalid JSON response for credits", e)
+                ApiResult.Error(
+                    message = "Invalid server response",
+                    code = response.code,
+                    details = respBody
+                )
+            }
         }
+    } catch (e: Exception) {
+        Log.e("ApiService", "Exception while fetching credits: ${e.message}", e)
+        ApiResult.Error(
+            message = "Network error: ${e.message ?: "Unknown error"}",
+            code = -1,
+            details = e.stackTraceToString()
+        )
     }
+}
 
     // Test secure authentication
     suspend fun testSecureAuth(): ApiResult<JSONObject> {
