@@ -117,23 +117,31 @@ class UserManager(private val context: Context) {
     }
 
     
-    /** Check if user is logged in - ENHANCED for UID-based auth */
+
+/** Check if user is logged in - ENHANCED for UID-based auth */
 fun isUserLoggedIn(): Boolean {
     val firebaseUser = auth.currentUser
+    val userId = getCurrentUserId()
     val isRegistered = prefs.getBoolean(IS_REGISTERED_KEY, false)
-    val hasUserId = !getCurrentUserId().isNullOrBlank()
     
-    Log.d("UserManager", "Login check - Firebase: ${firebaseUser != null}, Registered: $isRegistered, HasUserID: $hasUserId")
+    Log.d("UserManager", "Login check - Firebase: ${firebaseUser != null}, UserID: ${!userId.isNullOrBlank()}, Registered: $isRegistered")
     
     // For UID-based auth, we need all three to be true
-    val isLoggedIn = firebaseUser != null && isRegistered && hasUserId
+    val isLoggedIn = firebaseUser != null && !userId.isNullOrBlank() && isRegistered
     
     if (!isLoggedIn) {
-        Log.w("UserManager", "User not properly logged in. Clearing data...")
-        // Auto-cleanup if inconsistent state
-        if (firebaseUser == null) {
+        Log.w("UserManager", "❌ User not properly logged in. State inconsistent.")
+        
+        // Auto-cleanup if Firebase user exists but local data is missing
+        if (firebaseUser != null && (userId.isNullOrBlank() || !isRegistered)) {
+            Log.w("UserManager", "🔄 Auto-fixing inconsistent state...")
+            saveUserDataLocally(firebaseUser.email ?: "", firebaseUser.uid)
+        } else if (firebaseUser == null) {
+            // Clear everything if no Firebase user
             logout()
         }
+    } else {
+        Log.d("UserManager", "✅ User properly logged in: ${userId?.take(8)}...")
     }
     
     return isLoggedIn
