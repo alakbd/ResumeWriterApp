@@ -97,7 +97,7 @@ class ApiService(private val context: Context) {
                 .protocol(Protocol.HTTP_1_1)
                 .code(401) // Unauthorized
                 .message("User not authenticated")
-                .body("{ \"error\": \"User not authenticated. Please log in again.\" }".toRequestBody("application/json".toMediaType()))
+                .body("{ \"error\": \"User not authenticated. Please log in again.\" }".toResponseBody("application/json".toMediaType()))
                 .build()
         }
 
@@ -109,7 +109,7 @@ class ApiService(private val context: Context) {
                 .protocol(Protocol.HTTP_1_1)
                 .code(500)
                 .message("App configuration error")
-                .body("{ \"error\": \"App configuration error. Please contact support.\" }".toRequestBody("application/json".toMediaType()))
+                .body("{ \"error\": \"App configuration error. Please contact support.\" }".toResponseBody("application/json".toMediaType()))
                 .build()
         }
 
@@ -135,7 +135,7 @@ class ApiService(private val context: Context) {
                 .protocol(Protocol.HTTP_1_1)
                 .code(500)
                 .message("Security error")
-                .body("{ \"error\": \"Security configuration error: ${e.message}\" }".toRequestBody("application/json".toMediaType()))
+                .body("{ \"error\": \"Security configuration error: ${e.message}\" }".toResponseBody("application/json".toMediaType()))
                 .build()
         }
     }
