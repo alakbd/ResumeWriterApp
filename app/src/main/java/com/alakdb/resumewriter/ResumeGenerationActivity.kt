@@ -325,6 +325,28 @@ class ResumeGenerationActivity : AppCompatActivity() {
         return capabilities.hasCapability(NetworkCapabilities.NET_CAPABILITY_INTERNET)
     }
 
+    private suspend fun ensureUserAuthenticated(): Boolean {
+    if (!userManager.isUserLoggedIn()) {
+        Log.e("ResumeActivity", "User not logged in")
+        withContext(Dispatchers.Main) {
+            showError("Please log in to continue")
+        }
+        return false
+    }
+    
+    val userId = userManager.getCurrentUserId()
+    if (userId.isNullOrBlank()) {
+        Log.e("ResumeActivity", "User ID is null or blank")
+        withContext(Dispatchers.Main) {
+            showError("Authentication error. Please log in again.")
+        }
+        return false
+    }
+    
+    Log.d("ResumeActivity", "User authenticated: ${userId.take(8)}...")
+    return true
+}
+
     private fun testDirectConnection() {
         lifecycleScope.launch {
             Log.d("DirectTest", "Testing direct connection without interceptors...")
@@ -367,38 +389,56 @@ class ResumeGenerationActivity : AppCompatActivity() {
     
     /** ---------------- Resume Generation ---------------- **/
     private fun generateResumeFromFiles() {
-        val resumeUri = selectedResumeUri ?: return showError("Please select resume file")
-        val jobDescUri = selectedJobDescUri ?: return showError("Please select job description file")
+    val resumeUri = selectedResumeUri ?: return showError("Please select resume file")
+    val jobDescUri = selectedJobDescUri ?: return showError("Please select job description file")
 
-        disableGenerateButton("Processing...")
+    disableGenerateButton("Processing...")
 
-        lifecycleScope.launch {
-            try {
-                Log.d("ResumeActivity", "Checking user credits")
-                val creditResult = apiService.getUserCredits()
-                if (creditResult is ApiService.ApiResult.Success) {
+    lifecycleScope.launch {
+        try {
+            // Check authentication first
+            if (!ensureUserAuthenticated()) {
+                resetGenerateButton()
+                return@launch
+            }
+
+            Log.d("ResumeActivity", "Checking user credits")
+            val creditResult = apiService.getUserCredits()
+            
+            when (creditResult) {
+                is ApiService.ApiResult.Success -> {
                     val credits = creditResult.data.optInt("available_credits", 0)
                     Log.d("ResumeActivity", "User has $credits credits")
+                    
                     if (credits <= 0) {
                         showErrorAndReset("Insufficient credits. Please purchase more.")
                         return@launch
                     }
 
                     Log.d("ResumeActivity", "Generating resume from files")
-                    val genResult = retryApiCall { apiService.generateResumeFromFiles(resumeUri, jobDescUri) }
+                    val genResult = retryApiCall { 
+                        apiService.generateResumeFromFiles(resumeUri, jobDescUri) 
+                    }
                     handleGenerationResult(genResult)
-                } else if (creditResult is ApiService.ApiResult.Error) {
+                }
+                is ApiService.ApiResult.Error -> {
                     Log.e("ResumeActivity", "Failed to get credits: ${creditResult.message}")
                     showErrorAndReset("Failed to check credits: ${creditResult.message}")
+                    
+                    // If it's an auth error, suggest re-login
+                    if (creditResult.code == 401) {
+                        showError("Authentication failed. Please log out and log in again.")
+                    }
                 }
-            } catch (e: Exception) {
-                Log.e("ResumeActivity", "Exception in generateResumeFromFiles: ${e.message}", e)
-                showErrorAndReset("Generation failed: ${e.message}")
-            } finally {
-                resetGenerateButton()
             }
+        } catch (e: Exception) {
+            Log.e("ResumeActivity", "Exception in generateResumeFromFiles: ${e.message}", e)
+            showErrorAndReset("Generation failed: ${e.message}")
+        } finally {
+            resetGenerateButton()
         }
     }
+}
 
     private fun generateResumeFromText() {
         val resumeText = binding.etResumeText.text.toString().trim()
