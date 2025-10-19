@@ -67,6 +67,20 @@ class ApiService(private val context: Context) {
         }
     }
 
+    val loggingInterceptor = Interceptor { chain ->
+    val request = chain.request()
+    Log.d("DEBUG_HTTP", "➡️ ${request.method} ${request.url}")
+    request.headers.forEach { name, value ->
+        Log.d("DEBUG_HTTP", "   $name: $value")
+    }
+    val response = chain.proceed(request)
+    Log.d("DEBUG_HTTP", "⬅️ Response ${response.code}: ${response.message}")
+    response
+}
+    OkHttpClient.Builder()
+    .addInterceptor(loggingInterceptor)
+    .addInterceptor(SecureAuthInterceptor(userManager, BuildConfig.APP_SECRET_KEY))
+    .addInterceptor(DetailedLoggingInterceptor())
     
     
     // Secure Auth Interceptor for spoof-proof UID authentication
