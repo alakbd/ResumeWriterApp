@@ -54,6 +54,12 @@ class ResumeGenerationActivity : AppCompatActivity() {
         userManager = UserManager(this)
         apiService = ApiService(this)
         auth = FirebaseAuth.getInstance()
+        
+        // Ensure user info is saved in UserManager if logged in
+    FirebaseAuth.getInstance().currentUser?.uid?.let {
+        userManager.saveUser(it, FirebaseAuth.getInstance().currentUser?.email)
+        Log.d("ResumeActivity", "UserManager synced with Firebase UID: $it")
+    }
 
         // Debug calls
         checkEmailVerification()
@@ -63,10 +69,13 @@ class ResumeGenerationActivity : AppCompatActivity() {
 
         // Test connection safely
         lifecycleScope.launch {
-            delay(30000) // Wait for initialization
-            testApiConnection()
+            delay(30000)
+            if (ensureUserAuthenticated()) {
+                testApiConnection()
+            } else {
+                Log.e("ResumeActivity", "Skipped testApiConnection — user not authenticated yet.")
+            }
         }
-    }
 
     private fun comprehensiveAuthDebug() {
     lifecycleScope.launch {
@@ -100,16 +109,21 @@ class ResumeGenerationActivity : AppCompatActivity() {
 
         // 5. Test server connection without auth
         debugInfo.appendLine("5. BASIC SERVER CONNECTION:")
-        val connectionResult = apiService.testConnection()
-        when (connectionResult) {
-            is ApiService.ApiResult.Success -> {
-                debugInfo.appendLine("   • ✅ Server connection successful")
-                debugInfo.appendLine("   • Response: ${connectionResult.data}")
+        try {
+            val connectionResult = apiService.testConnection()
+            when (connectionResult) {
+                is ApiService.ApiResult.Success -> {
+                    debugInfo.appendLine("   • ✅ Server connection successful")
+                    debugInfo.appendLine("   • Response: ${connectionResult.data}")
+                }
+                is ApiService.ApiResult.Error -> {
+                    debugInfo.appendLine("   • ❌ Server connection failed: ${connectionResult.message}")
+                    debugInfo.appendLine("   • Error code: ${connectionResult.code}")
+                }
             }
-            is ApiService.ApiResult.Error -> {
-                debugInfo.appendLine("   • ❌ Server connection failed: ${connectionResult.message}")
-                debugInfo.appendLine("   • Error code: ${connectionResult.code}")
-            }
+        } catch (e: Exception) {
+            debugInfo.appendLine("   • ⚠️ Exception during server connection test: ${e.message}")
+            Log.e("DEBUG", "testConnection() failed", e)
         }
 
         // 6. Check if user ID is available for auth
@@ -376,7 +390,7 @@ class ResumeGenerationActivity : AppCompatActivity() {
                             showServerWakeupMessage()
                             
                             // Wait for server to wake up with fewer attempts
-                            val serverAwake = apiService.waitForServerWakeUp(maxAttempts = 5, delayBetweenAttempts = 3000L)
+                            val serverAwake = apiService.waitForServerWakeUp(maxAttempts = 12, delayBetweenAttempts = 10000L)
                             
                             if (serverAwake) {
                                 updateConnectionStatus("✅ Server is ready!", false)
