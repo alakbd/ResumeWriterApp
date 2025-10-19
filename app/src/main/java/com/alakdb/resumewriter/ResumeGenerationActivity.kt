@@ -183,7 +183,7 @@ private fun comprehensiveAuthDebug() {
 
     // Output final debug
     Log.d("DEBUG_AUTH", debugInfo.toString())
-    binding.tvDebugInfo.text = debugInfo.toString()
+
 }
 
 
