@@ -217,7 +217,7 @@ fun isUserLoggedIn(): Boolean {
     }
 
     /** Save user data locally in SharedPreferences */
-    private fun saveUserDataLocally(email: String, uid: String) {
+    fun saveUserDataLocally(email: String, uid: String) {
         prefs.edit().apply {
             putString(USER_EMAIL_KEY, email)
             putString(USER_ID_KEY, uid)
