@@ -78,40 +78,66 @@ class ApiService(private val context: Context) {
         val url = originalRequest.url.toString()
 
         // Skip auth for public endpoints
-        val publicEndpoints = listOf("/health", "/test", "/")
-        if (publicEndpoints.any { url.contains(it) }) {
-            Log.d("SecureAuth", "Skipping auth for public endpoint: $url")
+        val publicEndpoints = listOf("/health", "/test", "/", "/api")
+        if (publicEndpoints.any { endpoint -> url.contains(endpoint) }) {
+            Log.d("SecureAuth", "🔓 Skipping auth for public endpoint: $url")
             return chain.proceed(originalRequest)
         }
 
         // Get user ID from UserManager
         val userId = userManager.getCurrentUserId()
+        
+        // CRITICAL FIX: Check if user ID is valid
         if (userId.isNullOrBlank()) {
-            Log.e("SecureAuth", "❌ No user ID available for protected endpoint: $url")
-            // Instead of proceeding, throw a meaningful exception
-            throw IOException("User not authenticated. Please log in again.")
+            Log.e("SecureAuth", "❌ BLOCKED: No user ID available for protected endpoint: $url")
+            
+            // Create a meaningful error response instead of proceeding
+            return Response.Builder()
+                .request(originalRequest)
+                .protocol(Protocol.HTTP_1_1)
+                .code(401) // Unauthorized
+                .message("User not authenticated")
+                .body("{ \"error\": \"User not authenticated. Please log in again.\" }".toRequestBody("application/json".toMediaType()))
+                .build()
         }
 
         // Validate app secret key
         if (appSecretKey.isBlank() || appSecretKey == "default_secret") {
-            Log.e("SecureAuth", "❌ App secret key is not properly configured")
-            throw IOException("App configuration error. Please contact support.")
+            Log.e("SecureAuth", "❌ BLOCKED: App secret key is not properly configured")
+            return Response.Builder()
+                .request(originalRequest)
+                .protocol(Protocol.HTTP_1_1)
+                .code(500)
+                .message("App configuration error")
+                .body("{ \"error\": \"App configuration error. Please contact support.\" }".toRequestBody("application/json".toMediaType()))
+                .build()
         }
 
-        // Generate security headers using the BuildConfig key
-        val timestamp = System.currentTimeMillis().toString()
-        val signature = generateSignature(userId, timestamp, url, appSecretKey)
+        try {
+            // Generate security headers using the BuildConfig key
+            val timestamp = System.currentTimeMillis().toString()
+            val signature = generateSignature(userId, timestamp, url, appSecretKey)
 
-        val newRequest = originalRequest.newBuilder()
-            .addHeader("X-User-ID", userId)
-            .addHeader("X-Timestamp", timestamp)
-            .addHeader("X-Signature", signature)
-            .addHeader("X-Request-Path", url)
-            .addHeader("User-Agent", "ResumeWriter-Android")
-            .build()
-        
-        Log.d("SecureAuth", "✅ Added secure headers for user: ${userId.take(8)}... to: $url")
-        return chain.proceed(newRequest)
+            val newRequest = originalRequest.newBuilder()
+                .addHeader("X-User-ID", userId)
+                .addHeader("X-Timestamp", timestamp)
+                .addHeader("X-Signature", signature)
+                .addHeader("X-Request-Path", url)
+                .addHeader("User-Agent", "ResumeWriter-Android")
+                .build()
+            
+            Log.d("SecureAuth", "✅ Added secure headers for user: ${userId.take(8)}... to: ${originalRequest.method} $url")
+            return chain.proceed(newRequest)
+        } catch (e: Exception) {
+            Log.e("SecureAuth", "❌ Error creating secure request: ${e.message}")
+            return Response.Builder()
+                .request(originalRequest)
+                .protocol(Protocol.HTTP_1_1)
+                .code(500)
+                .message("Security error")
+                .body("{ \"error\": \"Security configuration error: ${e.message}\" }".toRequestBody("application/json".toMediaType()))
+                .build()
+        }
     }
 
     private fun generateSignature(userId: String, timestamp: String, url: String, secret: String): String {
