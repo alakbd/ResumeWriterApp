@@ -172,8 +172,8 @@ class ApiService(private val context: Context) {
     
         // Use a simple client without interceptors for connection testing
         val simpleClient = OkHttpClient.Builder()
-            .connectTimeout(10, TimeUnit.SECONDS)
-            .readTimeout(10, TimeUnit.SECONDS)
+            .connectTimeout(60, TimeUnit.SECONDS)
+            .readTimeout(60, TimeUnit.SECONDS)
             .build()
     
         val endpoints = listOf("/health", "/test", "/", "/api")
@@ -211,7 +211,7 @@ class ApiService(private val context: Context) {
         )
     }
 
-    suspend fun waitForServerWakeUp(maxAttempts: Int = 8, delayBetweenAttempts: Long = 5000L): Boolean {
+    suspend fun waitForServerWakeUp(maxAttempts: Int = 12, delayBetweenAttempts: Long = 10000L): Boolean {
         Log.d("ServerWakeUp", "🔄 Waiting for server to wake up...")
     
         repeat(maxAttempts) { attempt ->
@@ -494,13 +494,11 @@ class ApiService(private val context: Context) {
 
     // Enhanced Error Handling
     private fun handleErrorResponse(response: Response): String {
-        return try {
-            val body = response.body?.string()
-            "HTTP ${response.code}: ${response.message}. Body: $body"
-        } catch (e: Exception) {
-            "HTTP ${response.code}: ${response.message}"
-        }
-    }
+    val rawBody = try {
+        response.peekBody(Long.MAX_VALUE).string()
+    } catch (e: Exception) { "No body" }
+    return "HTTP ${response.code}: ${response.message}. Body: $rawBody"
+}
 
     private fun getErrorCode(e: Exception): Int = when (e) {
         is java.net.SocketTimeoutException -> 1002
