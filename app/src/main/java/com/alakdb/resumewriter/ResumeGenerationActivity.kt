@@ -83,81 +83,83 @@ class ResumeGenerationActivity : AppCompatActivity() {
     } // Added missing closing brace for onCreate()
 
     private fun comprehensiveAuthDebug() {
-        lifecycleScope.launch {
-            val debugInfo = StringBuilder()
-            debugInfo.appendLine("=== COMPREHENSIVE AUTH DEBUG ===")
+    lifecycleScope.launch {
+        val debugInfo = StringBuilder()
+        debugInfo.appendLine("=== COMPREHENSIVE AUTH DEBUG ===")
 
-            // 1. Check Firebase Auth state
-            val firebaseUser = FirebaseAuth.getInstance().currentUser
-            debugInfo.appendLine("1. FIREBASE AUTH STATE:")
-            debugInfo.appendLine("   • User ID: ${firebaseUser?.uid ?: "NULL"}")
-            debugInfo.appendLine("   • Email: ${firebaseUser?.email ?: "NULL"}")
-            debugInfo.appendLine("   • Email Verified: ${firebaseUser?.isEmailVerified ?: false}")
+        // 1. Check Firebase Auth state
+        val firebaseUser = FirebaseAuth.getInstance().currentUser
+        debugInfo.appendLine("1. FIREBASE AUTH STATE:")
+        debugInfo.appendLine("   • User ID: ${firebaseUser?.uid ?: "NULL"}")
+        debugInfo.appendLine("   • Email: ${firebaseUser?.email ?: "NULL"}")
+        debugInfo.appendLine("   • Email Verified: ${firebaseUser?.isEmailVerified ?: false}")
 
-            // 2. Check UserManager state
-            debugInfo.appendLine("2. USER MANAGER STATE:")
-            debugInfo.appendLine("   • Is User Logged In: ${userManager.isUserLoggedIn()}")
-            debugInfo.appendLine("   • User ID: ${userManager.getCurrentUserId() ?: "NULL"}")
-            debugInfo.appendLine("   • User Email: ${userManager.getCurrentUserEmail() ?: "NULL"}")
+        // 2. Check UserManager state
+        debugInfo.appendLine("2. USER MANAGER STATE:")
+        debugInfo.appendLine("   • Is User Logged In: ${userManager.isUserLoggedIn()}")
+        debugInfo.appendLine("   • User ID: ${userManager.getCurrentUserId() ?: "NULL"}")
+        debugInfo.appendLine("   • User Email: ${userManager.getCurrentUserEmail() ?: "NULL"}")
 
-            // 3. Check SharedPreferences directly
-            debugInfo.appendLine("3. SHARED PREFERENCES:")
-                val prefs = getSharedPreferences("user_prefs", Context.MODE_PRIVATE)
-                val allEntries = prefs.all
-                allEntries.forEach { (key, value) ->
+        // 3. Check SharedPreferences directly
+        debugInfo.appendLine("3. SHARED PREFERENCES:")
+        try {
+            val prefs = getSharedPreferences("user_prefs", Context.MODE_PRIVATE)
+            val allEntries = prefs.all
+            allEntries.forEach { (key, value) ->
                 debugInfo.appendLine("   • $key: $value")
+            }
+        } catch (e: Exception) {
+            debugInfo.appendLine("   • ⚠️ Error reading SharedPreferences: ${e.message}")
+        }
+
+        // 4. Check network connectivity
+        debugInfo.appendLine("4. NETWORK:")
+        try {
+            debugInfo.appendLine("   • Available: ${isNetworkAvailable()}")
+        } catch (e: Exception) {
+            debugInfo.appendLine("   • ⚠️ Error checking network: ${e.message}")
+        }
+
+        // 5. Test server connection without auth
+        debugInfo.appendLine("5. BASIC SERVER CONNECTION:")
+        try {
+            val connectionResult = apiService.testConnection()
+            when (connectionResult) {
+                is ApiService.ApiResult.Success -> {
+                    debugInfo.appendLine("   • ✅ Server connection successful")
+                    debugInfo.appendLine("   • Response: ${connectionResult.data}")
                 }
+                is ApiService.ApiResult.Error -> {
+                    debugInfo.appendLine("   • ❌ Server connection failed: ${connectionResult.message}")
+                    debugInfo.appendLine("   • Error code: ${connectionResult.code}")
+                }
+            }
+        } catch (e: Exception) {
+            debugInfo.appendLine("   • ⚠️ Exception during testConnection(): ${e.message}")
+            Log.e("DEBUG", "testConnection() failed", e)
+        }
 
-            // 4. Check network connectivity
-            debugInfo.appendLine("4. NETWORK:")
-                try {
-                val networkAvailable = isNetworkAvailable()  // uses the modern version
-                debugInfo.appendLine("   • Available: $networkAvailable")
-            } catch (e: Exception) {
-                debugInfo.appendLine("   • ⚠️ Error checking network: ${e.message}")
-                    Log.e("DEBUG", "Network check failed", e)
-                    }
+        // 6. Check if user ID is available for auth
+        val userId = userManager.getCurrentUserId()
+        var creditsResult: ApiService.ApiResult<org.json.JSONObject>? = null
+        debugInfo.appendLine("6. AUTHENTICATION READINESS:")
+        if (!userId.isNullOrBlank()) {
+            debugInfo.appendLine("   • ✅ User ID available: ${userId.take(8)}...")
 
-            // 5. Test server connection without auth
-            debugInfo.appendLine("5. BASIC SERVER CONNECTION:")
+            // 7. Test BuildConfig app secret
+            debugInfo.appendLine("7. APP CONFIGURATION:")
             try {
-                val connectionResult = apiService.testConnection()
-                when (connectionResult) {
-                    is ApiService.ApiResult.Success -> {
-                        debugInfo.appendLine("   • ✅ Server connection successful")
-                        debugInfo.appendLine("   • Response: ${connectionResult.data}")
-                    }
-                    is ApiService.ApiResult.Error -> {
-                        debugInfo.appendLine("   • ❌ Server connection failed: ${connectionResult.message}")
-                        debugInfo.appendLine("   • Error code: ${connectionResult.code}")
-                    }
-                }
+                val appSecret = BuildConfig.APP_SECRET_KEY
+                debugInfo.appendLine("   • App Secret: ${if (appSecret.isBlank()) "BLANK" else "CONFIGURED"}")
+                debugInfo.appendLine("   • Secret length: ${appSecret.length}")
             } catch (e: Exception) {
-                debugInfo.appendLine("   • ⚠️ Exception during server connection test: ${e.message}")
-                Log.e("DEBUG", "testConnection() failed", e)
+                debugInfo.appendLine("   • ❌ BuildConfig error: ${e.message}")
             }
 
-            // 6. Check if user ID is available for auth
-            val userId = userManager.getCurrentUserId()
-            var creditsResult: ApiService.ApiResult<org.json.JSONObject>? = null  // 👈 declared here
-
-            debugInfo.appendLine("6. AUTHENTICATION READINESS:")
-            if (!userId.isNullOrBlank()) {
-                debugInfo.appendLine("   • ✅ User ID available: ${userId.take(8)}...")
-
-                // 7. Test BuildConfig app secret
-                debugInfo.appendLine("7. APP CONFIGURATION:")
-                try {
-                    val appSecret = BuildConfig.APP_SECRET_KEY
-                    debugInfo.appendLine("   • App Secret: ${if (appSecret.isBlank()) "BLANK" else "CONFIGURED"}")
-                    debugInfo.appendLine("   • Secret length: ${appSecret.length}")
-                } catch (e: Exception) {
-                    debugInfo.appendLine("   • ❌ BuildConfig error: ${e.message}")
-                }
-
-                // 8. Test secure authentication with server
-                debugInfo.appendLine("8. SECURE AUTHENTICATION TEST:")
-                creditsResult = apiService.getUserCredits()   // 👈 assign to outer variable
+            // 8. Test secure authentication with server
+            debugInfo.appendLine("8. SECURE AUTHENTICATION TEST:")
+            try {
+                creditsResult = apiService.getUserCredits()
                 when (creditsResult) {
                     is ApiService.ApiResult.Success -> {
                         debugInfo.appendLine("   • ✅ Secure Authentication SUCCESS!")
@@ -170,21 +172,16 @@ class ResumeGenerationActivity : AppCompatActivity() {
                         debugInfo.appendLine("   • Error: ${creditsResult.message}")
                         debugInfo.appendLine("   • Error code: ${creditsResult.code}")
                         debugInfo.appendLine("   • Details: ${creditsResult.details ?: "None"}")
-
-                        // Additional diagnostic for common errors
-                        when (creditsResult.code) {
-                            401 -> debugInfo.appendLine("   • 🔍 Diagnosis: Authentication rejected by server")
-                            403 -> debugInfo.appendLine("   • 🔍 Diagnosis: Signature validation failed")
-                            500 -> debugInfo.appendLine("   • 🔍 Diagnosis: Server internal error")
-                            0 -> debugInfo.appendLine("   • 🔍 Diagnosis: Network connection failed")
-                            -1 -> debugInfo.appendLine("   • 🔍 Diagnosis: Local exception occurred")
-                        }
                     }
-                    null -> debugInfo.appendLine("   • ⚠️ No response received from server")
                 }
+            } catch (e: Exception) {
+                debugInfo.appendLine("   • ⚠️ Exception during getUserCredits(): ${e.message}")
+                Log.e("DEBUG", "getUserCredits() failed", e)
+            }
 
-                // 9. Test the security endpoint directly
-                debugInfo.appendLine("9. SECURITY ENDPOINT TEST:")
+            // 9. Test the security endpoint directly
+            debugInfo.appendLine("9. SECURITY ENDPOINT TEST:")
+            try {
                 val securityTest = apiService.testSecureAuth()
                 when (securityTest) {
                     is ApiService.ApiResult.Success -> {
@@ -195,38 +192,40 @@ class ResumeGenerationActivity : AppCompatActivity() {
                         debugInfo.appendLine("   • ❌ Security endpoint FAILED: ${securityTest.message}")
                     }
                 }
-            } else {
-                debugInfo.appendLine("   • ❌ No user ID available for authentication")
-                debugInfo.appendLine("   • 🔍 Diagnosis: User needs to log in again")
+            } catch (e: Exception) {
+                debugInfo.appendLine("   • ⚠️ Exception during testSecureAuth(): ${e.message}")
+                Log.e("DEBUG", "testSecureAuth() failed", e)
             }
 
-            // 10. Recommended actions
-            debugInfo.appendLine("10. RECOMMENDED ACTION:")
-            when {
-                userId.isNullOrBlank() -> debugInfo.appendLine("   • 👉 Please log out and log in again")
-                // Note: connectionResult is not accessible here since it's defined in try block
-                creditsResult is ApiService.ApiResult.Error -> {
-                    when (creditsResult.code) {
-                        401 -> debugInfo.appendLine("   • 👉 Re-authenticate: Log out and log in")
-                        403 -> debugInfo.appendLine("   • 👉 Check APP_SECRET_KEY configuration")
-                        else -> debugInfo.appendLine("   • 👉 Check server status and network")
-                    }
+        } else {
+            debugInfo.appendLine("   • ❌ No user ID available for authentication")
+            debugInfo.appendLine("   • 🔍 Diagnosis: User needs to log in again")
+        }
+
+        // 10. Recommended actions
+        debugInfo.appendLine("10. RECOMMENDED ACTION:")
+        when {
+            userId.isNullOrBlank() -> debugInfo.appendLine("   • 👉 Please log out and log in again")
+            creditsResult is ApiService.ApiResult.Error -> {
+                when (creditsResult.code) {
+                    401 -> debugInfo.appendLine("   • 👉 Re-authenticate: Log out and log in")
+                    403 -> debugInfo.appendLine("   • 👉 Check APP_SECRET_KEY configuration")
+                    else -> debugInfo.appendLine("   • 👉 Check server status and network")
                 }
-                else -> debugInfo.appendLine("   • ✅ Everything looks good!")
             }
+            else -> debugInfo.appendLine("   • ✅ Everything looks good!")
+        }
 
-            debugInfo.appendLine("=== END DEBUG ===")
+        debugInfo.appendLine("=== END DEBUG ===")
 
-            // Log to logcat
-            Log.d("DEBUG", debugInfo.toString())
-
-            // Also display in UI for easy viewing
-            withContext(Dispatchers.Main) {
-                binding.tvGeneratedResume.text = debugInfo.toString()
-                binding.layoutDownloadButtons.visibility = View.GONE
-            }
+        // Log and display in UI
+        Log.d("DEBUG", debugInfo.toString())
+        withContext(Dispatchers.Main) {
+            binding.tvGeneratedResume.text = debugInfo.toString()
+            binding.layoutDownloadButtons.visibility = View.GONE
         }
     }
+}
 
 
 
