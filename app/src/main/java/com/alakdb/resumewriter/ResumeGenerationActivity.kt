@@ -56,10 +56,10 @@ class ResumeGenerationActivity : AppCompatActivity() {
         auth = FirebaseAuth.getInstance()
         
         // Ensure user info is saved in UserManager if logged in
-    FirebaseAuth.getInstance().currentUser?.uid?.let {
-        userManager.saveUser(it, FirebaseAuth.getInstance().currentUser?.email)
-        Log.d("ResumeActivity", "UserManager synced with Firebase UID: $it")
-    }
+        FirebaseAuth.getInstance().currentUser?.uid?.let {
+            userManager.saveUser(it, FirebaseAuth.getInstance().currentUser?.email)
+            Log.d("ResumeActivity", "UserManager synced with Firebase UID: $it")
+        }
 
         // Debug calls
         checkEmailVerification()
@@ -76,144 +76,160 @@ class ResumeGenerationActivity : AppCompatActivity() {
                 Log.e("ResumeActivity", "Skipped testApiConnection — user not authenticated yet.")
             }
         }
+    } // Added missing closing brace for onCreate()
 
     private fun comprehensiveAuthDebug() {
-    lifecycleScope.launch {
-        val debugInfo = StringBuilder()
-        debugInfo.appendLine("=== COMPREHENSIVE AUTH DEBUG ===")
+        lifecycleScope.launch {
+            val debugInfo = StringBuilder()
+            debugInfo.appendLine("=== COMPREHENSIVE AUTH DEBUG ===")
 
-        // 1. Check Firebase Auth state
-        val firebaseUser = FirebaseAuth.getInstance().currentUser
-        debugInfo.appendLine("1. FIREBASE AUTH STATE:")
-        debugInfo.appendLine("   • User ID: ${firebaseUser?.uid ?: "NULL"}")
-        debugInfo.appendLine("   • Email: ${firebaseUser?.email ?: "NULL"}")
-        debugInfo.appendLine("   • Email Verified: ${firebaseUser?.isEmailVerified ?: false}")
+            // 1. Check Firebase Auth state
+            val firebaseUser = FirebaseAuth.getInstance().currentUser
+            debugInfo.appendLine("1. FIREBASE AUTH STATE:")
+            debugInfo.appendLine("   • User ID: ${firebaseUser?.uid ?: "NULL"}")
+            debugInfo.appendLine("   • Email: ${firebaseUser?.email ?: "NULL"}")
+            debugInfo.appendLine("   • Email Verified: ${firebaseUser?.isEmailVerified ?: false}")
 
-        // 2. Check UserManager state
-        debugInfo.appendLine("2. USER MANAGER STATE:")
-        debugInfo.appendLine("   • Is User Logged In: ${userManager.isUserLoggedIn()}")
-        debugInfo.appendLine("   • User ID: ${userManager.getCurrentUserId() ?: "NULL"}")
-        debugInfo.appendLine("   • User Email: ${userManager.getCurrentUserEmail() ?: "NULL"}")
+            // 2. Check UserManager state
+            debugInfo.appendLine("2. USER MANAGER STATE:")
+            debugInfo.appendLine("   • Is User Logged In: ${userManager.isUserLoggedIn()}")
+            debugInfo.appendLine("   • User ID: ${userManager.getCurrentUserId() ?: "NULL"}")
+            debugInfo.appendLine("   • User Email: ${userManager.getCurrentUserEmail() ?: "NULL"}")
 
-        // 3. Check SharedPreferences directly
-        debugInfo.appendLine("3. SHARED PREFERENCES:")
-        val prefs = getSharedPreferences("user_prefs", Context.MODE_PRIVATE)
-        val allEntries = prefs.all
-        allEntries.forEach { (key, value) ->
-            debugInfo.appendLine("   • $key: $value")
-        }
-
-        // 4. Check network connectivity
-        debugInfo.appendLine("4. NETWORK:")
-        debugInfo.appendLine("   • Available: ${isNetworkAvailable()}")
-
-        // 5. Test server connection without auth
-        debugInfo.appendLine("5. BASIC SERVER CONNECTION:")
-        try {
-            val connectionResult = apiService.testConnection()
-            when (connectionResult) {
-                is ApiService.ApiResult.Success -> {
-                    debugInfo.appendLine("   • ✅ Server connection successful")
-                    debugInfo.appendLine("   • Response: ${connectionResult.data}")
+            // 3. Check SharedPreferences directly
+            debugInfo.appendLine("3. SHARED PREFERENCES:")
+                val prefs = getSharedPreferences("user_prefs", Context.MODE_PRIVATE)
+                val allEntries = prefs.all
+                allEntries.forEach { (key, value) ->
+                debugInfo.appendLine("   • $key: $value")
                 }
-                is ApiService.ApiResult.Error -> {
-                    debugInfo.appendLine("   • ❌ Server connection failed: ${connectionResult.message}")
-                    debugInfo.appendLine("   • Error code: ${connectionResult.code}")
-                }
-            }
-        } catch (e: Exception) {
-            debugInfo.appendLine("   • ⚠️ Exception during server connection test: ${e.message}")
-            Log.e("DEBUG", "testConnection() failed", e)
-        }
 
-        // 6. Check if user ID is available for auth
-        val userId = userManager.getCurrentUserId()
-        var creditsResult: ApiService.ApiResult<org.json.JSONObject>? = null  // 👈 declared here
+            // 4. Check network connectivity
+            debugInfo.appendLine("4. NETWORK:")
+            debugInfo.appendLine("   • Available: ${isNetworkAvailable()}")
 
-        debugInfo.appendLine("6. AUTHENTICATION READINESS:")
-        if (!userId.isNullOrBlank()) {
-            debugInfo.appendLine("   • ✅ User ID available: ${userId.take(8)}...")
-
-            // 7. Test BuildConfig app secret
-            debugInfo.appendLine("7. APP CONFIGURATION:")
+            // 5. Test server connection without auth
+            debugInfo.appendLine("5. BASIC SERVER CONNECTION:")
             try {
-                val appSecret = BuildConfig.APP_SECRET_KEY
-                debugInfo.appendLine("   • App Secret: ${if (appSecret.isBlank()) "BLANK" else "CONFIGURED"}")
-                debugInfo.appendLine("   • Secret length: ${appSecret.length}")
-            } catch (e: Exception) {
-                debugInfo.appendLine("   • ❌ BuildConfig error: ${e.message}")
-            }
-
-            // 8. Test secure authentication with server
-            debugInfo.appendLine("8. SECURE AUTHENTICATION TEST:")
-            creditsResult = apiService.getUserCredits()   // 👈 assign to outer variable
-            when (creditsResult) {
-                is ApiService.ApiResult.Success -> {
-                    debugInfo.appendLine("   • ✅ Secure Authentication SUCCESS!")
-                    debugInfo.appendLine("   • Credits data: ${creditsResult.data}")
-                    val credits = creditsResult.data.optInt("available_credits", -1)
-                    debugInfo.appendLine("   • Available credits: $credits")
-                }
-                is ApiService.ApiResult.Error -> {
-                    debugInfo.appendLine("   • ❌ Secure Authentication FAILED")
-                    debugInfo.appendLine("   • Error: ${creditsResult.message}")
-                    debugInfo.appendLine("   • Error code: ${creditsResult.code}")
-                    debugInfo.appendLine("   • Details: ${creditsResult.details ?: "None"}")
-
-                    // Additional diagnostic for common errors
-                    when (creditsResult.code) {
-                        401 -> debugInfo.appendLine("   • 🔍 Diagnosis: Authentication rejected by server")
-                        403 -> debugInfo.appendLine("   • 🔍 Diagnosis: Signature validation failed")
-                        500 -> debugInfo.appendLine("   • 🔍 Diagnosis: Server internal error")
-                        0 -> debugInfo.appendLine("   • 🔍 Diagnosis: Network connection failed")
-                        -1 -> debugInfo.appendLine("   • 🔍 Diagnosis: Local exception occurred")
+                val connectionResult = apiService.testConnection()
+                when (connectionResult) {
+                    is ApiService.ApiResult.Success -> {
+                        debugInfo.appendLine("   • ✅ Server connection successful")
+                        debugInfo.appendLine("   • Response: ${connectionResult.data}")
+                    }
+                    is ApiService.ApiResult.Error -> {
+                        debugInfo.appendLine("   • ❌ Server connection failed: ${connectionResult.message}")
+                        debugInfo.appendLine("   • Error code: ${connectionResult.code}")
                     }
                 }
-                null -> debugInfo.appendLine("   • ⚠️ No response received from server")
+            } catch (e: Exception) {
+                debugInfo.appendLine("   • ⚠️ Exception during server connection test: ${e.message}")
+                Log.e("DEBUG", "testConnection() failed", e)
             }
 
-            // 9. Test the security endpoint directly
-            debugInfo.appendLine("9. SECURITY ENDPOINT TEST:")
-            val securityTest = apiService.testSecureAuth()
-            when (securityTest) {
-                is ApiService.ApiResult.Success -> {
-                    debugInfo.appendLine("   • ✅ Security endpoint SUCCESS")
-                    debugInfo.appendLine("   • Response: ${securityTest.data}")
+            // 6. Check if user ID is available for auth
+            val userId = userManager.getCurrentUserId()
+            var creditsResult: ApiService.ApiResult<org.json.JSONObject>? = null  // 👈 declared here
+
+            debugInfo.appendLine("6. AUTHENTICATION READINESS:")
+            if (!userId.isNullOrBlank()) {
+                debugInfo.appendLine("   • ✅ User ID available: ${userId.take(8)}...")
+
+                // 7. Test BuildConfig app secret
+                debugInfo.appendLine("7. APP CONFIGURATION:")
+                try {
+                    val appSecret = BuildConfig.APP_SECRET_KEY
+                    debugInfo.appendLine("   • App Secret: ${if (appSecret.isBlank()) "BLANK" else "CONFIGURED"}")
+                    debugInfo.appendLine("   • Secret length: ${appSecret.length}")
+                } catch (e: Exception) {
+                    debugInfo.appendLine("   • ❌ BuildConfig error: ${e.message}")
                 }
-                is ApiService.ApiResult.Error -> {
-                    debugInfo.appendLine("   • ❌ Security endpoint FAILED: ${securityTest.message}")
+
+                // 8. Test secure authentication with server
+                debugInfo.appendLine("8. SECURE AUTHENTICATION TEST:")
+                creditsResult = apiService.getUserCredits()   // 👈 assign to outer variable
+                when (creditsResult) {
+                    is ApiService.ApiResult.Success -> {
+                        debugInfo.appendLine("   • ✅ Secure Authentication SUCCESS!")
+                        debugInfo.appendLine("   • Credits data: ${creditsResult.data}")
+                        val credits = creditsResult.data.optInt("available_credits", -1)
+                        debugInfo.appendLine("   • Available credits: $credits")
+                    }
+                    is ApiService.ApiResult.Error -> {
+                        debugInfo.appendLine("   • ❌ Secure Authentication FAILED")
+                        debugInfo.appendLine("   • Error: ${creditsResult.message}")
+                        debugInfo.appendLine("   • Error code: ${creditsResult.code}")
+                        debugInfo.appendLine("   • Details: ${creditsResult.details ?: "None"}")
+
+                        // Additional diagnostic for common errors
+                        when (creditsResult.code) {
+                            401 -> debugInfo.appendLine("   • 🔍 Diagnosis: Authentication rejected by server")
+                            403 -> debugInfo.appendLine("   • 🔍 Diagnosis: Signature validation failed")
+                            500 -> debugInfo.appendLine("   • 🔍 Diagnosis: Server internal error")
+                            0 -> debugInfo.appendLine("   • 🔍 Diagnosis: Network connection failed")
+                            -1 -> debugInfo.appendLine("   • 🔍 Diagnosis: Local exception occurred")
+                        }
+                    }
+                    null -> debugInfo.appendLine("   • ⚠️ No response received from server")
                 }
+
+                // 9. Test the security endpoint directly
+                debugInfo.appendLine("9. SECURITY ENDPOINT TEST:")
+                val securityTest = apiService.testSecureAuth()
+                when (securityTest) {
+                    is ApiService.ApiResult.Success -> {
+                        debugInfo.appendLine("   • ✅ Security endpoint SUCCESS")
+                        debugInfo.appendLine("   • Response: ${securityTest.data}")
+                    }
+                    is ApiService.ApiResult.Error -> {
+                        debugInfo.appendLine("   • ❌ Security endpoint FAILED: ${securityTest.message}")
+                    }
+                }
+            } else {
+                debugInfo.appendLine("   • ❌ No user ID available for authentication")
+                debugInfo.appendLine("   • 🔍 Diagnosis: User needs to log in again")
             }
-        } else {
-            debugInfo.appendLine("   • ❌ No user ID available for authentication")
-            debugInfo.appendLine("   • 🔍 Diagnosis: User needs to log in again")
-        }
 
-        // 10. Recommended actions
-        debugInfo.appendLine("10. RECOMMENDED ACTION:")
-        when {
-            userId.isNullOrBlank() -> debugInfo.appendLine("   • 👉 Please log out and log in again")
-            connectionResult is ApiService.ApiResult.Error -> debugInfo.appendLine("   • 👉 Check server connectivity")
-            creditsResult is ApiService.ApiResult.Error -> {
-                when (creditsResult.code) {
-                    401 -> debugInfo.appendLine("   • 👉 Re-authenticate: Log out and log in")
-                    403 -> debugInfo.appendLine("   • 👉 Check APP_SECRET_KEY configuration")
-                    else -> debugInfo.appendLine("   • 👉 Check server status and network")
+            // 10. Recommended actions
+            debugInfo.appendLine("10. RECOMMENDED ACTION:")
+            when {
+                userId.isNullOrBlank() -> debugInfo.appendLine("   • 👉 Please log out and log in again")
+                // Note: connectionResult is not accessible here since it's defined in try block
+                creditsResult is ApiService.ApiResult.Error -> {
+                    when (creditsResult.code) {
+                        401 -> debugInfo.appendLine("   • 👉 Re-authenticate: Log out and log in")
+                        403 -> debugInfo.appendLine("   • 👉 Check APP_SECRET_KEY configuration")
+                        else -> debugInfo.appendLine("   • 👉 Check server status and network")
+                    }
                 }
+                else -> debugInfo.appendLine("   • ✅ Everything looks good!")
             }
-            else -> debugInfo.appendLine("   • ✅ Everything looks good!")
+
+            debugInfo.appendLine("=== END DEBUG ===")
+
+            // Log to logcat
+            Log.d("DEBUG", debugInfo.toString())
+
+            // Also display in UI for easy viewing
+            withContext(Dispatchers.Main) {
+                binding.tvGeneratedResume.text = debugInfo.toString()
+                binding.layoutDownloadButtons.visibility = View.GONE
+            }
         }
+    }
 
-        debugInfo.appendLine("=== END DEBUG ===")
-
-        // Log to logcat
-        Log.d("DEBUG", debugInfo.toString())
-
-        // Also display in UI for easy viewing
-        withContext(Dispatchers.Main) {
-            binding.tvGeneratedResume.text = debugInfo.toString()
-            binding.layoutDownloadButtons.visibility = View.GONE
-        }
+    @Suppress("DEPRECATION")
+private fun isNetworkAvailable(): Boolean {
+    val connectivityManager = getSystemService(Context.CONNECTIVITY_SERVICE) as ConnectivityManager
+    return if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.M) {
+        val network = connectivityManager.activeNetwork ?: return false
+        val capabilities = connectivityManager.getNetworkCapabilities(network) ?: return false
+        capabilities.hasTransport(NetworkCapabilities.TRANSPORT_WIFI) ||
+                capabilities.hasTransport(NetworkCapabilities.TRANSPORT_CELLULAR) ||
+                capabilities.hasTransport(NetworkCapabilities.TRANSPORT_ETHERNET)
+    } else {
+        val networkInfo = connectivityManager.activeNetworkInfo
+        networkInfo != null && networkInfo.isConnected
     }
 }
 
@@ -302,8 +318,8 @@ class ResumeGenerationActivity : AppCompatActivity() {
             binding.progressGenerate.visibility = View.VISIBLE
             binding.tvGeneratedResume.text = "Running comprehensive debug..."
             comprehensiveAuthDebug()
-            }
         }
+    } // Fixed: Added missing closing brace for setupUI()
 
     private fun checkGenerateButtonState() {
         val hasFiles = selectedResumeUri != null && selectedJobDescUri != null
@@ -424,26 +440,26 @@ class ResumeGenerationActivity : AppCompatActivity() {
     }
 
     private suspend fun ensureUserAuthenticated(): Boolean {
-    if (!userManager.isUserLoggedIn()) {
-        Log.e("ResumeActivity", "User not logged in")
-        withContext(Dispatchers.Main) {
-            showError("Please log in to continue")
+        if (!userManager.isUserLoggedIn()) {
+            Log.e("ResumeActivity", "User not logged in")
+            withContext(Dispatchers.Main) {
+                showError("Please log in to continue")
+            }
+            return false
         }
-        return false
-    }
-    
-    val userId = userManager.getCurrentUserId()
-    if (userId.isNullOrBlank()) {
-        Log.e("ResumeActivity", "User ID is null or blank")
-        withContext(Dispatchers.Main) {
-            showError("Authentication error. Please log in again.")
+        
+        val userId = userManager.getCurrentUserId()
+        if (userId.isNullOrBlank()) {
+            Log.e("ResumeActivity", "User ID is null or blank")
+            withContext(Dispatchers.Main) {
+                showError("Authentication error. Please log in again.")
+            }
+            return false
         }
-        return false
+        
+        Log.d("ResumeActivity", "User authenticated: ${userId.take(8)}...")
+        return true
     }
-    
-    Log.d("ResumeActivity", "User authenticated: ${userId.take(8)}...")
-    return true
-}
 
     private fun testDirectConnection() {
         lifecycleScope.launch {
@@ -486,148 +502,147 @@ class ResumeGenerationActivity : AppCompatActivity() {
     }
 
     private fun showReloginPrompt() {
-    AlertDialog.Builder(this)
-        .setTitle("Authentication Issue")
-        .setMessage("There seems to be an authentication problem. Would you like to log out and log in again?")
-        .setPositiveButton("Log Out & Re-login") { _, _ ->
-            userManager.logout()
-            finish() // Go back to login screen
-        }
-        .setNegativeButton("Cancel", null)
-        .show()
-}
+        AlertDialog.Builder(this)
+            .setTitle("Authentication Issue")
+            .setMessage("There seems to be an authentication problem. Would you like to log out and log in again?")
+            .setPositiveButton("Log Out & Re-login") { _, _ ->
+                userManager.logout()
+                finish() // Go back to login screen
+            }
+            .setNegativeButton("Cancel", null)
+            .show()
+    }
 
-    
     /** ---------------- Resume Generation ---------------- **/
     private fun generateResumeFromFiles() {
-    val resumeUri = selectedResumeUri ?: return showError("Please select resume file")
-    val jobDescUri = selectedJobDescUri ?: return showError("Please select job description file")
+        val resumeUri = selectedResumeUri ?: return showError("Please select resume file")
+        val jobDescUri = selectedJobDescUri ?: return showError("Please select job description file")
 
-    disableGenerateButton("Processing...")
+        disableGenerateButton("Processing...")
 
-    lifecycleScope.launch {
-        try {
-            // Check authentication first
-            if (!ensureAuthenticatedBeforeApiCall()) {
+        lifecycleScope.launch {
+            try {
+                // Check authentication first
+                if (!ensureAuthenticatedBeforeApiCall()) {
+                    resetGenerateButton()
+                    return@launch
+                }
+
+                Log.d("ResumeActivity", "Checking user credits")
+                val creditResult = apiService.getUserCredits()
+                
+                when (creditResult) {
+                    is ApiService.ApiResult.Success -> {
+                        val credits = creditResult.data.optInt("available_credits", 0)
+                        Log.d("ResumeActivity", "User has $credits credits")
+                        
+                        if (credits <= 0) {
+                            showErrorAndReset("Insufficient credits. Please purchase more.")
+                            return@launch
+                        }
+
+                        Log.d("ResumeActivity", "Generating resume from files")
+                        val genResult = retryApiCall { 
+                            apiService.generateResumeFromFiles(resumeUri, jobDescUri) 
+                        }
+                        handleGenerationResult(genResult)
+                    }
+                    is ApiService.ApiResult.Error -> {
+                        Log.e("ResumeActivity", "Failed to get credits: ${creditResult.message}")
+                        showErrorAndReset("Failed to check credits: ${creditResult.message}")
+                        
+                        // If it's an auth error, suggest re-login
+                        if (creditResult.code == 401) {
+                            showError("Authentication failed. Please log out and log in again.")
+                            userManager.logout()
+                            checkGenerateButtonState()
+                        }
+                    }
+                }
+            } catch (e: Exception) {
+                Log.e("ResumeActivity", "Exception in generateResumeFromFiles: ${e.message}", e)
+                showErrorAndReset("Generation failed: ${e.message}")
+            } finally {
                 resetGenerateButton()
-                return@launch
             }
-
-            Log.d("ResumeActivity", "Checking user credits")
-            val creditResult = apiService.getUserCredits()
-            
-            when (creditResult) {
-                is ApiService.ApiResult.Success -> {
-                    val credits = creditResult.data.optInt("available_credits", 0)
-                    Log.d("ResumeActivity", "User has $credits credits")
-                    
-                    if (credits <= 0) {
-                        showErrorAndReset("Insufficient credits. Please purchase more.")
-                        return@launch
-                    }
-
-                    Log.d("ResumeActivity", "Generating resume from files")
-                    val genResult = retryApiCall { 
-                        apiService.generateResumeFromFiles(resumeUri, jobDescUri) 
-                    }
-                    handleGenerationResult(genResult)
-                }
-                is ApiService.ApiResult.Error -> {
-                    Log.e("ResumeActivity", "Failed to get credits: ${creditResult.message}")
-                    showErrorAndReset("Failed to check credits: ${creditResult.message}")
-                    
-                    // If it's an auth error, suggest re-login
-                    if (creditResult.code == 401) {
-                        showError("Authentication failed. Please log out and log in again.")
-                        userManager.logout()
-                        checkGenerateButtonState()
-                    }
-                }
-            }
-        } catch (e: Exception) {
-            Log.e("ResumeActivity", "Exception in generateResumeFromFiles: ${e.message}", e)
-            showErrorAndReset("Generation failed: ${e.message}")
-        } finally {
-            resetGenerateButton()
         }
     }
-}
 
     private fun generateResumeFromText() {
-    val resumeText = binding.etResumeText.text.toString().trim()
-    val jobDesc = binding.etJobDescription.text.toString().trim()
+        val resumeText = binding.etResumeText.text.toString().trim()
+        val jobDesc = binding.etJobDescription.text.toString().trim()
 
-    if (resumeText.isEmpty() || jobDesc.isEmpty()) {
-        showError("Please enter both resume text and job description")
-        return
-    }
+        if (resumeText.isEmpty() || jobDesc.isEmpty()) {
+            showError("Please enter both resume text and job description")
+            return
+        }
 
-    disableGenerateButton("Processing...")
+        disableGenerateButton("Processing...")
 
-    lifecycleScope.launch {
-        try {
-            // Check authentication first - ADD THIS CHECK
-            if (!ensureAuthenticatedBeforeApiCall()) {
+        lifecycleScope.launch {
+            try {
+                // Check authentication first - ADD THIS CHECK
+                if (!ensureAuthenticatedBeforeApiCall()) {
+                    resetGenerateButton()
+                    return@launch
+                }
+
+                // Use the same retry pattern as generateResumeFromFiles
+                val creditResult = retryApiCall { apiService.getUserCredits() }
+                when (creditResult) {
+                    is ApiService.ApiResult.Success -> {
+                        val credits = creditResult.data.optInt("available_credits", 0)
+                        Log.d("ResumeActivity", "User has $credits credits")
+                        if (credits <= 0) {
+                            showErrorAndReset("Insufficient credits. Please purchase more.")
+                            return@launch
+                        }
+                        
+                        Log.d("ResumeActivity", "Generating resume from text input")
+                        val genResult = retryApiCall { 
+                            apiService.generateResume(resumeText, jobDesc) 
+                        }
+                        handleGenerationResult(genResult)
+                    }
+                    is ApiService.ApiResult.Error -> {
+                        Log.e("ResumeActivity", "Failed to check credits: ${creditResult.message}")
+                        showErrorAndReset("Failed to check credits: ${creditResult.message}")
+                        
+                        // Handle auth errors specifically - ADD THIS
+                        if (creditResult.code == 401) {
+                            showError("Authentication failed. Please log out and log in again.")
+                            userManager.logout()
+                            checkGenerateButtonState()
+                        }
+                    }
+                }
+            } catch (e: Exception) {
+                Log.e("ResumeActivity", "Exception in generateResumeFromText: ${e.message}", e)
+                showErrorAndReset("Generation failed: ${e.message}")
+            } finally {
                 resetGenerateButton()
-                return@launch
             }
-
-            // Use the same retry pattern as generateResumeFromFiles
-            val creditResult = retryApiCall { apiService.getUserCredits() }
-            when (creditResult) {
-                is ApiService.ApiResult.Success -> {
-                    val credits = creditResult.data.optInt("available_credits", 0)
-                    Log.d("ResumeActivity", "User has $credits credits")
-                    if (credits <= 0) {
-                        showErrorAndReset("Insufficient credits. Please purchase more.")
-                        return@launch
-                    }
-                    
-                    Log.d("ResumeActivity", "Generating resume from text input")
-                    val genResult = retryApiCall { 
-                        apiService.generateResume(resumeText, jobDesc) 
-                    }
-                    handleGenerationResult(genResult)
-                }
-                is ApiService.ApiResult.Error -> {
-                    Log.e("ResumeActivity", "Failed to check credits: ${creditResult.message}")
-                    showErrorAndReset("Failed to check credits: ${creditResult.message}")
-                    
-                    // Handle auth errors specifically - ADD THIS
-                    if (creditResult.code == 401) {
-                        showError("Authentication failed. Please log out and log in again.")
-                        userManager.logout()
-                        checkGenerateButtonState()
-                    }
-                }
-            }
-        } catch (e: Exception) {
-            Log.e("ResumeActivity", "Exception in generateResumeFromText: ${e.message}", e)
-            showErrorAndReset("Generation failed: ${e.message}")
-        } finally {
-            resetGenerateButton()
         }
     }
-}
 
     private suspend fun <T> retryApiCall(
-    maxRetries: Int = 2,
-    initialDelay: Long = 1000L,
-    block: suspend () -> ApiService.ApiResult<T>
-): ApiService.ApiResult<T> {
-    var lastResult: ApiService.ApiResult<T>? = null
-    repeat(maxRetries) { attempt ->
-        val result = block()
-        if (result is ApiService.ApiResult.Success) return result
-        lastResult = result
-        if (attempt < maxRetries - 1) {
-            val delayTime = initialDelay * (attempt + 1)
-            Log.d("ResumeActivity", "Retry ${attempt + 1}/$maxRetries in ${delayTime}ms")
-            delay(delayTime)
+        maxRetries: Int = 2,
+        initialDelay: Long = 1000L,
+        block: suspend () -> ApiService.ApiResult<T>
+    ): ApiService.ApiResult<T> {
+        var lastResult: ApiService.ApiResult<T>? = null
+        repeat(maxRetries) { attempt ->
+            val result = block()
+            if (result is ApiService.ApiResult.Success) return result
+            lastResult = result
+            if (attempt < maxRetries - 1) {
+                val delayTime = initialDelay * (attempt + 1)
+                Log.d("ResumeActivity", "Retry ${attempt + 1}/$maxRetries in ${delayTime}ms")
+                delay(delayTime)
+            }
         }
+        return lastResult ?: ApiService.ApiResult.Error("All retry attempts failed")
     }
-    return lastResult ?: ApiService.ApiResult.Error("All retry attempts failed")
-}
 
     /** ---------------- Display & Download ---------------- **/
     private fun displayGeneratedResume(resumeData: JSONObject) {
@@ -685,65 +700,65 @@ class ResumeGenerationActivity : AppCompatActivity() {
         startActivity(Intent.createChooser(shareIntent, "Share Resume"))
     }
 
-   private suspend fun ensureAuthenticatedBeforeApiCall(): Boolean {
-    if (!userManager.isUserLoggedIn()) {
-        Log.e("ResumeActivity", "❌ User not logged in for API call")
-        withContext(Dispatchers.Main) {
-            showError("Please log in to continue")
-            binding.creditText.text = "Credits: Please log in"
-        }
-        return false
-    }
-    
-    val userId = userManager.getCurrentUserId()
-    if (userId.isNullOrBlank()) {
-        Log.e("ResumeActivity", "❌ User ID is null for API call")
-        withContext(Dispatchers.Main) {
-            showError("Authentication error. Please log out and log in again.")
-            binding.creditText.text = "Credits: Auth error"
-        }
-        return false
-    }
-    
-    Log.d("ResumeActivity", "✅ User authenticated for API call: ${userId.take(8)}...")
-    return true
-}
-
-/** ---------------- Credit Display ---------------- **/
-private suspend fun updateCreditDisplay() {
-    Log.d("ResumeActivity", "Fetching user credits...")
-
-    // Check authentication first
-    if (!ensureAuthenticatedBeforeApiCall()) {
-        return
-    }
-
-    when (val result = apiService.getUserCredits()) {
-        is ApiService.ApiResult.Success -> {
-            val credits = result.data.optInt("available_credits", 0)
-            Log.d("ResumeActivity", "Credits retrieved: $credits")
-
+    private suspend fun ensureAuthenticatedBeforeApiCall(): Boolean {
+        if (!userManager.isUserLoggedIn()) {
+            Log.e("ResumeActivity", "❌ User not logged in for API call")
             withContext(Dispatchers.Main) {
-                binding.creditText.text = "Credits: $credits"
+                showError("Please log in to continue")
+                binding.creditText.text = "Credits: Please log in"
             }
+            return false
+        }
+        
+        val userId = userManager.getCurrentUserId()
+        if (userId.isNullOrBlank()) {
+            Log.e("ResumeActivity", "❌ User ID is null for API call")
+            withContext(Dispatchers.Main) {
+                showError("Authentication error. Please log out and log in again.")
+                binding.creditText.text = "Credits: Auth error"
+            }
+            return false
+        }
+        
+        Log.d("ResumeActivity", "✅ User authenticated for API call: ${userId.take(8)}...")
+        return true
+    }
+
+    /** ---------------- Credit Display ---------------- **/
+    private suspend fun updateCreditDisplay() {
+        Log.d("ResumeActivity", "Fetching user credits...")
+
+        // Check authentication first
+        if (!ensureAuthenticatedBeforeApiCall()) {
+            return
         }
 
-        is ApiService.ApiResult.Error -> {
-            Log.e("ResumeActivity", "Failed to fetch credits: ${result.message}")
-            withContext(Dispatchers.Main) {
-                binding.creditText.text = "Credits: Error"
-                if (result.code == 401) {
-                    showError("Authentication failed. Please log in again.")
-                    // Force logout to clear invalid state
-                    userManager.logout()
-                    checkGenerateButtonState()
-                } else {
-                    showError("Failed to load credits: ${result.message}")
+        when (val result = apiService.getUserCredits()) {
+            is ApiService.ApiResult.Success -> {
+                val credits = result.data.optInt("available_credits", 0)
+                Log.d("ResumeActivity", "Credits retrieved: $credits")
+
+                withContext(Dispatchers.Main) {
+                    binding.creditText.text = "Credits: $credits"
+                }
+            }
+
+            is ApiService.ApiResult.Error -> {
+                Log.e("ResumeActivity", "Failed to fetch credits: ${result.message}")
+                withContext(Dispatchers.Main) {
+                    binding.creditText.text = "Credits: Error"
+                    if (result.code == 401) {
+                        showError("Authentication failed. Please log in again.")
+                        // Force logout to clear invalid state
+                        userManager.logout()
+                        checkGenerateButtonState()
+                    } else {
+                        showError("Failed to load credits: ${result.message}")
+                    }
                 }
             }
         }
     }
-}
 
     /** ---------------- Debug Methods ---------------- **/
     private fun runApiServiceDebug() {
@@ -828,62 +843,61 @@ private suspend fun updateCreditDisplay() {
     }
 
     private fun testAuthStepByStep() {
-    lifecycleScope.launch {
-        binding.tvGeneratedResume.text = "Testing authentication step by step..."
-        
-        val steps = StringBuilder()
-        steps.appendLine("🔍 AUTHENTICATION STEP-BY-STEP TEST")
-        steps.appendLine()
-        
-        // Step 1: Check local authentication
-        steps.appendLine("1. LOCAL AUTHENTICATION")
-        val userId = userManager.getCurrentUserId()
-        if (!userId.isNullOrBlank()) {
-            steps.appendLine("   ✅ User ID: ${userId.take(8)}...")
-        } else {
-            steps.appendLine("   ❌ No user ID - cannot proceed")
-            updateUIWithResults(steps)
-            return@launch
-        }
-        
-        // Step 2: Test basic connection
-        steps.appendLine("2. BASIC CONNECTION")
-        val connection = apiService.testConnection()
-        if (connection is ApiService.ApiResult.Success) {
-            steps.appendLine("   ✅ Server is reachable")
-        } else {
-            steps.appendLine("   ❌ Server unreachable: ${(connection as ApiService.ApiResult.Error).message}")
-            updateUIWithResults(steps)
-            return@launch
-        }
-        
-        // Step 3: Test secure authentication
-        steps.appendLine("3. SECURE AUTHENTICATION")
-        val credits = apiService.getUserCredits()
-        when (credits) {
-            is ApiService.ApiResult.Success -> {
-                steps.appendLine("   ✅ Authentication SUCCESS!")
-                val creditCount = credits.data.optInt("available_credits", 0)
-                steps.appendLine("   📊 Available credits: $creditCount")
+        lifecycleScope.launch {
+            binding.tvGeneratedResume.text = "Testing authentication step by step..."
+            
+            val steps = StringBuilder()
+            steps.appendLine("🔍 AUTHENTICATION STEP-BY-STEP TEST")
+            steps.appendLine()
+            
+            // Step 1: Check local authentication
+            steps.appendLine("1. LOCAL AUTHENTICATION")
+            val userId = userManager.getCurrentUserId()
+            if (!userId.isNullOrBlank()) {
+                steps.appendLine("   ✅ User ID: ${userId.take(8)}...")
+            } else {
+                steps.appendLine("   ❌ No user ID - cannot proceed")
+                updateUIWithResults(steps)
+                return@launch
             }
-            is ApiService.ApiResult.Error -> {
-                steps.appendLine("   ❌ Authentication FAILED")
-                steps.appendLine("   💡 Error: ${credits.message} (Code: ${credits.code})")
+            
+            // Step 2: Test basic connection
+            steps.appendLine("2. BASIC CONNECTION")
+            val connection = apiService.testConnection()
+            if (connection is ApiService.ApiResult.Success) {
+                steps.appendLine("   ✅ Server is reachable")
+            } else {
+                steps.appendLine("   ❌ Server unreachable: ${(connection as ApiService.ApiResult.Error).message}")
+                updateUIWithResults(steps)
+                return@launch
             }
+            
+            // Step 3: Test secure authentication
+            steps.appendLine("3. SECURE AUTHENTICATION")
+            val credits = apiService.getUserCredits()
+            when (credits) {
+                is ApiService.ApiResult.Success -> {
+                    steps.appendLine("   ✅ Authentication SUCCESS!")
+                    val creditCount = credits.data.optInt("available_credits", 0)
+                    steps.appendLine("   📊 Available credits: $creditCount")
+                }
+                is ApiService.ApiResult.Error -> {
+                    steps.appendLine("   ❌ Authentication FAILED")
+                    steps.appendLine("   💡 Error: ${credits.message} (Code: ${credits.code})")
+                }
+            }
+            
+            updateUIWithResults(steps)
         }
-        
-        updateUIWithResults(steps)
     }
-}
 
     private fun updateUIWithResults(steps: StringBuilder) {
         lifecycleScope.launch(Dispatchers.Main) {
             binding.tvGeneratedResume.text = steps.toString()
             binding.layoutDownloadButtons.visibility = View.GONE
+        }
     }
-}
 
-    
     private fun testServerDirectly() {
         lifecycleScope.launch {
             Log.d("DirectTest", "Testing server endpoints directly...")
@@ -945,4 +959,4 @@ private suspend fun updateCreditDisplay() {
             }
         }
     }
-}
+} // End of class
