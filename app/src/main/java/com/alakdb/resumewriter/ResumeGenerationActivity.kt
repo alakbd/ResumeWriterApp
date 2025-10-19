@@ -159,7 +159,7 @@ class ResumeGenerationActivity : AppCompatActivity() {
             // 8. Test secure authentication with server
             debugInfo.appendLine("8. SECURE AUTHENTICATION TEST:")
             try {
-                creditsResult = apiService.getUserCredits()
+                val creditsResult = apiService.getUserCredits()
                 when (creditsResult) {
                     is ApiService.ApiResult.Success -> {
                         debugInfo.appendLine("   • ✅ Secure Authentication SUCCESS!")
@@ -175,8 +175,8 @@ class ResumeGenerationActivity : AppCompatActivity() {
                     }
                 }
             } catch (e: Exception) {
-                debugInfo.appendLine("   • ⚠️ Exception during getUserCredits(): ${e.message}")
-                Log.e("DEBUG", "getUserCredits() failed", e)
+                debugInfo.appendLine("   • ⚠️ Error fetching credits: ${e.message}")
+                Log.e("DEBUG", "getUserCredits failed", e)
             }
 
             // 9. Test the security endpoint directly
