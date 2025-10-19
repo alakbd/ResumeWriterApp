@@ -18,6 +18,7 @@ import androidx.appcompat.app.AppCompatActivity
 import androidx.lifecycle.lifecycleScope
 import androidx.appcompat.app.AlertDialog
 import android.content.DialogInterface
+import com.alakdb.resumewriter.usermanager.UserManager
 import com.alakdb.resumewriter.databinding.ActivityResumeGenerationBinding
 import com.google.firebase.auth.FirebaseAuth
 import kotlinx.coroutines.*
@@ -56,10 +57,12 @@ class ResumeGenerationActivity : AppCompatActivity() {
         auth = FirebaseAuth.getInstance()
         
         // Ensure user info is saved in UserManager if logged in
-        FirebaseAuth.getInstance().currentUser?.uid?.let {
-            userManager.saveUser(it, FirebaseAuth.getInstance().currentUser?.email)
-            Log.d("ResumeActivity", "UserManager synced with Firebase UID: $it")
-        }
+        FirebaseAuth.getInstance().currentUser?.let { user ->
+            val uid = user.uid
+            val email = user.email ?: ""
+            userManager.saveUserDataLocally(email, uid)
+            }
+
 
         // Debug calls
         checkEmailVerification()
