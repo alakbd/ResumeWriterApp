@@ -102,13 +102,15 @@ private fun comprehensiveAuthDebug() {
 
     // 2. UserManager State
     debugInfo.appendLine("\n2. USERMANAGER STATE:")
-    try {
-        val currentUser = userManager.CurrentUser
-        debugInfo.appendLine("   • UserManager user: $currentUser")
-    } catch (e: Exception) {
-        debugInfo.appendLine("   • ⚠️ UserManager error: ${e.message}")
-        Log.e("DEBUG", "UserManager error", e)
-    }
+try {
+    val userId = userManager.getCurrentUserId() ?: "NULL"
+    val userEmail = userManager.getCurrentUserEmail() ?: "NULL"
+    debugInfo.appendLine("   • UserManager user ID: $userId")
+    debugInfo.appendLine("   • UserManager email: $userEmail")
+} catch (e: Exception) {
+    debugInfo.appendLine("   • ⚠️ UserManager error: ${e.message}")
+    Log.e("DEBUG", "UserManager error", e)
+}
 
     // 3. SharedPreferences
     debugInfo.appendLine("\n3. SHARED PREFERENCES:")
@@ -175,13 +177,13 @@ private fun comprehensiveAuthDebug() {
 
     // 8. Secure Auth Test
     debugInfo.appendLine("\n8. SECURE AUTH TEST:")
-    try {
-        val result = apiService.testSecureAuth()
-        debugInfo.appendLine("   • Secure Auth Response: $result")
-    } catch (e: Exception) {
-        debugInfo.appendLine("   • ⚠️ testSecureAuth failed: ${e.message}")
-        Log.e("DEBUG", "testSecureAuth failed", e)
-    }
+try {
+    val result = apiService.testSecureAuth() // ok now
+    debugInfo.appendLine("   • Secure Auth Response: $result")
+} catch (e: Exception) {
+    debugInfo.appendLine("   • ⚠️ testSecureAuth failed: ${e.message}")
+    Log.e("DEBUG", "testSecureAuth failed", e)
+}
 
     debugInfo.appendLine("\n===== END OF DEBUG =====")
 
