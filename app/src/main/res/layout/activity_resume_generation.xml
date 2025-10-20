@@ -59,13 +59,22 @@
                 android:paddingStart="12dp"
                 android:paddingEnd="12dp" />
 
+            <TextView
+                android:id="@+id/debugTextView"
+                android:layout_width="match_parent"
+                android:layout_height="wrap_content"
+                android:textColor="@android:color/black"
+                android:textSize="12sp"
+                android:padding="8dp"
+                android:scrollbars="vertical" />
+            
             <Button
                 android:id="@+id/btnDebugAuth"
-            android:layout_width="wrap_content"
-            android:layout_height="wrap_content"
-            android:text="Debug Auth"
-            android:layout_marginTop="16dp"
-            android:onClick="onDebugAuthClicked"/>
+                android:layout_width="wrap_content"
+                android:layout_height="wrap_content"
+                android:text="Debug Auth"
+                android:layout_marginTop="16dp"
+                android:onClick="onDebugAuthClicked"/>
     
 
         </LinearLayout>
