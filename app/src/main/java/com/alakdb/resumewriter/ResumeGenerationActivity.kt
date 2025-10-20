@@ -103,7 +103,7 @@ private fun comprehensiveAuthDebug() {
     // 2. UserManager State
     debugInfo.appendLine("\n2. USERMANAGER STATE:")
     try {
-        val currentUser = userManager.getCurrentUser()
+        val currentUser = userManager.CurrentUser
         debugInfo.appendLine("   • UserManager user: $currentUser")
     } catch (e: Exception) {
         debugInfo.appendLine("   • ⚠️ UserManager error: ${e.message}")
@@ -149,15 +149,17 @@ private fun comprehensiveAuthDebug() {
 
     // 6. API Credit Check
     debugInfo.appendLine("\n6. API CREDITS TEST:")
-    try {
-        val creditsResult = apiService.getUserCredits()
-        when (creditsResult) {
-            is ApiService.ApiResult.Success -> debugInfo.appendLine("   • Credits: ${creditsResult.data}")
-            is ApiService.ApiResult.Error -> debugInfo.appendLine("   • Credits ERROR: ${creditsResult.message}")
+    lifecycleScope.launch {
+        try {
+            val creditsResult = apiService.getUserCredits()
+            when (creditsResult) {
+                is ApiService.ApiResult.Success -> debugInfo.appendLine("   • Credits: ${creditsResult.data}")
+                is ApiService.ApiResult.Error -> debugInfo.appendLine("   • Credits ERROR: ${creditsResult.message}")
+            }
+        } catch (e: Exception) {
+            debugInfo.appendLine("   • ⚠️ getUserCredits failed: ${e.message}")
+            Log.e("DEBUG", "getUserCredits failed", e)
         }
-    } catch (e: Exception) {
-        debugInfo.appendLine("   • ⚠️ getUserCredits failed: ${e.message}")
-        Log.e("DEBUG", "getUserCredits failed", e)
     }
 
     // 7. App Config
