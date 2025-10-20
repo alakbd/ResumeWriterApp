@@ -59,20 +59,22 @@
                 android:paddingStart="12dp"
                 android:paddingEnd="12dp" />
 
-            <Button
-                android:id="@+id/btnDebugAuth"
+        </LinearLayout>
+
+        <!-- Debug Button -->
+        <Button
+            android:id="@+id/btnDebugAuth"
             android:layout_width="wrap_content"
             android:layout_height="wrap_content"
             android:text="Debug Auth"
-            android:layout_marginTop="16dp"
-            android:onClick="onDebugAuthClicked"/>
-    
-
-        </LinearLayout>
+            android:layout_gravity="center"
+            android:layout_marginBottom="16dp"
+            android:background="@color/secondary"
+            android:textColor="#1976d2" />
 
         <!-- Credit Info -->
         <TextView
-            android:id="@+id/tvCreditInfo"
+            android:id="@+id/creditText"
             android:layout_width="match_parent"
             android:layout_height="wrap_content"
             android:text="Credits: Loading..."
@@ -109,12 +111,6 @@
                 android:textStyle="bold"
                 android:textColor="#333333"
                 android:layout_marginBottom="8dp" />
-
-            <TextView
-                android:id="@+id/creditText"
-                android:layout_width="wrap_content"
-                android:layout_height="wrap_content"
-                android:text="Credits: ${credits}" />
 
             <LinearLayout
                 android:layout_width="match_parent"
@@ -331,6 +327,20 @@
             </ScrollView>
 
         </LinearLayout>
+
+        <!-- Additional Credit Info (for generation results) -->
+        <TextView
+            android:id="@+id/tvCreditInfo"
+            android:layout_width="match_parent"
+            android:layout_height="wrap_content"
+            android:text=""
+            android:textStyle="bold"
+            android:gravity="center"
+            android:padding="8dp"
+            android:background="#e8f5e8"
+            android:textColor="#2e7d32"
+            android:layout_marginTop="8dp"
+            android:visibility="gone" />
 
         <!-- Download Buttons -->
         <LinearLayout
