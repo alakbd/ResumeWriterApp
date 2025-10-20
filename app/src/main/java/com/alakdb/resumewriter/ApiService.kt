@@ -307,49 +307,53 @@ class ApiService(private val context: Context) {
     }
 
     suspend fun getUserCredits(): ApiResult<JSONObject> {
-        return try {
-            Log.d("ApiService", "Getting user credits...")
+    return try {
+        Log.d("ApiService", "Getting user credits...")
 
-            val request = Request.Builder()
-                .url("$baseUrl/user/credits")
-                .get()
-                .build()
+        // Build the request normally; interceptor will inject X-User-ID
+        val request = Request.Builder()
+            .url("$baseUrl/user/credits")
+            .get()
+            .build()
 
-            client.newCall(request).execute().use { response ->
-                val respBody = response.body?.string() ?: "{}"
-                Log.d("ApiService", "Credits response: ${response.code}")
+        // Use the OkHttpClient that has SecureAuthInterceptor added
+        client.newCall(request).execute().use { response ->
+            val respBody = response.body?.string().orEmpty()
+            Log.d("ApiService", "Credits response: ${response.code}")
 
-                if (!response.isSuccessful) {
-                    Log.e("ApiService", "Failed to fetch credits: HTTP ${response.code}")
-                    return ApiResult.Error(
-                        message = "Failed to get credits: ${response.message}",
-                        code = response.code,
-                        details = respBody
-                    )
-                }
-
-                // Parse the response to ensure it's valid JSON
-                try {
-                    val jsonResponse = JSONObject(respBody)
-                    ApiResult.Success(jsonResponse)
-                } catch (e: Exception) {
-                    Log.e("ApiService", "Invalid JSON response for credits", e)
-                    ApiResult.Error(
-                        message = "Invalid server response",
-                        code = response.code,
-                        details = respBody
-                    )
-                }
+            // Check for HTTP errors
+            if (!response.isSuccessful) {
+                Log.e("ApiService", "Failed to fetch credits: HTTP ${response.code}")
+                return ApiResult.Error(
+                    message = "Failed to get credits: ${response.message}",
+                    code = response.code,
+                    details = respBody
+                )
             }
-        } catch (e: Exception) {
-            Log.e("ApiService", "Exception while fetching credits: ${e.message}", e)
-            ApiResult.Error(
-                message = "Network error: ${e.message ?: "Unknown error"}",
-                code = -1,
-                details = e.stackTraceToString()
-            )
+
+            // Confirm JSON parsing
+            try {
+                val jsonResponse = JSONObject(respBody)
+                Log.d("ApiService", "Parsed JSON: $jsonResponse")
+                ApiResult.Success(jsonResponse)
+            } catch (e: Exception) {
+                Log.e("ApiService", "Invalid JSON response for credits", e)
+                ApiResult.Error(
+                    message = "Invalid server response",
+                    code = response.code,
+                    details = respBody
+                )
+            }
         }
+    } catch (e: Exception) {
+        Log.e("ApiService", "Exception while fetching credits: ${e.message}", e)
+        ApiResult.Error(
+            message = "Network error: ${e.message.orEmpty()}",
+            code = -1,
+            details = e.stackTraceToString()
+        )
     }
+}
 
     // Test secure authentication
     suspend fun testSecureAuth(): ApiResult<JSONObject> {
