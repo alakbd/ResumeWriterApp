@@ -154,14 +154,22 @@ fun isUserLoggedIn(): Boolean {
 
     /** Get current user ID - CRITICAL for UID-based auth */
     fun getCurrentUserId(): String? {
-        return prefs.getString(USER_ID_KEY, null).also { userId ->
-            if (userId == null) {
-                Log.d("UserManager", "No user ID found in SharedPreferences")
-            } else {
-                Log.d("UserManager", "User ID retrieved: ${userId.take(8)}...")
-            }
-        }
+    val prefId = prefs.getString(USER_ID_KEY, null)
+    if (!prefId.isNullOrBlank()) {
+        Log.d("UserManager", "User ID retrieved from prefs: ${prefId.take(8)}...")
+        return prefId
     }
+
+    val firebaseUid = auth.currentUser?.uid
+    if (!firebaseUid.isNullOrBlank()) {
+        Log.d("UserManager", "User ID retrieved from Firebase: ${firebaseUid.take(8)}... Saving locally")
+        saveUserDataLocally(auth.currentUser?.email ?: "", firebaseUid)
+        return firebaseUid
+    }
+
+    Log.w("UserManager", "No user ID available")
+    return null
+}
 
     /** Get current user from Firebase Auth */
     fun getCurrentFirebaseUser() = auth.currentUser
