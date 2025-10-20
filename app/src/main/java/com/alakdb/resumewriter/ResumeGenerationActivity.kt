@@ -275,8 +275,15 @@ private suspend fun comprehensiveAuthDebug(): String {
         binding.btnDebugAuth.setOnClickListener {
             binding.progressGenerate.visibility = View.VISIBLE
             binding.tvGeneratedResume.text = "Running comprehensive debug..."
-            comprehensiveAuthDebug()
+
+    // Launch a coroutine for the suspend function
+        lifecycleScope.launch {
+            val debugResult = comprehensiveAuthDebug() // suspend function
+            // Update the TextView on the main thread
+            binding.tvGeneratedResume.text = debugResult
+            binding.progressGenerate.visibility = View.GONE
             }
+        }
     } // Fixed: Added missing closing brace for setupUI()
 
     private fun checkGenerateButtonState() {
