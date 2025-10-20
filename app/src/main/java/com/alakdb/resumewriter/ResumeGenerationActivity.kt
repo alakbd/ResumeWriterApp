@@ -103,33 +103,30 @@ private fun comprehensiveAuthDebug() {
     debugInfo.appendLine("   • UserManager email: $userEmail")
 
     // Update TextView so far
-    withContext(Dispatchers.Main) {
+    
     binding.debugTextView.text = debugInfo.toString()
-}
+
 
     // 3. SharedPreferences
     val prefs = getSharedPreferences("user_prefs", Context.MODE_PRIVATE)
     debugInfo.appendLine("\n3. SHARED PREFERENCES:")
     if (prefs.all.isEmpty()) debugInfo.appendLine("   • (empty)")
     else prefs.all.forEach { (k,v) -> debugInfo.appendLine("   • $k: $v") }
-       withContext(Dispatchers.Main) {
         binding.debugTextView.text = debugInfo.toString()
-        }
+       
 
     // 4. Network availability
     debugInfo.appendLine("\n4. NETWORK:")
     debugInfo.appendLine("   • Available: ${isNetworkAvailable()}")
-    withContext(Dispatchers.Main) {
     binding.debugTextView.text = debugInfo.toString()
-}
+
 
     // 5. API Service
     debugInfo.appendLine("\n5. API SERVICE INITIALIZATION:")
     debugInfo.appendLine(if (this::apiService.isInitialized) "   • ApiService initialized ✅"
                          else "   • ApiService not initialized ❌")
-   withContext(Dispatchers.Main) {
     binding.debugTextView.text = debugInfo.toString()
-}
+
 
     // 6 & 8: Run async operations in coroutine
     lifecycleScope.launch {
@@ -144,9 +141,7 @@ private fun comprehensiveAuthDebug() {
         } catch (e: Exception) {
             debugInfo.appendLine("   • ⚠️ getUserCredits failed: ${e.message}")
         }
-           withContext(Dispatchers.Main) {
             binding.debugTextView.text = debugInfo.toString()
-        }
 
         // 8. Secure Auth Test
         debugInfo.appendLine("\n8. SECURE AUTH TEST:")
@@ -156,14 +151,12 @@ private fun comprehensiveAuthDebug() {
         } catch (e: Exception) {
             debugInfo.appendLine("   • ⚠️ testSecureAuth failed: ${e.message}")
         }
-        withContext(Dispatchers.Main) {
         binding.debugTextView.text = debugInfo.toString()
-        }
+        
 
         debugInfo.appendLine("\n===== END OF DEBUG =====")
-        withContext(Dispatchers.Main) {
         binding.debugTextView.text = debugInfo.toString()
-        }
+        
     }
 }
 
