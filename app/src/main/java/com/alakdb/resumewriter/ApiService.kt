@@ -67,63 +67,48 @@ class ApiService(private val context: Context) {
         }
     }
 
-    val loggingInterceptor = Interceptor { chain ->
-    val request = chain.request()
-    Log.d("DEBUG_HTTP", "➡️ ${request.method} ${request.url}")
-    request.headers.forEach { name, value ->
-        Log.d("DEBUG_HTTP", "   $name: $value")
-    }
-    val response = chain.proceed(request)
-    Log.d("DEBUG_HTTP", "⬅️ Response ${response.code}: ${response.message}")
-    response
-}
-   
-    
-    
-    // Secure Auth Interceptor for spoof-proof UID authentication
     // Simplified Secure Auth Interceptor: Only sends X-User-ID
-class SecureAuthInterceptor(
-    private val userManager: UserManager
-) : Interceptor {
-    override fun intercept(chain: Interceptor.Chain): Response {
-        val originalRequest = chain.request()
-        val url = originalRequest.url.toString()
+    class SecureAuthInterceptor(
+        private val userManager: UserManager,
+        private val appSecretKey: String
+    ) : Interceptor {
+        override fun intercept(chain: Interceptor.Chain): Response {
+            val originalRequest = chain.request()
+            val url = originalRequest.url.toString()
 
-        // Skip auth for public endpoints
-        val publicEndpoints = listOf("/health", "/test", "/", "/api")
-        if (publicEndpoints.any { endpoint -> url.contains(endpoint) }) {
-            Log.d("SecureAuth", "🔓 Skipping auth for public endpoint: $url")
-            return chain.proceed(originalRequest)
-        }
+            // Skip auth for public endpoints
+            val publicEndpoints = listOf("/health", "/test", "/", "/api")
+            if (publicEndpoints.any { endpoint -> url.contains(endpoint) }) {
+                Log.d("SecureAuth", "🔓 Skipping auth for public endpoint: $url")
+                return chain.proceed(originalRequest)
+            }
 
-        // Get user ID from UserManager
-        val userId = userManager.getCurrentUserId()
+            // Get user ID from UserManager
+            val userId = userManager.getCurrentUserId()
 
-        // Check if user ID is valid
-        if (userId.isNullOrBlank()) {
-            Log.e("SecureAuth", "❌ BLOCKED: No user ID available for protected endpoint: $url")
-            return Response.Builder()
-                .request(originalRequest)
-                .protocol(Protocol.HTTP_1_1)
-                .code(401)
-                .message("User not authenticated")
-                .body("{ \"error\": \"User not authenticated. Please log in again.\" }"
-                    .toResponseBody("application/json".toMediaType()))
+            // Check if user ID is valid
+            if (userId.isNullOrBlank()) {
+                Log.e("SecureAuth", "❌ BLOCKED: No user ID available for protected endpoint: $url")
+                return Response.Builder()
+                    .request(originalRequest)
+                    .protocol(Protocol.HTTP_1_1)
+                    .code(401)
+                    .message("User not authenticated")
+                    .body("{ \"error\": \"User not authenticated. Please log in again.\" }"
+                        .toResponseBody("application/json".toMediaType()))
+                    .build()
+            }
+
+            // Only add X-User-ID header now
+            val newRequest = originalRequest.newBuilder()
+                .addHeader("X-User-ID", userId)
+                .addHeader("User-Agent", "ResumeWriter-Android")
                 .build()
-        }
 
-        // Only add X-User-ID header now
-        val newRequest = originalRequest.newBuilder()
-            .addHeader("X-User-ID", userId)
-            .addHeader("User-Agent", "ResumeWriter-Android")
-            .build()
-
-        Log.d("SecureAuth", "✅ Added X-User-ID for user: ${userId.take(8)}... to: ${originalRequest.method} $url")
-        return chain.proceed(newRequest)
+            Log.d("SecureAuth", "✅ Added X-User-ID for user: ${userId.take(8)}... to: ${originalRequest.method} $url")
+            return chain.proceed(newRequest)
         }
     }
-}
-    
 
     // Data Classes
     data class DeductCreditRequest(val user_id: String)
@@ -135,13 +120,6 @@ class SecureAuthInterceptor(
         data class Error(val message: String, val code: Int = 0, val details: String? = null) : ApiResult<Nothing>()
     }
 
-    fun String.sha256(): String {
-        val digest = MessageDigest.getInstance("SHA-256")
-        val hashBytes = digest.digest(this.toByteArray(Charsets.UTF_8))
-        return hashBytes.joinToString("") { "%02x".format(it) }
-        }
-
-    
     // Enhanced Test Connection with better error handling
     suspend fun testConnection(): ApiResult<JSONObject> {
         Log.d("NetworkTest", "Testing connection to: $baseUrl")
@@ -331,49 +309,49 @@ class SecureAuthInterceptor(
     }
 
     suspend fun getUserCredits(): ApiResult<JSONObject> {
-    return try {
-        Log.d("ApiService", "Getting user credits...")
+        return try {
+            Log.d("ApiService", "Getting user credits...")
 
-        val request = Request.Builder()
-            .url("$baseUrl/user/credits")
-            .get()
-            .build()
+            val request = Request.Builder()
+                .url("$baseUrl/user/credits")
+                .get()
+                .build()
 
-        client.newCall(request).execute().use { response ->
-            val respBody = response.body?.string() ?: "{}"
-            Log.d("ApiService", "Credits response: ${response.code}")
+            client.newCall(request).execute().use { response ->
+                val respBody = response.body?.string() ?: "{}"
+                Log.d("ApiService", "Credits response: ${response.code}")
 
-            if (!response.isSuccessful) {
-                Log.e("ApiService", "Failed to fetch credits: HTTP ${response.code}")
-                return ApiResult.Error(
-                    message = "Failed to get credits: ${response.message}",
-                    code = response.code,
-                    details = respBody
-                )
+                if (!response.isSuccessful) {
+                    Log.e("ApiService", "Failed to fetch credits: HTTP ${response.code}")
+                    return ApiResult.Error(
+                        message = "Failed to get credits: ${response.message}",
+                        code = response.code,
+                        details = respBody
+                    )
+                }
+
+                // Parse the response to ensure it's valid JSON
+                try {
+                    val jsonResponse = JSONObject(respBody)
+                    ApiResult.Success(jsonResponse)
+                } catch (e: Exception) {
+                    Log.e("ApiService", "Invalid JSON response for credits", e)
+                    ApiResult.Error(
+                        message = "Invalid server response",
+                        code = response.code,
+                        details = respBody
+                    )
+                }
             }
-
-            // Parse the response to ensure it's valid JSON
-            try {
-                val jsonResponse = JSONObject(respBody)
-                ApiResult.Success(jsonResponse)
-            } catch (e: Exception) {
-                Log.e("ApiService", "Invalid JSON response for credits", e)
-                ApiResult.Error(
-                    message = "Invalid server response",
-                    code = response.code,
-                    details = respBody
-                )
-            }
+        } catch (e: Exception) {
+            Log.e("ApiService", "Exception while fetching credits: ${e.message}", e)
+            ApiResult.Error(
+                message = "Network error: ${e.message ?: "Unknown error"}",
+                code = -1,
+                details = e.stackTraceToString()
+            )
         }
-    } catch (e: Exception) {
-        Log.e("ApiService", "Exception while fetching credits: ${e.message}", e)
-        ApiResult.Error(
-            message = "Network error: ${e.message ?: "Unknown error"}",
-            code = -1,
-            details = e.stackTraceToString()
-        )
     }
-}
 
     // Test secure authentication
     suspend fun testSecureAuth(): ApiResult<JSONObject> {
@@ -470,11 +448,11 @@ class SecureAuthInterceptor(
 
     // Enhanced Error Handling
     private fun handleErrorResponse(response: Response): String {
-    val rawBody = try {
-        response.peekBody(Long.MAX_VALUE).string()
-    } catch (e: Exception) { "No body" }
-    return "HTTP ${response.code}: ${response.message}. Body: $rawBody"
-}
+        val rawBody = try {
+            response.peekBody(Long.MAX_VALUE).string()
+        } catch (e: Exception) { "No body" }
+        return "HTTP ${response.code}: ${response.message}. Body: $rawBody"
+    }
 
     private fun getErrorCode(e: Exception): Int = when (e) {
         is java.net.SocketTimeoutException -> 1002
@@ -482,5 +460,4 @@ class SecureAuthInterceptor(
         is IOException -> 1001
         else -> 1000
     }
-}
 }
