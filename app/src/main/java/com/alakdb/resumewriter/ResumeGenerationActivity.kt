@@ -272,13 +272,11 @@ private suspend fun comprehensiveAuthDebug(): String {
         binding.btnRetryConnection.setOnClickListener { testApiConnection() }
         
         // Add debug button
-        binding.btnComprehensiveDebug.setOnClickListener {
-            lifecycleScope.launch {
-            val result = comprehensiveAuthDebug()
-            Log.d("DEBUG_AUTH", result)
-            binding.debugTextView.text = result
+        binding.btnDebugAuth.setOnClickListener {
+            binding.progressGenerate.visibility = View.VISIBLE
+            binding.tvGeneratedResume.text = "Running comprehensive debug..."
+            comprehensiveAuthDebug()
             }
-        }
     } // Fixed: Added missing closing brace for setupUI()
 
     private fun checkGenerateButtonState() {
