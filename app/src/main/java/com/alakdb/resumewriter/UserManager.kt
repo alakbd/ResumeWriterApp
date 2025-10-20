@@ -116,7 +116,13 @@ class UserManager(private val context: Context) {
             }
     }
 
-    
+    fun logCurrentUserState() {
+    val firebaseUser = auth.currentUser
+    val userId = getCurrentUserId()
+    val email = getCurrentUserEmail()
+    val registered = prefs.getBoolean(IS_REGISTERED_KEY, false)
+    Log.d("UserManager", "DEBUG User State -> Firebase UID: ${firebaseUser?.uid}, Pref UID: $userId, Email: $email, Registered: $registered")
+}
 
 /** Check if user is logged in - ENHANCED for UID-based auth */
 fun isUserLoggedIn(): Boolean {
