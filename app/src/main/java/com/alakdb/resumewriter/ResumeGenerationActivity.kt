@@ -177,12 +177,16 @@ try {
 
     // 8. Secure Auth Test
     debugInfo.appendLine("\n8. SECURE AUTH TEST:")
-try {
-    val result = apiService.testSecureAuth() // ok now
-    debugInfo.appendLine("   • Secure Auth Response: $result")
-} catch (e: Exception) {
-    debugInfo.appendLine("   • ⚠️ testSecureAuth failed: ${e.message}")
-    Log.e("DEBUG", "testSecureAuth failed", e)
+
+lifecycleScope.launch {
+    try {
+        val result = apiService.testSecureAuth()
+        debugInfo.appendLine("   • Secure Auth Response: $result")
+        // Update UI if needed
+    } catch (e: Exception) {
+        debugInfo.appendLine("   • ⚠️ testSecureAuth failed: ${e.message}")
+        Log.e("DEBUG", "testSecureAuth failed", e)
+    }
 }
 
     debugInfo.appendLine("\n===== END OF DEBUG =====")
