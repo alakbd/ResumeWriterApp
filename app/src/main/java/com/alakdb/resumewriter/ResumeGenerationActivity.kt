@@ -85,109 +85,72 @@ class ResumeGenerationActivity : AppCompatActivity() {
     } // Added missing closing brace for onCreate()
 
     @SuppressLint("SetTextI18n")
-private suspend fun comprehensiveAuthDebug(): String {
+private fun comprehensiveAuthDebug() {
     val debugInfo = StringBuilder()
     debugInfo.appendLine("===== Comprehensive Auth Debug =====")
 
     // 1. Firebase Auth
+    val user = FirebaseAuth.getInstance().currentUser
     debugInfo.appendLine("1. FIREBASE AUTH:")
-    try {
-        val user = FirebaseAuth.getInstance().currentUser
-        debugInfo.appendLine("   • UID: ${user?.uid ?: "null"}")
-        debugInfo.appendLine("   • Email: ${user?.email ?: "null"}")
-    } catch (e: Exception) {
-        debugInfo.appendLine("   • ⚠️ Firebase error: ${e.message}")
-        Log.e("DEBUG", "FirebaseAuth error", e)
-    }
+    debugInfo.appendLine("   • UID: ${user?.uid ?: "null"}")
+    debugInfo.appendLine("   • Email: ${user?.email ?: "null"}")
 
     // 2. UserManager State
+    val userId = userManager.getCurrentUserId() ?: "NULL"
+    val userEmail = userManager.getCurrentUserEmail() ?: "NULL"
     debugInfo.appendLine("\n2. USERMANAGER STATE:")
-    try {
-        val userId = userManager.getCurrentUserId() ?: "NULL"
-        val userEmail = userManager.getCurrentUserEmail() ?: "NULL"
-        debugInfo.appendLine("   • UserManager user ID: $userId")
-        debugInfo.appendLine("   • UserManager email: $userEmail")
-    } catch (e: Exception) {
-        debugInfo.appendLine("   • ⚠️ UserManager error: ${e.message}")
-        Log.e("DEBUG", "UserManager error", e)
-    }
+    debugInfo.appendLine("   • UserManager user ID: $userId")
+    debugInfo.appendLine("   • UserManager email: $userEmail")
+
+    // Update TextView so far
+    binding.debugTextView.text = debugInfo.toString()
 
     // 3. SharedPreferences
+    val prefs = getSharedPreferences("user_prefs", Context.MODE_PRIVATE)
     debugInfo.appendLine("\n3. SHARED PREFERENCES:")
-    try {
-        val prefs = getSharedPreferences("user_prefs", Context.MODE_PRIVATE)
-        if (prefs.all.isEmpty()) {
-            debugInfo.appendLine("   • (empty)")
-        } else {
-            prefs.all.forEach { (key, value) ->
-                debugInfo.appendLine("   • $key: $value")
-            }
-        }
-    } catch (e: Exception) {
-        debugInfo.appendLine("   • ⚠️ SharedPrefs error: ${e.message}")
-        Log.e("DEBUG", "SharedPrefs error", e)
-    }
+    if (prefs.all.isEmpty()) debugInfo.appendLine("   • (empty)")
+    else prefs.all.forEach { (k,v) -> debugInfo.appendLine("   • $k: $v") }
+    binding.debugTextView.text = debugInfo.toString()
 
-    // 4. Network
+    // 4. Network availability
     debugInfo.appendLine("\n4. NETWORK:")
-    try {
-        debugInfo.appendLine("   • Available: ${isNetworkAvailable()}")
-    } catch (e: Exception) {
-        debugInfo.appendLine("   • ⚠️ Network check error: ${e.message}")
-        Log.e("DEBUG", "Network check failed", e)
-    }
+    debugInfo.appendLine("   • Available: ${isNetworkAvailable()}")
+    binding.debugTextView.text = debugInfo.toString()
 
-    // 5. API Initialization
+    // 5. API Service
     debugInfo.appendLine("\n5. API SERVICE INITIALIZATION:")
-    try {
-        if (this::apiService.isInitialized) {
-            debugInfo.appendLine("   • ApiService initialized ✅")
-        } else {
-            debugInfo.appendLine("   • ApiService not initialized ❌")
+    debugInfo.appendLine(if (this::apiService.isInitialized) "   • ApiService initialized ✅"
+                         else "   • ApiService not initialized ❌")
+    binding.debugTextView.text = debugInfo.toString()
+
+    // 6 & 8: Run async operations in coroutine
+    lifecycleScope.launch {
+        // 6. API Credits
+        debugInfo.appendLine("\n6. API CREDITS TEST:")
+        try {
+            val creditsResult = apiService.getUserCredits()
+            when (creditsResult) {
+                is ApiService.ApiResult.Success -> debugInfo.appendLine("   • Credits: ${creditsResult.data}")
+                is ApiService.ApiResult.Error -> debugInfo.appendLine("   • Credits ERROR: ${creditsResult.message}")
+            }
+        } catch (e: Exception) {
+            debugInfo.appendLine("   • ⚠️ getUserCredits failed: ${e.message}")
         }
-    } catch (e: Exception) {
-        debugInfo.appendLine("   • ⚠️ ApiService check failed: ${e.message}")
-    }
+        binding.debugTextView.text = debugInfo.toString()
 
-    // 6. API Credit Check
-    debugInfo.appendLine("\n6. API CREDITS TEST:")
-    try {
-        val creditsResult = apiService.getUserCredits()
-        when (creditsResult) {
-            is ApiService.ApiResult.Success ->
-                debugInfo.appendLine("   • Credits: ${creditsResult.data}")
-            is ApiService.ApiResult.Error ->
-                debugInfo.appendLine("   • Credits ERROR: ${creditsResult.message}")
+        // 8. Secure Auth Test
+        debugInfo.appendLine("\n8. SECURE AUTH TEST:")
+        try {
+            val result = apiService.testSecureAuth()
+            debugInfo.appendLine("   • Secure Auth Response: $result")
+        } catch (e: Exception) {
+            debugInfo.appendLine("   • ⚠️ testSecureAuth failed: ${e.message}")
         }
-    } catch (e: Exception) {
-        debugInfo.appendLine("   • ⚠️ getUserCredits failed: ${e.message}")
-        Log.e("DEBUG", "getUserCredits failed", e)
+        binding.debugTextView.text = debugInfo.toString()
+
+        debugInfo.appendLine("\n===== END OF DEBUG =====")
+        binding.debugTextView.text = debugInfo.toString()
     }
-
-    // 7. App Config
-    debugInfo.appendLine("\n7. APP CONFIGURATION:")
-    try {
-        val appSecret = BuildConfig.APP_SECRET_KEY
-        debugInfo.appendLine("   • App Secret: ${if (appSecret.isBlank()) "BLANK" else "CONFIGURED"}")
-        debugInfo.appendLine("   • Secret length: ${appSecret.length}")
-    } catch (e: Exception) {
-        debugInfo.appendLine("   • ⚠️ BuildConfig error: ${e.message}")
-        Log.e("DEBUG", "BuildConfig error", e)
-    }
-
-    // 8. Secure Auth Test
-    debugInfo.appendLine("\n8. SECURE AUTH TEST:")
-    try {
-        val result = apiService.testSecureAuth()
-        debugInfo.appendLine("   • Secure Auth Response: $result")
-    } catch (e: Exception) {
-        debugInfo.appendLine("   • ⚠️ testSecureAuth failed: ${e.message}")
-        Log.e("DEBUG", "testSecureAuth failed", e)
-    }
-
-    debugInfo.appendLine("\n===== END OF DEBUG =====")
-
-    return debugInfo.toString()
 }
 
 
@@ -276,12 +239,14 @@ private suspend fun comprehensiveAuthDebug(): String {
             binding.progressGenerate.visibility = View.VISIBLE
             binding.tvGeneratedResume.text = "Running comprehensive debug..."
 
-    // Launch a coroutine for the suspend function
         lifecycleScope.launch {
-            val debugResult = comprehensiveAuthDebug() // suspend function
-            // Update the TextView on the main thread
-            binding.tvGeneratedResume.text = debugResult
-            binding.progressGenerate.visibility = View.GONE
+            val debugInfo = StringBuilder()
+            debugInfo.appendLine("===== Comprehensive Auth Debug =====")
+
+        // Your Firebase/UserManager/Network/API checks here...
+        // Update debugTextView.text = debugInfo.toString() after each step
+
+        binding.progressGenerate.visibility = View.GONE
             }
         }
     } // Fixed: Added missing closing brace for setupUI()
