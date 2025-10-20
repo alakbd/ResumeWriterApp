@@ -121,9 +121,20 @@ class ResumeGenerationActivity : AppCompatActivity() {
 
             // 5. API Service
             debugInfo.appendLine("\n5. API SERVICE INITIALIZATION:")
-            debugInfo.appendLine(if (this::apiService.isInitialized) "   • ApiService initialized ✅"
-                                 else "   • ApiService not initialized ❌")
-            binding.tvGeneratedResume.text = debugInfo.toString()
+
+            val isApiInitialized = try {
+                ::apiService.isInitialized
+            } catch (e: Exception) {
+                false
+            }
+
+        if (isApiInitialized) {
+            debugInfo.appendLine("   • ApiService initialized ✅")
+        } else {
+            debugInfo.appendLine("   • ApiService not initialized ❌")
+            }
+
+        binding.tvGeneratedResume.text = debugInfo.toString()
 
             // 6. API Credits
             debugInfo.appendLine("\n6. API CREDITS TEST:")
