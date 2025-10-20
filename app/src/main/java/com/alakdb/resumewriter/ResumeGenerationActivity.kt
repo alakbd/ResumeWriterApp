@@ -30,6 +30,7 @@ import java.util.concurrent.TimeUnit
 import java.io.File
 import okhttp3.OkHttpClient
 import okhttp3.Request
+import com.alakdb.resumewriter.ApiService
 
 class ResumeGenerationActivity : AppCompatActivity() {
 
