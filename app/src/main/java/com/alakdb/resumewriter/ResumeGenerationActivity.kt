@@ -85,7 +85,7 @@ class ResumeGenerationActivity : AppCompatActivity() {
     } // Added missing closing brace for onCreate()
 
     @SuppressLint("SetTextI18n")
-private fun comprehensiveAuthDebug() {
+private suspend fun comprehensiveAuthDebug(): String {
     val debugInfo = StringBuilder()
     debugInfo.appendLine("===== Comprehensive Auth Debug =====")
 
@@ -102,15 +102,15 @@ private fun comprehensiveAuthDebug() {
 
     // 2. UserManager State
     debugInfo.appendLine("\n2. USERMANAGER STATE:")
-try {
-    val userId = userManager.getCurrentUserId() ?: "NULL"
-    val userEmail = userManager.getCurrentUserEmail() ?: "NULL"
-    debugInfo.appendLine("   • UserManager user ID: $userId")
-    debugInfo.appendLine("   • UserManager email: $userEmail")
-} catch (e: Exception) {
-    debugInfo.appendLine("   • ⚠️ UserManager error: ${e.message}")
-    Log.e("DEBUG", "UserManager error", e)
-}
+    try {
+        val userId = userManager.getCurrentUserId() ?: "NULL"
+        val userEmail = userManager.getCurrentUserEmail() ?: "NULL"
+        debugInfo.appendLine("   • UserManager user ID: $userId")
+        debugInfo.appendLine("   • UserManager email: $userEmail")
+    } catch (e: Exception) {
+        debugInfo.appendLine("   • ⚠️ UserManager error: ${e.message}")
+        Log.e("DEBUG", "UserManager error", e)
+    }
 
     // 3. SharedPreferences
     debugInfo.appendLine("\n3. SHARED PREFERENCES:")
@@ -151,17 +151,17 @@ try {
 
     // 6. API Credit Check
     debugInfo.appendLine("\n6. API CREDITS TEST:")
-    lifecycleScope.launch {
-        try {
-            val creditsResult = apiService.getUserCredits()
-            when (creditsResult) {
-                is ApiService.ApiResult.Success -> debugInfo.appendLine("   • Credits: ${creditsResult.data}")
-                is ApiService.ApiResult.Error -> debugInfo.appendLine("   • Credits ERROR: ${creditsResult.message}")
-            }
-        } catch (e: Exception) {
-            debugInfo.appendLine("   • ⚠️ getUserCredits failed: ${e.message}")
-            Log.e("DEBUG", "getUserCredits failed", e)
+    try {
+        val creditsResult = apiService.getUserCredits()
+        when (creditsResult) {
+            is ApiService.ApiResult.Success ->
+                debugInfo.appendLine("   • Credits: ${creditsResult.data}")
+            is ApiService.ApiResult.Error ->
+                debugInfo.appendLine("   • Credits ERROR: ${creditsResult.message}")
         }
+    } catch (e: Exception) {
+        debugInfo.appendLine("   • ⚠️ getUserCredits failed: ${e.message}")
+        Log.e("DEBUG", "getUserCredits failed", e)
     }
 
     // 7. App Config
@@ -177,25 +177,18 @@ try {
 
     // 8. Secure Auth Test
     debugInfo.appendLine("\n8. SECURE AUTH TEST:")
-
-lifecycleScope.launch {
     try {
         val result = apiService.testSecureAuth()
         debugInfo.appendLine("   • Secure Auth Response: $result")
-        // Update UI if needed
     } catch (e: Exception) {
         debugInfo.appendLine("   • ⚠️ testSecureAuth failed: ${e.message}")
         Log.e("DEBUG", "testSecureAuth failed", e)
     }
-}
 
     debugInfo.appendLine("\n===== END OF DEBUG =====")
 
-    // Output final debug
-    Log.d("DEBUG_AUTH", debugInfo.toString())
-
+    return debugInfo.toString()
 }
-
 
 
     
@@ -279,10 +272,12 @@ lifecycleScope.launch {
         binding.btnRetryConnection.setOnClickListener { testApiConnection() }
         
         // Add debug button
-        binding.btnDebugAuth.setOnClickListener {
-            binding.progressGenerate.visibility = View.VISIBLE
-            binding.tvGeneratedResume.text = "Running comprehensive debug..."
-            comprehensiveAuthDebug()
+        binding.btnComprehensiveDebug.setOnClickListener {
+            lifecycleScope.launch {
+            val result = comprehensiveAuthDebug()
+            Log.d("DEBUG_AUTH", result)
+            binding.debugTextView.text = result
+            }
         }
     } // Fixed: Added missing closing brace for setupUI()
 
