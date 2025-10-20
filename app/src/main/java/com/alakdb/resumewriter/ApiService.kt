@@ -12,15 +12,9 @@ import okhttp3.logging.HttpLoggingInterceptor
 import org.json.JSONObject
 import java.io.File
 import java.io.IOException
-import java.security.MessageDigest
 import java.util.concurrent.TimeUnit
 import com.google.firebase.auth.FirebaseAuth
-
-fun String.sha256(): String {
-    val digest = MessageDigest.getInstance("SHA-256")
-    val hashBytes = digest.digest(this.toByteArray(Charsets.UTF_8))
-    return hashBytes.joinToString("") { "%02x".format(it) }
-}
+import kotlinx.coroutines.delay
 
 class ApiService(private val context: Context) {
 
@@ -28,8 +22,12 @@ class ApiService(private val context: Context) {
     private val baseUrl = "https://resume-writer-api.onrender.com"
     private val userManager = UserManager(context)
     
-    // ✅ Use BuildConfig as you had before
-    private val appSecretKey = BuildConfig.APP_SECRET_KEY
+    // Use BuildConfig or fallback
+    private val appSecretKey = try {
+        BuildConfig.APP_SECRET_KEY
+    } catch (e: Exception) {
+        "fallback-secret-key"
+    }
 
     // Enhanced OkHttp Client with request/response logging
     private val client = OkHttpClient.Builder()
@@ -121,7 +119,7 @@ class ApiService(private val context: Context) {
     }
 
     // Enhanced Test Connection with better error handling
-    suspend fun testConnection(): ApiResult<JSONObject> {
+    suspend fun testConnection(): ApiResult<String> {
         Log.d("NetworkTest", "Testing connection to: $baseUrl")
     
         // Use a simple client without interceptors for connection testing
@@ -149,7 +147,7 @@ class ApiService(private val context: Context) {
             
                 if (response.isSuccessful && body != null) {
                     Log.d("NetworkTest", "✅ Success with endpoint: $endpoint")
-                    return ApiResult.Success(JSONObject(body))
+                    return ApiResult.Success(body)
                 } else {
                     Log.w("NetworkTest", "❌ Failed with endpoint $endpoint: HTTP ${response.code}")
                 }
@@ -193,7 +191,7 @@ class ApiService(private val context: Context) {
             // Wait before next attempt (except on last attempt)
             if (attempt < maxAttempts - 1) {
                 Log.d("ServerWakeUp", "⏰ Waiting ${delayBetweenAttempts}ms before next attempt...")
-                kotlinx.coroutines.delay(delayBetweenAttempts)
+                delay(delayBetweenAttempts)
             }
         }
     
@@ -279,9 +277,9 @@ class ApiService(private val context: Context) {
                 .setType(MultipartBody.FORM)
                 .addFormDataPart("tone", tone)
                 .addFormDataPart("resume_file", resumeFile.name, 
-                    resumeFile.asRequestBody("application/pdf".toMediaType()))
+                    resumeFile.asRequestBody("application/octet-stream".toMediaType()))
                 .addFormDataPart("job_description_file", jobDescFile.name, 
-                    jobDescFile.asRequestBody("application/pdf".toMediaType()))
+                    jobDescFile.asRequestBody("application/octet-stream".toMediaType()))
                 .build()
 
             val request = Request.Builder()
