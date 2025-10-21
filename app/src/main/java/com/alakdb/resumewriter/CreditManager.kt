@@ -43,7 +43,7 @@ class CreditManager(private val context: Context) {
         val currentUser = auth.currentUser
         val userEmail = currentUser?.email ?: return false
         
-        return ADMIN_EMAILS.contains(userEmail.toLowerCase().trim())
+        return ADMIN_EMAILS.contains(userEmail.LowerCase().trim())
     }
 
     /**
