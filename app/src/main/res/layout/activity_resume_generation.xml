@@ -20,8 +20,8 @@
         android:textStyle="bold"
         android:layout_gravity="end"
         android:padding="8dp"
-        android:background="#E1BEE7"  <!-- Light purple hex color -->
-        android:textColor="#000000" /> <!-- Black hex color -->
+        android:background="#E1BEE7"  
+        android:textColor="#000000" /> 
 
         
         <TextView
