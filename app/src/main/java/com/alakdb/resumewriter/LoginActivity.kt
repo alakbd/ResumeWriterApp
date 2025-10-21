@@ -1,30 +1,35 @@
 package com.alakdb.resumewriter
 
 import android.content.Intent
-import android.util.Log
 import android.os.Bundle
+import android.util.Log
 import android.widget.Toast
 import androidx.appcompat.app.AppCompatActivity
 import com.google.firebase.auth.FirebaseAuth
+import com.google.firebase.auth.FirebaseUser
 import com.alakdb.resumewriter.databinding.ActivityLoginBinding
 
 class LoginActivity : AppCompatActivity() {
     private lateinit var binding: ActivityLoginBinding
     private lateinit var userManager: UserManager
     private lateinit var creditManager: CreditManager
+    private lateinit var apiService: ApiService
+    private lateinit var firebaseAuth: FirebaseAuth
 
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
         binding = ActivityLoginBinding.inflate(layoutInflater)
         setContentView(binding.root)
 
+        // Initialize managers and services
         userManager = UserManager(this)
         creditManager = CreditManager(this)
+        apiService = ApiService.getInstance(this)
+        firebaseAuth = FirebaseAuth.getInstance()
 
         // Check if already logged in
         if (userManager.isUserLoggedIn()) {
-            startActivity(Intent(this, MainActivity::class.java))
-            finish()
+            proceedToMainActivity()
             return
         }
 
@@ -44,14 +49,18 @@ class LoginActivity : AppCompatActivity() {
         binding.btnForgotPassword.setOnClickListener {
             val email = binding.etLoginEmail.text.toString().trim()
             when {
-                email.isEmpty() -> showMessage("Please enter your email first")
-                !android.util.Patterns.EMAIL_ADDRESS.matcher(email).matches() ->
+                email.isEmpty() -> {
+                    showMessage("Please enter your email first")
+                    binding.etLoginEmail.requestFocus()
+                }
+                !android.util.Patterns.EMAIL_ADDRESS.matcher(email).matches() -> {
                     binding.etLoginEmail.error = "Enter a valid email address"
+                    binding.etLoginEmail.requestFocus()
+                }
                 else -> sendPasswordResetEmail(email)
             }
         }
     
-        // Go to registration page
         binding.btnGoToRegister.setOnClickListener {
             startActivity(Intent(this, UserRegistrationActivity::class.java))
             finish()
@@ -59,62 +68,145 @@ class LoginActivity : AppCompatActivity() {
     }
 
     private fun validateInput(email: String, password: String): Boolean {
+        var isValid = true
+
         if (email.isEmpty()) {
             binding.etLoginEmail.error = "Email is required"
-            return false
+            isValid = false
+        } else if (!android.util.Patterns.EMAIL_ADDRESS.matcher(email).matches()) {
+            binding.etLoginEmail.error = "Enter a valid email address"
+            isValid = false
+        } else {
+            binding.etLoginEmail.error = null
         }
 
         if (password.isEmpty()) {
             binding.etLoginPassword.error = "Password is required"
-            return false
+            isValid = false
+        } else if (password.length < 6) {
+            binding.etLoginPassword.error = "Password must be at least 6 characters"
+            isValid = false
+        } else {
+            binding.etLoginPassword.error = null
         }
 
-        if (!android.util.Patterns.EMAIL_ADDRESS.matcher(email).matches()) {
-            binding.etLoginEmail.error = "Enter a valid email address"
-            return false
-        }
-
-        return true
+        return isValid
     }
 
     private fun sendPasswordResetEmail(email: String) {
-        FirebaseAuth.getInstance().sendPasswordResetEmail(email)
+        binding.btnForgotPassword.isEnabled = false
+        val originalText = binding.btnForgotPassword.text.toString()
+        binding.btnForgotPassword.text = "Sending..."
+
+        firebaseAuth.sendPasswordResetEmail(email)
             .addOnCompleteListener { task ->
+                binding.btnForgotPassword.isEnabled = true
+                binding.btnForgotPassword.text = originalText
+
                 if (task.isSuccessful) {
-                    Toast.makeText(this, "Password reset link sent to $email", Toast.LENGTH_LONG).show()
+                    showMessage("Password reset link sent to $email")
+                    Log.d("LoginActivity", "Password reset email sent to: $email")
                 } else {
-                    Toast.makeText(this, "Error: ${task.exception?.message}", Toast.LENGTH_LONG).show()
+                    val errorMessage = task.exception?.message ?: "Unknown error occurred"
+                    showMessage("Failed to send reset email: $errorMessage")
+                    Log.e("LoginActivity", "Password reset failed: $errorMessage")
                 }
             }
     }
 
     private fun attemptLogin(email: String, password: String) {
-        binding.btnLogin.isEnabled = false
-        binding.btnLogin.text = "Logging in..."
+        setLoginInProgress(true)
 
-        userManager.loginUser(email, password) { success, error ->
-            binding.btnLogin.isEnabled = true
-            binding.btnLogin.text = "Login"
-
-            if (success) {
-                // ✅ UID-based auth: No token management needed
-                // Ensure admin mode is explicitly disabled for regular login
-                creditManager.setAdminMode(false)
-                
-                Log.d("LoginActivity", "✅ Login successful - UID: ${userManager.getCurrentUserId()}")
-                showMessage("Login successful!")
-                creditManager.resetResumeCooldown()
-                
-                // Navigate to MainActivity
-                startActivity(Intent(this@LoginActivity, MainActivity::class.java))
-                finish()
-            } else {
-                showMessage(error ?: "Login failed")
+        firebaseAuth.signInWithEmailAndPassword(email, password)
+            .addOnCompleteListener { task ->
+                if (task.isSuccessful) {
+                    val user = task.result?.user
+                    if (user != null && user.isEmailVerified) {
+                        // ✅ CRITICAL: Save user data to UserManager
+                        userManager.saveUserLogin(user)
+                        onLoginSuccess(user)
+                    } else if (user != null && !user.isEmailVerified) {
+                        setLoginInProgress(false)
+                        showMessage("Please verify your email address before logging in")
+                        // Optionally, you can resend verification email here
+                        resendVerificationEmail(user)
+                    } else {
+                        setLoginInProgress(false)
+                        showMessage("Login failed: User not found")
+                    }
+                } else {
+                    setLoginInProgress(false)
+                    val errorMessage = task.exception?.message ?: "Login failed"
+                    onLoginFailure(errorMessage)
+                }
             }
+    }
+
+    private fun onLoginSuccess(user: FirebaseUser) {
+        // Ensure admin mode is disabled for regular login
+        creditManager.setAdminMode(false)
+        
+        // Initialize user session and credits
+        creditManager.resetResumeCooldown()
+        
+        // Initialize API service with user context
+        apiService.initializeUserSession(user.uid)
+        
+        Log.d("LoginActivity", "✅ Login successful - UID: ${user.uid}, Email: ${user.email}")
+        showMessage("Login successful!")
+        
+        proceedToMainActivity()
+    }
+
+    private fun onLoginFailure(error: String?) {
+        val errorMessage = error ?: "Login failed. Please check your credentials."
+        showMessage(errorMessage)
+        
+        Log.e("LoginActivity", "Login failed: $errorMessage")
+        
+        // Clear password field on failure
+        binding.etLoginPassword.text?.clear()
+        binding.etLoginPassword.requestFocus()
+    }
+
+    private fun resendVerificationEmail(user: FirebaseUser) {
+        user.sendEmailVerification()
+            .addOnCompleteListener { task ->
+                if (task.isSuccessful) {
+                    showMessage("Verification email sent to ${user.email}")
+                    Log.d("LoginActivity", "Verification email resent to: ${user.email}")
+                } else {
+                    showMessage("Failed to send verification email")
+                    Log.e("LoginActivity", "Failed to resend verification email")
+                }
+            }
+    }
+
+    private fun setLoginInProgress(inProgress: Boolean) {
+        binding.btnLogin.isEnabled = !inProgress
+        binding.btnLogin.text = if (inProgress) "Logging in..." else "Login"
+        binding.btnGoToRegister.isEnabled = !inProgress
+        binding.btnForgotPassword.isEnabled = !inProgress
+        
+        // Disable input fields during login process
+        binding.etLoginEmail.isEnabled = !inProgress
+        binding.etLoginPassword.isEnabled = !inProgress
+    }
+
+    private fun proceedToMainActivity() {
+        val intent = Intent(this, MainActivity::class.java).apply {
+            flags = Intent.FLAG_ACTIVITY_NEW_TASK or Intent.FLAG_ACTIVITY_CLEAR_TASK
         }
+        startActivity(intent)
+        finish()
     }
 
     private fun showMessage(message: String) {
         Toast.makeText(this, message, Toast.LENGTH_SHORT).show()
+    }
+
+    override fun onDestroy() {
+        // Clean up if needed
+        super.onDestroy()
     }
 }
