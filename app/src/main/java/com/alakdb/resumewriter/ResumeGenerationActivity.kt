@@ -32,6 +32,7 @@ import okhttp3.OkHttpClient
 import okhttp3.Request
 import com.alakdb.resumewriter.ApiService
 
+
 class ResumeGenerationActivity : AppCompatActivity() {
 
     private lateinit var binding: ActivityResumeGenerationBinding
