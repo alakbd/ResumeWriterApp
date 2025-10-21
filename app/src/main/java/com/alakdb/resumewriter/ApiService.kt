@@ -328,7 +328,11 @@ fun saveFileToStorage(data: ByteArray, filename: String): File {
             debugInfo.appendLine("UserManager User ID: ${userManager.getCurrentUserId() ?: "NULL"}")
             
             val authTest = testSecureAuth()
-            debugInfo.appendLine("Auth Test: ${if (authTest is ApiResult.Success) "SUCCESS" else "FAILED: ${authTest.message}"}")
+            val authMessage = when (authTest) {
+            is ApiResult.Success -> "SUCCESS"
+            is ApiResult.Error -> "FAILED: ${authTest.message}"
+            }
+            debugInfo.appendLine("Auth Test: $authMessage")
             
             debugInfo.appendLine("=== END DEBUG ===")
             debugInfo.toString()
