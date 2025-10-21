@@ -227,6 +227,47 @@ class ApiService(private val context: Context) {
         }
     }
 
+    // ADDED BACK: generateResumeFromFiles method
+    suspend fun generateResumeFromFiles(resumeUri: Uri, jobDescUri: Uri, tone: String = "Professional"): ApiResult<JSONObject> {
+        return try {
+            Log.d("ApiService", "Generating resume from files")
+            
+            val resumeFile = uriToFile(resumeUri)
+            val jobDescFile = uriToFile(jobDescUri)
+
+            Log.d("ApiService", "Files: resume=${resumeFile.name}, jobDesc=${jobDescFile.name}")
+
+            val body = MultipartBody.Builder()
+                .setType(MultipartBody.FORM)
+                .addFormDataPart("tone", tone)
+                .addFormDataPart("resume_file", resumeFile.name, 
+                    resumeFile.asRequestBody("application/pdf".toMediaType()))
+                .addFormDataPart("job_description_file", jobDescFile.name, 
+                    jobDescFile.asRequestBody("application/pdf".toMediaType()))
+                .build()
+
+            val request = Request.Builder()
+                .url("$baseUrl/generate-resume-from-files")
+                .post(body)
+                .build()
+
+            client.newCall(request).execute().use { response ->
+                val respBody = response.body?.string() ?: "{}"
+                Log.d("ApiService", "Generate resume from files response: ${response.code}")
+                
+                if (!response.isSuccessful) {
+                    val errorMsg = "HTTP ${response.code}: ${response.message}"
+                    return ApiResult.Error(errorMsg, response.code)
+                }
+                
+                ApiResult.Success(JSONObject(respBody))
+            }
+        } catch (e: Exception) {
+            Log.e("ApiService", "❌ File resume generation crashed: ${e.message}")
+            ApiResult.Error("File resume generation failed: ${e.message}")
+        }
+    }
+
     // FIXED: getUserCredits with crash protection
     suspend fun getUserCredits(): ApiResult<JSONObject> {
         return try {
@@ -286,6 +327,38 @@ class ApiService(private val context: Context) {
             Log.e("ApiService", "❌ Security test crashed", e)
             ApiResult.Error("Security test failed: ${e.message}")
         }
+    }
+
+    // ADDED BACK: File utility methods
+    private fun uriToFile(uri: Uri): File {
+        return try {
+            val input = context.contentResolver.openInputStream(uri)
+                ?: throw IOException("Failed to open URI: $uri")
+            val file = File.createTempFile("upload_", "_tmp", context.cacheDir)
+            input.use { inputStream -> 
+                file.outputStream().use { outputStream ->
+                    inputStream.copyTo(outputStream)
+                }
+            }
+            file
+        } catch (e: Exception) {
+            Log.e("ApiService", "Error converting URI to file: ${e.message}")
+            throw e
+        }
+    }
+
+    private fun File.asRequestBody(mediaType: MediaType): RequestBody {
+        return this.inputStream().readBytes().toRequestBody(mediaType)
+    }
+
+    // ADDED BACK: Base64 and file storage methods
+    fun decodeBase64File(base64Data: String): ByteArray = 
+        android.util.Base64.decode(base64Data, android.util.Base64.DEFAULT)
+
+    fun saveFileToStorage(data: ByteArray, filename: String): File {
+        val file = File(context.getExternalFilesDir(null), filename)
+        file.outputStream().use { it.write(data) }
+        return file
     }
 
     // Comprehensive Debug Method
