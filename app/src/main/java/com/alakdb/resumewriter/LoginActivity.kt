@@ -3,8 +3,6 @@ package com.alakdb.resumewriter
 import android.content.Intent
 import android.util.Log
 import android.os.Bundle
-import android.widget.Button
-import android.widget.EditText
 import android.widget.Toast
 import androidx.appcompat.app.AppCompatActivity
 import com.google.firebase.auth.FirebaseAuth
@@ -99,51 +97,21 @@ class LoginActivity : AppCompatActivity() {
             binding.btnLogin.text = "Login"
 
             if (success) {
-                // 🔒 CRITICAL FIX: Remove auto-admin grant
-                // DO NOT call creditManager.loginAsAdmin(email) here!
-                
+                // ✅ UID-based auth: No token management needed
                 // Ensure admin mode is explicitly disabled for regular login
                 creditManager.setAdminMode(false)
                 
-                val firebaseUser = FirebaseAuth.getInstance().currentUser
-
-                if (firebaseUser != null) {
-                    firebaseUser.getIdToken(true)
-                        .addOnCompleteListener { task ->
-                            if (task.isSuccessful) {
-                                val idToken = task.result?.token
-                                if (!idToken.isNullOrEmpty()) {
-                                    userManager.saveUserToken(idToken)
-                                    showMessage("Login successful!")
-                                    creditManager.resetResumeCooldown()
-                                    startActivity(Intent(this@LoginActivity, MainActivity::class.java))
-                                    finish()
-                                } else {
-                                    showMessage("Failed to get ID token — trying fallback.")
-                                    handleMissingToken()
-                                }
-                            } else {
-                                showMessage("Token fetch error: ${task.exception?.message}")
-                                handleMissingToken()
-                            }
-                        }
-                } else {
-                    showMessage("User not found in FirebaseAuth — trying fallback.")
-                    handleMissingToken()
-                }
+                Log.d("LoginActivity", "✅ Login successful - UID: ${userManager.getCurrentUserId()}")
+                showMessage("Login successful!")
+                creditManager.resetResumeCooldown()
+                
+                // Navigate to MainActivity
+                startActivity(Intent(this@LoginActivity, MainActivity::class.java))
+                finish()
             } else {
                 showMessage(error ?: "Login failed")
             }
         }
-    }
-
-    private fun handleMissingToken() {
-        // Ensure admin mode is disabled in fallback too
-        creditManager.setAdminMode(false)
-        userManager.saveUserToken("API_FALLBACK_MODE")
-        creditManager.resetResumeCooldown()
-        startActivity(Intent(this@LoginActivity, MainActivity::class.java))
-        finish()
     }
 
     private fun showMessage(message: String) {
