@@ -657,13 +657,13 @@ class ResumeGenerationActivity : AppCompatActivity() {
     try {
         val result = apiService.getUserCredits()
         when (result) {
-            is ApiResult.Success -> {
+            is ApiService.ApiResult.Success -> {
                 val credits = result.data.optInt("credits", 0)
                 runOnUiThread {
                     binding.creditsTextView.text = "Credits: $credits"
                 }
             }
-            is ApiResult.Error -> {
+            is ApiService.ApiResult.Error -> {
                 Log.e("ResumeGeneration", "Failed to get credits: ${result.message}")
                 runOnUiThread {
                     binding.creditsTextView.text = "Credits: Error"
