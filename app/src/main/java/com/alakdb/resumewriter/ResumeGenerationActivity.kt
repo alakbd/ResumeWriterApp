@@ -73,6 +73,7 @@ class ResumeGenerationActivity : AppCompatActivity() {
         registerFilePickers()
         setupUI()
         checkGenerateButtonState()
+        debugUserManagerState()
 
         // Test connection safely
         lifecycleScope.launch {
@@ -834,6 +835,29 @@ private fun showToast(message: String) {
             binding.layoutDownloadButtons.visibility = View.GONE
         }
     }
+
+    private fun debugUserManagerState() {
+    Log.d("Debug", "=== USER MANAGER STATE DEBUG ===")
+    
+    // Check UserManager directly
+    val userId = userManager.getCurrentUserId()
+    Log.d("Debug", "UserManager.getCurrentUserId(): '$userId'")
+    Log.d("Debug", "UserManager.isUserLoggedIn(): ${userManager.isUserLoggedIn()}")
+    
+    // Check Firebase directly
+    val firebaseUser = FirebaseAuth.getInstance().currentUser
+    Log.d("Debug", "FirebaseAuth.currentUser: ${firebaseUser?.uid}")
+    Log.d("Debug", "FirebaseAuth.email: ${firebaseUser?.email}")
+    
+    // Check if they match
+    if (userId != null && firebaseUser != null) {
+        Log.d("Debug", "MATCH: ${userId == firebaseUser.uid}")
+    } else {
+        Log.d("Debug", "MISMATCH: One or both are null")
+    }
+    
+    Log.d("Debug", "=== END DEBUG ===")
+}
 
     private fun testServerDirectly() {
         lifecycleScope.launch {
