@@ -655,30 +655,46 @@ class ResumeGenerationActivity : AppCompatActivity() {
 
     /** ---------------- Credit Display ---------------- **/
     private suspend fun updateCreditDisplay() {
-    try {
-        val result = apiService.getUserCredits()
-        when (result) {
-            is ApiService.ApiResult.Success -> {
-                val credits = result.data.optInt("credits", 0)
-                runOnUiThread {
-                    binding.creditsTextView.text = "Credits: $credits"
+        try {
+            Log.d("ResumeGeneration", "🔄 Starting credit display update...")
+            val result = apiService.getUserCredits()
+        
+        runOnUiThread {
+            when (result) {
+                is ApiService.ApiResult.Success -> {
+                    try {
+                        val credits = result.data.optInt("credits", 0)
+                        Log.d("ResumeGeneration", "✅ Credits updated: $credits")
+                        // Make sure your TextView ID is correct in XML
+                        findViewById<TextView>(R.id.creditsTextView)?.text = "Credits: $credits"
+                    } catch (e: Exception) {
+                        Log.e("ResumeGeneration", "❌ Error parsing credits", e)
+                        findViewById<TextView>(R.id.creditsTextView)?.text = "Credits: Error"
+                    }
                 }
-            }
-            is ApiService.ApiResult.Error -> {
-                Log.e("ResumeGeneration", "Failed to get credits: ${result.message}")
-                runOnUiThread {
-                    binding.creditsTextView.text = "Credits: Error"
-                    // Show a toast or snackbar with the error
-                    Toast.makeText(this, "Failed to load credits: ${result.message}", Toast.LENGTH_SHORT).show()
+                is ApiService.ApiResult.Error -> {
+                    Log.e("ResumeGeneration", "❌ Credit fetch failed: ${result.message}")
+                    findViewById<TextView>(R.id.creditsTextView)?.text = "Credits: --"
+                    
+                    // Show user-friendly error
+                    when (result.code) {
+                        401 -> showToast("Please log in to view credits")
+                        404 -> showToast("Service temporarily unavailable")
+                        else -> showToast("Failed to load credits")
+                    }
                 }
             }
         }
     } catch (e: Exception) {
-        Log.e("ResumeGeneration", "Exception in updateCreditDisplay: ${e.message}", e)
+        Log.e("ResumeGeneration", "💥 Exception in updateCreditDisplay: ${e.message}", e)
         runOnUiThread {
-            binding.creditsTextView.text = "Credits: Unknown"
+            findViewById<TextView>(R.id.creditsTextView)?.text = "Credits: --"
         }
     }
+}
+
+private fun showToast(message: String) {
+    Toast.makeText(this, message, Toast.LENGTH_SHORT).show()
 }
 
     /** ---------------- Debug Methods ---------------- **/
