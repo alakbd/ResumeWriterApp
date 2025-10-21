@@ -102,12 +102,12 @@ private fun File.asRequestBody(mediaType: MediaType): RequestBody {
     return this.inputStream().readBytes().toRequestBody(mediaType)
 }
 
-     suspend fun generateResumeFromFiles(resumeUri: Uri, jobDescUri: Uri, tone: String = "Professional"): ApiResult<JSONObject> {
+suspend fun generateResumeFromFiles(resumeUri: Uri, jobDescUri: Uri, tone: String = "Professional"): ApiResult<JSONObject> {
     return try {
         Log.d("ApiService", "Generating resume from files")
         
-        val resumeFile = uriToFile(resumeUri) // This should now work
-        val jobDescFile = uriToFile(jobDescUri) // This should now work
+        val resumeFile = uriToFile(resumeUri)
+        val jobDescFile = uriToFile(jobDescUri)
 
         Log.d("ApiService", "Files: resume=${resumeFile.name}, jobDesc=${jobDescFile.name}")
 
@@ -130,7 +130,7 @@ private fun File.asRequestBody(mediaType: MediaType): RequestBody {
             Log.d("ApiService", "Generate resume from files response: ${response.code}")
             
             if (!response.isSuccessful) {
-                val errorMsg = "HTTP ${response.code}: ${response.message}" // FIXED: This should work now
+                val errorMsg = "HTTP ${response.code}: ${response.message}" // FIXED: This uses response.message, not e.message
                 return ApiResult.Error(errorMsg, response.code)
             }
             
