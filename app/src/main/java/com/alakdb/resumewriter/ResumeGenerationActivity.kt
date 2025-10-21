@@ -31,6 +31,7 @@ import java.io.File
 import okhttp3.OkHttpClient
 import okhttp3.Request
 import com.alakdb.resumewriter.ApiService
+import com.alakdb.resumewriter.ApiService.ApiResult 
 
 
 class ResumeGenerationActivity : AppCompatActivity() {
@@ -313,7 +314,7 @@ class ResumeGenerationActivity : AppCompatActivity() {
     }
     
     /** ---------------- API Connection Test ---------------- **/
-    private fun testApiConnection() {
+     private fun testApiConnection() {
         binding.layoutConnectionStatus.visibility = View.VISIBLE
         binding.tvConnectionStatus.text = "Testing connection..."
         binding.progressConnection.visibility = View.VISIBLE
@@ -335,17 +336,17 @@ class ResumeGenerationActivity : AppCompatActivity() {
                 val connectionResult = apiService.testConnection()
                 
                 when (connectionResult) {
-                    is ApiService.ApiResult.Success -> {
+                    is ApiResult.Success -> { // FIXED: Use ApiResult directly
                         updateConnectionStatus("✅ API Connected", false)
                         updateCreditDisplay()
                     }
-                    is ApiService.ApiResult.Error -> {
+                    is ApiResult.Error -> { // FIXED: Use ApiResult directly
                         // Check if it's a server wake-up issue
                         if (connectionResult.code in 500..599 || connectionResult.code == 0) {
                             updateConnectionStatus("🔄 Server is waking up...", true)
                             showServerWakeupMessage()
                             
-                            // Wait for server to wake up with fewer attempts
+                            // FIXED: Use the correct method name
                             val serverAwake = apiService.waitForServerWakeUp(maxAttempts = 12, delayBetweenAttempts = 10000L)
                             
                             if (serverAwake) {
@@ -370,6 +371,11 @@ class ResumeGenerationActivity : AppCompatActivity() {
                 binding.btnRetryConnection.isEnabled = true
             }
         }
+    }
+
+    // ADD THIS MISSING METHOD:
+    private fun showMessage(message: String) {
+        Toast.makeText(this, message, Toast.LENGTH_LONG).show()
     }
 
     fun isNetworkAvailable(): Boolean {
@@ -454,7 +460,7 @@ class ResumeGenerationActivity : AppCompatActivity() {
     }
 
     /** ---------------- Resume Generation ---------------- **/
-    private fun generateResumeFromFiles() {
+      private fun generateResumeFromFiles() {
         val resumeUri = selectedResumeUri ?: return showError("Please select resume file")
         val jobDescUri = selectedJobDescUri ?: return showError("Please select job description file")
 
@@ -472,7 +478,7 @@ class ResumeGenerationActivity : AppCompatActivity() {
                 val creditResult = apiService.getUserCredits()
                 
                 when (creditResult) {
-                    is ApiService.ApiResult.Success -> {
+                    is ApiResult.Success -> { // FIXED: Use ApiResult directly
                         val credits = creditResult.data.optInt("available_credits", 0)
                         Log.d("ResumeActivity", "User has $credits credits")
                         
@@ -482,12 +488,13 @@ class ResumeGenerationActivity : AppCompatActivity() {
                         }
 
                         Log.d("ResumeActivity", "Generating resume from files")
+                        // FIXED: Return the ApiResult from the lambda
                         val genResult = retryApiCall { 
                             apiService.generateResumeFromFiles(resumeUri, jobDescUri) 
                         }
                         handleGenerationResult(genResult)
                     }
-                    is ApiService.ApiResult.Error -> {
+                    is ApiResult.Error -> { // FIXED: Use ApiResult directly
                         Log.e("ResumeActivity", "Failed to get credits: ${creditResult.message}")
                         showErrorAndReset("Failed to check credits: ${creditResult.message}")
                         
@@ -601,7 +608,7 @@ class ResumeGenerationActivity : AppCompatActivity() {
         }
     }
 
-    private fun downloadFile(format: String) {
+     private fun downloadFile(format: String) {
         val resumeData = currentGeneratedResume ?: return showError("No resume generated yet")
         lifecycleScope.launch {
             try {
@@ -613,6 +620,7 @@ class ResumeGenerationActivity : AppCompatActivity() {
                     return@launch
                 }
 
+                // FIXED: Call methods on apiService instance
                 val fileData = apiService.decodeBase64File(resumeData.getString(base64Key))
                 val file = apiService.saveFileToStorage(fileData, fileName)
                 showDownloadSuccess(file, format.uppercase())
@@ -666,31 +674,31 @@ class ResumeGenerationActivity : AppCompatActivity() {
 
     /** ---------------- Credit Display ---------------- **/
     private suspend fun updateCreditDisplay() {
-    try {
-        val result = apiService.getUserCredits()
-        when (result) {
-            is ApiResult.Success -> {
-                runOnUiThread {
-                    val credits = result.data.optInt("credits", 0)
-                    binding.tvCredits.text = "Credits: $credits"
+        try {
+            val result = apiService.getUserCredits()
+            when (result) {
+                is ApiResult.Success -> { // FIXED: Use ApiResult directly
+                    runOnUiThread {
+                        val credits = result.data.optInt("credits", 0)
+                        binding.creditText.text = "Credits: $credits" // FIXED: Use correct binding
+                    }
+                }
+                is ApiResult.Error -> { // FIXED: Use ApiResult directly and handle Error case
+                    Log.w("ResumeGeneration", "Failed to get credits: ${result.message}") // FIXED: Use result.message
+                    // Use cached credits or show default
+                    runOnUiThread {
+                        val cachedCredits = userManager.getCachedCredits()
+                        binding.creditText.text = "Credits: $cachedCredits" // FIXED: Use correct binding
+                    }
                 }
             }
-            is ApiResult.Error -> {
-                Log.w("ResumeGeneration", "Failed to get credits: ${result.message}")
-                // Use cached credits or show default
-                runOnUiThread {
-                    val cachedCredits = userManager.getCachedCredits()
-                    binding.tvCredits.text = "Credits: $cachedCredits"
-                }
+        } catch (e: Exception) {
+            Log.e("ResumeGeneration", "Credit update failed", e)
+            runOnUiThread {
+                binding.creditText.text = "Credits: --" // FIXED: Use correct binding
             }
-        }
-    } catch (e: Exception) {
-        Log.e("ResumeGeneration", "Credit update failed", e)
-        runOnUiThread {
-            binding.tvCredits.text = "Credits: --"
         }
     }
-}
 
     /** ---------------- Debug Methods ---------------- **/
     private fun runApiServiceDebug() {
@@ -885,9 +893,9 @@ class ResumeGenerationActivity : AppCompatActivity() {
 
     // Removed token-related debug methods since we're using UID-based auth now
     
-    private fun handleGenerationResult(result: ApiService.ApiResult<JSONObject>) {
+    private fun handleGenerationResult(result: ApiResult<JSONObject>) { // FIXED: Use ApiResult directly
         when (result) {
-            is ApiService.ApiResult.Success -> {
+            is ApiResult.Success -> { // FIXED: Use ApiResult directly
                 Log.d("ResumeActivity", "Resume generation success: ${result.data}")
                 currentGeneratedResume = result.data
                 displayGeneratedResume(result.data)
@@ -908,10 +916,10 @@ class ResumeGenerationActivity : AppCompatActivity() {
                     }
                 }
             }
-            is ApiService.ApiResult.Error -> {
+            is ApiResult.Error -> { // FIXED: Use ApiResult directly
                 Log.e("ResumeActivity", "Resume generation failed: ${result.message}")
                 showError("Generation failed: ${result.message}")
             }
         }
     }
-} // End of class
+} // 
