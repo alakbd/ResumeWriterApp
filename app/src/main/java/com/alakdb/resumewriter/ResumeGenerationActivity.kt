@@ -654,39 +654,31 @@ class ResumeGenerationActivity : AppCompatActivity() {
 
     /** ---------------- Credit Display ---------------- **/
     private suspend fun updateCreditDisplay() {
-        Log.d("ResumeActivity", "Fetching user credits...")
-
-        // Check authentication first
-        if (!ensureAuthenticatedBeforeApiCall()) {
-            return
+    try {
+        val result = apiService.getUserCredits()
+        when (result) {
+            is ApiResult.Success -> {
+                val credits = result.data.optInt("credits", 0)
+                runOnUiThread {
+                    binding.creditsTextView.text = "Credits: $credits"
+                }
+            }
+            is ApiResult.Error -> {
+                Log.e("ResumeGeneration", "Failed to get credits: ${result.message}")
+                runOnUiThread {
+                    binding.creditsTextView.text = "Credits: Error"
+                    // Show a toast or snackbar with the error
+                    Toast.makeText(this, "Failed to load credits: ${result.message}", Toast.LENGTH_SHORT).show()
+                }
+            }
         }
-
-        when (val result = apiService.getUserCredits()) {
-            is ApiService.ApiResult.Success -> {
-                val credits = result.data.optInt("available_credits", 0)
-                Log.d("ResumeActivity", "Credits retrieved: $credits")
-
-                withContext(Dispatchers.Main) {
-                    binding.creditText.text = "Credits: $credits"
-                }
-            }
-
-            is ApiService.ApiResult.Error -> {
-                Log.e("ResumeActivity", "Failed to fetch credits: ${result.message}")
-                withContext(Dispatchers.Main) {
-                    binding.creditText.text = "Credits: Error"
-                    if (result.code == 401) {
-                        showError("Authentication failed. Please log in again.")
-                        // Force logout to clear invalid state
-                        userManager.logout()
-                        checkGenerateButtonState()
-                    } else {
-                        showError("Failed to load credits: ${result.message}")
-                    }
-                }
-            }
+    } catch (e: Exception) {
+        Log.e("ResumeGeneration", "Exception in updateCreditDisplay: ${e.message}", e)
+        runOnUiThread {
+            binding.creditsTextView.text = "Credits: Unknown"
         }
     }
+}
 
     /** ---------------- Debug Methods ---------------- **/
     private fun runApiServiceDebug() {
