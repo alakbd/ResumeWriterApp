@@ -139,27 +139,7 @@ class LoginActivity : AppCompatActivity() {
             }
     }
 
-    private fun onLoginSuccess(user: FirebaseUser) {
-        // Ensure admin mode is disabled for regular login
-        creditManager.setAdminMode(false)
-        
-        // Initialize user session and credits
-        creditManager.resetResumeCooldown()
-        
-        // Sync user credits from Firestore
-        userManager.syncUserCredits { success, credits ->
-            if (success) {
-                Log.d("LoginActivity", "User credits synced: $credits")
-            } else {
-                Log.w("LoginActivity", "Failed to sync user credits")
-            }
-        }
-        
-        Log.d("LoginActivity", "✅ Login successful - UID: ${user.uid}, Email: ${user.email}")
-        showMessage("Login successful!")
-        
-        proceedToMainActivity()
-    }
+    
 
     private fun onLoginFailure(error: String?) {
         val errorMessage = error ?: "Login failed. Please check your credentials."
