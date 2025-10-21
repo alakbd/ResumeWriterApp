@@ -247,9 +247,19 @@ class ResumeGenerationActivity : AppCompatActivity() {
         
         // Add debug button
         binding.btnDebugAuth.setOnClickListener {
-            comprehensiveAuthDebug()
+            lifecycleScope.launch {
+                try {
+                    val debugInfo = apiService.debugAuthenticationFlow()
+                    showMessage(debugInfo)
+                    Log.d("DebugAuth", debugInfo)
+                } catch (e: Exception) {
+                    showMessage("Debug failed: ${e.message}")
+                }
+            }
         }
     }
+
+    
 
     private fun checkGenerateButtonState() {
         val hasFiles = selectedResumeUri != null && selectedJobDescUri != null
@@ -656,46 +666,30 @@ class ResumeGenerationActivity : AppCompatActivity() {
 
     /** ---------------- Credit Display ---------------- **/
     private suspend fun updateCreditDisplay() {
-        try {
-            Log.d("ResumeGeneration", "🔄 Starting credit display update...")
-            val result = apiService.getUserCredits()
-        
-        runOnUiThread {
-            when (result) {
-                is ApiService.ApiResult.Success -> {
-                    try {
-                        val credits = result.data.optInt("credits", 0)
-                        Log.d("ResumeGeneration", "✅ Credits updated: $credits")
-                        // Make sure your TextView ID is correct in XML
-                        findViewById<TextView>(R.id.creditsTextView)?.text = "Credits: $credits"
-                    } catch (e: Exception) {
-                        Log.e("ResumeGeneration", "❌ Error parsing credits", e)
-                        findViewById<TextView>(R.id.creditsTextView)?.text = "Credits: Error"
-                    }
+    try {
+        val result = apiService.getUserCredits()
+        when (result) {
+            is ApiResult.Success -> {
+                runOnUiThread {
+                    val credits = result.data.optInt("credits", 0)
+                    binding.tvCredits.text = "Credits: $credits"
                 }
-                is ApiService.ApiResult.Error -> {
-                    Log.e("ResumeGeneration", "❌ Credit fetch failed: ${result.message}")
-                    findViewById<TextView>(R.id.creditsTextView)?.text = "Credits: --"
-                    
-                    // Show user-friendly error
-                    when (result.code) {
-                        401 -> showToast("Please log in to view credits")
-                        404 -> showToast("Service temporarily unavailable")
-                        else -> showToast("Failed to load credits")
-                    }
+            }
+            is ApiResult.Error -> {
+                Log.w("ResumeGeneration", "Failed to get credits: ${result.message}")
+                // Use cached credits or show default
+                runOnUiThread {
+                    val cachedCredits = userManager.getCachedCredits()
+                    binding.tvCredits.text = "Credits: $cachedCredits"
                 }
             }
         }
     } catch (e: Exception) {
-        Log.e("ResumeGeneration", "💥 Exception in updateCreditDisplay: ${e.message}", e)
+        Log.e("ResumeGeneration", "Credit update failed", e)
         runOnUiThread {
-            findViewById<TextView>(R.id.creditsTextView)?.text = "Credits: --"
+            binding.tvCredits.text = "Credits: --"
         }
     }
-}
-
-private fun showToast(message: String) {
-    Toast.makeText(this, message, Toast.LENGTH_SHORT).show()
 }
 
     /** ---------------- Debug Methods ---------------- **/
