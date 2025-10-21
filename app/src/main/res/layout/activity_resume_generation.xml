@@ -12,6 +12,19 @@
 
         <!-- Title -->
         <TextView
+        android:id="@+id/creditsTextView"
+        android:layout_width="wrap_content"
+        android:layout_height="wrap_content"
+        android:text="Credits: Loading..."
+        android:textSize="16sp"
+        android:textStyle="bold"
+        android:layout_gravity="end"
+        android:padding="8dp"
+        android:background="@color/purple_200"
+        android:textColor="@color/black" />
+
+        
+        <TextView
             android:layout_width="match_parent"
             android:layout_height="wrap_content"
             android:text="Resume Generator"
