@@ -14,6 +14,9 @@ import java.io.IOException
 import java.security.MessageDigest
 import java.util.concurrent.TimeUnit
 import com.google.firebase.auth.FirebaseAuth
+import okhttp3.MultipartBody
+import okhttp3.RequestBody
+
 
 fun String.sha256(): String {
     return try {
@@ -39,6 +42,9 @@ class ApiService(private val context: Context) {
         .writeTimeout(60, TimeUnit.SECONDS)
         .addInterceptor(SafeAuthInterceptor(userManager))
         .build()
+
+
+
 
     // SAFE: Minimal auth interceptor that cannot crash
     class SafeAuthInterceptor(private val userManager: UserManager) : Interceptor {
@@ -75,6 +81,68 @@ class ApiService(private val context: Context) {
         data class Error(val message: String, val code: Int = 0) : ApiResult<Nothing>()
     }
 
+private fun uriToFile(uri: Uri): File {
+    return try {
+        val input = context.contentResolver.openInputStream(uri)
+            ?: throw IOException("Failed to open URI: $uri")
+        val file = File.createTempFile("upload_", "_tmp", context.cacheDir)
+        input.use { inputStream -> 
+            file.outputStream().use { outputStream ->
+                inputStream.copyTo(outputStream)
+            }
+        }
+        file
+    } catch (e: Exception) {
+        Log.e("ApiService", "Error converting URI to file: ${e.message}")
+        throw e
+    }
+}
+
+private fun File.asRequestBody(mediaType: MediaType): RequestBody {
+    return this.inputStream().readBytes().toRequestBody(mediaType)
+}
+
+     suspend fun generateResumeFromFiles(resumeUri: Uri, jobDescUri: Uri, tone: String = "Professional"): ApiResult<JSONObject> {
+    return try {
+        Log.d("ApiService", "Generating resume from files")
+        
+        val resumeFile = uriToFile(resumeUri) // This should now work
+        val jobDescFile = uriToFile(jobDescUri) // This should now work
+
+        Log.d("ApiService", "Files: resume=${resumeFile.name}, jobDesc=${jobDescFile.name}")
+
+        val body = MultipartBody.Builder()
+            .setType(MultipartBody.FORM)
+            .addFormDataPart("tone", tone)
+            .addFormDataPart("resume_file", resumeFile.name, 
+                resumeFile.asRequestBody("application/pdf".toMediaType()))
+            .addFormDataPart("job_description_file", jobDescFile.name, 
+                jobDescFile.asRequestBody("application/pdf".toMediaType()))
+            .build()
+
+        val request = Request.Builder()
+            .url("$baseUrl/generate-resume-from-files")
+            .post(body)
+            .build()
+
+        client.newCall(request).execute().use { response ->
+            val respBody = response.body?.string() ?: "{}"
+            Log.d("ApiService", "Generate resume from files response: ${response.code}")
+            
+            if (!response.isSuccessful) {
+                val errorMsg = "HTTP ${response.code}: ${response.message}" // FIXED: This should work now
+                return ApiResult.Error(errorMsg, response.code)
+            }
+            
+            ApiResult.Success(JSONObject(respBody))
+        }
+    } catch (e: Exception) {
+        Log.e("ApiService", "❌ File resume generation crashed: ${e.message}")
+        ApiResult.Error("File resume generation failed: ${e.message}")
+    }
+}
+
+    
     // SAFE: Test Connection
     suspend fun testConnection(): ApiResult<JSONObject> {
         return try {
@@ -186,45 +254,7 @@ class ApiService(private val context: Context) {
         }
     }
 
-    suspend fun generateResumeFromFiles(resumeUri: Uri, jobDescUri: Uri, tone: String = "Professional"): ApiResult<JSONObject> {
-    return try {
-        Log.d("ApiService", "Generating resume from files")
-        
-        val resumeFile = uriToFile(resumeUri)
-        val jobDescFile = uriToFile(jobDescUri)
-
-        Log.d("ApiService", "Files: resume=${resumeFile.name}, jobDesc=${jobDescFile.name}")
-
-        val body = MultipartBody.Builder()
-            .setType(MultipartBody.FORM)
-            .addFormDataPart("tone", tone)
-            .addFormDataPart("resume_file", resumeFile.name, 
-                resumeFile.asRequestBody("application/pdf".toMediaType()))
-            .addFormDataPart("job_description_file", jobDescFile.name, 
-                jobDescFile.asRequestBody("application/pdf".toMediaType()))
-            .build()
-
-        val request = Request.Builder()
-            .url("$baseUrl/generate-resume-from-files")
-            .post(body)
-            .build()
-
-        client.newCall(request).execute().use { response ->
-            val respBody = response.body?.string() ?: "{}"
-            Log.d("ApiService", "Generate resume from files response: ${response.code}")
-            
-            if (!response.isSuccessful) {
-                val errorMsg = "HTTP ${response.code}: ${response.message}" // FIXED: removed e.message
-                return ApiResult.Error(errorMsg, response.code)
-            }
-            
-            ApiResult.Success(JSONObject(respBody))
-        }
-    } catch (e: Exception) {
-        Log.e("ApiService", "❌ File resume generation crashed: ${e.message}")
-        ApiResult.Error("File resume generation failed: ${e.message}")
-    }
-}
+   
 
 // Make sure these utility methods exist:
 fun decodeBase64File(base64Data: String): ByteArray = 
@@ -262,6 +292,8 @@ fun saveFileToStorage(data: ByteArray, filename: String): File {
         }
     }
 
+   
+    
     // SAFE: Test Secure Auth
     suspend fun testSecureAuth(): ApiResult<JSONObject> {
         return try {
