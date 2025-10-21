@@ -43,14 +43,17 @@ class ApiService(private val context: Context) {
     class DetailedLoggingInterceptor : Interceptor {
         override fun intercept(chain: Interceptor.Chain): Response {
             val request = chain.request()
-            
-            // Log request details
-            Log.d("Network", "⬆️ REQUEST: ${request.method} ${request.url}")
-            request.headers.forEach { (name, value) ->
+        
+        // Log request details
+        Log.d("Network", "⬆️ REQUEST: ${request.method} ${request.url}")
+        request.headers.forEach { (name, value) ->
+            if (!name.equals("Authorization", ignoreCase = true)) { // Don't log auth tokens
                 Log.d("Network", "   $name: $value")
             }
-            
-            val startTime = System.currentTimeMillis()
+        }
+        
+        val startTime = System.currentTimeMillis()
+        try {
             val response = chain.proceed(request)
             val endTime = System.currentTimeMillis()
             
@@ -61,49 +64,46 @@ class ApiService(private val context: Context) {
             }
             
             return response
+        } catch (e: Exception) {
+            val endTime = System.currentTimeMillis()
+            Log.e("Network", "💥 NETWORK ERROR: ${e.message} (${endTime - startTime}ms)")
+            throw e // Re-throw to let caller handle it
         }
     }
+}
 
     // FIXED: Simplified Secure Auth Interceptor with better error handling
     class SecureAuthInterceptor(
-    private val userManager: UserManager
+        private val userManager: UserManager
 ) : Interceptor {
     override fun intercept(chain: Interceptor.Chain): Response {
         val originalRequest = chain.request()
         val url = originalRequest.url.toString()
 
-        try {
-            // Skip auth for public endpoints
-            val publicEndpoints = listOf("/health", "/test", "/", "/api")
-            if (publicEndpoints.any { url.contains(it) }) {
-                Log.d("SecureAuth", "🔓 Skipping auth for public endpoint: $url")
-                return chain.proceed(originalRequest)
-            }
-
-            // Get user ID safely
-            val userId = userManager.getCurrentUserId()
-            
-            if (userId.isNullOrBlank()) {
-                Log.w("SecureAuth", "⚠️ No user ID available, proceeding without auth header")
-                // Proceed without auth header - let server handle it
-                return chain.proceed(originalRequest)
-            }
-
-            // Add headers safely
-            val newRequest = originalRequest.newBuilder().apply {
-                addHeader("X-User-ID", userId)
-                addHeader("User-Agent", "ResumeWriter-Android")
-                // Don't add Content-Type here as it might conflict with request body
-            }.build()
-
-            Log.d("SecureAuth", "✅ Added X-User-ID for user: ${userId.take(8)}...")
-            return chain.proceed(newRequest)
-
-        } catch (e: Exception) {
-            Log.e("SecureAuth", "🚨 Critical error in auth interceptor: ${e.message}", e)
-            // In case of any error, proceed with original request to avoid blocking the app
+        // Skip auth for public endpoints
+        val publicEndpoints = listOf("/health", "/test", "/", "/api")
+        if (publicEndpoints.any { url.contains(it) }) {
+            Log.d("SecureAuth", "🔓 Skipping auth for public endpoint: $url")
             return chain.proceed(originalRequest)
         }
+
+        // Get user ID - if null/empty, proceed without auth (let server handle it)
+        val userId = userManager.getCurrentUserId()
+        
+        if (userId.isNullOrBlank()) {
+            Log.w("SecureAuth", "⚠️ No user ID available for: ${originalRequest.method} $url")
+            Log.w("SecureAuth", "   Proceeding without X-User-ID header")
+            return chain.proceed(originalRequest)
+        }
+
+        // Add auth headers and proceed
+        val newRequest = originalRequest.newBuilder()
+            .addHeader("X-User-ID", userId)
+            .addHeader("User-Agent", "ResumeWriter-Android")
+            .build()
+
+        Log.d("SecureAuth", "✅ Added X-User-ID: ${userId.take(8)}... for ${originalRequest.method} $url")
+        return chain.proceed(newRequest)
     }
 }
 
