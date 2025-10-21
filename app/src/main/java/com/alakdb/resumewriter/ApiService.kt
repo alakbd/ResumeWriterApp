@@ -12,9 +12,15 @@ import okhttp3.logging.HttpLoggingInterceptor
 import org.json.JSONObject
 import java.io.File
 import java.io.IOException
+import java.security.MessageDigest
 import java.util.concurrent.TimeUnit
 import com.google.firebase.auth.FirebaseAuth
-import kotlinx.coroutines.delay
+
+fun String.sha256(): String {
+    val digest = MessageDigest.getInstance("SHA-256")
+    val hashBytes = digest.digest(this.toByteArray(Charsets.UTF_8))
+    return hashBytes.joinToString("") { "%02x".format(it) }
+}
 
 class ApiService(private val context: Context) {
 
@@ -22,13 +28,6 @@ class ApiService(private val context: Context) {
     private val baseUrl = "https://resume-writer-api.onrender.com"
     private val userManager = UserManager(context)
     
-    // Use BuildConfig or fallback
-    private val appSecretKey = try {
-        BuildConfig.APP_SECRET_KEY
-    } catch (e: Exception) {
-        "fallback-secret-key"
-    }
-
     // Enhanced OkHttp Client with request/response logging
     private val client = OkHttpClient.Builder()
         .connectTimeout(60, TimeUnit.SECONDS)
@@ -38,7 +37,7 @@ class ApiService(private val context: Context) {
             level = HttpLoggingInterceptor.Level.BODY 
         })
         .addInterceptor(DetailedLoggingInterceptor())
-        .addInterceptor(SecureAuthInterceptor(userManager, appSecretKey))
+        .addInterceptor(SecureAuthInterceptor(userManager))
         .build()
 
     class DetailedLoggingInterceptor : Interceptor {
@@ -65,10 +64,9 @@ class ApiService(private val context: Context) {
         }
     }
 
-    // Simplified Secure Auth Interceptor: Only sends X-User-ID
+    // FIXED: Simplified Secure Auth Interceptor with better error handling
     class SecureAuthInterceptor(
-        private val userManager: UserManager,
-        private val appSecretKey: String
+        private val userManager: UserManager
     ) : Interceptor {
         override fun intercept(chain: Interceptor.Chain): Response {
             val originalRequest = chain.request()
@@ -81,30 +79,32 @@ class ApiService(private val context: Context) {
                 return chain.proceed(originalRequest)
             }
 
-            // Get user ID from UserManager
-            val userId = userManager.getCurrentUserId()
+            try {
+                // Get user ID from UserManager
+                val userId = userManager.getCurrentUserId()
 
-            // Check if user ID is valid
-            if (userId.isNullOrBlank()) {
-                Log.e("SecureAuth", "❌ BLOCKED: No user ID available for protected endpoint: $url")
-                return Response.Builder()
-                    .request(originalRequest)
-                    .protocol(Protocol.HTTP_1_1)
-                    .code(401)
-                    .message("User not authenticated")
-                    .body("{ \"error\": \"User not authenticated. Please log in again.\" }"
-                        .toResponseBody("application/json".toMediaType()))
+                // Check if user ID is valid
+                if (userId.isNullOrBlank()) {
+                    Log.e("SecureAuth", "❌ No user ID available for protected endpoint: $url")
+                    // Instead of blocking, proceed without auth header and let server handle it
+                    Log.w("SecureAuth", "⚠️ Proceeding without auth header, server will handle authentication")
+                    return chain.proceed(originalRequest)
+                }
+
+                // Add X-User-ID header
+                val newRequest = originalRequest.newBuilder()
+                    .addHeader("X-User-ID", userId)
+                    .addHeader("User-Agent", "ResumeWriter-Android")
                     .build()
+
+                Log.d("SecureAuth", "✅ Added X-User-ID for user: ${userId.take(8)}... to: ${originalRequest.method} $url")
+                return chain.proceed(newRequest)
+                
+            } catch (e: Exception) {
+                Log.e("SecureAuth", "🚨 Error in auth interceptor: ${e.message}", e)
+                // In case of error, proceed with original request
+                return chain.proceed(originalRequest)
             }
-
-            // Only add X-User-ID header now
-            val newRequest = originalRequest.newBuilder()
-                .addHeader("X-User-ID", userId)
-                .addHeader("User-Agent", "ResumeWriter-Android")
-                .build()
-
-            Log.d("SecureAuth", "✅ Added X-User-ID for user: ${userId.take(8)}... to: ${originalRequest.method} $url")
-            return chain.proceed(newRequest)
         }
     }
 
@@ -119,7 +119,7 @@ class ApiService(private val context: Context) {
     }
 
     // Enhanced Test Connection with better error handling
-    suspend fun testConnection(): ApiResult<String> {
+    suspend fun testConnection(): ApiResult<JSONObject> {
         Log.d("NetworkTest", "Testing connection to: $baseUrl")
     
         // Use a simple client without interceptors for connection testing
@@ -147,7 +147,7 @@ class ApiService(private val context: Context) {
             
                 if (response.isSuccessful && body != null) {
                     Log.d("NetworkTest", "✅ Success with endpoint: $endpoint")
-                    return ApiResult.Success(body)
+                    return ApiResult.Success(JSONObject(body))
                 } else {
                     Log.w("NetworkTest", "❌ Failed with endpoint $endpoint: HTTP ${response.code}")
                 }
@@ -191,7 +191,7 @@ class ApiService(private val context: Context) {
             // Wait before next attempt (except on last attempt)
             if (attempt < maxAttempts - 1) {
                 Log.d("ServerWakeUp", "⏰ Waiting ${delayBetweenAttempts}ms before next attempt...")
-                delay(delayBetweenAttempts)
+                kotlinx.coroutines.delay(delayBetweenAttempts)
             }
         }
     
@@ -277,9 +277,9 @@ class ApiService(private val context: Context) {
                 .setType(MultipartBody.FORM)
                 .addFormDataPart("tone", tone)
                 .addFormDataPart("resume_file", resumeFile.name, 
-                    resumeFile.asRequestBody("application/octet-stream".toMediaType()))
+                    resumeFile.asRequestBody("application/pdf".toMediaType()))
                 .addFormDataPart("job_description_file", jobDescFile.name, 
-                    jobDescFile.asRequestBody("application/octet-stream".toMediaType()))
+                    jobDescFile.asRequestBody("application/pdf".toMediaType()))
                 .build()
 
             val request = Request.Builder()
@@ -306,54 +306,51 @@ class ApiService(private val context: Context) {
         }
     }
 
+    // FIXED: getUserCredits with better error handling
     suspend fun getUserCredits(): ApiResult<JSONObject> {
-    return try {
-        Log.d("ApiService", "Getting user credits...")
+        return try {
+            Log.d("ApiService", "Getting user credits...")
 
-        // Build the request normally; interceptor will inject X-User-ID
-        val request = Request.Builder()
-            .url("$baseUrl/user/credits")
-            .get()
-            .build()
+            val request = Request.Builder()
+                .url("$baseUrl/user/credits")
+                .get()
+                .build()
 
-        // Use the OkHttpClient that has SecureAuthInterceptor added
-        client.newCall(request).execute().use { response ->
-            val respBody = response.body?.string().orEmpty()
-            Log.d("ApiService", "Credits response: ${response.code}")
+            client.newCall(request).execute().use { response ->
+                val respBody = response.body?.string() ?: "{}"
+                Log.d("ApiService", "Credits response: ${response.code} - $respBody")
 
-            // Check for HTTP errors
-            if (!response.isSuccessful) {
-                Log.e("ApiService", "Failed to fetch credits: HTTP ${response.code}")
-                return ApiResult.Error(
-                    message = "Failed to get credits: ${response.message}",
-                    code = response.code,
-                    details = respBody
-                )
+                if (!response.isSuccessful) {
+                    Log.e("ApiService", "Failed to fetch credits: HTTP ${response.code}")
+                    return ApiResult.Error(
+                        message = "Failed to get credits: ${response.message}",
+                        code = response.code,
+                        details = respBody
+                    )
+                }
+
+                // Parse the response to ensure it's valid JSON
+                try {
+                    val jsonResponse = JSONObject(respBody)
+                    ApiResult.Success(jsonResponse)
+                } catch (e: Exception) {
+                    Log.e("ApiService", "Invalid JSON response for credits", e)
+                    ApiResult.Error(
+                        message = "Invalid server response",
+                        code = response.code,
+                        details = respBody
+                    )
+                }
             }
-
-            // Confirm JSON parsing
-            try {
-                val jsonResponse = JSONObject(respBody)
-                Log.d("ApiService", "Parsed JSON: $jsonResponse")
-                ApiResult.Success(jsonResponse)
-            } catch (e: Exception) {
-                Log.e("ApiService", "Invalid JSON response for credits", e)
-                ApiResult.Error(
-                    message = "Invalid server response",
-                    code = response.code,
-                    details = respBody
-                )
-            }
+        } catch (e: Exception) {
+            Log.e("ApiService", "Exception while fetching credits: ${e.message}", e)
+            ApiResult.Error(
+                message = "Network error: ${e.message ?: "Unknown error"}",
+                code = -1,
+                details = e.stackTraceToString()
+            )
         }
-    } catch (e: Exception) {
-        Log.e("ApiService", "Exception while fetching credits: ${e.message}", e)
-        ApiResult.Error(
-            message = "Network error: ${e.message.orEmpty()}",
-            code = -1,
-            details = e.stackTraceToString()
-        )
     }
-}
 
     // Test secure authentication
     suspend fun testSecureAuth(): ApiResult<JSONObject> {
