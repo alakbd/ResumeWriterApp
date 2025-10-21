@@ -101,6 +101,41 @@ class ApiService(private val context: Context) {
         }
     }
 
+    suspend fun waitForServerWakeUp(maxAttempts: Int = 12, delayBetweenAttempts: Long = 10000L): Boolean {
+    return try {
+        Log.d("ServerWakeUp", "🔄 Waiting for server to wake up...")
+        
+        repeat(maxAttempts) { attempt ->
+            try {
+                Log.d("ServerWakeUp", "Attempt ${attempt + 1}/$maxAttempts")
+                val result = testConnection()
+            
+                when (result) {
+                    is ApiResult.Success -> {
+                        Log.d("ServerWakeUp", "✅ Server is awake and responding!")
+                        return true
+                    }
+                    is ApiResult.Error -> {
+                        Log.w("ServerWakeUp", "⏳ Server not ready: ${result.message}")
+                    }
+                }
+            } catch (e: Exception) {
+                Log.w("ServerWakeUp", "🚨 Connection attempt ${attempt + 1} failed: ${e.message}")
+            }
+        
+            if (attempt < maxAttempts - 1) {
+                kotlinx.coroutines.delay(delayBetweenAttempts)
+            }
+        }
+        
+        Log.e("ServerWakeUp", "❌ Server failed to wake up after $maxAttempts attempts")
+        false
+    } catch (e: Exception) {
+        Log.e("ServerWakeUp", "❌ Server wakeup crashed: ${e.message}")
+        false
+    }
+}
+    
     // SAFE: Deduct Credit
     suspend fun deductCredit(userId: String): ApiResult<JSONObject> {
         return try {
@@ -150,6 +185,56 @@ class ApiService(private val context: Context) {
             ApiResult.Error("Request failed: ${e.message ?: "Unknown error"}")
         }
     }
+
+    suspend fun generateResumeFromFiles(resumeUri: Uri, jobDescUri: Uri, tone: String = "Professional"): ApiResult<JSONObject> {
+    return try {
+        Log.d("ApiService", "Generating resume from files")
+        
+        val resumeFile = uriToFile(resumeUri)
+        val jobDescFile = uriToFile(jobDescUri)
+
+        Log.d("ApiService", "Files: resume=${resumeFile.name}, jobDesc=${jobDescFile.name}")
+
+        val body = MultipartBody.Builder()
+            .setType(MultipartBody.FORM)
+            .addFormDataPart("tone", tone)
+            .addFormDataPart("resume_file", resumeFile.name, 
+                resumeFile.asRequestBody("application/pdf".toMediaType()))
+            .addFormDataPart("job_description_file", jobDescFile.name, 
+                jobDescFile.asRequestBody("application/pdf".toMediaType()))
+            .build()
+
+        val request = Request.Builder()
+            .url("$baseUrl/generate-resume-from-files")
+            .post(body)
+            .build()
+
+        client.newCall(request).execute().use { response ->
+            val respBody = response.body?.string() ?: "{}"
+            Log.d("ApiService", "Generate resume from files response: ${response.code}")
+            
+            if (!response.isSuccessful) {
+                val errorMsg = "HTTP ${response.code}: ${response.message}" // FIXED: removed e.message
+                return ApiResult.Error(errorMsg, response.code)
+            }
+            
+            ApiResult.Success(JSONObject(respBody))
+        }
+    } catch (e: Exception) {
+        Log.e("ApiService", "❌ File resume generation crashed: ${e.message}")
+        ApiResult.Error("File resume generation failed: ${e.message}")
+    }
+}
+
+// Make sure these utility methods exist:
+fun decodeBase64File(base64Data: String): ByteArray = 
+    android.util.Base64.decode(base64Data, android.util.Base64.DEFAULT)
+
+fun saveFileToStorage(data: ByteArray, filename: String): File {
+    val file = File(context.getExternalFilesDir(null), filename)
+    file.outputStream().use { it.write(data) }
+    return file
+}
 
     // SAFE: Get User Credits
     suspend fun getUserCredits(): ApiResult<JSONObject> {
