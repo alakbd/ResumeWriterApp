@@ -13,7 +13,6 @@ class LoginActivity : AppCompatActivity() {
     private lateinit var binding: ActivityLoginBinding
     private lateinit var userManager: UserManager
     private lateinit var creditManager: CreditManager
-    private lateinit var apiService: ApiService
     private lateinit var firebaseAuth: FirebaseAuth
 
     override fun onCreate(savedInstanceState: Bundle?) {
@@ -24,7 +23,6 @@ class LoginActivity : AppCompatActivity() {
         // Initialize managers and services
         userManager = UserManager(this)
         creditManager = CreditManager(this)
-        apiService = ApiService.getInstance(this)
         firebaseAuth = FirebaseAuth.getInstance()
 
         // Check if already logged in
@@ -122,8 +120,7 @@ class LoginActivity : AppCompatActivity() {
                 if (task.isSuccessful) {
                     val user = task.result?.user
                     if (user != null && user.isEmailVerified) {
-                        // ✅ CRITICAL: Save user data to UserManager
-                        userManager.saveUserLogin(user)
+                        // ✅ UserManager.saveUserDataLocally is called internally in loginUser
                         onLoginSuccess(user)
                     } else if (user != null && !user.isEmailVerified) {
                         setLoginInProgress(false)
@@ -149,8 +146,14 @@ class LoginActivity : AppCompatActivity() {
         // Initialize user session and credits
         creditManager.resetResumeCooldown()
         
-        // Initialize API service with user context
-        apiService.initializeUserSession(user.uid)
+        // Sync user credits from Firestore
+        userManager.syncUserCredits { success, credits ->
+            if (success) {
+                Log.d("LoginActivity", "User credits synced: $credits")
+            } else {
+                Log.w("LoginActivity", "Failed to sync user credits")
+            }
+        }
         
         Log.d("LoginActivity", "✅ Login successful - UID: ${user.uid}, Email: ${user.email}")
         showMessage("Login successful!")
@@ -203,10 +206,5 @@ class LoginActivity : AppCompatActivity() {
 
     private fun showMessage(message: String) {
         Toast.makeText(this, message, Toast.LENGTH_SHORT).show()
-    }
-
-    override fun onDestroy() {
-        // Clean up if needed
-        super.onDestroy()
     }
 }
