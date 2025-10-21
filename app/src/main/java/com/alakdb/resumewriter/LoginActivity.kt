@@ -37,27 +37,59 @@ class LoginActivity : AppCompatActivity() {
             val password = binding.etLoginPassword.text.toString().trim()
 
             if (validateInput(email, password)) {
+                // Hide keyboard
+                hideKeyboard()
                 attemptLogin(email, password)
             }
         }
 
         binding.btnForgotPassword.setOnClickListener {
-            val email = binding.etLoginEmail.text.toString().trim()
-            when {
-                email.isEmpty() -> showMessage("Please enter your email first")
-                !android.util.Patterns.EMAIL_ADDRESS.matcher(email).matches() ->
-                    binding.etLoginEmail.error = "Enter a valid email address"
-                else -> sendPasswordResetEmail(email)
+        val email = binding.etLoginEmail.text.toString().trim()
+        when {
+            email.isEmpty() -> {
+                binding.etLoginEmail.error = getString(R.string.enter_email_first)
+                binding.etLoginEmail.requestFocus()
+            }
+            !android.util.Patterns.EMAIL_ADDRESS.matcher(email).matches() -> {
+                binding.etLoginEmail.error = getString(R.string.enter_valid_email)
+                binding.etLoginEmail.requestFocus()
+            }
+            else -> {
+                hideKeyboard()
+                sendPasswordResetEmail(email)
             }
         }
-    
-        // Go to registration page
-        binding.btnGoToRegister.setOnClickListener {
-            startActivity(Intent(this, UserRegistrationActivity::class.java))
-            finish()
-        }
     }
+    
+    binding.btnGoToRegister.setOnClickListener {
+        startActivity(Intent(this, UserRegistrationActivity::class.java))
+        finish()
+    }
+}
 
+    private fun sendPasswordResetEmail(email: String) {
+    binding.btnForgotPassword.isEnabled = false
+    binding.btnForgotPassword.text = getString(R.string.sending_email)
+    
+    FirebaseAuth.getInstance().sendPasswordResetEmail(email)
+        .addOnCompleteListener { task ->
+            binding.btnForgotPassword.isEnabled = true
+            binding.btnForgotPassword.text = getString(R.string.forgot_password)
+            
+            if (task.isSuccessful) {
+                showMessage(getString(R.string.reset_link_sent, email))
+            } else {
+                val errorMessage = task.exception?.message ?: getString(R.string.unknown_error)
+                showMessage(getString(R.string.reset_email_failed, errorMessage))
+            }
+        }
+}
+    // Add helper to hide keyboard
+private fun hideKeyboard() {
+    val imm = getSystemService(Context.INPUT_METHOD_SERVICE) as InputMethodManager
+    imm.hideSoftInputFromWindow(binding.root.windowToken, 0)
+}
+    
     private fun validateInput(email: String, password: String): Boolean {
         if (email.isEmpty()) {
             binding.etLoginEmail.error = "Email is required"
@@ -77,16 +109,7 @@ class LoginActivity : AppCompatActivity() {
         return true
     }
 
-    private fun sendPasswordResetEmail(email: String) {
-        FirebaseAuth.getInstance().sendPasswordResetEmail(email)
-            .addOnCompleteListener { task ->
-                if (task.isSuccessful) {
-                    Toast.makeText(this, "Password reset link sent to $email", Toast.LENGTH_LONG).show()
-                } else {
-                    Toast.makeText(this, "Error: ${task.exception?.message}", Toast.LENGTH_LONG).show()
-                }
-            }
-    }
+    
 
     private fun attemptLogin(email: String, password: String) {
         binding.btnLogin.isEnabled = false
@@ -111,6 +134,24 @@ class LoginActivity : AppCompatActivity() {
             } else {
                 showMessage(error ?: "Login failed")
             }
+        }
+    }
+
+    // After successful Firebase login
+FirebaseAuth.getInstance().signInWithEmailAndPassword(email, password)
+    .addOnCompleteListener { task ->
+        if (task.isSuccessful) {
+            val user = task.result?.user
+            if (user != null) {
+                // ⭐️ CRITICAL: Save user data to UserManager
+                userManager.saveUserLogin(user)
+                
+                // Then proceed to main activity
+                startActivity(Intent(this, ResumeGenerationActivity::class.java))
+                finish()
+            }
+        } else {
+            // Handle login failure
         }
     }
 
