@@ -47,30 +47,68 @@ class ApiService(private val context: Context) {
 
 
     // SAFE: Minimal auth interceptor that cannot crash
-    class SafeAuthInterceptor(private val userManager: UserManager) : Interceptor {
-        override fun intercept(chain: Interceptor.Chain): Response {
-            val request = chain.request()
+    // FIXED: Enhanced SafeAuthInterceptor with proper user ID handling
+class SafeAuthInterceptor(private val userManager: UserManager) : Interceptor {
+    override fun intercept(chain: Interceptor.Chain): Response {
+        val originalRequest = chain.request()
+        
+        // Always proceed with original request if anything fails
+        return try {
+            val userId = userManager.getCurrentUserId()
             
-            // Always proceed with original request if anything fails
-            return try {
-                val userId = userManager.getCurrentUserId()
+            Log.d("AuthInterceptor", "🔐 Interceptor - User ID: ${userId ?: "NULL"}")
+            Log.d("AuthInterceptor", "🔐 Request URL: ${originalRequest.url}")
+            
+            if (!userId.isNullOrBlank()) {
+                val newRequest = originalRequest.newBuilder()
+                    .addHeader("X-User-ID", userId)
+                    .addHeader("User-Agent", "ResumeWriter-Android")
+                    .build()
                 
-                if (!userId.isNullOrBlank()) {
-                    val newRequest = request.newBuilder()
-                        .addHeader("X-User-ID", userId)
-                        .addHeader("User-Agent", "ResumeWriter-Android")
-                        .build()
-                    chain.proceed(newRequest)
-                } else {
-                    chain.proceed(request)
-                }
-            } catch (e: Exception) {
-                // If anything fails, proceed with original request
-                chain.proceed(request)
+                Log.d("AuthInterceptor", "✅ Added X-User-ID: ${userId.take(8)}...")
+                Log.d("AuthInterceptor", "✅ Headers: ${newRequest.headers}")
+                
+                chain.proceed(newRequest)
+            } else {
+                Log.w("AuthInterceptor", "⚠️ No user ID available - proceeding without X-User-ID")
+                chain.proceed(originalRequest)
             }
+        } catch (e: Exception) {
+            Log.e("AuthInterceptor", "❌ Interceptor crashed: ${e.message}")
+            // Fallback: proceed with original request
+            chain.proceed(originalRequest)
         }
     }
+}
 
+suspend fun testAuthentication(): ApiResult<JSONObject> {
+    return try {
+        Log.d("ApiService", "🔐 Testing authentication with X-User-ID header...")
+        
+        val userId = userManager.getCurrentUserId()
+        Log.d("ApiService", "🔐 Current User ID: ${userId ?: "NULL"}")
+        
+        val request = Request.Builder()
+            .url("$baseUrl/user/credits")
+            .get()
+            .build()
+
+        client.newCall(request).execute().use { response ->
+            val respBody = response.body?.string() ?: "{}"
+            Log.d("ApiService", "🔐 Auth test response: ${response.code}")
+            Log.d("ApiService", "🔐 Response body: $respBody")
+            
+            if (response.isSuccessful) {
+                ApiResult.Success(JSONObject(respBody))
+            } else {
+                ApiResult.Error("HTTP ${response.code}: ${response.message}", response.code)
+            }
+        }
+    } catch (e: Exception) {
+        Log.e("ApiService", "🔐 Auth test failed", e)
+        ApiResult.Error("Auth test failed: ${e.message ?: "Unknown error"}")
+    }
+}
     // Data Classes
     data class DeductCreditRequest(val user_id: String)
     data class GenerateResumeRequest(val resume_text: String, val job_description: String, val tone: String = "Professional")
@@ -318,31 +356,71 @@ fun saveFileToStorage(data: ByteArray, filename: String): File {
 
     // SAFE: Debug Authentication
     suspend fun debugAuthenticationFlow(): String {
-        return try {
-            val debugInfo = StringBuilder()
-            debugInfo.appendLine("=== AUTHENTICATION DEBUG ===")
-            
-            val firebaseUser = FirebaseAuth.getInstance().currentUser
-            debugInfo.appendLine("Firebase User: ${firebaseUser?.uid ?: "NULL"}")
-            debugInfo.appendLine("UserManager Logged In: ${userManager.isUserLoggedIn()}")
-            debugInfo.appendLine("UserManager User ID: ${userManager.getCurrentUserId() ?: "NULL"}")
-            
-            val authTest = testSecureAuth()
-            val authMessage = when (authTest) {
-            is ApiResult.Success -> "SUCCESS"
-            is ApiResult.Error -> "FAILED: ${authTest.message}"
+    return try {
+        val debugInfo = StringBuilder()
+        debugInfo.appendLine("=== AUTHENTICATION DEBUG ===")
+        
+        // 1. Firebase Auth State
+        val firebaseUser = FirebaseAuth.getInstance().currentUser
+        debugInfo.appendLine("1. FIREBASE AUTH STATE:")
+        debugInfo.appendLine("   • UID: ${firebaseUser?.uid ?: "NULL"}")
+        debugInfo.appendLine("   • Email: ${firebaseUser?.email ?: "NULL"}")
+        debugInfo.appendLine("   • Email Verified: ${firebaseUser?.isEmailVerified ?: false}")
+        
+        // 2. UserManager State
+        debugInfo.appendLine("2. USERMANAGER STATE:")
+        debugInfo.appendLine("   • Is Logged In: ${userManager.isUserLoggedIn()}")
+        debugInfo.appendLine("   • User ID: ${userManager.getCurrentUserId() ?: "NULL"}")
+        debugInfo.appendLine("   • User Email: ${userManager.getCurrentUserEmail() ?: "NULL"}")
+        
+        // 3. Test if UserManager and Firebase are in sync
+        debugInfo.appendLine("3. SYNC CHECK:")
+        val firebaseUid = firebaseUser?.uid
+        val managerUid = userManager.getCurrentUserId()
+        if (firebaseUid != null && managerUid != null) {
+            debugInfo.appendLine("   • UID Match: ${firebaseUid == managerUid}")
+            if (firebaseUid != managerUid) {
+                debugInfo.appendLine("   ⚠️ UID MISMATCH! Firebase: $firebaseUid, Manager: $managerUid")
             }
-            debugInfo.appendLine("Auth Test: $authMessage")
-            
-            debugInfo.appendLine("=== END DEBUG ===")
-            debugInfo.toString()
-        } catch (e: Exception) {
-            "Debug failed: ${e.message}"
+        } else {
+            debugInfo.appendLine("   • One or both UIDs are NULL")
         }
-    }
+        
+        // 4. Test authentication with credits endpoint (the one that's failing)
+        debugInfo.appendLine("4. CREDITS ENDPOINT TEST:")
+        val creditsRequest = Request.Builder()
+            .url("$baseUrl/user/credits")
+            .get()
+            .build()
 
-    // Compatibility method
-    fun initializeUserSession(userId: String?) {
-        // No-op for compatibility
+        try {
+            val response = client.newCall(creditsRequest).execute()
+            val respBody = response.body?.string() ?: "{}"
+            debugInfo.appendLine("   • HTTP Status: ${response.code}")
+            debugInfo.appendLine("   • Response: $respBody")
+            
+            if (response.code == 401 || respBody.contains("Missing X-User-ID")) {
+                debugInfo.appendLine("   ❌ AUTH FAILED: X-User-ID header missing or invalid")
+                debugInfo.appendLine("   💡 Check if UserManager.getCurrentUserId() is returning the correct UID")
+            } else if (response.isSuccessful) {
+                debugInfo.appendLine("   ✅ AUTH SUCCESS")
+            }
+        } catch (e: Exception) {
+            debugInfo.appendLine("   ❌ Request failed: ${e.message}")
+        }
+        
+        // 5. Test secure auth endpoint
+        debugInfo.appendLine("5. SECURE AUTH TEST:")
+        val authTest = testSecureAuth()
+        val authMessage = when (authTest) {
+            is ApiResult.Success -> "SUCCESS - ${authTest.data}"
+            is ApiResult.Error -> "FAILED: ${authTest.message}"
+        }
+        debugInfo.appendLine("   • Result: $authMessage")
+        
+        debugInfo.appendLine("=== END DEBUG ===")
+        debugInfo.toString()
+    } catch (e: Exception) {
+        "Debug failed: ${e.message}"
     }
 }
