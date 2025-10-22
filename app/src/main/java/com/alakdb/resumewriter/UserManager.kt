@@ -409,17 +409,17 @@ fun getCurrentUserId(): String? {
     }
 
     /** Check if this is a fresh install (no user data at all) */
-fun isFreshInstall(): Boolean {
-    val hasUserData = prefs.contains(USER_ID_KEY) || 
-                     prefs.contains(USER_EMAIL_KEY) || 
-                     prefs.contains(IS_REGISTERED_KEY)
+    fun isFreshInstall(): Boolean {
+        val hasUserData = prefs.contains(USER_ID_KEY) || 
+                         prefs.contains(USER_EMAIL_KEY) || 
+                         prefs.contains(IS_REGISTERED_KEY)
     
-    val hasFirebaseUser = auth.currentUser != null
+        val hasFirebaseUser = auth.currentUser != null
     
-    Log.d("UserManager", "Fresh install check - HasUserData: $hasUserData, HasFirebaseUser: $hasFirebaseUser")
+        Log.d("UserManager", "Fresh install check - HasUserData: $hasUserData, HasFirebaseUser: $hasFirebaseUser")
     
-    return !hasUserData && !hasFirebaseUser
-}
+        return !hasUserData && !hasFirebaseUser
+    }
 
     // ========== NO TOKEN METHODS - COMPLETELY REMOVED ==========
     // We don't need any token methods for UID-based authentication
