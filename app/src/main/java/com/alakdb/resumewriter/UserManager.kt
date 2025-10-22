@@ -362,6 +362,44 @@ fun getCurrentUserId(): String? {
             }
     }
 
+    /** Emergency method to ensure headers can be sent */
+fun getUserIdForHeaders(): String? {
+    return try {
+        // Priority 1: Direct Firebase (most reliable)
+        val firebaseUser = FirebaseAuth.getInstance().currentUser
+        val firebaseUid = firebaseUser?.uid
+        
+        if (!firebaseUid.isNullOrBlank()) {
+            Log.d("UserManager", "🔥 Using Firebase UID for headers: ${firebaseUid.take(8)}...")
+            
+            // Emergency sync to local storage
+            try {
+                if (getCurrentUserId() != firebaseUid) {
+                    saveUserDataLocally(firebaseUser.email ?: "", firebaseUid)
+                }
+            } catch (e: Exception) {
+                Log.w("UserManager", "⚠️ Local sync failed but we have Firebase UID")
+            }
+            
+            return firebaseUid
+        }
+        
+        // Priority 2: Local storage
+        val localUid = getCurrentUserId()
+        if (!localUid.isNullOrBlank()) {
+            Log.d("UserManager", "📱 Using local UID for headers: ${localUid.take(8)}...")
+            return localUid
+        }
+        
+        Log.e("UserManager", "❌ NO UID AVAILABLE FOR HEADERS")
+        null
+        
+    } catch (e: Exception) {
+        Log.e("UserManager", "💥 Header UID retrieval failed: ${e.message}")
+        null
+    }
+}
+    
     /** Get locally cached credits (use syncUserCredits for fresh data) */
     fun getCachedCredits(): Int {
         return prefs.getInt(AVAILABLE_CREDITS_KEY, 0)
