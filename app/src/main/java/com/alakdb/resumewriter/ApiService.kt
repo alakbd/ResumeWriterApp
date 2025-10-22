@@ -48,45 +48,71 @@ class ApiService(private val context: Context) {
         val originalRequest = chain.request()
         
         return try {
-            // STEP 1: Try to get user ID normally
-            var userId = userManager.getCurrentUserId()
+            // STEP 1: Get user ID with multiple fallback strategies
+            val userId = getUserIdWithComprehensiveFallback()
             
-            // STEP 2: If null, attempt emergency sync
-            if (userId.isNullOrBlank()) {
-                Log.w("AuthInterceptor", "🔄 User ID is null - attempting emergency sync")
-                userManager.emergencySyncWithFirebase()
-                userId = userManager.getCurrentUserId()
-            }
-            
-            // STEP 3: If still null, check Firebase directly as last resort
-            if (userId.isNullOrBlank()) {
-                userId = FirebaseAuth.getInstance().currentUser?.uid
-                if (!userId.isNullOrBlank()) {
-                    Log.w("AuthInterceptor", "🚨 Using Firebase UID directly (emergency fallback)")
-                }
-            }
-            
+            Log.d("AuthInterceptor", "🔐 Request to: ${originalRequest.url}")
             Log.d("AuthInterceptor", "🔐 Final User ID: ${userId ?: "NULL"}")
             
             val requestBuilder = originalRequest.newBuilder()
                 .addHeader("User-Agent", "ResumeWriter-Android")
             
-            // STEP 4: Add X-User-ID header if we have it
+            // STEP 2: Only add X-User-ID if we have a valid, non-empty user ID
             if (!userId.isNullOrBlank()) {
                 requestBuilder.addHeader("X-User-ID", userId)
                 Log.d("AuthInterceptor", "✅ Added X-User-ID: ${userId.take(8)}...")
             } else {
-                Log.e("AuthInterceptor", "❌ CRITICAL: No User ID available for API request")
-                // Don't fail the request - let server handle authentication
+                Log.w("AuthInterceptor", "⚠️ No valid User ID - proceeding without X-User-ID header")
+                // Don't crash - let server handle authentication failure
             }
             
             val newRequest = requestBuilder.build()
             chain.proceed(newRequest)
             
         } catch (e: Exception) {
-            Log.e("AuthInterceptor", "💥 Interceptor crashed: ${e.message}")
-            // Critical fallback: proceed without headers
+            Log.e("AuthInterceptor", "💥 Interceptor crashed at line 89: ${e.message}", e)
+            // CRITICAL: Always proceed with original request to avoid breaking the app
             chain.proceed(originalRequest)
+        }
+    }
+    
+    private fun getUserIdWithComprehensiveFallback(): String? {
+        return try {
+            // Strategy 1: Try UserManager first
+            var userId = userManager.getCurrentUserId()
+            
+            if (!userId.isNullOrBlank()) {
+                Log.d("AuthInterceptor", "✅ UserManager provided UID: ${userId.take(8)}...")
+                return userId
+            }
+            
+            // Strategy 2: Emergency sync and retry
+            Log.w("AuthInterceptor", "🔄 UserManager returned null - attempting emergency sync")
+            userManager.emergencySyncWithFirebase()
+            userId = userManager.getCurrentUserId()
+            
+            if (!userId.isNullOrBlank()) {
+                Log.d("AuthInterceptor", "✅ Emergency sync successful: ${userId.take(8)}...")
+                return userId
+            }
+            
+            // Strategy 3: Direct Firebase fallback
+            userId = FirebaseAuth.getInstance().currentUser?.uid
+            if (!userId.isNullOrBlank()) {
+                Log.w("AuthInterceptor", "🚨 Using direct Firebase UID: ${userId.take(8)}...")
+                // Save this to UserManager for future requests
+                userManager.emergencySyncWithFirebase()
+                return userId
+            }
+            
+            // Strategy 4: Final fallback - return null
+            Log.e("AuthInterceptor", "❌ All fallback strategies failed - no user ID available")
+            null
+            
+        } catch (e: Exception) {
+            Log.e("AuthInterceptor", "💥 User ID lookup failed: ${e.message}")
+            // Final fallback to Firebase
+            FirebaseAuth.getInstance().currentUser?.uid
         }
     }
 }
