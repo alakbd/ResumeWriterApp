@@ -22,12 +22,19 @@ class MainActivity : AppCompatActivity() {
         binding = ActivityMainBinding.inflate(layoutInflater)
         setContentView(binding.root)
 
-        // Initialize managers
+        // Initialize managers first
         initializeManagers()
 
-        // Check authentication first
-        if (!checkAuthentication()) return
+        // DEBUG: Check current state
+        userManager.logCurrentUserState()
+        userManager.debugStoredData()
 
+        // Check authentication - redirect to login if not authenticated
+        if (!checkAuthentication()) {
+            return // Will start LoginActivity and finish this one
+        }
+
+        // Only initialize app if user is properly authenticated
         initializeApp()
     }
 
