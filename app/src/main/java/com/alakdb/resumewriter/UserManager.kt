@@ -86,6 +86,90 @@ class UserManager(private val context: Context) {
             }
     }
 
+    /** Check if current user has verified email */
+fun isEmailVerified(): Boolean {
+    return auth.currentUser?.isEmailVerified ?: false
+}
+
+/** Send email verification to current user */
+fun sendEmailVerification(onComplete: (Boolean, String?) -> Unit) {
+    val user = auth.currentUser
+    if (user == null) {
+        onComplete(false, "No user logged in")
+        return
+    }
+    
+    user.sendEmailVerification()
+        .addOnCompleteListener { task ->
+            if (task.isSuccessful) {
+                Log.d("UserManager", "Verification email sent to ${user.email}")
+                onComplete(true, null)
+            } else {
+                val error = task.exception?.message ?: "Failed to send verification email"
+                Log.e("UserManager", "Verification email failed: $error")
+                onComplete(false, error)
+            }
+        }
+}
+
+/** Enhanced login with email verification check */
+fun loginUserWithVerification(
+    email: String, 
+    password: String, 
+    onComplete: (Boolean, String?) -> Unit
+) {
+    auth.signInWithEmailAndPassword(email, password)
+        .addOnCompleteListener { task ->
+            if (task.isSuccessful) {
+                val user = auth.currentUser
+                if (user != null) {
+                    if (!user.isEmailVerified) {
+                        // Sign out if email not verified
+                        auth.signOut()
+                        Log.w("UserManager", "Login blocked: Email not verified for $email")
+                        onComplete(false, "Please verify your email address before logging in. Check your inbox for the verification link.")
+                    } else {
+                        saveUserDataLocally(user.email ?: "", user.uid)
+                        Log.d("UserManager", "User logged in successfully: $email")
+                        onComplete(true, null)
+                    }
+                } else {
+                    Log.e("UserManager", "Login failed: No user data after successful auth")
+                    onComplete(false, "Login failed: No user data")
+                }
+            } else {
+                val error = when (task.exception) {
+                    is FirebaseAuthInvalidUserException -> "No account found with this email"
+                    is FirebaseAuthInvalidCredentialsException -> "Invalid password"
+                    else -> "Login failed: ${task.exception?.message}"
+                }
+                Log.e("UserManager", "Login failed: $error")
+                onComplete(false, error)
+            }
+        }
+}
+
+/** Resend verification email to a specific email (for registration flow) */
+fun resendVerificationEmail(onComplete: (Boolean, String?) -> Unit) {
+    val user = auth.currentUser
+    if (user == null) {
+        onComplete(false, "No user logged in")
+        return
+    }
+    
+    user.sendEmailVerification()
+        .addOnCompleteListener { task ->
+            if (task.isSuccessful) {
+                Log.d("UserManager", "Verification email resent to ${user.email}")
+                onComplete(true, null)
+            } else {
+                val error = task.exception?.message ?: "Failed to send verification email"
+                Log.e("UserManager", "Verification email resend failed: $error")
+                onComplete(false, error)
+            }
+        }
+}
+
     /** Login existing user */
     fun loginUser(
         email: String,
