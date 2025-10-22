@@ -26,6 +26,9 @@ class LoginActivity : AppCompatActivity() {
         creditManager = CreditManager(this)
         firebaseAuth = FirebaseAuth.getInstance()
 
+        // FORCE CLEANUP on fresh start to ensure clean state
+        cleanupStaleData()
+
         // Check if already logged in
         if (userManager.isUserLoggedIn()) {
             proceedToMainActivity()
@@ -34,7 +37,17 @@ class LoginActivity : AppCompatActivity() {
 
         setupClickListeners()
     }
+    
+    private fun cleanupStaleData() {
+    // If no Firebase user but we have local data, clear it
+    val firebaseUser = firebaseAuth.currentUser
+    if (firebaseUser == null) {
+        userManager.logout() // This clears all local data
+        Log.d("LoginActivity", "🔄 Cleaned up stale local data - no Firebase user")
+    }
+}
 
+    
     private fun setupClickListeners() {
         binding.btnLogin.setOnClickListener {
             val email = binding.etLoginEmail.text.toString().trim()
