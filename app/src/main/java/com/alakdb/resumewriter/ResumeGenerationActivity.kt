@@ -61,11 +61,11 @@ class ResumeGenerationActivity : AppCompatActivity() {
     setContentView(binding.root)
 
     userManager = UserManager(this)
-    apiService = ApiService(this)
+    apiService = ApiService(this) // FIXED: Remove userManager parameter
     auth = FirebaseAuth.getInstance()
 
-    // ⚠️ CRITICAL: These MUST be called synchronously in onCreate (not in coroutines)
-    registerFilePickers() // Must be called before activity reaches STARTED state
+    // ⚠️ CRITICAL: THESE MUST BE CALLED SYNCHRONOUSLY IN onCreate
+    registerFilePickers() // Must be called BEFORE the activity reaches RESUMED state
     setupUI() // Setup UI components immediately
     checkEmailVerification() // Can be called here safely
     checkGenerateButtonState() // Update button state
