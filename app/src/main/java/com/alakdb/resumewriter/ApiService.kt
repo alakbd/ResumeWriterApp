@@ -7,7 +7,6 @@ import com.google.gson.Gson
 import okhttp3.*
 import okhttp3.MediaType.Companion.toMediaType
 import okhttp3.RequestBody.Companion.toRequestBody
-import okhttp3.logging.HttpLoggingInterceptor
 import org.json.JSONObject
 import java.io.File
 import java.io.IOException
@@ -41,139 +40,6 @@ class ApiService(private val context: Context) {
         .writeTimeout(60, TimeUnit.SECONDS)
         .addInterceptor(SafeAuthInterceptor(userManager))
         .build()
-
-    // FIXED: Enhanced SafeAuthInterceptor with proper user ID handling
-    class SafeAuthInterceptor(private val userManager: UserManager) : Interceptor {
-    override fun intercept(chain: Interceptor.Chain): Response {
-        val originalRequest = chain.request()
-        
-        // ULTRA-SAFE: Wrap everything in try-catch to prevent ANY crashes
-        return try {
-            Log.d("AuthInterceptor", "🛡️ Starting ultra-safe interceptor for: ${originalRequest.url}")
-            
-            // STEP 1: Get user ID with ZERO risk of crashing
-            val userId = getUserIdUltraSafe()
-            
-            Log.d("AuthInterceptor", "🔐 User ID result: ${userId ?: "NULL"}")
-            
-            // STEP 2: Build request with headers (only if we have valid user ID)
-            val requestBuilder = originalRequest.newBuilder()
-                .addHeader("User-Agent", "ResumeWriter-Android")
-            
-            if (!userId.isNullOrBlank()) {
-                requestBuilder.addHeader("X-User-ID", userId)
-                Log.d("AuthInterceptor", "✅ Added X-User-ID header: ${userId.take(8)}...")
-            } else {
-                Log.w("AuthInterceptor", "⚠️ No user ID - proceeding without auth header")
-                // This is OK - server will handle authentication failure
-            }
-            
-            val newRequest = requestBuilder.build()
-            
-            // STEP 3: Proceed with the request (even without user ID)
-            Log.d("AuthInterceptor", "🚀 Proceeding with request...")
-            chain.proceed(newRequest)
-            
-        } catch (e: Exception) {
-            // CRITICAL: If ANYTHING fails, proceed with original request
-            Log.e("AuthInterceptor", "💥 CATASTROPHIC INTERCEPTOR FAILURE: ${e.message}")
-            Log.e("AuthInterceptor", "🔧 Stack trace:", e)
-            
-            // EMERGENCY FALLBACK: Proceed with original request no matter what
-            Log.w("AuthInterceptor", "🆘 EMERGENCY: Proceeding with original request without modifications")
-            chain.proceed(originalRequest)
-        }
-    }
-    
-    private fun getUserIdUltraSafe(): String? {
-        return try {
-            // Strategy 1: Direct Firebase access (most reliable)
-            val firebaseUser = try {
-                FirebaseAuth.getInstance().currentUser
-            } catch (e: Exception) {
-                Log.e("AuthInterceptor", "❌ Firebase access failed: ${e.message}")
-                null
-            }
-            
-            val firebaseUid = firebaseUser?.uid
-            if (!firebaseUid.isNullOrBlank()) {
-                Log.d("AuthInterceptor", "🔥 Got UID directly from Firebase: ${firebaseUid.take(8)}...")
-                
-                // Try to sync with UserManager (but don't crash if it fails)
-                try {
-                    userManager.emergencySyncWithFirebase()
-                } catch (e: Exception) {
-                    Log.w("AuthInterceptor", "⚠️ UserManager sync failed but we have Firebase UID: ${e.message}")
-                }
-                
-                return firebaseUid
-            }
-            
-            // Strategy 2: Try UserManager (with extra safety)
-            val userManagerUid = try {
-                userManager.getCurrentUserId()
-            } catch (e: Exception) {
-                Log.e("AuthInterceptor", "❌ UserManager access failed: ${e.message}")
-                null
-            }
-            
-            if (!userManagerUid.isNullOrBlank()) {
-                Log.d("AuthInterceptor", "📱 Got UID from UserManager: ${userManagerUid.take(8)}...")
-                return userManagerUid
-            }
-            
-            // Strategy 3: Final fallback - no user ID available
-            Log.w("AuthInterceptor", "🔍 No user ID available from any source")
-            null
-            
-        } catch (e: Exception) {
-            // If ANYTHING in this method fails, return null
-            Log.e("AuthInterceptor", "💥 getUserIdUltraSafe completely failed: ${e.message}")
-            null
-        }
-    }
-}
-    
-    private fun getUserIdWithComprehensiveFallback(): String? {
-        return try {
-            // Strategy 1: Try UserManager first
-            var userId = userManager.getCurrentUserId()
-            
-            if (!userId.isNullOrBlank()) {
-                Log.d("AuthInterceptor", "✅ UserManager provided UID: ${userId.take(8)}...")
-                return userId
-            }
-            
-            // Strategy 2: Emergency sync and retry
-            Log.w("AuthInterceptor", "🔄 UserManager returned null - attempting emergency sync")
-            userManager.emergencySyncWithFirebase()
-            userId = userManager.getCurrentUserId()
-            
-            if (!userId.isNullOrBlank()) {
-                Log.d("AuthInterceptor", "✅ Emergency sync successful: ${userId.take(8)}...")
-                return userId
-            }
-            
-            // Strategy 3: Direct Firebase fallback
-            userId = FirebaseAuth.getInstance().currentUser?.uid
-            if (!userId.isNullOrBlank()) {
-                Log.w("AuthInterceptor", "🚨 Using direct Firebase UID: ${userId.take(8)}...")
-                // Save this to UserManager for future requests
-                userManager.emergencySyncWithFirebase()
-                return userId
-            }
-            
-            // Strategy 4: Final fallback - return null
-            Log.e("AuthInterceptor", "❌ All fallback strategies failed - no user ID available")
-            null
-            
-        } catch (e: Exception) {
-            Log.e("AuthInterceptor", "💥 User ID lookup failed: ${e.message}")
-            // Final fallback to Firebase
-            FirebaseAuth.getInstance().currentUser?.uid
-        }
-    }
-}
 
     // Data Classes
     data class DeductCreditRequest(val user_id: String)
@@ -511,5 +377,97 @@ class ApiService(private val context: Context) {
     // Compatibility method
     fun initializeUserSession(userId: String?) {
         // No-op for compatibility
+    }
+}
+
+// FIXED: Enhanced SafeAuthInterceptor with proper user ID handling - MOVED OUTSIDE THE CLASS
+class SafeAuthInterceptor(private val userManager: UserManager) : Interceptor {
+    override fun intercept(chain: Interceptor.Chain): Response {
+        val originalRequest = chain.request()
+        
+        // ULTRA-SAFE: Wrap everything in try-catch to prevent ANY crashes
+        return try {
+            Log.d("AuthInterceptor", "🛡️ Starting ultra-safe interceptor for: ${originalRequest.url}")
+            
+            // STEP 1: Get user ID with ZERO risk of crashing
+            val userId = getUserIdUltraSafe()
+            
+            Log.d("AuthInterceptor", "🔐 User ID result: ${userId ?: "NULL"}")
+            
+            // STEP 2: Build request with headers (only if we have valid user ID)
+            val requestBuilder = originalRequest.newBuilder()
+                .addHeader("User-Agent", "ResumeWriter-Android")
+            
+            if (!userId.isNullOrBlank()) {
+                requestBuilder.addHeader("X-User-ID", userId)
+                Log.d("AuthInterceptor", "✅ Added X-User-ID header: ${userId.take(8)}...")
+            } else {
+                Log.w("AuthInterceptor", "⚠️ No user ID - proceeding without auth header")
+                // This is OK - server will handle authentication failure
+            }
+            
+            val newRequest = requestBuilder.build()
+            
+            // STEP 3: Proceed with the request (even without user ID)
+            Log.d("AuthInterceptor", "🚀 Proceeding with request...")
+            chain.proceed(newRequest)
+            
+        } catch (e: Exception) {
+            // CRITICAL: If ANYTHING fails, proceed with original request
+            Log.e("AuthInterceptor", "💥 CATASTROPHIC INTERCEPTOR FAILURE: ${e.message}")
+            Log.e("AuthInterceptor", "🔧 Stack trace:", e)
+            
+            // EMERGENCY FALLBACK: Proceed with original request no matter what
+            Log.w("AuthInterceptor", "🆘 EMERGENCY: Proceeding with original request without modifications")
+            chain.proceed(originalRequest)
+        }
+    }
+    
+    private fun getUserIdUltraSafe(): String? {
+        return try {
+            // Strategy 1: Direct Firebase access (most reliable)
+            val firebaseUser = try {
+                FirebaseAuth.getInstance().currentUser
+            } catch (e: Exception) {
+                Log.e("AuthInterceptor", "❌ Firebase access failed: ${e.message}")
+                null
+            }
+            
+            val firebaseUid = firebaseUser?.uid
+            if (!firebaseUid.isNullOrBlank()) {
+                Log.d("AuthInterceptor", "🔥 Got UID directly from Firebase: ${firebaseUid.take(8)}...")
+                
+                // Try to sync with UserManager (but don't crash if it fails)
+                try {
+                    userManager.emergencySyncWithFirebase()
+                } catch (e: Exception) {
+                    Log.w("AuthInterceptor", "⚠️ UserManager sync failed but we have Firebase UID: ${e.message}")
+                }
+                
+                return firebaseUid
+            }
+            
+            // Strategy 2: Try UserManager (with extra safety)
+            val userManagerUid = try {
+                userManager.getCurrentUserId()
+            } catch (e: Exception) {
+                Log.e("AuthInterceptor", "❌ UserManager access failed: ${e.message}")
+                null
+            }
+            
+            if (!userManagerUid.isNullOrBlank()) {
+                Log.d("AuthInterceptor", "📱 Got UID from UserManager: ${userManagerUid.take(8)}...")
+                return userManagerUid
+            }
+            
+            // Strategy 3: Final fallback - no user ID available
+            Log.w("AuthInterceptor", "🔍 No user ID available from any source")
+            null
+            
+        } catch (e: Exception) {
+            // If ANYTHING in this method fails, return null
+            Log.e("AuthInterceptor", "💥 getUserIdUltraSafe completely failed: ${e.message}")
+            null
+        }
     }
 }
