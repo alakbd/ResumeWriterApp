@@ -722,7 +722,30 @@ class ResumeGenerationActivity : AppCompatActivity() {
             }
         }
     }
+    
+    private fun debugAuthAndCredits() {
+    lifecycleScope.launch {
+        try {
+            binding.progressGenerate.visibility = View.VISIBLE
+            
+            // Force sync UserManager with Firebase first
+            apiService.forceSyncUserManager()
+            
+            val debugInfo = apiService.debugAuthenticationFlow()
+            
+            // Show the debug info
+            binding.tvGeneratedResume.text = debugInfo
+            Log.d("AuthDebug", debugInfo)
+            
+        } catch (e: Exception) {
+            showMessage("Debug failed: ${e.message}")
+        } finally {
+            binding.progressGenerate.visibility = View.GONE
+        }
+    }
+}
 
+    
     /** ---------------- Helpers ---------------- **/
     private fun disableGenerateButton(text: String) {
         binding.btnGenerateResume.isEnabled = false
