@@ -1,5 +1,6 @@
 package com.alakdb.resumewriter
 
+import android.content.DialogInterface
 import android.content.Intent
 import android.os.Bundle
 import android.util.Log
@@ -131,13 +132,11 @@ class UserRegistrationActivity : AppCompatActivity() {
         AlertDialog.Builder(this)
             .setTitle("Verify Your Email")
             .setMessage("We've sent a verification link to $email. Please check your inbox and verify your email address before logging in.")
-            .setPositiveButton("Open Email") { dialog: AlertDialog, _: Int ->
+            .setPositiveButton("Open Email") { _: DialogInterface, _: Int ->
                 openEmailApp()
-                dialog.dismiss()
                 proceedToLoginActivity()
             }
-            .setNegativeButton("Continue") { dialog: AlertDialog, _: Int ->
-                dialog.dismiss()
+            .setNegativeButton("Continue") { _: DialogInterface, _: Int ->
                 proceedToLoginActivity()
             }
             .setCancelable(false)
