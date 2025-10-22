@@ -45,13 +45,30 @@ class MainActivity : AppCompatActivity() {
     }
 
     private fun checkAuthentication(): Boolean {
-        if (!userManager.isUserLoggedIn()) {
-            startActivity(Intent(this, LoginActivity::class.java))
-            finish()
-            return false
-        }
-        return true
+    // Check if fresh install - force login
+    if (userManager.isFreshInstall()) {
+        Log.d("MainActivity", "🚨 Fresh install detected - forcing login")
+        redirectToLogin()
+        return false
     }
+    
+    // Check if user is properly logged in
+    if (!userManager.isUserLoggedIn()) {
+        Log.d("MainActivity", "❌ User not logged in - redirecting to login")
+        redirectToLogin()
+        return false
+    }
+    
+    Log.d("MainActivity", "✅ User authenticated - proceeding to main screen")
+    return true
+}
+
+private fun redirectToLogin() {
+    val intent = Intent(this, LoginActivity::class.java)
+    intent.flags = Intent.FLAG_ACTIVITY_NEW_TASK or Intent.FLAG_ACTIVITY_CLEAR_TASK
+    startActivity(intent)
+    finish()
+}
 
     private fun initializeApp() {
         setupClickListeners()
