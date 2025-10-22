@@ -109,5 +109,39 @@ class UserRegistrationActivity : AppCompatActivity() {
     private fun showMessage(message: String) {
         Toast.makeText(this, message, Toast.LENGTH_SHORT).show()
     }
+
+        private fun onRegistrationSuccess(user: FirebaseUser) {
+    // Send verification email
+    user.sendEmailVerification()
+        .addOnCompleteListener { task ->
+            if (task.isSuccessful) {
+                Log.d("Registration", "Verification email sent to ${user.email}")
+                showVerificationDialog(user.email)
+            } else {
+                Log.e("Registration", "Failed to send verification email", task.exception)
+                // Still proceed to main activity, but show message
+                showMessage("Registration successful but verification email failed to send")
+                proceedToMainActivity()
+            }
+        }
+}
+
+private fun showVerificationDialog(email: String?) {
+    AlertDialog.Builder(this)
+        .setTitle("Verify Your Email")
+        .setMessage("We've sent a verification link to $email. Please check your inbox and verify your email address before logging in.")
+        .setPositiveButton("Open Email") { dialog, _ ->
+            openEmailApp()
+            dialog.dismiss()
+            proceedToMainActivity()
+        }
+        .setNegativeButton("Continue") { dialog, _ ->
+            dialog.dismiss()
+            proceedToMainActivity()
+        }
+        .setCancelable(false)
+        .show()
+}
+    
 }
 
