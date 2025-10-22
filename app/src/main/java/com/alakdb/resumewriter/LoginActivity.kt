@@ -113,31 +113,74 @@ class LoginActivity : AppCompatActivity() {
     }
 
     private fun attemptLogin(email: String, password: String) {
-        setLoginInProgress(true)
+    setLoginInProgress(true)
 
-        firebaseAuth.signInWithEmailAndPassword(email, password)
-            .addOnCompleteListener { task ->
-                if (task.isSuccessful) {
-                    val user = task.result?.user
-                    if (user != null && user.isEmailVerified) {
-                        // ✅ UserManager.saveUserDataLocally is called internally in loginUser
+    FirebaseAuth.getInstance().signInWithEmailAndPassword(email, password)
+        .addOnCompleteListener { task ->
+            if (task.isSuccessful) {
+                val user = task.result?.user
+                if (user != null) {
+                    if (user.isEmailVerified) {
+                        // ✅ Email verified - proceed with login
                         onLoginSuccess(user)
-                    } else if (user != null && !user.isEmailVerified) {
-                        setLoginInProgress(false)
-                        showMessage("Please verify your email address before logging in")
-                        // Optionally, you can resend verification email here
-                        resendVerificationEmail(user)
                     } else {
+                        // ❌ Email not verified - show dialog
                         setLoginInProgress(false)
-                        showMessage("Login failed: User not found")
+                        showUnverifiedEmailDialog(user) // Pass the user object
                     }
                 } else {
                     setLoginInProgress(false)
-                    val errorMessage = task.exception?.message ?: "Login failed"
-                    onLoginFailure(errorMessage)
+                    showMessage("Login failed: User not found")
+                }
+            } else {
+                setLoginInProgress(false)
+                val errorMessage = task.exception?.message ?: "Login failed"
+                onLoginFailure(errorMessage)
+            }
+        }
+}
+
+private fun showUnverifiedEmailDialog(user: FirebaseUser) {
+    AlertDialog.Builder(this)
+        .setTitle("Email Not Verified")
+        .setMessage("Please verify your email address (${user.email}) before logging in. Check your inbox for the verification link.")
+        .setPositiveButton("Resend Verification") { dialog, _ ->
+            resendVerificationEmail(user) // Use the simpler function
+            dialog.dismiss()
+        }
+        .setNegativeButton("OK") { dialog, _ ->
+            dialog.dismiss()
+        }
+        .setNeutralButton("Open Email App") { dialog, _ ->
+            openEmailApp()
+            dialog.dismiss()
+        }
+        .show()
+}
+
+    private fun resendVerificationEmail(user: FirebaseUser) {
+        user.sendEmailVerification()
+            .addOnCompleteListener { task ->
+                if (task.isSuccessful) {
+                    showMessage("Verification email sent to ${user.email}")
+                    Log.d("LoginActivity", "Verification email resent to: ${user.email}")
+                } else {
+                    showMessage("Failed to send verification email")
+                    Log.e("LoginActivity", "Failed to resend verification email")
                 }
             }
     }
+    
+private fun openEmailApp() {
+    try {
+        val intent = Intent(Intent.ACTION_MAIN)
+        intent.addCategory(Intent.CATEGORY_APP_EMAIL)
+        intent.flags = Intent.FLAG_ACTIVITY_NEW_TASK
+        startActivity(intent)
+    } catch (e: Exception) {
+        showMessage("No email app found")
+    }
+}
 
     private fun onLoginSuccess(user: FirebaseUser) {
     // Ensure admin mode is disabled for regular login
@@ -172,18 +215,7 @@ class LoginActivity : AppCompatActivity() {
         binding.etLoginPassword.requestFocus()
     }
 
-    private fun resendVerificationEmail(user: FirebaseUser) {
-        user.sendEmailVerification()
-            .addOnCompleteListener { task ->
-                if (task.isSuccessful) {
-                    showMessage("Verification email sent to ${user.email}")
-                    Log.d("LoginActivity", "Verification email resent to: ${user.email}")
-                } else {
-                    showMessage("Failed to send verification email")
-                    Log.e("LoginActivity", "Failed to resend verification email")
-                }
-            }
-    }
+    
 
     private fun setLoginInProgress(inProgress: Boolean) {
         binding.btnLogin.isEnabled = !inProgress
