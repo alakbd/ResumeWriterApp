@@ -44,37 +44,52 @@ class ApiService(private val context: Context) {
 
     // FIXED: Enhanced SafeAuthInterceptor with proper user ID handling
     class SafeAuthInterceptor(private val userManager: UserManager) : Interceptor {
-        override fun intercept(chain: Interceptor.Chain): Response {
-            val originalRequest = chain.request()
+    override fun intercept(chain: Interceptor.Chain): Response {
+        val originalRequest = chain.request()
+        
+        return try {
+            // STEP 1: Try to get user ID normally
+            var userId = userManager.getCurrentUserId()
             
-            // Always proceed with original request if anything fails
-            return try {
-                val userId = userManager.getCurrentUserId()
-                
-                Log.d("AuthInterceptor", "🔐 Interceptor - User ID: ${userId ?: "NULL"}")
-                Log.d("AuthInterceptor", "🔐 Request URL: ${originalRequest.url}")
-                
-                if (!userId.isNullOrBlank()) {
-                    val newRequest = originalRequest.newBuilder()
-                        .addHeader("X-User-ID", userId)
-                        .addHeader("User-Agent", "ResumeWriter-Android")
-                        .build()
-                    
-                    Log.d("AuthInterceptor", "✅ Added X-User-ID: ${userId.take(8)}...")
-                    Log.d("AuthInterceptor", "✅ Headers: ${newRequest.headers}")
-                    
-                    chain.proceed(newRequest)
-                } else {
-                    Log.w("AuthInterceptor", "⚠️ No user ID available - proceeding without X-User-ID")
-                    chain.proceed(originalRequest)
-                }
-            } catch (e: Exception) {
-                Log.e("AuthInterceptor", "❌ Interceptor crashed: ${e.message}")
-                // Fallback: proceed with original request
-                chain.proceed(originalRequest)
+            // STEP 2: If null, attempt emergency sync
+            if (userId.isNullOrBlank()) {
+                Log.w("AuthInterceptor", "🔄 User ID is null - attempting emergency sync")
+                userManager.emergencySyncWithFirebase()
+                userId = userManager.getCurrentUserId()
             }
+            
+            // STEP 3: If still null, check Firebase directly as last resort
+            if (userId.isNullOrBlank()) {
+                userId = FirebaseAuth.getInstance().currentUser?.uid
+                if (!userId.isNullOrBlank()) {
+                    Log.w("AuthInterceptor", "🚨 Using Firebase UID directly (emergency fallback)")
+                }
+            }
+            
+            Log.d("AuthInterceptor", "🔐 Final User ID: ${userId ?: "NULL"}")
+            
+            val requestBuilder = originalRequest.newBuilder()
+                .addHeader("User-Agent", "ResumeWriter-Android")
+            
+            // STEP 4: Add X-User-ID header if we have it
+            if (!userId.isNullOrBlank()) {
+                requestBuilder.addHeader("X-User-ID", userId)
+                Log.d("AuthInterceptor", "✅ Added X-User-ID: ${userId.take(8)}...")
+            } else {
+                Log.e("AuthInterceptor", "❌ CRITICAL: No User ID available for API request")
+                // Don't fail the request - let server handle authentication
+            }
+            
+            val newRequest = requestBuilder.build()
+            chain.proceed(newRequest)
+            
+        } catch (e: Exception) {
+            Log.e("AuthInterceptor", "💥 Interceptor crashed: ${e.message}")
+            // Critical fallback: proceed without headers
+            chain.proceed(originalRequest)
         }
     }
+}
 
     // Data Classes
     data class DeductCreditRequest(val user_id: String)
