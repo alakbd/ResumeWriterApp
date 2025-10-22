@@ -287,7 +287,7 @@ fun getCurrentUserId(): String? {
             // Case 2: Firebase has UID but prefs don't match or are missing - SYNC REQUIRED
             !firebaseUid.isNullOrBlank() -> {
                 Log.w("UserManager", "🔄 Syncing UID from Firebase to prefs: ${firebaseUid.take(8)}...")
-                val email = firebaseUser?.email ?: ""
+                val email = firebaseUser.email ?: ""
                 saveUserDataLocally(email, firebaseUid)
                 firebaseUid
             }
