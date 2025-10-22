@@ -47,6 +47,8 @@ class ResumeGenerationActivity : AppCompatActivity() {
 
     private lateinit var resumePicker: ActivityResultLauncher<String>
     private lateinit var jobDescPicker: ActivityResultLauncher<String>
+    private var lastToastTime: Long = 0
+    private val TOAST_COOLDOWN_MS = 3000L // 3 seconds between toasts
 
     private companion object {
         const val MAX_RETRIES = 4
@@ -331,54 +333,57 @@ class ResumeGenerationActivity : AppCompatActivity() {
             }
         }
     }
+
+    private fun showRateLimitedToast(message: String) {
+        val currentTime = System.currentTimeMillis()
+            if (currentTime - lastToastTime > TOAST_COOLDOWN_MS) {
+            Toast.makeText(this, message, Toast.LENGTH_LONG).show()
+            lastToastTime = currentTime
+            Log.d("Toast", "Showing: $message")
+        } else {
+            Log.d("Toast", "Rate limited: $message")
+            }
+        }
+
+        private fun showRateLimitedError(message: String) {
+            showRateLimitedToast("❌ $message")
+        }
+
+        private fun showRateLimitedSuccess(message: String) {
+            showRateLimitedToast("✅ $message")
+        }
     
     /** ---------------- API Connection Test ---------------- **/
      private fun testApiConnection() {
-        binding.layoutConnectionStatus.visibility = View.VISIBLE
-        binding.tvConnectionStatus.text = "Testing connection..."
-        binding.progressConnection.visibility = View.VISIBLE
-        binding.btnRetryConnection.isEnabled = false
+    binding.layoutConnectionStatus.visibility = View.VISIBLE
+    binding.tvConnectionStatus.text = "Testing connection..."
+    binding.progressConnection.visibility = View.VISIBLE
+    binding.btnRetryConnection.isEnabled = false
 
-        lifecycleScope.launch {
+    lifecycleScope.launch {
+        safeApiCall {
+            // Your existing testApiConnection code here...
             if (!isNetworkAvailable()) {
                 updateConnectionStatus("❌ No internet connection", true)
                 binding.progressConnection.visibility = View.GONE
                 binding.btnRetryConnection.isEnabled = true
                 showError("Please check your internet connection")
-                return@launch
+                return@safeApiCall
             }
 
             try {
                 Log.d("ResumeActivity", "Testing API connection...")
                 
-                // First, test basic connection
+                // Rest of your existing testApiConnection code...
                 val connectionResult = apiService.testConnection()
                 
                 when (connectionResult) {
-                    is ApiResult.Success -> { // FIXED: Use ApiResult directly
+                    is ApiResult.Success -> {
                         updateConnectionStatus("✅ API Connected", false)
                         updateCreditDisplay()
                     }
-                    is ApiResult.Error -> { // FIXED: Use ApiResult directly
-                        // Check if it's a server wake-up issue
-                        if (connectionResult.code in 500..599 || connectionResult.code == 0) {
-                            updateConnectionStatus("🔄 Server is waking up...", true)
-                            showServerWakeupMessage()
-                            
-                            // FIXED: Use the correct method name
-                            val serverAwake = apiService.waitForServerWakeUp(maxAttempts = 12, delayBetweenAttempts = 10000L)
-                            
-                            if (serverAwake) {
-                                updateConnectionStatus("✅ Server is ready!", false)
-                                updateCreditDisplay()
-                            } else {
-                                updateConnectionStatus("⏰ Server taking too long", true)
-                                showError("Server is taking longer than expected. Please try again in a minute.")
-                            }
-                        } else {
-                            updateConnectionStatus("❌ API Connection Failed", true)
-                            showError("API error: ${connectionResult.message}")
-                        }
+                    is ApiResult.Error -> {
+                        // Your existing error handling...
                     }
                 }
             } catch (e: Exception) {
@@ -391,6 +396,7 @@ class ResumeGenerationActivity : AppCompatActivity() {
             }
         }
     }
+}
 
     // ADD THIS MISSING METHOD:
     private fun showMessage(message: String) {
@@ -405,30 +411,55 @@ class ResumeGenerationActivity : AppCompatActivity() {
     }
 
     private suspend fun ensureUserAuthenticated(): Boolean {
-    // Force sync first
-    userManager.emergencySyncWithFirebase()
-    
-    if (!userManager.isUserLoggedIn()) {
-        Log.e("ResumeActivity", "❌ User not logged in after sync")
-        withContext(Dispatchers.Main) {
-            showError("Please log in to continue")
-            binding.creditText.text = "Credits: Please log in"
+    return try {
+        // Step 1: Force sync first
+        userManager.emergencySyncWithFirebase()
+        
+        // Step 2: Check if user is logged in
+        if (!userManager.isUserLoggedIn()) {
+            Log.e("ResumeActivity", "❌ User not logged in after sync")
+            withContext(Dispatchers.Main) {
+                showError("Please log in to continue")
+                binding.creditText.text = "Credits: Please log in"
+            }
+            return false
         }
-        return false
-    }
-    
-    val userId = userManager.getCurrentUserId()
-    if (userId.isNullOrBlank()) {
-        Log.e("ResumeActivity", "❌ User ID is null/blank after sync")
-        withContext(Dispatchers.Main) {
-            showError("Authentication error. Please log out and log in again.")
-            binding.creditText.text = "Credits: Auth error"
+        
+        // Step 3: Verify we have a valid user ID
+        val userId = userManager.getCurrentUserId()
+        if (userId.isNullOrBlank()) {
+            Log.e("ResumeActivity", "❌ User ID is null/blank after sync")
+            withContext(Dispatchers.Main) {
+                showError("Authentication error. Please log out and log in again.")
+                binding.creditText.text = "Credits: Auth error"
+            }
+            return false
         }
-        return false
+        
+        Log.d("ResumeActivity", "✅ User authenticated: ${userId.take(8)}...")
+        true
+        
+    } catch (e: Exception) {
+        Log.e("ResumeActivity", "💥 Authentication check failed: ${e.message}", e)
+        withContext(Dispatchers.Main) {
+            showError("Authentication system error. Please restart the app.")
+            binding.creditText.text = "Credits: System error"
+        }
+        false
     }
-    
-    Log.d("ResumeActivity", "✅ User authenticated: ${userId.take(8)}...")
-    return true
+}
+
+    private suspend fun safeApiCall(block: suspend () -> Unit) {
+    try {
+        if (!ensureUserAuthenticated()) {
+            Log.w("ResumeActivity", "⚠️ Blocked API call - user not authenticated")
+            return
+        }
+        block()
+    } catch (e: Exception) {
+        Log.e("ResumeActivity", "💥 Safe API call failed: ${e.message}", e)
+        showError("Network error: ${e.message}")
+    }
 }
 
     private fun testDirectConnection() {
@@ -802,15 +833,15 @@ class ResumeGenerationActivity : AppCompatActivity() {
         }
     }
 
-    private fun showError(message: String) {
-        Toast.makeText(this, "❌ $message", Toast.LENGTH_LONG).show()
-        Log.e("ResumeActivity", message)
-    }
+        private fun showError(message: String) {
+            showRateLimitedError(message)
+            Log.e("ResumeActivity", message)
+        }
 
-    private fun showSuccess(message: String) {
-        Toast.makeText(this, "✅ $message", Toast.LENGTH_SHORT).show()
-        Log.d("ResumeActivity", message)
-    }
+        private fun showSuccess(message: String) {
+            showRateLimitedSuccess(message)
+            Log.d("ResumeActivity", message)
+        }
 
     private fun updateConnectionStatus(message: String, isError: Boolean = false) {
         binding.tvConnectionStatus.text = message
