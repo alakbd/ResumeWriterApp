@@ -54,38 +54,51 @@ class ResumeGenerationActivity : AppCompatActivity() {
     }
 
     override fun onCreate(savedInstanceState: Bundle?) {
-        super.onCreate(savedInstanceState)
-        binding = ActivityResumeGenerationBinding.inflate(layoutInflater)
-        setContentView(binding.root)
+    super.onCreate(savedInstanceState)
+    binding = ActivityResumeGenerationBinding.inflate(layoutInflater)
+    setContentView(binding.root)
 
-        userManager = UserManager(this)
-        apiService = ApiService(this)
-        auth = FirebaseAuth.getInstance()
+    userManager = UserManager(this)
+    apiService = ApiService(this)
+    auth = FirebaseAuth.getInstance()
+
+    // CRITICAL: Force immediate UserManager sync with Firebase
+    lifecycleScope.launch {
+        Log.d("ResumeActivity", "🔄 Initializing UserManager sync...")
         
-        // Ensure user info is saved in UserManager if logged in
-        FirebaseAuth.getInstance().currentUser?.let { user ->
-            val uid = user.uid
-            val email = user.email ?: ""
-            userManager.saveUserDataLocally(email, uid)
+        // Step 1: Emergency sync to ensure UserManager has current user data
+        userManager.emergencySyncWithFirebase()
+        
+        // Step 2: Debug the current state
+        userManager.logCurrentUserState()
+        userManager.debugStoredData()
+        
+        // Step 3: Set up UI components (non-blocking)
+        withContext(Dispatchers.Main) {
+            checkEmailVerification()
+            registerFilePickers()
+            setupUI()
+            checkGenerateButtonState()
+            debugUserManagerState()
         }
-
-        // Debug calls
-        checkEmailVerification()
-        registerFilePickers()
-        setupUI()
-        checkGenerateButtonState()
-        debugUserManagerState()
-
-        // Test connection safely
-        lifecycleScope.launch {
-            delay(30000)
-            if (ensureUserAuthenticated()) {
-                testApiConnection()
-            } else {
-                Log.e("ResumeActivity", "Skipped testApiConnection — user not authenticated yet.")
+        
+        // Step 4: Test API connection if user is authenticated
+        delay(2000) // Give time for sync to complete
+        
+        if (ensureUserAuthenticated()) {
+            Log.d("ResumeActivity", "✅ User authenticated - testing API connection")
+            testApiConnection()
+        } else {
+            Log.w("ResumeActivity", "⚠️ User not authenticated - skipping API test")
+            withContext(Dispatchers.Main) {
+                binding.creditText.text = "Credits: Please log in"
+                binding.layoutConnectionStatus.visibility = View.GONE
             }
         }
     }
+    
+    // REMOVED the old 30-second delay test - it's too late and causes race conditions
+}
 
     @SuppressLint("SetTextI18n")
     private fun comprehensiveAuthDebug() {
@@ -386,26 +399,31 @@ class ResumeGenerationActivity : AppCompatActivity() {
     }
 
     private suspend fun ensureUserAuthenticated(): Boolean {
-        if (!userManager.isUserLoggedIn()) {
-            Log.e("ResumeActivity", "User not logged in")
-            withContext(Dispatchers.Main) {
-                showError("Please log in to continue")
-            }
-            return false
+    // Force sync first
+    userManager.emergencySyncWithFirebase()
+    
+    if (!userManager.isUserLoggedIn()) {
+        Log.e("ResumeActivity", "❌ User not logged in after sync")
+        withContext(Dispatchers.Main) {
+            showError("Please log in to continue")
+            binding.creditText.text = "Credits: Please log in"
         }
-        
-        val userId = userManager.getCurrentUserId()
-        if (userId.isNullOrBlank()) {
-            Log.e("ResumeActivity", "User ID is null or blank")
-            withContext(Dispatchers.Main) {
-                showError("Authentication error. Please log in again.")
-            }
-            return false
-        }
-        
-        Log.d("ResumeActivity", "User authenticated: ${userId.take(8)}...")
-        return true
+        return false
     }
+    
+    val userId = userManager.getCurrentUserId()
+    if (userId.isNullOrBlank()) {
+        Log.e("ResumeActivity", "❌ User ID is null/blank after sync")
+        withContext(Dispatchers.Main) {
+            showError("Authentication error. Please log out and log in again.")
+            binding.creditText.text = "Credits: Auth error"
+        }
+        return false
+    }
+    
+    Log.d("ResumeActivity", "✅ User authenticated: ${userId.take(8)}...")
+    return true
+}
 
     private fun testDirectConnection() {
         lifecycleScope.launch {
