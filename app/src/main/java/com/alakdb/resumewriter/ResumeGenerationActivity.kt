@@ -61,7 +61,7 @@ class ResumeGenerationActivity : AppCompatActivity() {
     setContentView(binding.root)
 
     userManager = UserManager(this)
-    apiService = ApiService(this, userManager) // Make sure you're passing userManager
+    apiService = ApiService(this)
     auth = FirebaseAuth.getInstance()
 
     // ⚠️ CRITICAL: These MUST be called synchronously in onCreate (not in coroutines)
