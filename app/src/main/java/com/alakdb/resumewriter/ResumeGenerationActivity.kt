@@ -62,6 +62,15 @@ class ResumeGenerationActivity : AppCompatActivity() {
     apiService = ApiService(this)
     auth = FirebaseAuth.getInstance()
 
+    // ⚠️ CRITICAL: These MUST be called synchronously in onCreate (not in coroutines)
+    registerFilePickers() // Must be called before activity reaches STARTED state
+    setupUI() // Setup UI components immediately
+    checkEmailVerification() // Can be called here safely
+    checkGenerateButtonState() // Update button state
+
+    // Debug calls (safe to call here)
+    debugUserManagerState()
+
     // CRITICAL: Force immediate UserManager sync with Firebase
     lifecycleScope.launch {
         Log.d("ResumeActivity", "🔄 Initializing UserManager sync...")
@@ -73,17 +82,8 @@ class ResumeGenerationActivity : AppCompatActivity() {
         userManager.logCurrentUserState()
         userManager.debugStoredData()
         
-        // Step 3: Set up UI components (non-blocking)
-        withContext(Dispatchers.Main) {
-            checkEmailVerification()
-            registerFilePickers()
-            setupUI()
-            checkGenerateButtonState()
-            debugUserManagerState()
-        }
-        
-        // Step 4: Test API connection if user is authenticated
-        delay(2000) // Give time for sync to complete
+        // Step 3: Test API connection if user is authenticated
+        delay(1000) // Give time for sync to complete
         
         if (ensureUserAuthenticated()) {
             Log.d("ResumeActivity", "✅ User authenticated - testing API connection")
@@ -96,8 +96,6 @@ class ResumeGenerationActivity : AppCompatActivity() {
             }
         }
     }
-    
-    // REMOVED the old 30-second delay test - it's too late and causes race conditions
 }
 
     @SuppressLint("SetTextI18n")
@@ -181,22 +179,30 @@ class ResumeGenerationActivity : AppCompatActivity() {
     }
     
     override fun onResume() {
-        super.onResume()
+    super.onResume()
+    
+    lifecycleScope.launch {
+        Log.d("ResumeActivity", "🔄 onResume - refreshing data...")
         
-        lifecycleScope.launch {
-            Log.d("ResumeActivity", "User logged in: ${userManager.isUserLoggedIn()}")
-            Log.d("ResumeActivity", "User ID: ${userManager.getCurrentUserId()}")
-            
-            // Add a small delay to ensure everything is initialized
-            delay(1000)
-            
-            // Update credits display
+        // Force sync to ensure fresh data
+        userManager.emergencySyncWithFirebase()
+        
+        // Update UI with current state
+        withContext(Dispatchers.Main) {
+            checkGenerateButtonState()
+        }
+        
+        // Update credits display if user is logged in
+        if (userManager.isUserLoggedIn()) {
             updateCreditDisplay()
-            
-            // Test server connection
             testApiConnection()
+        } else {
+            withContext(Dispatchers.Main) {
+                binding.creditText.text = "Credits: Please log in"
+            }
         }
     }
+}
 
     /** ---------------- File Picker Setup ---------------- **/
     private fun registerFilePickers() {
