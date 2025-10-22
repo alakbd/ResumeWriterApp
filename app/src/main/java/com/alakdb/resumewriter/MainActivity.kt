@@ -264,4 +264,40 @@ class MainActivity : AppCompatActivity() {
         super.onDestroy()
         if (::billingManager.isInitialized) billingManager.destroy()
     }
+
+    private fun checkEmailVerification() {
+    val userManager = UserManager(this)
+    val user = userManager.getCurrentFirebaseUser()
+    
+    if (user != null && !user.isEmailVerified) {
+        showVerificationReminder(user.email)
+    }
+}
+
+    private fun showVerificationReminder(email: String?) {
+        AlertDialog.Builder(this)
+            .setTitle("Email Not Verified")
+            .setMessage("Your email address ($email) is not verified. Please check your inbox for the verification link. Some features may be limited until you verify your email.")
+            .setPositiveButton("Resend Verification") { dialog, _ ->
+                resendVerification()
+                dialog.dismiss()
+            }
+            .setNegativeButton("Later") { dialog, _ ->
+                dialog.dismiss()
+            }
+            .show()
+    }
+
+    private fun resendVerification() {
+        val userManager = UserManager(this)
+        userManager.resendVerificationEmail { success, error ->
+            if (success) {
+                showMessage("Verification email sent!")
+            } else {
+                showMessage("Failed to send verification: $error")
+            }
+        }
+    }
+
+    
 }
