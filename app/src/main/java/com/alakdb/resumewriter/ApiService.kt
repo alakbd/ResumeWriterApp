@@ -424,3 +424,16 @@ fun saveFileToStorage(data: ByteArray, filename: String): File {
         "Debug failed: ${e.message}"
     }
 }
+
+    fun forceSyncUserManager() {
+    val firebaseUser = FirebaseAuth.getInstance().currentUser
+    if (firebaseUser != null) {
+        val uid = firebaseUser.uid
+        val email = firebaseUser.email ?: ""
+        
+        userManager.saveUserDataLocally(email, uid)
+        Log.d("ApiService", "🔄 Force synced UserManager with Firebase: $uid")
+    } else {
+        Log.w("ApiService", "⚠️ Cannot sync: No Firebase user")
+    }
+}
