@@ -28,20 +28,31 @@ class UserManager(private val context: Context) {
     /** Emergency sync - ensures UserManager is synchronized with Firebase */
 fun emergencySyncWithFirebase(): Boolean {
     return try {
-        val firebaseUser = auth.currentUser
+        val firebaseUser = try {
+            FirebaseAuth.getInstance().currentUser
+        } catch (e: Exception) {
+            Log.e("UserManager", "❌ Firebase access failed in emergency sync: ${e.message}")
+            null
+        }
+        
         if (firebaseUser != null) {
             val uid = firebaseUser.uid
             val email = firebaseUser.email ?: ""
             
-            saveUserDataLocally(email, uid)
-            Log.d("UserManager", "🚨 EMERGENCY SYNC: Saved UID ${uid.take(8)}... to prefs")
-            true
+            try {
+                saveUserDataLocally(email, uid)
+                Log.d("UserManager", "✅ Emergency sync successful: ${uid.take(8)}...")
+                true
+            } catch (e: Exception) {
+                Log.e("UserManager", "❌ saveUserDataLocally failed: ${e.message}")
+                false
+            }
         } else {
-            Log.w("UserManager", "🚨 EMERGENCY SYNC: No Firebase user available")
+            Log.w("UserManager", "⚠️ No Firebase user for emergency sync")
             false
         }
     } catch (e: Exception) {
-        Log.e("UserManager", "🚨 EMERGENCY SYNC FAILED: ${e.message}")
+        Log.e("UserManager", "💥 Emergency sync completely failed: ${e.message}")
         false
     }
 }
