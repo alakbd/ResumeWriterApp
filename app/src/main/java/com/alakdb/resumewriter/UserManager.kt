@@ -25,6 +25,28 @@ class UserManager(private val context: Context) {
         // NO TOKEN CONSTANTS - WE DON'T NEED THEM ANYMORE
     }
 
+    /** Emergency sync - ensures UserManager is synchronized with Firebase */
+fun emergencySyncWithFirebase(): Boolean {
+    return try {
+        val firebaseUser = auth.currentUser
+        if (firebaseUser != null) {
+            val uid = firebaseUser.uid
+            val email = firebaseUser.email ?: ""
+            
+            saveUserDataLocally(email, uid)
+            Log.d("UserManager", "🚨 EMERGENCY SYNC: Saved UID ${uid.take(8)}... to prefs")
+            true
+        } else {
+            Log.w("UserManager", "🚨 EMERGENCY SYNC: No Firebase user available")
+            false
+        }
+    } catch (e: Exception) {
+        Log.e("UserManager", "🚨 EMERGENCY SYNC FAILED: ${e.message}")
+        false
+    }
+}
+
+    
     /** Register a new user */
     fun registerUser(
         email: String,
@@ -243,22 +265,51 @@ fun isUserLoggedIn(): Boolean {
     }
 
     /** Get current user ID - CRITICAL for UID-based auth */
-    fun getCurrentUserId(): String? {
-    val prefId = prefs.getString(USER_ID_KEY, null)
-    if (!prefId.isNullOrBlank()) {
-        Log.d("UserManager", "User ID retrieved from prefs: ${prefId.take(8)}...")
-        return prefId
+    /** Get current user ID - ENHANCED with proper synchronization */
+fun getCurrentUserId(): String? {
+    return try {
+        // First, check if we have a valid Firebase user
+        val firebaseUser = auth.currentUser
+        val firebaseUid = firebaseUser?.uid
+        
+        // Check local preferences
+        val prefId = prefs.getString(USER_ID_KEY, null)
+        
+        Log.d("UserManager", "🔍 UID Check - Firebase: ${firebaseUid?.take(8)}, Prefs: ${prefId?.take(8)}")
+        
+        when {
+            // Case 1: Both exist and match - ideal scenario
+            !prefId.isNullOrBlank() && !firebaseUid.isNullOrBlank() && prefId == firebaseUid -> {
+                Log.d("UserManager", "✅ UID from prefs (matches Firebase): ${prefId.take(8)}...")
+                prefId
+            }
+            
+            // Case 2: Firebase has UID but prefs don't match or are missing - SYNC REQUIRED
+            !firebaseUid.isNullOrBlank() -> {
+                Log.w("UserManager", "🔄 Syncing UID from Firebase to prefs: ${firebaseUid.take(8)}...")
+                val email = firebaseUser?.email ?: ""
+                saveUserDataLocally(email, firebaseUid)
+                firebaseUid
+            }
+            
+            // Case 3: Prefs have UID but no Firebase user - CLEANUP REQUIRED
+            !prefId.isNullOrBlank() && firebaseUser == null -> {
+                Log.e("UserManager", "⚠️ Stale UID in prefs with no Firebase user - clearing")
+                logout() // Clear stale data
+                null
+            }
+            
+            // Case 4: No UID available
+            else -> {
+                Log.w("UserManager", "❌ No UID available (Firebase: ${firebaseUser != null}, Prefs: ${!prefId.isNullOrBlank()})")
+                null
+            }
+        }
+    } catch (e: Exception) {
+        Log.e("UserManager", "💥 Exception in getCurrentUserId: ${e.message}", e)
+        // Fallback to Firebase UID
+        auth.currentUser?.uid
     }
-
-    val firebaseUid = auth.currentUser?.uid
-    if (!firebaseUid.isNullOrBlank()) {
-        Log.d("UserManager", "User ID retrieved from Firebase: ${firebaseUid.take(8)}... Saving locally")
-        saveUserDataLocally(auth.currentUser?.email ?: "", firebaseUid)
-        return firebaseUid
-    }
-
-    Log.w("UserManager", "No user ID available")
-    return null
 }
 
     /** Get current user from Firebase Auth */
