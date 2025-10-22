@@ -40,6 +40,7 @@ class ResumeGenerationActivity : AppCompatActivity() {
     private lateinit var apiService: ApiService
     private lateinit var auth: FirebaseAuth
     private lateinit var userManager: UserManager
+    private lateinit var debugApiService: DebugApiService
 
     private var selectedResumeUri: Uri? = null
     private var selectedJobDescUri: Uri? = null
@@ -62,6 +63,7 @@ class ResumeGenerationActivity : AppCompatActivity() {
 
     userManager = UserManager(this)
     apiService = ApiService(this) // FIXED: Remove userManager parameter
+    debugApiService = DebugApiService(this)
     auth = FirebaseAuth.getInstance()
 
     // ⚠️ CRITICAL: THESE MUST BE CALLED SYNCHRONOUSLY IN onCreate
@@ -460,6 +462,25 @@ class ResumeGenerationActivity : AppCompatActivity() {
         Log.e("ResumeActivity", "💥 Safe API call failed: ${e.message}", e)
         showError("Network error: ${e.message}")
     }
+}
+
+    // Add this method to test headers:
+private fun testHeaderDebug() {
+    lifecycleScope.launch {
+        try {
+            binding.tvGeneratedResume.text = "Testing headers..."
+            val debugResult = debugApiService.testHeaderSending()
+            binding.tvGeneratedResume.text = debugResult
+            Log.d("HeaderDebug", debugResult)
+        } catch (e: Exception) {
+            binding.tvGeneratedResume.text = "Debug failed: ${e.message}"
+        }
+    }
+}
+
+// Add this button to your setupUI():
+binding.btnTestHeaders.setOnClickListener {
+    testHeaderDebug()
 }
 
     private fun testDirectConnection() {
