@@ -66,6 +66,7 @@ class ResumeGenerationActivity : AppCompatActivity() {
         setupUI() // Setup UI components immediately
         checkEmailVerification() // Can be called here safely
         checkGenerateButtonState() // Update button state
+        handleFreshInstall()
 
         // Debug calls (safe to call here)
         debugUserManagerState()
