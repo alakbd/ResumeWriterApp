@@ -403,6 +403,8 @@ class SafeAuthInterceptor : Interceptor {
         if (!userId.isNullOrBlank()) {
             requestBuilder.addHeader("X-User-ID", userId)
             Log.d("Auth", "✅ Sending Firebase UID: ${userId.take(8)}...")
+        } else {
+            Log.w("Auth", "⚠️ No Firebase user - request will fail auth")
         }
         
         return chain.proceed(requestBuilder.build())
@@ -461,19 +463,6 @@ class SafeAuthInterceptor : Interceptor {
             return "Firebase UID: ${firebaseUser?.uid ?: "NULL"}"
         }
         
-        private fun testHeaderSending() {
-    lifecycleScope.launch {
-        val result = apiService.getUserCredits()
-        when (result) {
-            is ApiService.ApiResult.Success -> {
-                val credits = result.data.optInt("available_credits", 0)
-                showMessage("✅ Headers working! Credits: $credits")
-            }
-            is ApiService.ApiResult.Error -> {
-                showMessage("❌ Header issue: ${result.message}")
-            }
-        }
-    }
-}
+       
     
 }
