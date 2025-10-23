@@ -213,17 +213,15 @@ class ResumeGenerationActivity : AppCompatActivity() {
         
         // Add debug button
         binding.btnDebugAuth.setOnClickListener {
-            lifecycleScope.launch {
-                try {
-                    val debugInfo = apiService.debugAuthenticationFlow()
-                    showMessage(debugInfo)
-                    Log.d("DebugAuth", debugInfo)
-                } catch (e: Exception) {
-                    showMessage("Debug failed: ${e.message}")
-                }
-            }
+            val firebaseUser = FirebaseAuth.getInstance().currentUser
+            val debugInfo = "Firebase UID: ${firebaseUser?.uid ?: "NULL"}"
+    
+            showMessage(debugInfo)
+            Log.d("AuthDebug", debugInfo)
+    
+            // Test header sending
+            testHeaderSending()
         }
-    }
 
     private fun checkGenerateButtonState() {
         val hasFiles = selectedResumeUri != null && selectedJobDescUri != null
