@@ -67,6 +67,7 @@ class ResumeGenerationActivity : AppCompatActivity() {
         checkEmailVerification() // Can be called here safely
         checkGenerateButtonState() // Update button state
         handleFreshInstall()
+        testHeaderSending()
 
         // Debug calls (safe to call here)
         debugUserManagerState()
