@@ -226,37 +226,48 @@ class ApiService(private val context: Context) {
     }
 
     suspend fun getUserCredits(): ApiResult<JSONObject> {
-        return try {
-            Log.d("ApiService", "🔄 Getting user credits from: $baseUrl/user/credits")
-            
-            val request = Request.Builder()
-                .url("$baseUrl/user/credits")
-                .get()
-                .build()
+    return try {
+        Log.d("ApiService", "🔄 Getting user credits from: $baseUrl/user/credits")
+        
+        // Check Firebase auth first
+        val firebaseUser = FirebaseAuth.getInstance().currentUser
+        if (firebaseUser == null) {
+            Log.e("ApiService", "❌ No Firebase user - cannot get credits")
+            return ApiResult.Error("User not authenticated", 401)
+        }
 
-            client.newCall(request).execute().use { response ->
-                val respBody = response.body?.string() ?: "{}"
-                Log.d("ApiService", "💰 Credits response: ${response.code} - Body: $respBody")
-                
-                if (response.isSuccessful) {
-                    try {
-                        val jsonResponse = JSONObject(respBody)
-                        Log.d("ApiService", "✅ Credits success: ${jsonResponse.toString()}")
-                        ApiResult.Success(jsonResponse)
-                    } catch (e: Exception) {
-                        Log.e("ApiService", "❌ JSON parsing error for credits", e)
-                        ApiResult.Error("Invalid server response format", response.code)
-                    }
-                } else {
-                    Log.e("ApiService", "❌ Server error: HTTP ${response.code}")
-                    ApiResult.Error("Server error: ${response.code}", response.code)
+        val request = Request.Builder()
+            .url("$baseUrl/user/credits")
+            .get()
+            .build()
+
+        client.newCall(request).execute().use { response ->
+            val respBody = response.body?.string() ?: "{}"
+            Log.d("ApiService", "💰 Credits response: ${response.code} - Body: $respBody")
+            
+            if (response.isSuccessful) {
+                try {
+                    val jsonResponse = JSONObject(respBody)
+                    Log.d("ApiService", "✅ Credits success: ${jsonResponse.toString()}")
+                    ApiResult.Success(jsonResponse)
+                } catch (e: Exception) {
+                    Log.e("ApiService", "❌ JSON parsing error for credits", e)
+                    ApiResult.Error("Invalid server response format", response.code)
+                }
+            } else {
+                Log.e("ApiService", "❌ Server error: HTTP ${response.code}")
+                when (response.code) {
+                    401 -> ApiResult.Error("Authentication failed - please log in again", 401)
+                    429 -> ApiResult.Error("Rate limit exceeded - please wait", 429)
+                    else -> ApiResult.Error("Server error: ${response.code}", response.code)
                 }
             }
-        } catch (e: Exception) {
-            Log.e("ApiService", "💥 Network exception while fetching credits: ${e.message}", e)
-            ApiResult.Error("Network error: ${e.message ?: "Unknown error"}")
         }
+    } catch (e: Exception) {
+        Log.e("ApiService", "💥 Network exception while fetching credits: ${e.message}", e)
+        ApiResult.Error("Network error: ${e.message ?: "Unknown error"}")
     }
+}
     
     suspend fun testSecureAuth(): ApiResult<JSONObject> {
         return try {
@@ -341,30 +352,50 @@ class ApiService(private val context: Context) {
 
 class SafeAuthInterceptor : Interceptor {
     override fun intercept(chain: Interceptor.Chain): Response {
-        val originalRequest = chain.request()
-        
-        // Get UID from Firebase
-        val firebaseUser = FirebaseAuth.getInstance().currentUser
-        val userId = firebaseUser?.uid
-        
-        val requestBuilder = originalRequest.newBuilder()
-            .addHeader("User-Agent", "ResumeWriter-Android")
-        
-        // 🔧 DEBUG: Log what we're sending
-        Log.d("🔥 HEADER DEBUG", "Firebase UID: $userId")
-        Log.d("🔥 HEADER DEBUG", "Request URL: ${originalRequest.url}")
-        
-        if (!userId.isNullOrBlank()) {
-            requestBuilder.addHeader("X-User-ID", userId)
-            Log.d("🔥 HEADER DEBUG", "✅ ADDED X-User-ID: $userId")
-        } else {
-            Log.w("🔥 HEADER DEBUG", "⚠️ No Firebase user - no auth header")
+        return try {
+            val originalRequest = chain.request()
+            
+            // Get UID from Firebase - handle potential exceptions
+            val userId = try {
+                val firebaseUser = FirebaseAuth.getInstance().currentUser
+                firebaseUser?.uid
+            } catch (e: Exception) {
+                Log.e("🔥 HEADER DEBUG", "❌ Firebase auth error: ${e.message}")
+                null
+            }
+            
+            val requestBuilder = originalRequest.newBuilder()
+                .addHeader("User-Agent", "ResumeWriter-Android")
+                .addHeader("Content-Type", "application/json")
+            
+            // 🔧 DEBUG: Log what we're sending
+            Log.d("🔥 HEADER DEBUG", "Firebase UID: $userId")
+            Log.d("🔥 HEADER DEBUG", "Request URL: ${originalRequest.url}")
+            
+            if (!userId.isNullOrBlank()) {
+                requestBuilder.addHeader("X-User-ID", userId)
+                Log.d("🔥 HEADER DEBUG", "✅ ADDED X-User-ID: $userId")
+            } else {
+                Log.w("🔥 HEADER DEBUG", "⚠️ No Firebase user - no auth header")
+                // Don't throw exception, just proceed without auth header
+                // The server will handle the missing header with proper error response
+            }
+            
+            // Log all headers being sent
+            val newRequest = requestBuilder.build()
+            Log.d("🔥 HEADER DEBUG", "Final headers: ${newRequest.headers}")
+            
+            chain.proceed(newRequest)
+        } catch (e: Exception) {
+            Log.e("🔥 HEADER DEBUG", "💥 Critical interceptor crash: ${e.message}", e)
+            // Return a mock response instead of crashing
+            Response.Builder()
+                .request(chain.request())
+                .protocol(Protocol.HTTP_1_1)
+                .code(500)
+                .message("Interceptor Error: ${e.message}")
+                .body("{\"error\": \"Interceptor crashed: ${e.message}\"}".toRequestBody("application/json".toMediaType()))
+                .build()
         }
-        
-        // Log all headers being sent
-        val newRequest = requestBuilder.build()
-        Log.d("🔥 HEADER DEBUG", "Final headers: ${newRequest.headers}")
-        
-        return chain.proceed(newRequest)
     }
 }
