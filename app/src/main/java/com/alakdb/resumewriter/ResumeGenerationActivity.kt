@@ -71,27 +71,63 @@ class ResumeGenerationActivity : AppCompatActivity() {
 
     // ADD this method to ResumeGenerationActivity.kt (around line 70)
     private fun testHeaderSending() {
-        lifecycleScope.launch {
-            try {
-                binding.tvGeneratedResume.text = "Testing headers..."
+    lifecycleScope.launch {
+        try {
+            binding.tvGeneratedResume.text = "Testing headers...\n(Server may be waking up)"
+            binding.progressGenerate.visibility = View.VISIBLE
             
-                val result = apiService.getUserCredits()
-                when (result) {
-                    is ApiService.ApiResult.Success -> {
-                        val credits = result.data.optInt("available_credits", 0)
-                        showMessage("✅ Headers working! Credits: $credits")
-                        binding.tvGeneratedResume.text = "Headers OK - Credits: $credits"
+            // First, test if server is awake
+            val connectionResult = apiService.testConnection()
+            
+            when (connectionResult) {
+                is ApiService.ApiResult.Success -> {
+                    // Server is awake - test headers with credits endpoint
+                    binding.tvGeneratedResume.text = "Server awake! Testing headers..."
+                    
+                    val result = apiService.getUserCredits()
+                    when (result) {
+                        is ApiService.ApiResult.Success -> {
+                            val credits = result.data.optInt("available_credits", 0)
+                            showMessage("✅ Headers working! Credits: $credits")
+                            binding.tvGeneratedResume.text = "Headers OK - Credits: $credits"
+                        }
+                        is ApiService.ApiResult.Error -> {
+                            showMessage("❌ Header issue: ${result.message}")
+                            binding.tvGeneratedResume.text = "Header failed: ${result.message}"
+                        }
                     }
+                }
                 is ApiService.ApiResult.Error -> {
-                    showMessage("❌ Header issue: ${result.message}")
-                    binding.tvGeneratedResume.text = "Header failed: ${result.message}"
+                    // Server is sleeping or having issues
+                    if (connectionResult.code in 500..599 || connectionResult.code == 0) {
+                        binding.tvGeneratedResume.text = "🔄 Server is waking up...\nThis may take 30-60 seconds\n\nTrying automatic wake-up..."
+                        showMessage("Server is waking up. Please wait...")
+                        
+                        // Trigger server wake-up
+                        val serverAwake = apiService.waitForServerWakeUp(maxAttempts = 6, delayBetweenAttempts = 10000L)
+                        
+                        if (serverAwake) {
+                            binding.tvGeneratedResume.text = "✅ Server is now awake!\nTesting headers..."
+                            testHeaderSending() // Recursive call to test again
+                        } else {
+                            binding.tvGeneratedResume.text = "⏰ Server taking too long\nPlease try again in 1 minute"
+                            showMessage("Server is taking longer than expected. Please try the test again.")
+                        }
+                    } else {
+                        showMessage("❌ Connection issue: ${connectionResult.message}")
+                        binding.tvGeneratedResume.text = "Connection failed: ${connectionResult.message}"
+                    }
                 }
             }
         } catch (e: Exception) {
             showMessage("Test failed: ${e.message}")
+            binding.tvGeneratedResume.text = "Test error: ${e.message}"
+        } finally {
+            binding.progressGenerate.visibility = View.GONE
         }
     }
 }
+    
         // Debug calls (safe to call here)
         debugUserManagerState()
 
@@ -209,20 +245,24 @@ class ResumeGenerationActivity : AppCompatActivity() {
         binding.btnBack.setOnClickListener { finish() }
         binding.btnRetryConnection.setOnClickListener { testApiConnection() }
 
-      
+      / Add server status text view if not already there
+        binding.tvServerStatus.text = "Server status: Checking..."
+        binding.tvServerStatus.setTextColor(getColor(android.R.color.darker_gray))
         
         // Add debug button
         binding.btnDebugAuth.setOnClickListener {
             val firebaseUser = FirebaseAuth.getInstance().currentUser
             val debugInfo = "Firebase UID: ${firebaseUser?.uid ?: "NULL"}"
     
-            showMessage(debugInfo)
+            showMessage("$debugInfo\n\nTesting server connection...")
             Log.d("AuthDebug", debugInfo)
     
-            // Test header sending
-            testHeaderSending()
+        // Test header sending with server wake-up awareness
+        testHeaderSending()
         }
+    
 
+        
     private fun checkGenerateButtonState() {
         val hasFiles = selectedResumeUri != null && selectedJobDescUri != null
         val hasText = binding.etResumeText.text.isNotEmpty() && binding.etJobDescription.text.isNotEmpty()
@@ -294,63 +334,57 @@ class ResumeGenerationActivity : AppCompatActivity() {
     
     /** ---------------- API Connection Test ---------------- **/
     private fun testApiConnection() {
-        binding.layoutConnectionStatus.visibility = View.VISIBLE
-        binding.tvConnectionStatus.text = "Testing connection..."
-        binding.progressConnection.visibility = View.VISIBLE
-        binding.btnRetryConnection.isEnabled = false
+    binding.layoutConnectionStatus.visibility = View.VISIBLE
+    binding.tvConnectionStatus.text = "Testing connection...\n(Server may be waking up)"
+    binding.progressConnection.visibility = View.VISIBLE
+    binding.btnRetryConnection.isEnabled = false
 
-        lifecycleScope.launch {
-            safeApiCall {
-                if (!isNetworkAvailable()) {
-                    updateConnectionStatus("❌ No internet connection", true)
-                    binding.progressConnection.visibility = View.GONE
-                    binding.btnRetryConnection.isEnabled = true
-                    showError("Please check your internet connection")
-                    return@safeApiCall
-                }
+    lifecycleScope.launch {
+        safeApiCall {
+            if (!isNetworkAvailable()) {
+                updateConnectionStatus("❌ No internet connection", true)
+                return@safeApiCall
+            }
 
-                try {
-                    Log.d("ResumeActivity", "Testing API connection...")
-                    
-                    val connectionResult = apiService.testConnection()
-                    
-                    when (connectionResult) {
-                        is ApiService.ApiResult.Success -> {
-                            updateConnectionStatus("✅ API Connected", false)
-                            updateCreditDisplay()
-                        }
-                        is ApiService.ApiResult.Error -> {
-                            // Check if it's a server wake-up issue
-                            if (connectionResult.code in 500..599 || connectionResult.code == 0) {
-                                updateConnectionStatus("🔄 Server is waking up...", true)
-                                showServerWakeupMessage()
-                                
-                                val serverAwake = apiService.waitForServerWakeUp(maxAttempts = 12, delayBetweenAttempts = 10000L)
-                                
-                                if (serverAwake) {
-                                    updateConnectionStatus("✅ Server is ready!", false)
-                                    updateCreditDisplay()
-                                } else {
-                                    updateConnectionStatus("⏰ Server taking too long", true)
-                                    showError("Server is taking longer than expected. Please try again in a minute.")
-                                }
+            try {
+                val connectionResult = apiService.testConnection()
+                
+                when (connectionResult) {
+                    is ApiService.ApiResult.Success -> {
+                        updateConnectionStatus("✅ API Connected", false)
+                        updateCreditDisplay()
+                    }
+                    is ApiService.ApiResult.Error -> {
+                        // Handle server wake-up specifically
+                        if (connectionResult.code in 500..599 || connectionResult.code == 0) {
+                            updateConnectionStatus("🔄 Server is waking up...", true)
+                            showServerWakeupMessage()
+                            
+                            val serverAwake = apiService.waitForServerWakeUp(maxAttempts = 8, delayBetweenAttempts = 10000L)
+                            
+                            if (serverAwake) {
+                                updateConnectionStatus("✅ Server is ready!", false)
+                                updateCreditDisplay()
                             } else {
-                                updateConnectionStatus("❌ API Connection Failed", true)
-                                showError("API error: ${connectionResult.message}")
+                                updateConnectionStatus("⏰ Server taking too long", true)
+                                showError("Server is taking longer than expected. Please try again in a minute.")
                             }
+                        } else {
+                            updateConnectionStatus("❌ API Connection Failed", true)
+                            showError("API error: ${connectionResult.message}")
                         }
                     }
-                } catch (e: Exception) {
-                    updateConnectionStatus("❌ Connection Error", true)
-                    Log.e("ResumeActivity", "Connection test failed", e)
-                    showError("Connection failed: ${e.message}")
-                } finally {
-                    binding.progressConnection.visibility = View.GONE
-                    binding.btnRetryConnection.isEnabled = true
                 }
+            } catch (e: Exception) {
+                updateConnectionStatus("❌ Connection Error", true)
+                Log.e("ResumeActivity", "Connection test failed", e)
+            } finally {
+                binding.progressConnection.visibility = View.GONE
+                binding.btnRetryConnection.isEnabled = true
             }
         }
     }
+}
 
     // ADD THIS MISSING METHOD:
     private fun showMessage(message: String) {
