@@ -69,6 +69,29 @@ class ResumeGenerationActivity : AppCompatActivity() {
         handleFreshInstall()
         testHeaderSending()
 
+    // ADD this method to ResumeGenerationActivity.kt (around line 70)
+    private fun testHeaderSending() {
+        lifecycleScope.launch {
+            try {
+                binding.tvGeneratedResume.text = "Testing headers..."
+            
+                val result = apiService.getUserCredits()
+                when (result) {
+                    is ApiService.ApiResult.Success -> {
+                        val credits = result.data.optInt("available_credits", 0)
+                        showMessage("✅ Headers working! Credits: $credits")
+                        binding.tvGeneratedResume.text = "Headers OK - Credits: $credits"
+                    }
+                is ApiService.ApiResult.Error -> {
+                    showMessage("❌ Header issue: ${result.message}")
+                    binding.tvGeneratedResume.text = "Header failed: ${result.message}"
+                }
+            }
+        } catch (e: Exception) {
+            showMessage("Test failed: ${e.message}")
+        }
+    }
+}
         // Debug calls (safe to call here)
         debugUserManagerState()
 
