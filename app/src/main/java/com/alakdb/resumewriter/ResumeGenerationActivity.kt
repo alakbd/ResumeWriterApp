@@ -652,6 +652,20 @@ class ResumeGenerationActivity : AppCompatActivity() {
         }
     }
     
+    private fun quickAuthCheck(): String {
+    val firebaseUser = FirebaseAuth.getInstance().currentUser
+    val userManagerUser = userManager.getCurrentUserId()
+    
+    return """
+    🔍 QUICK AUTH CHECK:
+    Firebase UID: ${firebaseUser?.uid ?: "NULL"}
+    UserManager UID: ${userManagerUser ?: "NULL"}
+    Match: ${firebaseUser?.uid == userManagerUser}
+    Firebase Email: ${firebaseUser?.email ?: "NULL"}
+    UserManager Email: ${userManager.getCurrentUserEmail() ?: "NULL"}
+    """.trimIndent()
+}
+    
     private fun debugAuthAndCredits() {
         lifecycleScope.launch {
             try {
