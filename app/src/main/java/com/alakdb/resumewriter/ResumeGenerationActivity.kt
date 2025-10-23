@@ -87,27 +87,36 @@ class ResumeGenerationActivity : AppCompatActivity() {
     }
 
     override fun onResume() {
-        super.onResume()
+    super.onResume()
+    
+    lifecycleScope.launch {
+        Log.d("ResumeActivity", "🔄 onResume - refreshing data...")
         
-        lifecycleScope.launch {
-            Log.d("ResumeActivity", "🔄 onResume - refreshing data...")
+        try {
+            val authValid = checkAuthenticationState()
             
-            userManager.emergencySyncWithFirebase()
-            
-            withContext(Dispatchers.Main) {
-                checkGenerateButtonState()
-            }
-            
-            if (userManager.isUserLoggedIn()) {
+            if (authValid) {
                 updateCreditDisplay()
                 testApiConnection()
             } else {
                 withContext(Dispatchers.Main) {
                     binding.creditText.text = "Credits: Please log in"
+                    binding.layoutConnectionStatus.visibility = View.GONE
                 }
+            }
+            
+            withContext(Dispatchers.Main) {
+                checkGenerateButtonState()
+            }
+        } catch (e: Exception) {
+            Log.e("ResumeActivity", "❌ onResume failed: ${e.message}", e)
+            withContext(Dispatchers.Main) {
+                binding.creditText.text = "Credits: Error"
+                showError("Failed to refresh: ${e.message}")
             }
         }
     }
+}
 
     /** ---------------- File Picker Setup ---------------- **/
     private fun registerFilePickers() {
@@ -497,24 +506,47 @@ class ResumeGenerationActivity : AppCompatActivity() {
         }
     }
 
-    private suspend fun <T> retryApiCall(
-        maxRetries: Int = 2,
-        initialDelay: Long = 1000L,
-        block: suspend () -> ApiService.ApiResult<T>
-    ): ApiService.ApiResult<T> {
-        var lastResult: ApiService.ApiResult<T>? = null
-        repeat(maxRetries) { attempt ->
-            val result = block()
-            if (result is ApiService.ApiResult.Success) return result
-            lastResult = result
-            if (attempt < maxRetries - 1) {
-                val delayTime = initialDelay * (attempt + 1)
-                Log.d("ResumeActivity", "Retry ${attempt + 1}/$maxRetries in ${delayTime}ms")
-                delay(delayTime)
+    private suspend fun <T> safeApiCall(
+    operation: String,
+    maxRetries: Int = 2,
+    block: suspend () -> ApiService.ApiResult<T>
+): ApiService.ApiResult<T> {
+    var lastError: Exception? = null
+    
+    repeat(maxRetries) { attempt ->
+        try {
+            // Check authentication before each attempt
+            if (!checkAuthenticationState()) {
+                return ApiService.ApiResult.Error("Authentication failed", 401)
             }
+            
+            val result = block()
+            if (result is ApiService.ApiResult.Success) {
+                return result
+            }
+            
+            // If it's an auth error, don't retry
+            if (result is ApiService.ApiResult.Error && result.code == 401) {
+                return result
+            }
+            
+            Log.w("SafeApiCall", "Attempt $attempt failed for $operation: ${(result as? ApiService.ApiResult.Error)?.message}")
+            
+        } catch (e: Exception) {
+            lastError = e
+            Log.e("SafeApiCall", "Exception in $operation attempt $attempt: ${e.message}")
         }
-        return lastResult ?: ApiService.ApiResult.Error("All retry attempts failed")
+        
+        if (attempt < maxRetries - 1) {
+            delay(1000L * (attempt + 1)) // Exponential backoff
+        }
     }
+    
+    return ApiService.ApiResult.Error(
+        lastError?.message ?: "All retry attempts failed for $operation", 
+        0
+    )
+}
 
     /** ---------------- Display & Download ---------------- **/
     private fun displayGeneratedResume(resumeData: JSONObject) {
@@ -598,31 +630,89 @@ class ResumeGenerationActivity : AppCompatActivity() {
 
     /** ---------------- Credit Display ---------------- **/
     private suspend fun updateCreditDisplay() {
-        try {
-            val result = apiService.getUserCredits()
-            when (result) {
-                is ApiService.ApiResult.Success -> {
-                    runOnUiThread {
-                        val credits = result.data.optInt("credits", 0)
+    try {
+        // Check authentication first
+        if (!userManager.isUserLoggedIn()) {
+            runOnUiThread {
+                binding.creditText.text = "Credits: Please log in"
+            }
+            return
+        }
+
+        val result = apiService.getUserCredits()
+        when (result) {
+            is ApiService.ApiResult.Success -> {
+                runOnUiThread {
+                    try {
+                        val credits = result.data.optInt("available_credits", 0)
                         binding.creditText.text = "Credits: $credits"
-                    }
-                }
-                is ApiService.ApiResult.Error -> {
-                    Log.w("ResumeGeneration", "Failed to get credits: ${result.message}")
-                    runOnUiThread {
-                        val cachedCredits = userManager.getCachedCredits()
-                        binding.creditText.text = "Credits: $cachedCredits"
+                        Log.d("ResumeActivity", "✅ Credits updated: $credits")
+                    } catch (e: Exception) {
+                        binding.creditText.text = "Credits: Error"
+                        Log.e("ResumeActivity", "❌ Error parsing credits response", e)
                     }
                 }
             }
-        } catch (e: Exception) {
-            Log.e("ResumeGeneration", "Credit update failed", e)
-            runOnUiThread {
-                binding.creditText.text = "Credits: --"
+            is ApiService.ApiResult.Error -> {
+                Log.w("ResumeGeneration", "Failed to get credits: ${result.message} (Code: ${result.code})")
+                runOnUiThread {
+                    when (result.code) {
+                        401 -> {
+                            binding.creditText.text = "Credits: Auth Error"
+                            showError("Authentication failed. Please log out and log in again.")
+                            userManager.logout()
+                        }
+                        429 -> {
+                            binding.creditText.text = "Credits: Rate Limited"
+                            showError("Too many requests. Please wait a moment.")
+                        }
+                        else -> {
+                            val cachedCredits = userManager.getCachedCredits()
+                            binding.creditText.text = "Credits: $cachedCredits"
+                            Log.w("ResumeActivity", "Using cached credits due to API error")
+                        }
+                    }
+                }
             }
         }
+    } catch (e: Exception) {
+        Log.e("ResumeGeneration", "Credit update failed", e)
+        runOnUiThread {
+            binding.creditText.text = "Credits: --"
+        }
     }
+}
 
+    private suspend fun checkAuthenticationState(): Boolean {
+    return try {
+        userManager.emergencySyncWithFirebase()
+        
+        val isLoggedIn = userManager.isUserLoggedIn()
+        val firebaseUser = FirebaseAuth.getInstance().currentUser
+        
+        Log.d("AuthCheck", "UserManager logged in: $isLoggedIn")
+        Log.d("AuthCheck", "Firebase user: ${firebaseUser?.uid}")
+        
+        if (!isLoggedIn || firebaseUser == null) {
+            withContext(Dispatchers.Main) {
+                showError("Please log in to continue")
+                binding.creditText.text = "Credits: Please log in"
+            }
+            return false
+        }
+        
+        true
+    } catch (e: Exception) {
+        Log.e("AuthCheck", "Authentication check failed", e)
+        withContext(Dispatchers.Main) {
+            showError("Authentication error: ${e.message}")
+            binding.creditText.text = "Credits: Auth Error"
+        }
+        false
+    }
+}
+    
+    
     /** ---------------- Debug Methods ---------------- **/
     private fun runApiServiceDebug() {
         lifecycleScope.launch {
