@@ -184,6 +184,12 @@ class ResumeGenerationActivity : AppCompatActivity() {
         binding.btnDownloadPdf.setOnClickListener { downloadFile("pdf") }
         binding.btnBack.setOnClickListener { finish() }
         binding.btnRetryConnection.setOnClickListener { testApiConnection() }
+
+        // In setupUI() method, add:
+        binding.btnQuickCheck.setOnClickListener {
+            showMessage(quickAuthCheck())
+            Log.d("QuickCheck", quickAuthCheck())
+        }
         
         // Add debug button
         binding.btnDebugAuth.setOnClickListener {
