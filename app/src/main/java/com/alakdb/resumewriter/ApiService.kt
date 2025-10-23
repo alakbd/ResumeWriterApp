@@ -383,45 +383,29 @@ class ApiService(private val context: Context) {
 // FIXED: Enhanced SafeAuthInterceptor with proper user ID handling - MOVED OUTSIDE THE CLASS
 class SafeAuthInterceptor(private val userManager: UserManager) : Interceptor {
     override fun intercept(chain: Interceptor.Chain): Response {
-        val originalRequest = chain.request()
-        
-        // ULTRA-SAFE: Wrap everything in try-catch to prevent ANY crashes
         return try {
-            Log.d("AuthInterceptor", "🛡️ Starting ultra-safe interceptor for: ${originalRequest.url}")
+            val originalRequest = chain.request()
             
-            // STEP 1: Get user ID with ZERO risk of crashing
-            val userId = getUserIdUltraSafe()
+            // ULTRA-SIMPLE: Get user ID from Firebase directly
+            val userId = FirebaseAuth.getInstance().currentUser?.uid
             
-            Log.d("AuthInterceptor", "🔐 User ID result: ${userId ?: "NULL"}")
-            
-            // STEP 2: Build request with headers (only if we have valid user ID)
             val requestBuilder = originalRequest.newBuilder()
                 .addHeader("User-Agent", "ResumeWriter-Android")
             
             if (!userId.isNullOrBlank()) {
                 requestBuilder.addHeader("X-User-ID", userId)
-                Log.d("AuthInterceptor", "✅ Added X-User-ID header: ${userId.take(8)}...")
+                Log.d("AuthInterceptor", "✅ Added X-User-ID: ${userId.take(8)}...")
             } else {
-                Log.w("AuthInterceptor", "⚠️ No user ID - proceeding without auth header")
-                // This is OK - server will handle authentication failure
+                Log.w("AuthInterceptor", "⚠️ No Firebase user - no auth header")
             }
             
-            val newRequest = requestBuilder.build()
-            
-            // STEP 3: Proceed with the request (even without user ID)
-            Log.d("AuthInterceptor", "🚀 Proceeding with request...")
-            chain.proceed(newRequest)
-            
+            chain.proceed(requestBuilder.build())
         } catch (e: Exception) {
-            // CRITICAL: If ANYTHING fails, proceed with original request
-            Log.e("AuthInterceptor", "💥 CATASTROPHIC INTERCEPTOR FAILURE: ${e.message}")
-            Log.e("AuthInterceptor", "🔧 Stack trace:", e)
-            
-            // EMERGENCY FALLBACK: Proceed with original request no matter what
-            Log.w("AuthInterceptor", "🆘 EMERGENCY: Proceeding with original request without modifications")
-            chain.proceed(originalRequest)
+            Log.e("AuthInterceptor", "Emergency fallback: ${e.message}")
+            chain.proceed(chain.request()) // Original request as fallback
         }
     }
+}
     
     private fun getUserIdUltraSafe(): String? {
         return try {
