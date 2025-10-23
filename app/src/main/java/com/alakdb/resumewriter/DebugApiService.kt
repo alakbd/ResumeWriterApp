@@ -19,77 +19,26 @@ class DebugApiService(private val context: Context) {
         .readTimeout(30, TimeUnit.SECONDS)
         .build()
 
-    suspend fun testHeaderSending(): String {
-        return try {
-            val debugInfo = StringBuilder()
-            debugInfo.appendLine("=== HEADER DEBUG TEST ===")
+  private fun testHeaderSending() {
+    lifecycleScope.launch {
+        try {
+            binding.tvGeneratedResume.text = "Testing headers..."
             
-            // Step 1: Check Firebase Auth
-            val firebaseUser = com.google.firebase.auth.FirebaseAuth.getInstance().currentUser
-            debugInfo.appendLine("1. FIREBASE AUTH:")
-            debugInfo.appendLine("   • UID: ${firebaseUser?.uid ?: "NULL"}")
-            debugInfo.appendLine("   • Email: ${firebaseUser?.email ?: "NULL"}")
-            
-            // Step 2: Check UserManager
-            debugInfo.appendLine("2. USERMANAGER:")
-            debugInfo.appendLine("   • getCurrentUserId(): ${userManager.getCurrentUserId() ?: "NULL"}")
-            debugInfo.appendLine("   • isUserLoggedIn(): ${userManager.isUserLoggedIn()}")
-            
-            // Step 3: Test direct request with manual headers
-            debugInfo.appendLine("3. MANUAL HEADER TEST:")
-            val testUid = userManager.getCurrentUserId() ?: firebaseUser?.uid
-            if (testUid != null) {
-                debugInfo.appendLine("   • Using UID: ${testUid.take(8)}...")
-                
-                val request = Request.Builder()
-                    .url("$baseUrl/user/credits")
-                    .addHeader("X-User-ID", testUid)
-                    .addHeader("User-Agent", "ResumeWriter-Debug")
-                    .get()
-                    .build()
-                
-                try {
-                    val response = simpleClient.newCall(request).execute()
-                    val body = response.body?.string() ?: "{}"
-                    
-                    debugInfo.appendLine("   • Response Code: ${response.code}")
-                    debugInfo.appendLine("   • Response Body: $body")
-                    
-                    if (response.code == 401) {
-                        debugInfo.appendLine("   ❌ SERVER SAYS: UNAUTHORIZED")
-                        debugInfo.appendLine("   💡 The UID might not exist in Firestore")
-                    } else if (response.isSuccessful) {
-                        debugInfo.appendLine("   ✅ SUCCESS: Headers are working!")
-                    }
-                    
-                } catch (e: Exception) {
-                    debugInfo.appendLine("   ❌ Request failed: ${e.message}")
+            val result = apiService.getUserCredits()
+            when (result) {
+                is ApiService.ApiResult.Success -> {
+                    val credits = result.data.optInt("available_credits", 0)
+                    showMessage("✅ Headers working! Credits: $credits")
+                    binding.tvGeneratedResume.text = "Headers OK - Credits: $credits"
                 }
-            } else {
-                debugInfo.appendLine("   ❌ No UID available - cannot test headers")
+                is ApiService.ApiResult.Error -> {
+                    showMessage("❌ Header issue: ${result.message}")
+                    binding.tvGeneratedResume.text = "Header failed: ${result.message}"
+                }
             }
-            
-            // Step 4: Test without headers (should fail)
-            debugInfo.appendLine("4. NO HEADER TEST:")
-            val noHeaderRequest = Request.Builder()
-                .url("$baseUrl/user/credits")
-                .get()
-                .build()
-            
-            try {
-                val response = simpleClient.newCall(noHeaderRequest).execute()
-                val body = response.body?.string() ?: "{}"
-                debugInfo.appendLine("   • No-Header Response: ${response.code}")
-                debugInfo.appendLine("   • Body: $body")
-            } catch (e: Exception) {
-                debugInfo.appendLine("   ❌ No-header request failed: ${e.message}")
-            }
-            
-            debugInfo.appendLine("=== END DEBUG ===")
-            debugInfo.toString()
-            
         } catch (e: Exception) {
-            "Debug failed: ${e.message}"
+            showMessage("Test failed: ${e.message}")
         }
     }
+}
 }
