@@ -340,43 +340,28 @@ class ResumeGenerationActivity : AppCompatActivity() {
     }
 
     private suspend fun ensureUserAuthenticated(): Boolean {
-        return try {
-            // Step 1: Force sync first
-            userManager.emergencySyncWithFirebase()
-            
-            // Step 2: Check if user is logged in
-            if (!userManager.isUserLoggedIn()) {
-                Log.e("ResumeActivity", "❌ User not logged in after sync")
-                withContext(Dispatchers.Main) {
-                    showError("Please log in to continue")
-                    binding.creditText.text = "Credits: Please log in"
-                }
-                return false
+    return withContext(Dispatchers.IO) {
+        try {
+            val firebaseUser = FirebaseAuth.getInstance().currentUser
+            if (firebaseUser == null) {
+                Log.e("Auth", "❌ No Firebase user")
+                return@withContext false
             }
             
-            // Step 3: Verify we have a valid user ID
-            val userId = userManager.getCurrentUserId()
-            if (userId.isNullOrBlank()) {
-                Log.e("ResumeActivity", "❌ User ID is null/blank after sync")
-                withContext(Dispatchers.Main) {
-                    showError("Authentication error. Please log out and log in again.")
-                    binding.creditText.text = "Credits: Auth error"
-                }
-                return false
-            }
+            val userId = firebaseUser.uid
+            val email = firebaseUser.email ?: ""
             
-            Log.d("ResumeActivity", "✅ User authenticated: ${userId.take(8)}...")
+            // CRITICAL: Force UserManager to match Firebase
+            userManager.saveUserDataLocally(email, userId)
+            
+            Log.d("Auth", "✅ User authenticated: ${userId.take(8)}...")
             true
-            
         } catch (e: Exception) {
-            Log.e("ResumeActivity", "💥 Authentication check failed: ${e.message}", e)
-            withContext(Dispatchers.Main) {
-                showError("Authentication system error. Please restart the app.")
-                binding.creditText.text = "Credits: System error"
-            }
+            Log.e("Auth", "💥 Auth check failed: ${e.message}")
             false
         }
     }
+}
 
     private suspend fun safeApiCall(block: suspend () -> Unit) {
         try {
@@ -687,6 +672,34 @@ class ResumeGenerationActivity : AppCompatActivity() {
             }
         }
     }
+
+    private fun handleFreshInstall() {
+    val firebaseUser = FirebaseAuth.getInstance().currentUser
+    if (firebaseUser != null && !userManager.isUserLoggedIn()) {
+        Log.w("FreshInstall", "🆘 Firebase user exists but UserManager is empty - RECOVERING")
+        
+        val userId = firebaseUser.uid
+        val email = firebaseUser.email ?: ""
+        
+        userManager.saveUserDataLocally(email, userId)
+        Log.d("FreshInstall", "✅ Recovered user session: ${userId.take(8)}...")
+    }
+}
+
+    private fun quickAuthCheck(): String {
+    val firebaseUser = FirebaseAuth.getInstance().currentUser
+    val userManagerUser = userManager.getCurrentUserId()
+    
+    return """
+    🔍 QUICK AUTH CHECK:
+    Firebase UID: ${firebaseUser?.uid ?: "NULL"}
+    UserManager UID: ${userManagerUser ?: "NULL"}
+    Match: ${firebaseUser?.uid == userManagerUser}
+    Firebase Email: ${firebaseUser?.email ?: "NULL"}
+    UserManager Email: ${userManager.getCurrentUserEmail() ?: "NULL"}
+    """.trimIndent()
+}
+    
     
     /** ---------------- Helpers ---------------- **/
     private fun disableGenerateButton(text: String) {
