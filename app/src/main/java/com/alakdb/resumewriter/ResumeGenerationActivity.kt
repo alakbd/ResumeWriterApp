@@ -30,9 +30,6 @@ import java.util.concurrent.TimeUnit
 import java.io.File
 import okhttp3.OkHttpClient
 import okhttp3.Request
-import com.alakdb.resumewriter.ApiService
-import com.alakdb.resumewriter.ApiService.ApiResult 
-
 
 class ResumeGenerationActivity : AppCompatActivity() {
 
@@ -40,7 +37,6 @@ class ResumeGenerationActivity : AppCompatActivity() {
     private lateinit var apiService: ApiService
     private lateinit var auth: FirebaseAuth
     private lateinit var userManager: UserManager
-    private lateinit var debugApiService: DebugApiService
 
     private var selectedResumeUri: Uri? = null
     private var selectedJobDescUri: Uri? = null
@@ -57,156 +53,75 @@ class ResumeGenerationActivity : AppCompatActivity() {
     }
 
     override fun onCreate(savedInstanceState: Bundle?) {
-    super.onCreate(savedInstanceState)
-    binding = ActivityResumeGenerationBinding.inflate(layoutInflater)
-    setContentView(binding.root)
+        super.onCreate(savedInstanceState)
+        binding = ActivityResumeGenerationBinding.inflate(layoutInflater)
+        setContentView(binding.root)
 
-    userManager = UserManager(this)
-    apiService = ApiService(this) // FIXED: Remove userManager parameter
-    debugApiService = DebugApiService(this)
-    auth = FirebaseAuth.getInstance()
+        userManager = UserManager(this)
+        apiService = ApiService(this) // FIXED: Remove userManager parameter
+        auth = FirebaseAuth.getInstance()
 
-    // ⚠️ CRITICAL: THESE MUST BE CALLED SYNCHRONOUSLY IN onCreate
-    registerFilePickers() // Must be called BEFORE the activity reaches RESUMED state
-    setupUI() // Setup UI components immediately
-    checkEmailVerification() // Can be called here safely
-    checkGenerateButtonState() // Update button state
+        // ⚠️ CRITICAL: These MUST be called synchronously in onCreate
+        registerFilePickers() // Must be called before activity reaches STARTED state
+        setupUI() // Setup UI components immediately
+        checkEmailVerification() // Can be called here safely
+        checkGenerateButtonState() // Update button state
 
-    // Debug calls (safe to call here)
-    debugUserManagerState()
+        // Debug calls (safe to call here)
+        debugUserManagerState()
 
-    // CRITICAL: Force immediate UserManager sync with Firebase
-    lifecycleScope.launch {
-        Log.d("ResumeActivity", "🔄 Initializing UserManager sync...")
-        
-        // Step 1: Emergency sync to ensure UserManager has current user data
-        userManager.emergencySyncWithFirebase()
-        
-        // Step 2: Debug the current state
-        userManager.logCurrentUserState()
-        userManager.debugStoredData()
-        
-        // Step 3: Test API connection if user is authenticated
-        delay(1000) // Give time for sync to complete
-        
-        if (ensureUserAuthenticated()) {
-            Log.d("ResumeActivity", "✅ User authenticated - testing API connection")
-            testApiConnection()
-        } else {
-            Log.w("ResumeActivity", "⚠️ User not authenticated - skipping API test")
-            withContext(Dispatchers.Main) {
-                binding.creditText.text = "Credits: Please log in"
-                binding.layoutConnectionStatus.visibility = View.GONE
-            }
-        }
-    }
-}
-
-    @SuppressLint("SetTextI18n")
-    private fun comprehensiveAuthDebug() {
+        // CRITICAL: Force immediate UserManager sync with Firebase
         lifecycleScope.launch {
-            binding.progressGenerate.visibility = View.VISIBLE
-            val debugInfo = StringBuilder()
-            debugInfo.appendLine("===== Comprehensive Auth Debug =====")
-
-            // 1. Firebase Auth
-            val user = FirebaseAuth.getInstance().currentUser
-            debugInfo.appendLine("1. FIREBASE AUTH:")
-            debugInfo.appendLine("   • UID: ${user?.uid ?: "null"}")
-            debugInfo.appendLine("   • Email: ${user?.email ?: "null"}")
-
-            // 2. UserManager State
-            val userId = userManager.getCurrentUserId() ?: "NULL"
-            val userEmail = userManager.getCurrentUserEmail() ?: "NULL"
-            debugInfo.appendLine("\n2. USERMANAGER STATE:")
-            debugInfo.appendLine("   • UserManager user ID: $userId")
-            debugInfo.appendLine("   • UserManager email: $userEmail")
-
-            // Update TextView so far
-            binding.tvGeneratedResume.text = debugInfo.toString()
-
-            // 3. SharedPreferences
-            val prefs = getSharedPreferences("user_prefs", Context.MODE_PRIVATE)
-            debugInfo.appendLine("\n3. SHARED PREFERENCES:")
-            if (prefs.all.isEmpty()) debugInfo.appendLine("   • (empty)")
-            else prefs.all.forEach { (k,v) -> debugInfo.appendLine("   • $k: $v") }
-            binding.tvGeneratedResume.text = debugInfo.toString()
-
-            // 4. Network availability
-            debugInfo.appendLine("\n4. NETWORK:")
-            debugInfo.appendLine("   • Available: ${isNetworkAvailable()}")
-            binding.tvGeneratedResume.text = debugInfo.toString()
-
-            // 5. API Service
-            debugInfo.appendLine("\n5. API SERVICE INITIALIZATION:")
-
-            val isApiInitialized = try {
-                ::apiService.isInitialized
-            } catch (e: Exception) {
-                false
-            }
-
-        if (isApiInitialized) {
-            debugInfo.appendLine("   • ApiService initialized ✅")
-        } else {
-            debugInfo.appendLine("   • ApiService not initialized ❌")
-            }
-
-        binding.tvGeneratedResume.text = debugInfo.toString()
-
-            // 6. API Credits
-            debugInfo.appendLine("\n6. API CREDITS TEST:")
-            try {
-                val creditsResult = apiService.getUserCredits()
-                when (creditsResult) {
-                    is ApiService.ApiResult.Success -> debugInfo.appendLine("   • Credits: ${creditsResult.data}")
-                    is ApiService.ApiResult.Error -> debugInfo.appendLine("   • Credits ERROR: ${creditsResult.message}")
+            Log.d("ResumeActivity", "🔄 Initializing UserManager sync...")
+            
+            // Step 1: Emergency sync to ensure UserManager has current user data
+            userManager.emergencySyncWithFirebase()
+            
+            // Step 2: Debug the current state
+            userManager.logCurrentUserState()
+            userManager.debugStoredData()
+            
+            // Step 3: Test API connection if user is authenticated
+            delay(1000) // Give time for sync to complete
+            
+            if (ensureUserAuthenticated()) {
+                Log.d("ResumeActivity", "✅ User authenticated - testing API connection")
+                testApiConnection()
+            } else {
+                Log.w("ResumeActivity", "⚠️ User not authenticated - skipping API test")
+                withContext(Dispatchers.Main) {
+                    binding.creditText.text = "Credits: Please log in"
+                    binding.layoutConnectionStatus.visibility = View.GONE
                 }
-            } catch (e: Exception) {
-                debugInfo.appendLine("   • ⚠️ getUserCredits failed: ${e.message}")
             }
-            binding.tvGeneratedResume.text = debugInfo.toString()
-
-            // 7. Secure Auth Test
-            debugInfo.appendLine("\n7. SECURE AUTH TEST:")
-            try {
-                val result = apiService.testSecureAuth()
-                debugInfo.appendLine("   • Secure Auth Response: $result")
-            } catch (e: Exception) {
-                debugInfo.appendLine("   • ⚠️ testSecureAuth failed: ${e.message}")
-            }
-
-            debugInfo.appendLine("\n===== END OF DEBUG =====")
-            binding.tvGeneratedResume.text = debugInfo.toString()
-            binding.progressGenerate.visibility = View.GONE
         }
     }
-    
+
     override fun onResume() {
-    super.onResume()
-    
-    lifecycleScope.launch {
-        Log.d("ResumeActivity", "🔄 onResume - refreshing data...")
+        super.onResume()
         
-        // Force sync to ensure fresh data
-        userManager.emergencySyncWithFirebase()
-        
-        // Update UI with current state
-        withContext(Dispatchers.Main) {
-            checkGenerateButtonState()
-        }
-        
-        // Update credits display if user is logged in
-        if (userManager.isUserLoggedIn()) {
-            updateCreditDisplay()
-            testApiConnection()
-        } else {
+        lifecycleScope.launch {
+            Log.d("ResumeActivity", "🔄 onResume - refreshing data...")
+            
+            // Force sync to ensure fresh data
+            userManager.emergencySyncWithFirebase()
+            
+            // Update UI with current state
             withContext(Dispatchers.Main) {
-                binding.creditText.text = "Credits: Please log in"
+                checkGenerateButtonState()
+            }
+            
+            // Update credits display if user is logged in
+            if (userManager.isUserLoggedIn()) {
+                updateCreditDisplay()
+                testApiConnection()
+            } else {
+                withContext(Dispatchers.Main) {
+                    binding.creditText.text = "Credits: Please log in"
+                }
             }
         }
     }
-}
 
     /** ---------------- File Picker Setup ---------------- **/
     private fun registerFilePickers() {
@@ -283,8 +198,6 @@ class ResumeGenerationActivity : AppCompatActivity() {
         }
     }
 
-    
-
     private fun checkGenerateButtonState() {
         val hasFiles = selectedResumeUri != null && selectedJobDescUri != null
         val hasText = binding.etResumeText.text.isNotEmpty() && binding.etJobDescription.text.isNotEmpty()
@@ -308,7 +221,6 @@ class ResumeGenerationActivity : AppCompatActivity() {
             val builder = AlertDialog.Builder(this)
                 .setTitle("Email Verification Required")
                 .setMessage("Your email ${user.email} is not verified. Some features may not work properly. Please check your email for a verification link.")
-
                 .setPositiveButton("Send Verification", DialogInterface.OnClickListener { _, _ ->
                     sendEmailVerification()
                 })
@@ -338,67 +250,82 @@ class ResumeGenerationActivity : AppCompatActivity() {
 
     private fun showRateLimitedToast(message: String) {
         val currentTime = System.currentTimeMillis()
-            if (currentTime - lastToastTime > TOAST_COOLDOWN_MS) {
+        if (currentTime - lastToastTime > TOAST_COOLDOWN_MS) {
             Toast.makeText(this, message, Toast.LENGTH_LONG).show()
             lastToastTime = currentTime
             Log.d("Toast", "Showing: $message")
         } else {
             Log.d("Toast", "Rate limited: $message")
-            }
         }
+    }
 
-        private fun showRateLimitedError(message: String) {
-            showRateLimitedToast("❌ $message")
-        }
+    private fun showRateLimitedError(message: String) {
+        showRateLimitedToast("❌ $message")
+    }
 
-        private fun showRateLimitedSuccess(message: String) {
-            showRateLimitedToast("✅ $message")
-        }
+    private fun showRateLimitedSuccess(message: String) {
+        showRateLimitedToast("✅ $message")
+    }
     
     /** ---------------- API Connection Test ---------------- **/
-     private fun testApiConnection() {
-    binding.layoutConnectionStatus.visibility = View.VISIBLE
-    binding.tvConnectionStatus.text = "Testing connection..."
-    binding.progressConnection.visibility = View.VISIBLE
-    binding.btnRetryConnection.isEnabled = false
+    private fun testApiConnection() {
+        binding.layoutConnectionStatus.visibility = View.VISIBLE
+        binding.tvConnectionStatus.text = "Testing connection..."
+        binding.progressConnection.visibility = View.VISIBLE
+        binding.btnRetryConnection.isEnabled = false
 
-    lifecycleScope.launch {
-        safeApiCall {
-            // Your existing testApiConnection code here...
-            if (!isNetworkAvailable()) {
-                updateConnectionStatus("❌ No internet connection", true)
-                binding.progressConnection.visibility = View.GONE
-                binding.btnRetryConnection.isEnabled = true
-                showError("Please check your internet connection")
-                return@safeApiCall
-            }
-
-            try {
-                Log.d("ResumeActivity", "Testing API connection...")
-                
-                // Rest of your existing testApiConnection code...
-                val connectionResult = apiService.testConnection()
-                
-                when (connectionResult) {
-                    is ApiResult.Success -> {
-                        updateConnectionStatus("✅ API Connected", false)
-                        updateCreditDisplay()
-                    }
-                    is ApiResult.Error -> {
-                        // Your existing error handling...
-                    }
+        lifecycleScope.launch {
+            safeApiCall {
+                if (!isNetworkAvailable()) {
+                    updateConnectionStatus("❌ No internet connection", true)
+                    binding.progressConnection.visibility = View.GONE
+                    binding.btnRetryConnection.isEnabled = true
+                    showError("Please check your internet connection")
+                    return@safeApiCall
                 }
-            } catch (e: Exception) {
-                updateConnectionStatus("❌ Connection Error", true)
-                Log.e("ResumeActivity", "Connection test failed", e)
-                showError("Connection failed: ${e.message}")
-            } finally {
-                binding.progressConnection.visibility = View.GONE
-                binding.btnRetryConnection.isEnabled = true
+
+                try {
+                    Log.d("ResumeActivity", "Testing API connection...")
+                    
+                    val connectionResult = apiService.testConnection()
+                    
+                    when (connectionResult) {
+                        is ApiService.ApiResult.Success -> {
+                            updateConnectionStatus("✅ API Connected", false)
+                            updateCreditDisplay()
+                        }
+                        is ApiService.ApiResult.Error -> {
+                            // Check if it's a server wake-up issue
+                            if (connectionResult.code in 500..599 || connectionResult.code == 0) {
+                                updateConnectionStatus("🔄 Server is waking up...", true)
+                                showServerWakeupMessage()
+                                
+                                val serverAwake = apiService.waitForServerWakeUp(maxAttempts = 12, delayBetweenAttempts = 10000L)
+                                
+                                if (serverAwake) {
+                                    updateConnectionStatus("✅ Server is ready!", false)
+                                    updateCreditDisplay()
+                                } else {
+                                    updateConnectionStatus("⏰ Server taking too long", true)
+                                    showError("Server is taking longer than expected. Please try again in a minute.")
+                                }
+                            } else {
+                                updateConnectionStatus("❌ API Connection Failed", true)
+                                showError("API error: ${connectionResult.message}")
+                            }
+                        }
+                    }
+                } catch (e: Exception) {
+                    updateConnectionStatus("❌ Connection Error", true)
+                    Log.e("ResumeActivity", "Connection test failed", e)
+                    showError("Connection failed: ${e.message}")
+                } finally {
+                    binding.progressConnection.visibility = View.GONE
+                    binding.btnRetryConnection.isEnabled = true
+                }
             }
         }
     }
-}
 
     // ADD THIS MISSING METHOD:
     private fun showMessage(message: String) {
@@ -413,113 +340,54 @@ class ResumeGenerationActivity : AppCompatActivity() {
     }
 
     private suspend fun ensureUserAuthenticated(): Boolean {
-    return try {
-        // Step 1: Force sync first
-        userManager.emergencySyncWithFirebase()
-        
-        // Step 2: Check if user is logged in
-        if (!userManager.isUserLoggedIn()) {
-            Log.e("ResumeActivity", "❌ User not logged in after sync")
-            withContext(Dispatchers.Main) {
-                showError("Please log in to continue")
-                binding.creditText.text = "Credits: Please log in"
+        return try {
+            // Step 1: Force sync first
+            userManager.emergencySyncWithFirebase()
+            
+            // Step 2: Check if user is logged in
+            if (!userManager.isUserLoggedIn()) {
+                Log.e("ResumeActivity", "❌ User not logged in after sync")
+                withContext(Dispatchers.Main) {
+                    showError("Please log in to continue")
+                    binding.creditText.text = "Credits: Please log in"
+                }
+                return false
             }
-            return false
-        }
-        
-        // Step 3: Verify we have a valid user ID
-        val userId = userManager.getCurrentUserId()
-        if (userId.isNullOrBlank()) {
-            Log.e("ResumeActivity", "❌ User ID is null/blank after sync")
-            withContext(Dispatchers.Main) {
-                showError("Authentication error. Please log out and log in again.")
-                binding.creditText.text = "Credits: Auth error"
+            
+            // Step 3: Verify we have a valid user ID
+            val userId = userManager.getCurrentUserId()
+            if (userId.isNullOrBlank()) {
+                Log.e("ResumeActivity", "❌ User ID is null/blank after sync")
+                withContext(Dispatchers.Main) {
+                    showError("Authentication error. Please log out and log in again.")
+                    binding.creditText.text = "Credits: Auth error"
+                }
+                return false
             }
-            return false
+            
+            Log.d("ResumeActivity", "✅ User authenticated: ${userId.take(8)}...")
+            true
+            
+        } catch (e: Exception) {
+            Log.e("ResumeActivity", "💥 Authentication check failed: ${e.message}", e)
+            withContext(Dispatchers.Main) {
+                showError("Authentication system error. Please restart the app.")
+                binding.creditText.text = "Credits: System error"
+            }
+            false
         }
-        
-        Log.d("ResumeActivity", "✅ User authenticated: ${userId.take(8)}...")
-        true
-        
-    } catch (e: Exception) {
-        Log.e("ResumeActivity", "💥 Authentication check failed: ${e.message}", e)
-        withContext(Dispatchers.Main) {
-            showError("Authentication system error. Please restart the app.")
-            binding.creditText.text = "Credits: System error"
-        }
-        false
     }
-}
 
     private suspend fun safeApiCall(block: suspend () -> Unit) {
-    try {
-        if (!ensureUserAuthenticated()) {
-            Log.w("ResumeActivity", "⚠️ Blocked API call - user not authenticated")
-            return
-        }
-        block()
-    } catch (e: Exception) {
-        Log.e("ResumeActivity", "💥 Safe API call failed: ${e.message}", e)
-        showError("Network error: ${e.message}")
-    }
-}
-
-    // Add this method to test headers:
-private fun testHeaderDebug() {
-    lifecycleScope.launch {
         try {
-            binding.tvGeneratedResume.text = "Testing headers..."
-            val debugResult = debugApiService.testHeaderSending()
-            binding.tvGeneratedResume.text = debugResult
-            Log.d("HeaderDebug", debugResult)
-        } catch (e: Exception) {
-            binding.tvGeneratedResume.text = "Debug failed: ${e.message}"
-        }
-    }
-}
-
-// Add this button to your setupUI():
-binding.btnTestHeaders.setOnClickListener {
-    testHeaderDebug()
-}
-
-    private fun testDirectConnection() {
-        lifecycleScope.launch {
-            Log.d("DirectTest", "Testing direct connection without interceptors...")
-            
-            val simpleClient = OkHttpClient.Builder()
-                .connectTimeout(10, TimeUnit.SECONDS)
-                .readTimeout(10, TimeUnit.SECONDS)
-                .build()
-            
-            val endpoints = listOf(
-                "https://resume-writer-api.onrender.com/health",
-                "https://resume-writer-api.onrender.com/test", 
-                "https://resume-writer-api.onrender.com/"
-            )
-            
-            for (endpoint in endpoints) {
-                try {
-                    val request = Request.Builder()
-                        .url(endpoint)
-                        .get()
-                        .build()
-                    
-                    val response = simpleClient.newCall(request).execute()
-                    Log.d("DirectTest", "$endpoint → ${response.code}")
-                    
-                    if (response.isSuccessful) {
-                        val body = response.body?.string()
-                        Log.d("DirectTest", "✅ SUCCESS: $body")
-                        withContext(Dispatchers.Main) {
-                            Toast.makeText(this@ResumeGenerationActivity, "Server connected!", Toast.LENGTH_SHORT).show()
-                        }
-                        break
-                    }
-                } catch (e: Exception) {
-                    Log.e("DirectTest", "$endpoint → ERROR: ${e.message}")
-                }
+            if (!ensureUserAuthenticated()) {
+                Log.w("ResumeActivity", "⚠️ Blocked API call - user not authenticated")
+                return
             }
+            block()
+        } catch (e: Exception) {
+            Log.e("ResumeActivity", "💥 Safe API call failed: ${e.message}", e)
+            showError("Network error: ${e.message}")
         }
     }
 
@@ -536,7 +404,7 @@ binding.btnTestHeaders.setOnClickListener {
     }
 
     /** ---------------- Resume Generation ---------------- **/
-      private fun generateResumeFromFiles() {
+    private fun generateResumeFromFiles() {
         val resumeUri = selectedResumeUri ?: return showError("Please select resume file")
         val jobDescUri = selectedJobDescUri ?: return showError("Please select job description file")
 
@@ -554,7 +422,7 @@ binding.btnTestHeaders.setOnClickListener {
                 val creditResult = apiService.getUserCredits()
                 
                 when (creditResult) {
-                    is ApiResult.Success -> { // FIXED: Use ApiResult directly
+                    is ApiService.ApiResult.Success -> {
                         val credits = creditResult.data.optInt("available_credits", 0)
                         Log.d("ResumeActivity", "User has $credits credits")
                         
@@ -564,13 +432,12 @@ binding.btnTestHeaders.setOnClickListener {
                         }
 
                         Log.d("ResumeActivity", "Generating resume from files")
-                        // FIXED: Return the ApiResult from the lambda
                         val genResult = retryApiCall { 
                             apiService.generateResumeFromFiles(resumeUri, jobDescUri) 
                         }
                         handleGenerationResult(genResult)
                     }
-                    is ApiResult.Error -> { // FIXED: Use ApiResult directly
+                    is ApiService.ApiResult.Error -> {
                         Log.e("ResumeActivity", "Failed to get credits: ${creditResult.message}")
                         showErrorAndReset("Failed to check credits: ${creditResult.message}")
                         
@@ -684,7 +551,7 @@ binding.btnTestHeaders.setOnClickListener {
         }
     }
 
-     private fun downloadFile(format: String) {
+    private fun downloadFile(format: String) {
         val resumeData = currentGeneratedResume ?: return showError("No resume generated yet")
         lifecycleScope.launch {
             try {
@@ -753,25 +620,25 @@ binding.btnTestHeaders.setOnClickListener {
         try {
             val result = apiService.getUserCredits()
             when (result) {
-                is ApiResult.Success -> { // FIXED: Use ApiResult directly
+                is ApiService.ApiResult.Success -> {
                     runOnUiThread {
                         val credits = result.data.optInt("credits", 0)
-                        binding.creditText.text = "Credits: $credits" // FIXED: Use correct binding
+                        binding.creditText.text = "Credits: $credits"
                     }
                 }
-                is ApiResult.Error -> { // FIXED: Use ApiResult directly and handle Error case
-                    Log.w("ResumeGeneration", "Failed to get credits: ${result.message}") // FIXED: Use result.message
+                is ApiService.ApiResult.Error -> {
+                    Log.w("ResumeGeneration", "Failed to get credits: ${result.message}")
                     // Use cached credits or show default
                     runOnUiThread {
                         val cachedCredits = userManager.getCachedCredits()
-                        binding.creditText.text = "Credits: $cachedCredits" // FIXED: Use correct binding
+                        binding.creditText.text = "Credits: $cachedCredits"
                     }
                 }
             }
         } catch (e: Exception) {
             Log.e("ResumeGeneration", "Credit update failed", e)
             runOnUiThread {
-                binding.creditText.text = "Credits: --" // FIXED: Use correct binding
+                binding.creditText.text = "Credits: --"
             }
         }
     }
@@ -800,27 +667,26 @@ binding.btnTestHeaders.setOnClickListener {
     }
     
     private fun debugAuthAndCredits() {
-    lifecycleScope.launch {
-        try {
-            binding.progressGenerate.visibility = View.VISIBLE
-            
-            // Force sync UserManager with Firebase first
-            apiService.forceSyncUserManager()
-            
-            val debugInfo = apiService.debugAuthenticationFlow()
-            
-            // Show the debug info
-            binding.tvGeneratedResume.text = debugInfo
-            Log.d("AuthDebug", debugInfo)
-            
-        } catch (e: Exception) {
-            showMessage("Debug failed: ${e.message}")
-        } finally {
-            binding.progressGenerate.visibility = View.GONE
+        lifecycleScope.launch {
+            try {
+                binding.progressGenerate.visibility = View.VISIBLE
+                
+                // Force sync UserManager with Firebase first
+                apiService.forceSyncUserManager()
+                
+                val debugInfo = apiService.debugAuthenticationFlow()
+                
+                // Show the debug info
+                binding.tvGeneratedResume.text = debugInfo
+                Log.d("AuthDebug", debugInfo)
+                
+            } catch (e: Exception) {
+                showMessage("Debug failed: ${e.message}")
+            } finally {
+                binding.progressGenerate.visibility = View.GONE
+            }
         }
     }
-}
-
     
     /** ---------------- Helpers ---------------- **/
     private fun disableGenerateButton(text: String) {
@@ -854,15 +720,15 @@ binding.btnTestHeaders.setOnClickListener {
         }
     }
 
-        private fun showError(message: String) {
-            showRateLimitedError(message)
-            Log.e("ResumeActivity", message)
-        }
+    private fun showError(message: String) {
+        showRateLimitedError(message)
+        Log.e("ResumeActivity", message)
+    }
 
-        private fun showSuccess(message: String) {
-            showRateLimitedSuccess(message)
-            Log.d("ResumeActivity", message)
-        }
+    private fun showSuccess(message: String) {
+        showRateLimitedSuccess(message)
+        Log.d("ResumeActivity", message)
+    }
 
     private fun updateConnectionStatus(message: String, isError: Boolean = false) {
         binding.tvConnectionStatus.text = message
@@ -881,120 +747,32 @@ binding.btnTestHeaders.setOnClickListener {
         ).show()
     }
 
-    private fun testAuthStepByStep() {
-        lifecycleScope.launch {
-            binding.tvGeneratedResume.text = "Testing authentication step by step..."
-            
-            val steps = StringBuilder()
-            steps.appendLine("🔍 AUTHENTICATION STEP-BY-STEP TEST")
-            steps.appendLine()
-            
-            // Step 1: Check local authentication
-            steps.appendLine("1. LOCAL AUTHENTICATION")
-            val userId = userManager.getCurrentUserId()
-            if (!userId.isNullOrBlank()) {
-                steps.appendLine("   ✅ User ID: ${userId.take(8)}...")
-            } else {
-                steps.appendLine("   ❌ No user ID - cannot proceed")
-                updateUIWithResults(steps)
-                return@launch
-            }
-            
-            // Step 2: Test basic connection
-            steps.appendLine("2. BASIC CONNECTION")
-            val connection = apiService.testConnection()
-            if (connection is ApiService.ApiResult.Success) {
-                steps.appendLine("   ✅ Server is reachable")
-            } else {
-                steps.appendLine("   ❌ Server unreachable: ${(connection as ApiService.ApiResult.Error).message}")
-                updateUIWithResults(steps)
-                return@launch
-            }
-            
-            // Step 3: Test secure authentication
-            steps.appendLine("3. SECURE AUTHENTICATION")
-            val credits = apiService.getUserCredits()
-            when (credits) {
-                is ApiService.ApiResult.Success -> {
-                    steps.appendLine("   ✅ Authentication SUCCESS!")
-                    val creditCount = credits.data.optInt("available_credits", 0)
-                    steps.appendLine("   📊 Available credits: $creditCount")
-                }
-                is ApiService.ApiResult.Error -> {
-                    steps.appendLine("   ❌ Authentication FAILED")
-                    steps.appendLine("   💡 Error: ${credits.message} (Code: ${credits.code})")
-                }
-            }
-            
-            updateUIWithResults(steps)
-        }
-    }
-
-    private fun updateUIWithResults(steps: StringBuilder) {
-        lifecycleScope.launch(Dispatchers.Main) {
-            binding.tvGeneratedResume.text = steps.toString()
-            binding.layoutDownloadButtons.visibility = View.GONE
-        }
-    }
-
     private fun debugUserManagerState() {
-    Log.d("Debug", "=== USER MANAGER STATE DEBUG ===")
-    
-    // Check UserManager directly
-    val userId = userManager.getCurrentUserId()
-    Log.d("Debug", "UserManager.getCurrentUserId(): '$userId'")
-    Log.d("Debug", "UserManager.isUserLoggedIn(): ${userManager.isUserLoggedIn()}")
-    
-    // Check Firebase directly
-    val firebaseUser = FirebaseAuth.getInstance().currentUser
-    Log.d("Debug", "FirebaseAuth.currentUser: ${firebaseUser?.uid}")
-    Log.d("Debug", "FirebaseAuth.email: ${firebaseUser?.email}")
-    
-    // Check if they match
-    if (userId != null && firebaseUser != null) {
-        Log.d("Debug", "MATCH: ${userId == firebaseUser.uid}")
-    } else {
-        Log.d("Debug", "MISMATCH: One or both are null")
-    }
-    
-    Log.d("Debug", "=== END DEBUG ===")
-}
-
-    private fun testServerDirectly() {
-        lifecycleScope.launch {
-            Log.d("DirectTest", "Testing server endpoints directly...")
-            
-            // Test public endpoints
-            val endpoints = listOf(
-                "https://resume-writer-api.onrender.com/health",
-                "https://resume-writer-api.onrender.com/test",
-                "https://resume-writer-api.onrender.com/"
-            )
-            
-            for (endpoint in endpoints) {
-                try {
-                    val request = Request.Builder()
-                        .url(endpoint)
-                        .get()
-                        .build()
-                    
-                    val response = OkHttpClient().newCall(request).execute()
-                    Log.d("DirectTest", "$endpoint → ${response.code}")
-                    response.body?.string()?.let { body ->
-                        Log.d("DirectTest", "Response: $body")
-                    }
-                } catch (e: Exception) {
-                    Log.e("DirectTest", "$endpoint → ERROR: ${e.message}")
-                }
-            }
+        Log.d("Debug", "=== USER MANAGER STATE DEBUG ===")
+        
+        // Check UserManager directly
+        val userId = userManager.getCurrentUserId()
+        Log.d("Debug", "UserManager.getCurrentUserId(): '$userId'")
+        Log.d("Debug", "UserManager.isUserLoggedIn(): ${userManager.isUserLoggedIn()}")
+        
+        // Check Firebase directly
+        val firebaseUser = FirebaseAuth.getInstance().currentUser
+        Log.d("Debug", "FirebaseAuth.currentUser: ${firebaseUser?.uid}")
+        Log.d("Debug", "FirebaseAuth.email: ${firebaseUser?.email}")
+        
+        // Check if they match
+        if (userId != null && firebaseUser != null) {
+            Log.d("Debug", "MATCH: ${userId == firebaseUser.uid}")
+        } else {
+            Log.d("Debug", "MISMATCH: One or both are null")
         }
+        
+        Log.d("Debug", "=== END DEBUG ===")
     }
 
-    // Removed token-related debug methods since we're using UID-based auth now
-    
-    private fun handleGenerationResult(result: ApiResult<JSONObject>) { // FIXED: Use ApiResult directly
+    private fun handleGenerationResult(result: ApiService.ApiResult<JSONObject>) {
         when (result) {
-            is ApiResult.Success -> { // FIXED: Use ApiResult directly
+            is ApiService.ApiResult.Success -> {
                 Log.d("ResumeActivity", "Resume generation success: ${result.data}")
                 currentGeneratedResume = result.data
                 displayGeneratedResume(result.data)
@@ -1015,10 +793,10 @@ binding.btnTestHeaders.setOnClickListener {
                     }
                 }
             }
-            is ApiResult.Error -> { // FIXED: Use ApiResult directly
+            is ApiService.ApiResult.Error -> {
                 Log.e("ResumeActivity", "Resume generation failed: ${result.message}")
                 showError("Generation failed: ${result.message}")
             }
         }
     }
-} // 
+}
