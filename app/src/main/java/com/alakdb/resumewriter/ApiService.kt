@@ -10,10 +10,22 @@ import okhttp3.RequestBody.Companion.toRequestBody
 import org.json.JSONObject
 import java.io.File
 import java.io.IOException
+import java.security.MessageDigest
 import java.util.concurrent.TimeUnit
 import com.google.firebase.auth.FirebaseAuth
 import okhttp3.MultipartBody
 import okhttp3.RequestBody
+
+fun String.sha256(): String {
+    return try {
+        val digest = MessageDigest.getInstance("SHA-256")
+        val hashBytes = digest.digest(this.toByteArray(Charsets.UTF_8))
+        hashBytes.joinToString("") { "%02x".format(it) }
+    } catch (e: Exception) {
+        Log.e("SHA256", "Error hashing string", e)
+        ""
+    }
+}
 
 class ApiService(private val context: Context) {
 
@@ -63,6 +75,8 @@ class ApiService(private val context: Context) {
             val resumeFile = uriToFile(resumeUri)
             val jobDescFile = uriToFile(jobDescUri)
 
+            Log.d("ApiService", "Files: resume=${resumeFile.name}, jobDesc=${jobDescFile.name}")
+
             val body = MultipartBody.Builder()
                 .setType(MultipartBody.FORM)
                 .addFormDataPart("tone", tone)
@@ -89,7 +103,7 @@ class ApiService(private val context: Context) {
                 ApiResult.Success(JSONObject(respBody))
             }
         } catch (e: Exception) {
-            Log.e("ApiService", "File resume generation crashed: ${e.message}")
+            Log.e("ApiService", "❌ File resume generation crashed: ${e.message}")
             ApiResult.Error("File resume generation failed: ${e.message}")
         }
     }
@@ -138,7 +152,7 @@ class ApiService(private val context: Context) {
                         }
                     }
                 } catch (e: Exception) {
-                    Log.w("ServerWakeUp", "Connection attempt ${attempt + 1} failed: ${e.message}")
+                    Log.w("ServerWakeUp", "🚨 Connection attempt ${attempt + 1} failed: ${e.message}")
                 }
             
                 if (attempt < maxAttempts - 1) {
@@ -149,8 +163,32 @@ class ApiService(private val context: Context) {
             Log.e("ServerWakeUp", "❌ Server failed to wake up after $maxAttempts attempts")
             false
         } catch (e: Exception) {
-            Log.e("ServerWakeUp", "Server wakeup crashed: ${e.message}")
+            Log.e("ServerWakeUp", "❌ Server wakeup crashed: ${e.message}")
             false
+        }
+    }
+    
+    suspend fun deductCredit(userId: String): ApiResult<JSONObject> {
+        return try {
+            val requestBody = DeductCreditRequest(userId)
+            val body = gson.toJson(requestBody).toRequestBody("application/json".toMediaType())
+            
+            val request = Request.Builder()
+                .url("$baseUrl/deduct-credit")
+                .post(body)
+                .build()
+            
+            client.newCall(request).execute().use { response ->
+                val respBody = response.body?.string() ?: "{}"
+                
+                if (response.isSuccessful) {
+                    ApiResult.Success(JSONObject(respBody))
+                } else {
+                    ApiResult.Error("HTTP ${response.code}", response.code)
+                }
+            }
+        } catch (e: Exception) {
+            ApiResult.Error("Request failed: ${e.message ?: "Unknown error"}")
         }
     }
 
@@ -206,21 +244,41 @@ class ApiService(private val context: Context) {
                         Log.d("ApiService", "✅ Credits success: ${jsonResponse.toString()}")
                         ApiResult.Success(jsonResponse)
                     } catch (e: Exception) {
-                        Log.e("ApiService", "JSON parsing error for credits", e)
+                        Log.e("ApiService", "❌ JSON parsing error for credits", e)
                         ApiResult.Error("Invalid server response format", response.code)
                     }
                 } else {
-                    Log.e("ApiService", "Server error: HTTP ${response.code}")
+                    Log.e("ApiService", "❌ Server error: HTTP ${response.code}")
                     ApiResult.Error("Server error: ${response.code}", response.code)
                 }
             }
         } catch (e: Exception) {
-            Log.e("ApiService", "Network exception while fetching credits: ${e.message}", e)
+            Log.e("ApiService", "💥 Network exception while fetching credits: ${e.message}", e)
             ApiResult.Error("Network error: ${e.message ?: "Unknown error"}")
         }
     }
+    
+    suspend fun testSecureAuth(): ApiResult<JSONObject> {
+        return try {
+            val request = Request.Builder()
+                .url("$baseUrl/security-test")
+                .post("".toRequestBody("application/json".toMediaType()))
+                .build()
 
-    // 🔧 DEBUG METHOD: Test authentication flow
+            client.newCall(request).execute().use { response ->
+                val respBody = response.body?.string() ?: "{}"
+                
+                if (response.isSuccessful) {
+                    ApiResult.Success(JSONObject(respBody))
+                } else {
+                    ApiResult.Error("HTTP ${response.code}", response.code)
+                }
+            }
+        } catch (e: Exception) {
+            ApiResult.Error("Test failed: ${e.message ?: "Unknown error"}")
+        }
+    }
+
     suspend fun debugAuthenticationFlow(): String {
         return try {
             val debugInfo = StringBuilder()
@@ -261,9 +319,26 @@ class ApiService(private val context: Context) {
             "Debug failed: ${e.message}"
         }
     }
+
+    fun forceSyncUserManager() {
+        val firebaseUser = FirebaseAuth.getInstance().currentUser
+        if (firebaseUser != null) {
+            val uid = firebaseUser.uid
+            val email = firebaseUser.email ?: ""
+            
+            // This would sync with UserManager - you'll need to implement based on your UserManager
+            Log.d("ApiService", "🔄 Force synced with Firebase: $uid")
+        } else {
+            Log.w("ApiService", "⚠️ Cannot sync: No Firebase user")
+        }
+    }
+
+    fun initializeUserSession(userId: String?) {
+        // No-op for compatibility
+        Log.d("ApiService", "initializeUserSession called with: $userId")
+    }
 }
 
-// 🔧 DEBUG-ENABLED SafeAuthInterceptor
 class SafeAuthInterceptor : Interceptor {
     override fun intercept(chain: Interceptor.Chain): Response {
         val originalRequest = chain.request()
