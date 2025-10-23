@@ -377,8 +377,6 @@ class SafeAuthInterceptor : Interceptor {
                 Log.d("🔥 HEADER DEBUG", "✅ ADDED X-User-ID: $userId")
             } else {
                 Log.w("🔥 HEADER DEBUG", "⚠️ No Firebase user - no auth header")
-                // Don't throw exception, just proceed without auth header
-                // The server will handle the missing header with proper error response
             }
             
             // Log all headers being sent
@@ -388,13 +386,13 @@ class SafeAuthInterceptor : Interceptor {
             chain.proceed(newRequest)
         } catch (e: Exception) {
             Log.e("🔥 HEADER DEBUG", "💥 Critical interceptor crash: ${e.message}", e)
-            // Return a mock response instead of crashing
+            // Create a proper error response
             Response.Builder()
                 .request(chain.request())
                 .protocol(Protocol.HTTP_1_1)
                 .code(500)
-                .message("Interceptor Error: ${e.message}")
-                .body("{\"error\": \"Interceptor crashed: ${e.message}\"}".toRequestBody("application/json".toMediaType()))
+                .message("Interceptor Error")
+                .body("{ \"error\": \"Interceptor crashed: ${e.message}\" }".toResponseBody("application/json".toMediaType()))
                 .build()
         }
     }
