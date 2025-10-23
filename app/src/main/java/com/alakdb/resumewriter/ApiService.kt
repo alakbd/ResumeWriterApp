@@ -10,30 +10,16 @@ import okhttp3.RequestBody.Companion.toRequestBody
 import org.json.JSONObject
 import java.io.File
 import java.io.IOException
-import java.security.MessageDigest
 import java.util.concurrent.TimeUnit
 import com.google.firebase.auth.FirebaseAuth
 import okhttp3.MultipartBody
 import okhttp3.RequestBody
 
-fun String.sha256(): String {
-    return try {
-        val digest = MessageDigest.getInstance("SHA-256")
-        val hashBytes = digest.digest(this.toByteArray(Charsets.UTF_8))
-        hashBytes.joinToString("") { "%02x".format(it) }
-    } catch (e: Exception) {
-        Log.e("SHA256", "Error hashing string", e)
-        ""
-    }
-}
-
 class ApiService(private val context: Context) {
 
     private val gson = Gson()
     private val baseUrl = "https://resume-writer-api.onrender.com"
-    private val userManager = UserManager(context)
     
-    // SAFE: OkHttp Client with minimal interceptors
     private val client = OkHttpClient.Builder()
         .connectTimeout(30, TimeUnit.SECONDS)
         .readTimeout(30, TimeUnit.SECONDS)
@@ -41,11 +27,9 @@ class ApiService(private val context: Context) {
         .addInterceptor(SafeAuthInterceptor())
         .build()
 
-    // Data Classes
     data class DeductCreditRequest(val user_id: String)
     data class GenerateResumeRequest(val resume_text: String, val job_description: String, val tone: String = "Professional")
 
-    // API Result wrapper
     sealed class ApiResult<out T> {
         data class Success<out T>(val data: T) : ApiResult<T>()
         data class Error(val message: String, val code: Int = 0) : ApiResult<Nothing>()
@@ -79,8 +63,6 @@ class ApiService(private val context: Context) {
             val resumeFile = uriToFile(resumeUri)
             val jobDescFile = uriToFile(jobDescUri)
 
-            Log.d("ApiService", "Files: resume=${resumeFile.name}, jobDesc=${jobDescFile.name}")
-
             val body = MultipartBody.Builder()
                 .setType(MultipartBody.FORM)
                 .addFormDataPart("tone", tone)
@@ -107,12 +89,11 @@ class ApiService(private val context: Context) {
                 ApiResult.Success(JSONObject(respBody))
             }
         } catch (e: Exception) {
-            Log.e("ApiService", "❌ File resume generation crashed: ${e.message}")
+            Log.e("ApiService", "File resume generation crashed: ${e.message}")
             ApiResult.Error("File resume generation failed: ${e.message}")
         }
     }
     
-    // SAFE: Test Connection
     suspend fun testConnection(): ApiResult<JSONObject> {
         return try {
             val simpleClient = OkHttpClient.Builder()
@@ -157,7 +138,7 @@ class ApiService(private val context: Context) {
                         }
                     }
                 } catch (e: Exception) {
-                    Log.w("ServerWakeUp", "🚨 Connection attempt ${attempt + 1} failed: ${e.message}")
+                    Log.w("ServerWakeUp", "Connection attempt ${attempt + 1} failed: ${e.message}")
                 }
             
                 if (attempt < maxAttempts - 1) {
@@ -168,37 +149,11 @@ class ApiService(private val context: Context) {
             Log.e("ServerWakeUp", "❌ Server failed to wake up after $maxAttempts attempts")
             false
         } catch (e: Exception) {
-            Log.e("ServerWakeUp", "❌ Server wakeup crashed: ${e.message}")
+            Log.e("ServerWakeUp", "Server wakeup crashed: ${e.message}")
             false
         }
     }
-    
-    // SAFE: Deduct Credit
-    suspend fun deductCredit(userId: String): ApiResult<JSONObject> {
-        return try {
-            val requestBody = DeductCreditRequest(userId)
-            val body = gson.toJson(requestBody).toRequestBody("application/json".toMediaType())
-            
-            val request = Request.Builder()
-                .url("$baseUrl/deduct-credit")
-                .post(body)
-                .build()
-            
-            client.newCall(request).execute().use { response ->
-                val respBody = response.body?.string() ?: "{}"
-                
-                if (response.isSuccessful) {
-                    ApiResult.Success(JSONObject(respBody))
-                } else {
-                    ApiResult.Error("HTTP ${response.code}", response.code)
-                }
-            }
-        } catch (e: Exception) {
-            ApiResult.Error("Request failed: ${e.message ?: "Unknown error"}")
-        }
-    }
 
-    // SAFE: Generate Resume
     suspend fun generateResume(resumeText: String, jobDescription: String, tone: String = "Professional"): ApiResult<JSONObject> {
         return try {
             val requestBody = GenerateResumeRequest(resumeText, jobDescription, tone)
@@ -223,7 +178,6 @@ class ApiService(private val context: Context) {
         }
     }
 
-    // Make sure these utility methods exist:
     fun decodeBase64File(base64Data: String): ByteArray = 
         android.util.Base64.decode(base64Data, android.util.Base64.DEFAULT)
 
@@ -233,7 +187,6 @@ class ApiService(private val context: Context) {
         return file
     }
 
-    // FIXED: Enhanced Get User Credits with better debugging
     suspend fun getUserCredits(): ApiResult<JSONObject> {
         return try {
             Log.d("ApiService", "🔄 Getting user credits from: $baseUrl/user/credits")
@@ -253,43 +206,21 @@ class ApiService(private val context: Context) {
                         Log.d("ApiService", "✅ Credits success: ${jsonResponse.toString()}")
                         ApiResult.Success(jsonResponse)
                     } catch (e: Exception) {
-                        Log.e("ApiService", "❌ JSON parsing error for credits", e)
+                        Log.e("ApiService", "JSON parsing error for credits", e)
                         ApiResult.Error("Invalid server response format", response.code)
                     }
                 } else {
-                    Log.e("ApiService", "❌ Server error: HTTP ${response.code}")
+                    Log.e("ApiService", "Server error: HTTP ${response.code}")
                     ApiResult.Error("Server error: ${response.code}", response.code)
                 }
             }
         } catch (e: Exception) {
-            Log.e("ApiService", "💥 Network exception while fetching credits: ${e.message}", e)
+            Log.e("ApiService", "Network exception while fetching credits: ${e.message}", e)
             ApiResult.Error("Network error: ${e.message ?: "Unknown error"}")
         }
     }
-    
-    // SAFE: Test Secure Auth
-    suspend fun testSecureAuth(): ApiResult<JSONObject> {
-        return try {
-            val request = Request.Builder()
-                .url("$baseUrl/security-test")
-                .post("".toRequestBody("application/json".toMediaType()))
-                .build()
 
-            client.newCall(request).execute().use { response ->
-                val respBody = response.body?.string() ?: "{}"
-                
-                if (response.isSuccessful) {
-                    ApiResult.Success(JSONObject(respBody))
-                } else {
-                    ApiResult.Error("HTTP ${response.code}", response.code)
-                }
-            }
-        } catch (e: Exception) {
-            ApiResult.Error("Test failed: ${e.message ?: "Unknown error"}")
-        }
-    }
-
-    // ENHANCED: Debug Authentication Flow
+    // 🔧 DEBUG METHOD: Test authentication flow
     suspend fun debugAuthenticationFlow(): String {
         return try {
             val debugInfo = StringBuilder()
@@ -302,27 +233,8 @@ class ApiService(private val context: Context) {
             debugInfo.appendLine("   • Email: ${firebaseUser?.email ?: "NULL"}")
             debugInfo.appendLine("   • Email Verified: ${firebaseUser?.isEmailVerified ?: false}")
             
-            // 2. UserManager State
-            debugInfo.appendLine("2. USERMANAGER STATE:")
-            debugInfo.appendLine("   • Is Logged In: ${userManager.isUserLoggedIn()}")
-            debugInfo.appendLine("   • User ID: ${userManager.getCurrentUserId() ?: "NULL"}")
-            debugInfo.appendLine("   • User Email: ${userManager.getCurrentUserEmail() ?: "NULL"}")
-            
-            // 3. Test if UserManager and Firebase are in sync
-            debugInfo.appendLine("3. SYNC CHECK:")
-            val firebaseUid = firebaseUser?.uid
-            val managerUid = userManager.getCurrentUserId()
-            if (firebaseUid != null && managerUid != null) {
-                debugInfo.appendLine("   • UID Match: ${firebaseUid == managerUid}")
-                if (firebaseUid != managerUid) {
-                    debugInfo.appendLine("   ⚠️ UID MISMATCH! Firebase: $firebaseUid, Manager: $managerUid")
-                }
-            } else {
-                debugInfo.appendLine("   • One or both UIDs are NULL")
-            }
-            
-            // 4. Test authentication with credits endpoint (the one that's failing)
-            debugInfo.appendLine("4. CREDITS ENDPOINT TEST:")
+            // 2. Test credits endpoint (the one that's failing)
+            debugInfo.appendLine("2. CREDITS ENDPOINT TEST:")
             val creditsRequest = Request.Builder()
                 .url("$baseUrl/user/credits")
                 .get()
@@ -336,7 +248,6 @@ class ApiService(private val context: Context) {
                 
                 if (response.code == 401 || respBody.contains("Missing X-User-ID")) {
                     debugInfo.appendLine("   ❌ AUTH FAILED: X-User-ID header missing or invalid")
-                    debugInfo.appendLine("   💡 Check if UserManager.getCurrentUserId() is returning the correct UID")
                 } else if (response.isSuccessful) {
                     debugInfo.appendLine("   ✅ AUTH SUCCESS")
                 }
@@ -344,125 +255,41 @@ class ApiService(private val context: Context) {
                 debugInfo.appendLine("   ❌ Request failed: ${e.message}")
             }
             
-            // 5. Test secure auth endpoint
-            debugInfo.appendLine("5. SECURE AUTH TEST:")
-            val authTest = testSecureAuth()
-            val authMessage = when (authTest) {
-                is ApiResult.Success -> "SUCCESS - ${authTest.data}"
-                is ApiResult.Error -> "FAILED: ${authTest.message}"
-            }
-            debugInfo.appendLine("   • Result: $authMessage")
-            
             debugInfo.appendLine("=== END DEBUG ===")
             debugInfo.toString()
         } catch (e: Exception) {
             "Debug failed: ${e.message}"
         }
     }
-
-    // Add this method to force sync UserManager with Firebase
-    fun forceSyncUserManager() {
-        val firebaseUser = FirebaseAuth.getInstance().currentUser
-        if (firebaseUser != null) {
-            val uid = firebaseUser.uid
-            val email = firebaseUser.email ?: ""
-            
-            userManager.saveUserDataLocally(email, uid)
-            Log.d("ApiService", "🔄 Force synced UserManager with Firebase: $uid")
-        } else {
-            Log.w("ApiService", "⚠️ Cannot sync: No Firebase user")
-        }
-    }
-
-    // Compatibility method
-    fun initializeUserSession(userId: String?) {
-        // No-op for compatibility
-    }
 }
 
-// In setupUI(), use the existing debug button:
-binding.btnDebugAuth.setOnClickListener {
-    val authInfo = debugFirebaseAuth()
-    showMessage(authInfo)
-    Log.d("AuthDebug", authInfo)
-    testHeaderSending() // Test if headers work
-}
-
-// FIXED: Enhanced SafeAuthInterceptor with proper user ID handling - MOVED OUTSIDE THE CLASS
+// 🔧 DEBUG-ENABLED SafeAuthInterceptor
 class SafeAuthInterceptor : Interceptor {
     override fun intercept(chain: Interceptor.Chain): Response {
         val originalRequest = chain.request()
         
-        // SIMPLE: Get UID only from Firebase
+        // Get UID from Firebase
         val firebaseUser = FirebaseAuth.getInstance().currentUser
         val userId = firebaseUser?.uid
         
         val requestBuilder = originalRequest.newBuilder()
             .addHeader("User-Agent", "ResumeWriter-Android")
         
+        // 🔧 DEBUG: Log what we're sending
+        Log.d("🔥 HEADER DEBUG", "Firebase UID: $userId")
+        Log.d("🔥 HEADER DEBUG", "Request URL: ${originalRequest.url}")
+        
         if (!userId.isNullOrBlank()) {
             requestBuilder.addHeader("X-User-ID", userId)
-            Log.d("Auth", "✅ Sending Firebase UID: ${userId.take(8)}...")
+            Log.d("🔥 HEADER DEBUG", "✅ ADDED X-User-ID: $userId")
         } else {
-            Log.w("Auth", "⚠️ No Firebase user - request will fail auth")
+            Log.w("🔥 HEADER DEBUG", "⚠️ No Firebase user - no auth header")
         }
         
-        return chain.proceed(requestBuilder.build())
-    }
-}
-    
-    private fun getUserIdUltraSafe(): String? {
-        return try {
-            // Strategy 1: Direct Firebase access (most reliable)
-            val firebaseUser = try {
-                FirebaseAuth.getInstance().currentUser
-            } catch (e: Exception) {
-                Log.e("AuthInterceptor", "❌ Firebase access failed: ${e.message}")
-                null
-            }
-            
-            val firebaseUid = firebaseUser?.uid
-            if (!firebaseUid.isNullOrBlank()) {
-                Log.d("AuthInterceptor", "🔥 Got UID directly from Firebase: ${firebaseUid.take(8)}...")
-                
-                // Try to sync with UserManager (but don't crash if it fails)
-                try {
-                    userManager.emergencySyncWithFirebase()
-                } catch (e: Exception) {
-                    Log.w("AuthInterceptor", "⚠️ UserManager sync failed but we have Firebase UID: ${e.message}")
-                }
-                
-                return firebaseUid
-            }
-            
-            // Strategy 2: Try UserManager (with extra safety)
-            val userManagerUid = try {
-                userManager.getCurrentUserId()
-            } catch (e: Exception) {
-                Log.e("AuthInterceptor", "❌ UserManager access failed: ${e.message}")
-                null
-            }
-            
-            if (!userManagerUid.isNullOrBlank()) {
-                Log.d("AuthInterceptor", "📱 Got UID from UserManager: ${userManagerUid.take(8)}...")
-                return userManagerUid
-            }
-            
-            // Strategy 3: Final fallback - no user ID available
-            Log.w("AuthInterceptor", "🔍 No user ID available from any source")
-            null
-            
-        } catch (e: Exception) {
-            // If ANYTHING in this method fails, return null
-            Log.e("AuthInterceptor", "💥 getUserIdUltraSafe completely failed: ${e.message}")
-            null
-        }
-    }
-        private fun debugFirebaseAuth(): String {
-            val firebaseUser = FirebaseAuth.getInstance().currentUser
-            return "Firebase UID: ${firebaseUser?.uid ?: "NULL"}"
-        }
+        // Log all headers being sent
+        val newRequest = requestBuilder.build()
+        Log.d("🔥 HEADER DEBUG", "Final headers: ${newRequest.headers}")
         
-       
-    
+        return chain.proceed(newRequest)
+    }
 }
