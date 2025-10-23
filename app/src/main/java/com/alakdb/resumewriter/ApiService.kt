@@ -10,22 +10,22 @@ import okhttp3.RequestBody.Companion.toRequestBody
 import org.json.JSONObject
 import java.io.File
 import java.io.IOException
-import java.security.MessageDigest
 import java.util.concurrent.TimeUnit
 import com.google.firebase.auth.FirebaseAuth
 import okhttp3.MultipartBody
 import okhttp3.RequestBody
+import okhttp3.MediaType.Companion.toMediaType
 
-fun String.sha256(): String {
-    return try {
-        val digest = MessageDigest.getInstance("SHA-256")
-        val hashBytes = digest.digest(this.toByteArray(Charsets.UTF_8))
-        hashBytes.joinToString("") { "%02x".format(it) }
-    } catch (e: Exception) {
-        Log.e("SHA256", "Error hashing string", e)
-        ""
-    }
+
+// Add this extension function for converting String to ResponseBody
+fun String.toResponseBody(mediaType: MediaType): ResponseBody {
+    return this.toByteArray().toResponseBody(mediaType)
 }
+
+fun ByteArray.toResponseBody(mediaType: MediaType): ResponseBody {
+    return ResponseBody.create(mediaType, this)
+}
+
 
 class ApiService(private val context: Context) {
 
