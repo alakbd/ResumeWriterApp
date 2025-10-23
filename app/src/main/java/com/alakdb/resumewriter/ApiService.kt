@@ -38,7 +38,7 @@ class ApiService(private val context: Context) {
         .connectTimeout(30, TimeUnit.SECONDS)
         .readTimeout(30, TimeUnit.SECONDS)
         .writeTimeout(60, TimeUnit.SECONDS)
-        .addInterceptor(SafeAuthInterceptor(userManager))
+        .addInterceptor(SafeAuthInterceptor())
         .build()
 
     // Data Classes
@@ -380,30 +380,32 @@ class ApiService(private val context: Context) {
     }
 }
 
+// In setupUI(), use the existing debug button:
+binding.btnDebugAuth.setOnClickListener {
+    val authInfo = debugFirebaseAuth()
+    showMessage(authInfo)
+    Log.d("AuthDebug", authInfo)
+    testHeaderSending() // Test if headers work
+}
+
 // FIXED: Enhanced SafeAuthInterceptor with proper user ID handling - MOVED OUTSIDE THE CLASS
-class SafeAuthInterceptor(private val userManager: UserManager) : Interceptor {
+class SafeAuthInterceptor : Interceptor {
     override fun intercept(chain: Interceptor.Chain): Response {
-        return try {
-            val originalRequest = chain.request()
-            
-            // ULTRA-SIMPLE: Get user ID from Firebase directly
-            val userId = FirebaseAuth.getInstance().currentUser?.uid
-            
-            val requestBuilder = originalRequest.newBuilder()
-                .addHeader("User-Agent", "ResumeWriter-Android")
-            
-            if (!userId.isNullOrBlank()) {
-                requestBuilder.addHeader("X-User-ID", userId)
-                Log.d("AuthInterceptor", "✅ Added X-User-ID: ${userId.take(8)}...")
-            } else {
-                Log.w("AuthInterceptor", "⚠️ No Firebase user - no auth header")
-            }
-            
-            chain.proceed(requestBuilder.build())
-        } catch (e: Exception) {
-            Log.e("AuthInterceptor", "Emergency fallback: ${e.message}")
-            chain.proceed(chain.request()) // Original request as fallback
+        val originalRequest = chain.request()
+        
+        // SIMPLE: Get UID only from Firebase
+        val firebaseUser = FirebaseAuth.getInstance().currentUser
+        val userId = firebaseUser?.uid
+        
+        val requestBuilder = originalRequest.newBuilder()
+            .addHeader("User-Agent", "ResumeWriter-Android")
+        
+        if (!userId.isNullOrBlank()) {
+            requestBuilder.addHeader("X-User-ID", userId)
+            Log.d("Auth", "✅ Sending Firebase UID: ${userId.take(8)}...")
         }
+        
+        return chain.proceed(requestBuilder.build())
     }
 }
     
@@ -454,4 +456,24 @@ class SafeAuthInterceptor(private val userManager: UserManager) : Interceptor {
             null
         }
     }
+        private fun debugFirebaseAuth(): String {
+            val firebaseUser = FirebaseAuth.getInstance().currentUser
+            return "Firebase UID: ${firebaseUser?.uid ?: "NULL"}"
+        }
+        
+        private fun testHeaderSending() {
+    lifecycleScope.launch {
+        val result = apiService.getUserCredits()
+        when (result) {
+            is ApiService.ApiResult.Success -> {
+                val credits = result.data.optInt("available_credits", 0)
+                showMessage("✅ Headers working! Credits: $credits")
+            }
+            is ApiService.ApiResult.Error -> {
+                showMessage("❌ Header issue: ${result.message}")
+            }
+        }
+    }
+}
+    
 }
