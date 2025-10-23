@@ -185,11 +185,7 @@ class ResumeGenerationActivity : AppCompatActivity() {
         binding.btnBack.setOnClickListener { finish() }
         binding.btnRetryConnection.setOnClickListener { testApiConnection() }
 
-        // In setupUI() method, add:
-        binding.btnQuickCheck.setOnClickListener {
-            showMessage(quickAuthCheck())
-            Log.d("QuickCheck", quickAuthCheck())
-        }
+      
         
         // Add debug button
         binding.btnDebugAuth.setOnClickListener {
@@ -707,19 +703,7 @@ class ResumeGenerationActivity : AppCompatActivity() {
     }
 }
 
-    private fun quickAuthCheck(): String {
-    val firebaseUser = FirebaseAuth.getInstance().currentUser
-    val userManagerUser = userManager.getCurrentUserId()
-    
-    return """
-    🔍 QUICK AUTH CHECK:
-    Firebase UID: ${firebaseUser?.uid ?: "NULL"}
-    UserManager UID: ${userManagerUser ?: "NULL"}
-    Match: ${firebaseUser?.uid == userManagerUser}
-    Firebase Email: ${firebaseUser?.email ?: "NULL"}
-    UserManager Email: ${userManager.getCurrentUserEmail() ?: "NULL"}
-    """.trimIndent()
-}
+
     
     
     /** ---------------- Helpers ---------------- **/
