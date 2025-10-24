@@ -351,14 +351,47 @@ class ApiService(private val context: Context) {
 
 class SafeAuthInterceptor : Interceptor {
     override fun intercept(chain: Interceptor.Chain): Response {
-        return try {
-            val request = chain.request().newBuilder()
-                .addHeader("User-Agent", "ResumeWriter-Android")
-                .build()
-            chain.proceed(request)
+        try {
+            Log.d("DEBUG", "Step 1: Starting interceptor")
+            
+            val originalRequest = chain.request()
+            Log.d("DEBUG", "Step 2: Got original request")
+            
+            val requestBuilder = originalRequest.newBuilder()
+            Log.d("DEBUG", "Step 3: Created request builder")
+            
+            requestBuilder.addHeader("User-Agent", "ResumeWriter-Android")
+            Log.d("DEBUG", "Step 4: Added User-Agent")
+            
+            requestBuilder.addHeader("Accept", "application/json")
+            Log.d("DEBUG", "Step 5: Added Accept header")
+            
+            // Try to get Firebase user - wrap in try-catch
+            try {
+                val firebaseUser = FirebaseAuth.getInstance().currentUser
+                val userId = firebaseUser?.uid
+                
+                if (!userId.isNullOrBlank()) {
+                    requestBuilder.addHeader("X-User-ID", userId)
+                    Log.d("DEBUG", "Step 6: Added X-User-ID: ${userId.take(8)}...")
+                } else {
+                    Log.d("DEBUG", "Step 6: No user ID available")
+                }
+            } catch (e: Exception) {
+                Log.e("DEBUG", "Step 6: Failed to get Firebase user: ${e.message}")
+                // Continue without auth header
+            }
+            
+            val newRequest = requestBuilder.build()
+            Log.d("DEBUG", "Step 7: Built new request")
+            
+            Log.d("DEBUG", "Step 8: Proceeding with request...")
+            return chain.proceed(newRequest)
+            
         } catch (e: Exception) {
-            // If everything fails, just proceed with original request
-            chain.proceed(chain.request())
+            Log.e("DEBUG", "💥 INTERCEPTOR CRASHED: ${e.message}", e)
+            // Last resort: try to proceed with original request
+            return chain.proceed(chain.request())
         }
     }
 }
