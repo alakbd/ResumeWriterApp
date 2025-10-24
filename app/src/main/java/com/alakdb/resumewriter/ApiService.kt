@@ -14,6 +14,8 @@ import java.util.concurrent.TimeUnit
 import com.google.firebase.auth.FirebaseAuth
 import okhttp3.MultipartBody
 import okhttp3.RequestBody
+import java.io.IOException
+import javax.net.ssl.SSLHandshakeException
 
 
 // Add this extension function for converting String to ResponseBody
