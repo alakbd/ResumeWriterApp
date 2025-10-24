@@ -66,6 +66,9 @@ class ResumeGenerationActivity : AppCompatActivity() {
         checkEmailVerification()
         checkGenerateButtonState()
 
+         // 🔧 TEST BASIC CONNECTIVITY FIRST
+        testBasicApiCall()
+
         // 🔧 DEBUG: Auto-check authentication state
         lifecycleScope.launch {
             Log.d("ResumeActivity", "🔄 Initializing UserManager sync...")
@@ -268,6 +271,39 @@ class ResumeGenerationActivity : AppCompatActivity() {
     }
     
     /** ---------------- API Connection Test ---------------- **/
+private fun testBasicApiCall() {
+    lifecycleScope.launch {
+        try {
+            binding.tvConnectionStatus.text = "Testing basic API call..."
+            binding.progressConnection.visibility = View.VISIBLE
+            
+            Log.d("BasicTest", "🔄 Testing basic API call without authentication...")
+            
+            // Test the health endpoint first (no auth required)
+            val result = apiService.testConnection()
+            
+            when (result) {
+                is ApiService.ApiResult.Success -> {
+                    binding.tvConnectionStatus.text = "✅ Basic API works!"
+                    Log.d("BasicTest", "✅ Basic API call SUCCESS: ${result.data}")
+                    showMessage("Basic connectivity: ✅ WORKING")
+                }
+                is ApiService.ApiResult.Error -> {
+                    binding.tvConnectionStatus.text = "❌ Basic API failed: ${result.message}"
+                    Log.e("BasicTest", "❌ Basic API call FAILED: ${result.message}")
+                    showMessage("Basic connectivity: ❌ FAILED - ${result.message}")
+                }
+            }
+        } catch (e: Exception) {
+            binding.tvConnectionStatus.text = "💥 Test crashed: ${e.message}"
+            Log.e("BasicTest", "💥 Test crashed", e)
+            showMessage("Test crashed: ${e.message}")
+        } finally {
+            binding.progressConnection.visibility = View.GONE
+        }
+    }
+}
+    
     private fun testApiConnection() {
         binding.layoutConnectionStatus.visibility = View.VISIBLE
         binding.tvConnectionStatus.text = "Testing connection..."
