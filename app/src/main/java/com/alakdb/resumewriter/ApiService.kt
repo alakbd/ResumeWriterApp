@@ -353,24 +353,24 @@ class SafeAuthInterceptor : Interceptor {
     override fun intercept(chain: Interceptor.Chain): Response {
         try {
             Log.d("DEBUG", "Step 1: Starting interceptor")
-            
+
             val originalRequest = chain.request()
             Log.d("DEBUG", "Step 2: Got original request")
-            
+
             val requestBuilder = originalRequest.newBuilder()
             Log.d("DEBUG", "Step 3: Created request builder")
-            
+
             requestBuilder.addHeader("User-Agent", "ResumeWriter-Android")
             Log.d("DEBUG", "Step 4: Added User-Agent")
-            
+
             requestBuilder.addHeader("Accept", "application/json")
             Log.d("DEBUG", "Step 5: Added Accept header")
-            
+
             // Try to get Firebase user - wrap in try-catch
             try {
                 val firebaseUser = FirebaseAuth.getInstance().currentUser
                 val userId = firebaseUser?.uid
-                
+
                 if (!userId.isNullOrBlank()) {
                     requestBuilder.addHeader("X-User-ID", userId)
                     Log.d("DEBUG", "Step 6: Added X-User-ID: ${userId.take(8)}...")
@@ -381,17 +381,25 @@ class SafeAuthInterceptor : Interceptor {
                 Log.e("DEBUG", "Step 6: Failed to get Firebase user: ${e.message}")
                 // Continue without auth header
             }
-            
+
             val newRequest = requestBuilder.build()
             Log.d("DEBUG", "Step 7: Built new request")
-            
-            Log.d("DEBUG", "Step 8: Proceeding with request...")
-            return chain.proceed(newRequest)
-            
+
+            // ✅ Inner try-catch: catch network errors only
+            try {
+                Log.d("DEBUG", "Step 8: Proceeding with request to ${newRequest.url}")
+                val response = chain.proceed(newRequest)
+                Log.d("DEBUG", "Step 9: Got response ${response.code}")
+                return response
+            } catch (e: Exception) {
+                Log.e("DEBUG", "💥 NETWORK CALL FAILED: ${e::class.simpleName} - ${e.message}")
+                throw e // rethrow so ApiService can handle gracefully
+            }
+
         } catch (e: Exception) {
+            // ✅ Outer try-catch: only if something unexpected goes wrong above
             Log.e("DEBUG", "💥 INTERCEPTOR CRASHED: ${e.message}", e)
-            // Last resort: try to proceed with original request
-            return chain.proceed(chain.request())
+            return chain.proceed(chain.request()) // last resort fallback
         }
     }
 }
