@@ -228,12 +228,12 @@ class ApiService(private val context: Context) {
     return try {
         Log.d("ApiService", "🔄 Getting user credits from: $baseUrl/user/credits")
         
-        // Check Firebase auth first
-        val firebaseUser = FirebaseAuth.getInstance().currentUser
-        if (firebaseUser == null) {
-            Log.e("ApiService", "❌ No Firebase user - cannot get credits")
-            return ApiResult.Error("User not authenticated", 401)
-        }
+        // REMOVE the Firebase check - let the server handle authentication
+        // val firebaseUser = FirebaseAuth.getInstance().currentUser
+        // if (firebaseUser == null) {
+        //     Log.e("ApiService", "❌ No Firebase user - cannot get credits")
+        //     return ApiResult.Error("User not authenticated", 401)
+        // }
 
         val request = Request.Builder()
             .url("$baseUrl/user/credits")
@@ -351,56 +351,20 @@ class ApiService(private val context: Context) {
 
 class SafeAuthInterceptor : Interceptor {
     override fun intercept(chain: Interceptor.Chain): Response {
+        // NUCLEAR OPTION - NO FIREBASE, NO COMPLEX LOGIC
         try {
-            Log.d("DEBUG", "Step 1: Starting interceptor")
-
-            val originalRequest = chain.request()
-            Log.d("DEBUG", "Step 2: Got original request")
-
-            val requestBuilder = originalRequest.newBuilder()
-            Log.d("DEBUG", "Step 3: Created request builder")
-
-            requestBuilder.addHeader("User-Agent", "ResumeWriter-Android")
-            Log.d("DEBUG", "Step 4: Added User-Agent")
-
-            requestBuilder.addHeader("Accept", "application/json")
-            Log.d("DEBUG", "Step 5: Added Accept header")
-
-            // Try to get Firebase user - wrap in try-catch
-            try {
-                val firebaseUser = FirebaseAuth.getInstance().currentUser
-                val userId = firebaseUser?.uid
-
-                if (!userId.isNullOrBlank()) {
-                    requestBuilder.addHeader("X-User-ID", userId)
-                    Log.d("DEBUG", "Step 6: Added X-User-ID: ${userId.take(8)}...")
-                } else {
-                    Log.d("DEBUG", "Step 6: No user ID available")
-                }
-            } catch (e: Exception) {
-                Log.e("DEBUG", "Step 6: Failed to get Firebase user: ${e.message}")
-                // Continue without auth header
-            }
-
-            val newRequest = requestBuilder.build()
-            Log.d("DEBUG", "Step 7: Built new request")
-
-            // ✅ Inner try-catch: catch network errors only
-            try {
-                Log.d("DEBUG", "Step 8: Proceeding with request to ${newRequest.url}")
-                val response = chain.proceed(newRequest)
-                Log.d("DEBUG", "Step 9: Got response ${response.code}")
-                return response
-            } catch (e: Exception) {
-                Log.e("DEBUG", "💥 NETWORK CALL FAILED: ${e::class.java.simpleName} - ${e.message}", e)
-                Log.e("DEBUG", "💥 STACK TRACE:", e)
-                throw e
-            }
-
+            val request = chain.request().newBuilder()
+                .addHeader("User-Agent", "ResumeWriter-Android")
+                .addHeader("Accept", "application/json")
+                .build()
+            
+            Log.d("SafeAuth", "✅ Proceeding with basic request")
+            return chain.proceed(request)
+            
         } catch (e: Exception) {
-            // ✅ Outer try-catch: only if something unexpected goes wrong above
-            throw IOException("Interceptor crashed: ${e.message}", e)
-        
+            Log.e("SafeAuth", "💥 EVEN BASIC REQUEST FAILED: ${e.message}", e)
+            // If even this fails, there's a fundamental OkHttp issue
+            throw e
         }
     }
 }
