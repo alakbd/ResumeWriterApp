@@ -352,47 +352,13 @@ class ApiService(private val context: Context) {
 class SafeAuthInterceptor : Interceptor {
     override fun intercept(chain: Interceptor.Chain): Response {
         return try {
-            val originalRequest = chain.request()
-            
-            // Get UID from Firebase - handle potential exceptions
-            val userId = try {
-                val firebaseUser = FirebaseAuth.getInstance().currentUser
-                firebaseUser?.uid
-            } catch (e: Exception) {
-                Log.e("🔥 HEADER DEBUG", "❌ Firebase auth error: ${e.message}")
-                null
-            }
-            
-            val requestBuilder = originalRequest.newBuilder()
+            val request = chain.request().newBuilder()
                 .addHeader("User-Agent", "ResumeWriter-Android")
-                .addHeader("Content-Type", "application/json")
-            
-            // 🔧 DEBUG: Log what we're sending
-            Log.d("🔥 HEADER DEBUG", "Firebase UID: $userId")
-            Log.d("🔥 HEADER DEBUG", "Request URL: ${originalRequest.url}")
-            
-            if (!userId.isNullOrBlank()) {
-                requestBuilder.addHeader("X-User-ID", userId)
-                Log.d("🔥 HEADER DEBUG", "✅ ADDED X-User-ID: $userId")
-            } else {
-                Log.w("🔥 HEADER DEBUG", "⚠️ No Firebase user - no auth header")
-            }
-            
-            // Log all headers being sent
-            val newRequest = requestBuilder.build()
-            Log.d("🔥 HEADER DEBUG", "Final headers: ${newRequest.headers}")
-            
-            chain.proceed(newRequest)
-        } catch (e: Exception) {
-            Log.e("🔥 HEADER DEBUG", "💥 Critical interceptor crash: ${e.message}", e)
-            // Create a proper error response
-            Response.Builder()
-                .request(chain.request())
-                .protocol(Protocol.HTTP_1_1)
-                .code(500)
-                .message("Interceptor Error")
-                .body("{ \"error\": \"Interceptor crashed: ${e.message}\" }".toResponseBody("application/json".toMediaType()))
                 .build()
+            chain.proceed(request)
+        } catch (e: Exception) {
+            // If everything fails, just proceed with original request
+            chain.proceed(chain.request())
         }
     }
 }
