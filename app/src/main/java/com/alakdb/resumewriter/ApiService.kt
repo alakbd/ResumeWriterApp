@@ -368,3 +368,52 @@ class SafeAuthInterceptor : Interceptor {
         }
     }
 }
+
+suspend fun getUserCreditsSafe(): Result<Int> {
+    return try {
+        val response = api.getUserCredits() // suspend Retrofit call
+        if (response.isSuccessful) {
+            Result.success(response.body() ?: 0)
+        } else {
+            Result.failure(Exception("API Error: ${response.code()} ${response.message()}"))
+        }
+    } catch (e: java.net.UnknownHostException) {
+        Result.failure(e) // No route to host / DNS issues
+    } catch (e: java.net.SocketTimeoutException) {
+        Result.failure(e) // Timeout
+    } catch (e: javax.net.ssl.SSLHandshakeException) {
+        Result.failure(e) // SSL issues
+    } catch (e: java.io.IOException) {
+        Result.failure(e) // Network I/O errors
+    } catch (e: Exception) {
+        Result.failure(e) // Any other exceptions
+    }
+}
+
+suspend fun <T> safeApiCall(apiCall: suspend () -> T): Result<T> {
+    return try {
+        Result.success(apiCall())
+    } catch (e: Exception) {
+        Result.failure(e)
+    }
+}
+suspend fun <T> safeApiCall(apiCall: suspend () -> T): Result<T> {
+    return try {
+        Result.success(apiCall())
+    } catch (e: java.net.UnknownHostException) {
+        Log.e("Network", "No route to host", e)
+        Result.failure(e)
+    } catch (e: javax.net.ssl.SSLHandshakeException) {
+        Log.e("Network", "SSL handshake failed", e)
+        Result.failure(e)
+    } catch (e: java.net.SocketTimeoutException) {
+        Log.e("Network", "Timeout", e)
+        Result.failure(e)
+    } catch (e: IOException) {
+        Log.e("Network", "I/O error", e)
+        Result.failure(e)
+    } catch (e: Exception) {
+        Log.e("Network", "Unknown error", e)
+        Result.failure(e)
+    }
+}
