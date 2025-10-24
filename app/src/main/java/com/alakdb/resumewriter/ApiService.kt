@@ -399,8 +399,8 @@ class SafeAuthInterceptor : Interceptor {
 
         } catch (e: Exception) {
             // ✅ Outer try-catch: only if something unexpected goes wrong above
-            Log.e("DEBUG", "💥 INTERCEPTOR CRASHED: ${e.message}", e)
-            return chain.proceed(chain.request()) // last resort fallback
+            throw IOException("Interceptor crashed: ${e.message}", e)
+        
         }
     }
 }
