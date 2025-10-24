@@ -392,8 +392,9 @@ class SafeAuthInterceptor : Interceptor {
                 Log.d("DEBUG", "Step 9: Got response ${response.code}")
                 return response
             } catch (e: Exception) {
-                Log.e("DEBUG", "💥 NETWORK CALL FAILED: ${e::class.simpleName} - ${e.message}")
-                throw e // rethrow so ApiService can handle gracefully
+                Log.e("DEBUG", "💥 NETWORK CALL FAILED: ${e::class.java.simpleName} - ${e.message}", e)
+                Log.e("DEBUG", "💥 STACK TRACE:", e)
+                throw e
             }
 
         } catch (e: Exception) {
