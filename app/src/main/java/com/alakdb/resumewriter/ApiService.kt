@@ -87,6 +87,41 @@ class ApiService(private val context: Context) {
     }
 }
 
+        // ADD TO ApiService - A client that bypasses SSL issues
+private fun createUnsafeOkHttpClient(): OkHttpClient {
+    return try {
+        // Create a trust manager that does not validate certificate chains
+        val trustAllCerts = arrayOf<okhttp3.CertificatePinner>(object : okhttp3.CertificatePinner {
+            // Empty pinner - trust all certificates
+        })
+        
+        val sslContext = javax.net.ssl.SSLContext.getInstance("SSL")
+        sslContext.init(null, null, java.security.SecureRandom())
+        
+        OkHttpClient.Builder()
+            .sslSocketFactory(sslContext.socketFactory, getTrustManager())
+            .hostnameVerifier { _, _ -> true } // Trust all hostnames
+            .connectTimeout(15, TimeUnit.SECONDS)
+            .readTimeout(15, TimeUnit.SECONDS)
+            .addInterceptor(SimpleLoggingInterceptor())
+            .build()
+    } catch (e: Exception) {
+        Log.e("SSL", "Failed to create unsafe client, using regular one")
+        OkHttpClient.Builder()
+            .connectTimeout(15, TimeUnit.SECONDS)
+            .readTimeout(15, TimeUnit.SECONDS)
+            .addInterceptor(SimpleLoggingInterceptor())
+            .build()
+    }
+}
+
+private fun getTrustManager(): javax.net.ssl.X509TrustManager {
+    return object : javax.net.ssl.X509TrustManager {
+        override fun checkClientTrusted(chain: Array<java.security.cert.X509Certificate>, authType: String) = Unit
+        override fun checkServerTrusted(chain: Array<java.security.cert.X509Certificate>, authType: String) = Unit
+        override fun getAcceptedIssuers() = arrayOf<java.security.cert.X509Certificate>()
+    }
+}
     
     // ==================== FILE HANDLING METHODS ====================
 
@@ -174,41 +209,7 @@ class ApiService(private val context: Context) {
     }
 }
 
-    // ADD TO ApiService - A client that bypasses SSL issues
-private fun createUnsafeOkHttpClient(): OkHttpClient {
-    return try {
-        // Create a trust manager that does not validate certificate chains
-        val trustAllCerts = arrayOf<okhttp3.CertificatePinner>(object : okhttp3.CertificatePinner {
-            // Empty pinner - trust all certificates
-        })
-        
-        val sslContext = javax.net.ssl.SSLContext.getInstance("SSL")
-        sslContext.init(null, null, java.security.SecureRandom())
-        
-        OkHttpClient.Builder()
-            .sslSocketFactory(sslContext.socketFactory, getTrustManager())
-            .hostnameVerifier { _, _ -> true } // Trust all hostnames
-            .connectTimeout(15, TimeUnit.SECONDS)
-            .readTimeout(15, TimeUnit.SECONDS)
-            .addInterceptor(SimpleLoggingInterceptor())
-            .build()
-    } catch (e: Exception) {
-        Log.e("SSL", "Failed to create unsafe client, using regular one")
-        OkHttpClient.Builder()
-            .connectTimeout(15, TimeUnit.SECONDS)
-            .readTimeout(15, TimeUnit.SECONDS)
-            .addInterceptor(SimpleLoggingInterceptor())
-            .build()
-    }
-}
 
-private fun getTrustManager(): javax.net.ssl.X509TrustManager {
-    return object : javax.net.ssl.X509TrustManager {
-        override fun checkClientTrusted(chain: Array<java.security.cert.X509Certificate>, authType: String) = Unit
-        override fun checkServerTrusted(chain: Array<java.security.cert.X509Certificate>, authType: String) = Unit
-        override fun getAcceptedIssuers() = arrayOf<java.security.cert.X509Certificate>()
-    }
-}
 
     
     // ==================== API METHODS ====================
