@@ -1,0 +1,14 @@
+<network-security-config>
+    <!-- Allow HTTPS traffic to your API -->
+    <domain-config cleartextTrafficPermitted="true">
+        <domain includeSubdomains="true">resume-writer-api.onrender.com</domain>
+    </domain-config>
+
+    <!-- Trust normal system and user certificates -->
+    <base-config cleartextTrafficPermitted="false">
+        <trust-anchors>
+            <certificates src="system"/>
+            <certificates src="user"/>
+        </trust-anchors>
+    </base-config>
+</network-security-config>
