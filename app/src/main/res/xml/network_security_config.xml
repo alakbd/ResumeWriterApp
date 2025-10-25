@@ -4,12 +4,9 @@
         <domain includeSubdomains="true">resume-writer-api.onrender.com</domain>
     </domain-config>
     
-    <!-- Allow all domains for debugging -->
     <base-config cleartextTrafficPermitted="false">
         <trust-anchors>
-            <certificates src="@raw/your_custom_ca"/> <!-- Optional: if you have custom CA -->
             <certificates src="system"/>
-            <certificates src="user"/>
         </trust-anchors>
     </base-config>
 </network-security-config>
