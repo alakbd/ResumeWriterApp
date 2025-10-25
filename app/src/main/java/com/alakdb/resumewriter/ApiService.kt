@@ -352,19 +352,55 @@ class ApiService(private val context: Context) {
 
 class SafeAuthInterceptor : Interceptor {
     override fun intercept(chain: Interceptor.Chain): Response {
-        // NUCLEAR OPTION - NO FIREBASE, NO COMPLEX LOGIC
-        try {
-            val request = chain.request().newBuilder()
-                .addHeader("User-Agent", "ResumeWriter-Android")
-                .addHeader("Accept", "application/json")
-                .build()
+        return try {
+            Log.d("SafeAuth", "🔄 Starting request interception...")
             
-            Log.d("SafeAuth", "✅ Proceeding with basic request")
-            return chain.proceed(request)
+            val originalRequest = chain.request()
+            val requestBuilder = originalRequest.newBuilder()
+            
+            // Add basic headers
+            requestBuilder.addHeader("User-Agent", "ResumeWriter-Android")
+            requestBuilder.addHeader("Accept", "application/json")
+            requestBuilder.addHeader("Content-Type", "application/json")
+            
+            // Safely get Firebase user
+            try {
+                val firebaseUser = FirebaseAuth.getInstance().currentUser
+                val userId = firebaseUser?.uid
+                
+                if (!userId.isNullOrBlank()) {
+                    requestBuilder.addHeader("X-User-ID", userId)
+                    Log.d("SafeAuth", "✅ Added X-User-ID: ${userId.take(8)}...")
+                } else {
+                    Log.w("SafeAuth", "⚠️ No user ID available")
+                }
+            } catch (e: Exception) {
+                Log.e("SafeAuth", "❌ Firebase error: ${e.message}")
+                // Continue without auth header rather than crashing
+            }
+            
+            val newRequest = requestBuilder.build()
+            Log.d("SafeAuth", "➡️ Sending request to: ${newRequest.url}")
+            
+            // Proceed with the request
+            val response = chain.proceed(newRequest)
+            Log.d("SafeAuth", "⬅️ Response: ${response.code}")
+            
+            response
             
         } catch (e: Exception) {
-            Log.e("SafeAuth", "💥 EVEN BASIC REQUEST FAILED: ${e.message}", e)
-            // If even this fails, there's a fundamental OkHttp issue
+            Log.e("SafeAuth", "💥 INTERCEPTOR CRASHED: ${e.message}", e)
+            
+            // Detailed error analysis
+            when {
+                e is UnknownHostException -> Log.e("SafeAuth", "❌ DNS FAILED - Cannot resolve host")
+                e is SSLHandshakeException -> Log.e("SafeAuth", "❌ SSL FAILED - Certificate issue")
+                e is ConnectException -> Log.e("SafeAuth", "❌ CONNECTION REFUSED - Server down?")
+                e is SocketTimeoutException -> Log.e("SafeAuth", "❌ TIMEOUT - Server not responding")
+                else -> Log.e("SafeAuth", "❌ UNKNOWN NETWORK ERROR: ${e.javaClass.simpleName}")
+            }
+            
+            // Re-throw to let the caller handle it
             throw e
         }
     }
@@ -426,4 +462,5 @@ suspend fun <T> safeApiCall(apiCall: suspend () -> T): Result<T> {
     } catch (e: Exception) {                // fallback for others
         Result.failure(e)
     }
+}
 }
