@@ -96,15 +96,17 @@ class ResumeGenerationActivity : AppCompatActivity() {
         Log.d("ResumeActivity", "🔄 onResume - refreshing data...")
         
         try {
+            // Add initial delay to let system stabilize
+            delay(1000L)
+            
             val authValid = checkAuthenticationState()
             
             if (authValid) {
-                updateCreditDisplay()
-                testApiConnection()
-            } else {
-                withContext(Dispatchers.Main) {
-                    binding.creditText.text = "Credits: Please log in"
-                    binding.layoutConnectionStatus.visibility = View.GONE
+                // Only update credits if we have a stable connection
+                if (isNetworkAvailable()) {
+                    updateCreditDisplay()
+                } else {
+                    binding.creditText.text = "Credits: Offline"
                 }
             }
             
@@ -115,7 +117,7 @@ class ResumeGenerationActivity : AppCompatActivity() {
             Log.e("ResumeActivity", "❌ onResume failed: ${e.message}", e)
             withContext(Dispatchers.Main) {
                 binding.creditText.text = "Credits: Error"
-                showError("Failed to refresh: ${e.message}")
+                // Don't show error toast here to avoid spamming user
             }
         }
     }
@@ -670,7 +672,11 @@ private fun testBasicApiCall() {
 
     /** ---------------- Credit Display ---------------- **/
     private suspend fun updateCreditDisplay() {
+        ensureApiCooldown()
     try {
+        // Add delay to prevent rapid successive calls
+        delay(500L)
+        
         // Check authentication first
         if (!userManager.isUserLoggedIn()) {
             runOnUiThread {
@@ -679,6 +685,8 @@ private fun testBasicApiCall() {
             return
         }
 
+        Log.d("ResumeActivity", "🔄 Updating credit display...")
+        
         val result = apiService.getUserCredits()
         when (result) {
             is ApiService.ApiResult.Success -> {
@@ -708,8 +716,8 @@ private fun testBasicApiCall() {
                         }
                         else -> {
                             val cachedCredits = userManager.getCachedCredits()
-                            binding.creditText.text = "Credits: $cachedCredits"
-                            Log.w("ResumeActivity", "Using cached credits due to API error")
+                            binding.creditText.text = "Credits: $cachedCredits (cached)"
+                            Log.w("ResumeActivity", "Using cached credits due to API error: ${result.message}")
                         }
                     }
                 }
@@ -963,6 +971,19 @@ private fun testBasicApiCall() {
         )
         Log.d("ResumeActivity", "Connection status updated: $message")
     }
+    private var lastApiCallTime = 0L
+    private val API_COOLDOWN_MS = 1000L // 1 second between API calls
+
+    private suspend fun ensureApiCooldown() {
+    val currentTime = System.currentTimeMillis()
+    val timeSinceLastCall = currentTime - lastApiCallTime
+    
+    if (timeSinceLastCall < API_COOLDOWN_MS) {
+        delay(API_COOLDOWN_MS - timeSinceLastCall)
+    }
+    
+    lastApiCallTime = System.currentTimeMillis()
+}
 
     private fun showServerWakeupMessage() {
         Toast.makeText(
