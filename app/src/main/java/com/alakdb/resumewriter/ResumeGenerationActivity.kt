@@ -803,6 +803,47 @@ private fun testBasicApiCall() {
     }
     
     // 🔧 NEW DEBUG METHODS
+    private fun testBasicConnectivity() {
+    lifecycleScope.launch {
+        try {
+            binding.tvGeneratedResume.text = "Testing basic connectivity..."
+            
+            // Test 1: Can we reach ANY external site?
+            val client = OkHttpClient.Builder()
+                .connectTimeout(10, TimeUnit.SECONDS)
+                .build()
+            
+            val googleRequest = Request.Builder()
+                .url("https://www.google.com")
+                .build()
+            
+            val googleResponse = client.newCall(googleRequest).execute()
+            val googleSuccess = googleResponse.isSuccessful
+            
+            // Test 2: Can we reach your API?
+            val apiRequest = Request.Builder()
+                .url("https://resume-writer-api.onrender.com/health")
+                .build()
+            
+            val apiResponse = client.newCall(apiRequest).execute()
+            val apiSuccess = apiResponse.isSuccessful
+            
+            binding.tvGeneratedResume.text = """
+                📊 BASIC CONNECTIVITY TEST:
+                • Google: ${if (googleSuccess) "✅" else "❌"}
+                • Your API: ${if (apiSuccess) "✅" else "❌"}
+                
+                ${if (!googleSuccess) "❌ Cannot reach internet" else ""}
+                ${if (googleSuccess && !apiSuccess) "❌ Internet works but API blocked" else ""}
+                ${if (apiSuccess) "✅ Everything works!" else ""}
+            """.trimIndent()
+            
+        } catch (e: Exception) {
+            binding.tvGeneratedResume.text = "💥 Test crashed: ${e.message}"
+        }
+    }
+}
+    
     private fun testHeaderSending() {
     lifecycleScope.launch {
         try {
