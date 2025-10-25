@@ -796,36 +796,59 @@ private fun testBasicApiCall() {
     
     // 🔧 NEW DEBUG METHODS
     private fun testHeaderSending() {
-        lifecycleScope.launch {
+    lifecycleScope.launch {
+        try {
+            binding.tvGeneratedResume.text = "🔧 Testing network connection..."
+            binding.progressGenerate.visibility = View.VISIBLE
+            
+            Log.d("NetworkTest", "=== NETWORK TEST STARTED ===")
+            
+            // Test 1: Basic internet connectivity
+            val hasInternet = isNetworkAvailable()
+            Log.d("NetworkTest", "Basic internet: $hasInternet")
+            
+            if (!hasInternet) {
+                binding.tvGeneratedResume.text = "❌ NO INTERNET CONNECTION\nPlease check your network"
+                return@launch
+            }
+
+            // Test 2: DNS resolution
+            binding.tvGeneratedResume.text = "Resolving DNS..."
             try {
-                binding.tvGeneratedResume.text = "🔧 Testing header sending..."
-                binding.progressGenerate.visibility = View.VISIBLE
-                
-                Log.d("🔧 DEBUG", "=== HEADER TEST STARTED ===")
-                
-                val result = apiService.getUserCredits()
-                when (result) {
-                    is ApiService.ApiResult.Success -> {
-                        val credits = result.data.optInt("available_credits", 0)
-                        val message = "✅ HEADERS WORKING!\nCredits: $credits"
-                        showMessage(message)
-                        binding.tvGeneratedResume.text = message
-                        Log.d("🔧 DEBUG", "✅ Header test SUCCESS - Credits: $credits")
-                    }
-                    is ApiService.ApiResult.Error -> {
-                        val message = "❌ Header issue: ${result.message}"
-                        showMessage(message)
-                        binding.tvGeneratedResume.text = "$message\n\n${debugFirebaseAuth()}"
-                        Log.e("🔧 DEBUG", "❌ Header test FAILED: ${result.message}")
-                    }
+                val addresses = java.net.InetAddress.getAllByName("resume-writer-api.onrender.com")
+                Log.d("NetworkTest", "✅ DNS resolved: ${addresses.size} IPs")
+                addresses.forEach { addr ->
+                    Log.d("NetworkTest", "   - ${addr.hostAddress}")
                 }
             } catch (e: Exception) {
-                showMessage("Test failed: ${e.message}")
-            } finally {
-                binding.progressGenerate.visibility = View.GONE
+                Log.e("NetworkTest", "❌ DNS failed: ${e.message}")
+                binding.tvGeneratedResume.text = "❌ DNS FAILED\nCannot resolve server address\n${e.message}"
+                return@launch
             }
+
+            // Test 3: Simple HTTP connection (health endpoint)
+            binding.tvGeneratedResume.text = "Testing server connection..."
+            val healthResult = apiService.testConnection()
+            
+            when (healthResult) {
+                is ApiService.ApiResult.Success -> {
+                    Log.d("NetworkTest", "✅ HTTP connection: WORKING")
+                    binding.tvGeneratedResume.text = "✅ SERVER CONNECTED!\n\nHealth Response:\n${healthResult.data}"
+                }
+                is ApiService.ApiResult.Error -> {
+                    Log.e("NetworkTest", "❌ HTTP failed: ${healthResult.message}")
+                    binding.tvGeneratedResume.text = "❌ SERVER UNREACHABLE\n\nError: ${healthResult.message}\n\nThis means:\n• Server might be down\n• Firewall blocking\n• SSL certificate issue"
+                }
+            }
+            
+        } catch (e: Exception) {
+            Log.e("NetworkTest", "💥 Test crashed: ${e.message}", e)
+            binding.tvGeneratedResume.text = "💥 TEST CRASHED\n\n${e.javaClass.simpleName}: ${e.message}"
+        } finally {
+            binding.progressGenerate.visibility = View.GONE
         }
     }
+}
 
     private fun debugUserManagerState() {
         Log.d("🔧 DEBUG", "=== USER MANAGER STATE ===")
@@ -854,6 +877,41 @@ private fun testBasicApiCall() {
         Verified: ${firebaseUser?.isEmailVerified ?: false}
         """.trimIndent()
     }
+
+    private fun quickNetworkTest() {
+    lifecycleScope.launch {
+        try {
+            binding.tvGeneratedResume.text = "🔍 Testing network connection..."
+            binding.progressGenerate.visibility = View.VISIBLE
+            
+            // Test 1: Basic connectivity
+            val hasNet = isNetworkAvailable()
+            Log.d("QuickTest", "Basic internet: $hasNet")
+            
+            // Test 2: Try the health endpoint (no auth required)
+            binding.tvGeneratedResume.text = "Testing server connectivity..."
+            val healthResult = apiService.testConnection()
+            
+            when (healthResult) {
+                is ApiService.ApiResult.Success -> {
+                    binding.tvGeneratedResume.text = "✅ SERVER CONNECTED!\n${healthResult.data}"
+                    showMessage("✅ Server is reachable!")
+                }
+                is ApiService.ApiResult.Error -> {
+                    binding.tvGeneratedResume.text = "❌ SERVER UNREACHABLE\n${healthResult.message}"
+                    showMessage("❌ Cannot reach server: ${healthResult.message}")
+                }
+            }
+            
+        } catch (e: Exception) {
+            binding.tvGeneratedResume.text = "💥 TEST CRASHED\n${e.message}"
+            Log.e("QuickTest", "Test failed", e)
+            showMessage("Test crashed: ${e.message}")
+        } finally {
+            binding.progressGenerate.visibility = View.GONE
+        }
+    }
+}
 
     /** ---------------- Helpers ---------------- **/
     private fun disableGenerateButton(text: String) {
