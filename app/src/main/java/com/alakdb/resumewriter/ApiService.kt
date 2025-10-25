@@ -323,6 +323,22 @@ class ApiService(private val context: Context) {
         }
     }
 
+    suspend fun testDnsResolution(): String {
+    return try {
+        Log.d("DNS Test", "Testing DNS resolution for: resume-writer-api.onrender.com")
+        
+        val addresses = java.net.InetAddress.getAllByName("resume-writer-api.onrender.com")
+        val ipList = addresses.joinToString(", ") { it.hostAddress }
+        
+        Log.d("DNS Test", "✅ DNS Resolution SUCCESS: $ipList")
+        "✅ DNS Resolution SUCCESS\nIP Addresses: $ipList"
+    } catch (e: Exception) {
+        Log.e("DNS Test", "❌ DNS Resolution FAILED: ${e.message}")
+        "❌ DNS Resolution FAILED\nError: ${e.message}\n\nPossible causes:\n• No internet connection\n• DNS server issues\n• Firewall blocking\n• Domain doesn't exist"
+    }
+}
+
+    
     suspend fun getUserCredits(): ApiResult<JSONObject> {
         return try {
             Log.d("ApiService", "🔄 Getting user credits from: $baseUrl/user/credits")
