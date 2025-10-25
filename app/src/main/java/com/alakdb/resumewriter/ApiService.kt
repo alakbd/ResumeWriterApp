@@ -533,66 +533,53 @@ class SafeAuthInterceptor : Interceptor {
     override fun intercept(chain: Interceptor.Chain): Response {
         return try {
             Log.d("SafeAuth", "🔄 Starting request interception...")
-            
+
             val originalRequest = chain.request()
             val requestBuilder = originalRequest.newBuilder()
-            
-            // Add basic headers
-            requestBuilder.addHeader("User-Agent", "ResumeWriter-Android")
-            requestBuilder.addHeader("Accept", "application/json")
-            
+                .addHeader("User-Agent", "ResumeWriter-Android")
+                .addHeader("Accept", "application/json")
+
             // Only add Content-Type for requests that have a body
             if (originalRequest.body != null) {
                 requestBuilder.addHeader("Content-Type", "application/json")
             }
-            
-            // Safely get Firebase user and add auth header
+
+            // Add X-User-ID header if Firebase user exists (optional)
             try {
                 val firebaseUser = FirebaseAuth.getInstance().currentUser
-                firebaseUser?.let { user ->
-                    user.getIdToken(false).addOnCompleteListener { task ->
-                        if (task.isSuccessful) {
-                            val token = task.result?.token
-                            token?.let {
-                                requestBuilder.addHeader("Authorization", "Bearer $it")
-                                Log.d("SafeAuth", "✅ Added Auth token: ${it.take(10)}...")
-                            }
-                        }
-                    }.await() // Wait for token
-                }
-                
                 val userId = firebaseUser?.uid
                 if (!userId.isNullOrBlank()) {
                     requestBuilder.addHeader("X-User-ID", userId)
                     Log.d("SafeAuth", "✅ Added X-User-ID: ${userId.take(8)}...")
                 } else {
-                    Log.w("SafeAuth", "⚠️ No user ID available - user may not be logged in")
-                    // Don't throw, just continue without auth header
+                    Log.w("SafeAuth", "⚠️ No Firebase user found — proceeding without user header")
                 }
             } catch (e: Exception) {
-                Log.e("SafeAuth", "❌ Firebase auth error: ${e.message}")
-                // Continue without auth headers rather than crashing
+                Log.e("SafeAuth", "❌ Firebase check failed: ${e.message}")
             }
-            
+
             val newRequest = requestBuilder.build()
             Log.d("SafeAuth", "➡️ Sending request to: ${newRequest.url}")
-            
-            // Proceed with the request
+
+            // Proceed with request normally
             val response = chain.proceed(newRequest)
             Log.d("SafeAuth", "⬅️ Response: ${response.code}")
-            
+
             response
-            
+
         } catch (e: Exception) {
-            Log.e("SafeAuth", "💥 INTERCEPTOR CRASHED: ${e.message}", e)
-            
-            // Return a mock response instead of crashing
+            Log.e("SafeAuth", "💥 Interceptor crashed: ${e.message}", e)
+
+            // Return a fallback error response (won’t crash app)
             Response.Builder()
                 .request(chain.request())
                 .protocol(Protocol.HTTP_1_1)
                 .code(500)
                 .message("Interceptor Error: ${e.message}")
-                .body("{\"error\": \"Authentication interceptor failed\"}".toResponseBody("application/json".toMediaType()))
+                .body(
+                    "{\"error\": \"SafeAuthInterceptor failed\"}"
+                        .toResponseBody("application/json".toMediaType())
+                )
                 .build()
         }
     }
