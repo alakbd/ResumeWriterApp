@@ -806,48 +806,45 @@ private fun testBasicApiCall() {
     private fun testHeaderSending() {
     lifecycleScope.launch {
         try {
-            binding.tvGeneratedResume.text = "🔧 Testing network connection..."
+            binding.tvGeneratedResume.text = "🔧 Running Network Diagnostics..."
             binding.progressGenerate.visibility = View.VISIBLE
             
-            Log.d("NetworkTest", "=== NETWORK TEST STARTED ===")
+            val diagnostic = StringBuilder()
+            diagnostic.appendLine("🩺 NETWORK DIAGNOSTICS")
+            diagnostic.appendLine("=".repeat(50))
             
-            // Test 1: Basic internet connectivity
+            // Test 1: Basic Network Connectivity
+            diagnostic.appendLine("1. BASIC CONNECTIVITY:")
             val hasInternet = isNetworkAvailable()
-            Log.d("NetworkTest", "Basic internet: $hasInternet")
+            diagnostic.appendLine("   • Internet Access: ${if (hasInternet) "✅" else "❌"}")
             
             if (!hasInternet) {
-                binding.tvGeneratedResume.text = "❌ NO INTERNET CONNECTION\nPlease check your network"
-                return@launch
+                diagnostic.appendLine("   ⚠️  No internet connection detected")
+                diagnostic.appendLine("   💡 Check: WiFi/Mobile data, Airplane mode")
             }
-
-            // Test 2: DNS resolution
-            binding.tvGeneratedResume.text = "Resolving DNS..."
-            try {
-                val addresses = java.net.InetAddress.getAllByName("resume-writer-api.onrender.com")
-                Log.d("NetworkTest", "✅ DNS resolved: ${addresses.size} IPs")
-                addresses.forEach { addr ->
-                    Log.d("NetworkTest", "   - ${addr.hostAddress}")
-                }
-            } catch (e: Exception) {
-                Log.e("NetworkTest", "❌ DNS failed: ${e.message}")
-                binding.tvGeneratedResume.text = "❌ DNS FAILED\nCannot resolve server address\n${e.message}"
-                return@launch
-            }
-
-            // Test 3: Simple HTTP connection (health endpoint)
-            binding.tvGeneratedResume.text = "Testing server connection..."
-            val healthResult = apiService.testConnection()
             
+            // Test 2: DNS Resolution
+            diagnostic.appendLine("\n2. DNS RESOLUTION:")
+            val dnsResult = apiService.testDnsResolution()
+            diagnostic.appendLine("   • $dnsResult")
+            
+            // Test 3: HTTP Connection
+            diagnostic.appendLine("\n3. HTTP CONNECTION:")
+            val healthResult = apiService.testConnection()
             when (healthResult) {
                 is ApiService.ApiResult.Success -> {
-                    Log.d("NetworkTest", "✅ HTTP connection: WORKING")
-                    binding.tvGeneratedResume.text = "✅ SERVER CONNECTED!\n\nHealth Response:\n${healthResult.data}"
+                    diagnostic.appendLine("   • API Health: ✅ SUCCESS")
+                    diagnostic.appendLine("     Response: ${healthResult.data}")
                 }
                 is ApiService.ApiResult.Error -> {
-                    Log.e("NetworkTest", "❌ HTTP failed: ${healthResult.message}")
-                    binding.tvGeneratedResume.text = "❌ SERVER UNREACHABLE\n\nError: ${healthResult.message}\n\nThis means:\n• Server might be down\n• Firewall blocking\n• SSL certificate issue"
+                    diagnostic.appendLine("   • API Health: ❌ FAILED")
+                    diagnostic.appendLine("     Error: ${healthResult.message}")
                 }
             }
+            
+            diagnostic.appendLine("=".repeat(50))
+            
+            binding.tvGeneratedResume.text = diagnostic.toString()
             
         } catch (e: Exception) {
             Log.e("NetworkTest", "💥 Test crashed: ${e.message}", e)
