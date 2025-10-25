@@ -1,7 +1,15 @@
+<?xml version="1.0" encoding="utf-8"?>
 <network-security-config>
-    <domain-config cleartextTrafficPermitted="false">
+    <domain-config cleartextTrafficPermitted="true">
         <domain includeSubdomains="true">resume-writer-api.onrender.com</domain>
     </domain-config>
-    <base-config cleartextTrafficPermitted="false" />
+    
+    <!-- Allow all domains for debugging -->
+    <base-config cleartextTrafficPermitted="false">
+        <trust-anchors>
+            <certificates src="@raw/your_custom_ca"/> <!-- Optional: if you have custom CA -->
+            <certificates src="system"/>
+            <certificates src="user"/>
+        </trust-anchors>
+    </base-config>
 </network-security-config>
-
