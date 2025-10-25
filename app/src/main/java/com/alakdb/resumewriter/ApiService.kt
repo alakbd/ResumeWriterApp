@@ -13,11 +13,13 @@ import java.io.IOException
 import java.util.concurrent.TimeUnit
 import com.google.firebase.auth.FirebaseAuth
 import okhttp3.MultipartBody
-import okhttp3.RequestBody
 import javax.net.ssl.SSLHandshakeException
+import java.net.UnknownHostException
+import java.net.ConnectException
+import java.net.SocketTimeoutException
+import java.net.SocketException
 
-
-// Add this extension function for converting String to ResponseBody
+// Extension functions for ResponseBody conversion
 fun String.toResponseBody(mediaType: MediaType): ResponseBody {
     return this.toByteArray().toResponseBody(mediaType)
 }
@@ -26,12 +28,12 @@ fun ByteArray.toResponseBody(mediaType: MediaType): ResponseBody {
     return ResponseBody.create(mediaType, this)
 }
 
-
 class ApiService(private val context: Context) {
 
     private val gson = Gson()
     private val baseUrl = "https://resume-writer-api.onrender.com"
     
+    // Main client with authentication interceptor
     private val client = OkHttpClient.Builder()
         .connectTimeout(30, TimeUnit.SECONDS)
         .readTimeout(30, TimeUnit.SECONDS)
@@ -39,13 +41,27 @@ class ApiService(private val context: Context) {
         .addInterceptor(SafeAuthInterceptor())
         .build()
 
-    data class DeductCreditRequest(val user_id: String)
-    data class GenerateResumeRequest(val resume_text: String, val job_description: String, val tone: String = "Professional")
+    // Simple client for health checks (no authentication needed)
+    private val simpleClient = OkHttpClient.Builder()
+        .connectTimeout(10, TimeUnit.SECONDS)
+        .readTimeout(10, TimeUnit.SECONDS)
+        .build()
 
+    // Data classes for API requests
+    data class DeductCreditRequest(val user_id: String)
+    data class GenerateResumeRequest(
+        val resume_text: String, 
+        val job_description: String, 
+        val tone: String = "Professional"
+    )
+
+    // API Result sealed class
     sealed class ApiResult<out T> {
         data class Success<out T>(val data: T) : ApiResult<T>()
         data class Error(val message: String, val code: Int = 0) : ApiResult<Nothing>()
     }
+
+    // ==================== FILE HANDLING METHODS ====================
 
     private fun uriToFile(uri: Uri): File {
         return try {
@@ -68,7 +84,70 @@ class ApiService(private val context: Context) {
         return this.inputStream().readBytes().toRequestBody(mediaType)
     }
 
-    suspend fun generateResumeFromFiles(resumeUri: Uri, jobDescUri: Uri, tone: String = "Professional"): ApiResult<JSONObject> {
+    // ==================== NETWORK DIAGNOSTICS ====================
+
+    /**
+     * Comprehensive network exception analyzer
+     */
+    private fun analyzeNetworkException(e: Exception, url: String): String {
+        val analysis = StringBuilder()
+        analysis.appendLine("🔍 NETWORK FAILURE ANALYSIS")
+        analysis.appendLine("URL: $url")
+        analysis.appendLine("Exception: ${e.javaClass.simpleName}")
+        analysis.appendLine("Message: ${e.message}")
+        
+        when (e) {
+            is UnknownHostException -> {
+                analysis.appendLine("❌ DNS RESOLUTION FAILED")
+                analysis.appendLine("   • Cannot resolve host: ${e.message}")
+            }
+            is ConnectException -> {
+                analysis.appendLine("❌ CONNECTION REFUSED")
+                analysis.appendLine("   • Server refused connection or is offline")
+            }
+            is SocketTimeoutException -> {
+                analysis.appendLine("⏰ SOCKET TIMEOUT")
+                analysis.appendLine("   • Connection/read timeout reached")
+            }
+            is SSLHandshakeException -> {
+                analysis.appendLine("🔒 SSL HANDSHAKE FAILED")
+                analysis.appendLine("   • SSL certificate issue")
+            }
+            is SocketException -> {
+                analysis.appendLine("🔌 SOCKET ERROR")
+                analysis.appendLine("   • General socket communication failure")
+            }
+            is IOException -> {
+                analysis.appendLine("📡 IO EXCEPTION")
+                analysis.appendLine("   • General network I/O failure")
+            }
+            else -> {
+                analysis.appendLine("💥 UNEXPECTED EXCEPTION")
+                analysis.appendLine("   • Non-network related error")
+            }
+        }
+        
+        return analysis.toString()
+    }
+
+    private fun isNetworkAvailable(): Boolean {
+        return try {
+            val connectivityManager = context.getSystemService(Context.CONNECTIVITY_SERVICE) as ConnectivityManager
+            val network = connectivityManager.activeNetwork
+            val capabilities = connectivityManager.getNetworkCapabilities(network)
+            capabilities != null && capabilities.hasCapability(NetworkCapabilities.NET_CAPABILITY_INTERNET)
+        } catch (e: Exception) {
+            false
+        }
+    }
+
+    // ==================== API METHODS ====================
+
+    suspend fun generateResumeFromFiles(
+        resumeUri: Uri, 
+        jobDescUri: Uri, 
+        tone: String = "Professional"
+    ): ApiResult<JSONObject> {
         return try {
             Log.d("ApiService", "Generating resume from files")
             
@@ -103,18 +182,16 @@ class ApiService(private val context: Context) {
                 ApiResult.Success(JSONObject(respBody))
             }
         } catch (e: Exception) {
-            Log.e("ApiService", "❌ File resume generation crashed: ${e.message}")
+            val analysis = analyzeNetworkException(e, "$baseUrl/generate-resume-from-files")
+            Log.e("ApiService", analysis)
             ApiResult.Error("File resume generation failed: ${e.message}")
         }
     }
-    
+
     suspend fun testConnection(): ApiResult<JSONObject> {
         return try {
-            val simpleClient = OkHttpClient.Builder()
-                .connectTimeout(10, TimeUnit.SECONDS)
-                .readTimeout(10, TimeUnit.SECONDS)
-                .build()
-
+            Log.d("ApiService", "Testing connection to: $baseUrl/health")
+            
             val request = Request.Builder()
                 .url("$baseUrl/health")
                 .get()
@@ -123,12 +200,16 @@ class ApiService(private val context: Context) {
             val response = simpleClient.newCall(request).execute()
             val body = response.body?.string()
             
+            Log.d("ApiService", "Connection test response: ${response.code}")
+            
             if (response.isSuccessful && body != null) {
                 ApiResult.Success(JSONObject(body))
             } else {
                 ApiResult.Error("HTTP ${response.code}: ${response.message}")
             }
         } catch (e: Exception) {
+            val analysis = analyzeNetworkException(e, "$baseUrl/health")
+            Log.e("ApiService", analysis)
             ApiResult.Error("Connection failed: ${e.message ?: "Unknown error"}")
         }
     }
@@ -167,7 +248,7 @@ class ApiService(private val context: Context) {
             false
         }
     }
-    
+
     suspend fun deductCredit(userId: String): ApiResult<JSONObject> {
         return try {
             val requestBody = DeductCreditRequest(userId)
@@ -188,11 +269,17 @@ class ApiService(private val context: Context) {
                 }
             }
         } catch (e: Exception) {
+            val analysis = analyzeNetworkException(e, "$baseUrl/deduct-credit")
+            Log.e("ApiService", analysis)
             ApiResult.Error("Request failed: ${e.message ?: "Unknown error"}")
         }
     }
 
-    suspend fun generateResume(resumeText: String, jobDescription: String, tone: String = "Professional"): ApiResult<JSONObject> {
+    suspend fun generateResume(
+        resumeText: String, 
+        jobDescription: String, 
+        tone: String = "Professional"
+    ): ApiResult<JSONObject> {
         return try {
             val requestBody = GenerateResumeRequest(resumeText, jobDescription, tone)
             val body = gson.toJson(requestBody).toRequestBody("application/json".toMediaType())
@@ -212,63 +299,50 @@ class ApiService(private val context: Context) {
                 }
             }
         } catch (e: Exception) {
+            val analysis = analyzeNetworkException(e, "$baseUrl/generate-resume")
+            Log.e("ApiService", analysis)
             ApiResult.Error("Request failed: ${e.message ?: "Unknown error"}")
         }
     }
 
-    fun decodeBase64File(base64Data: String): ByteArray = 
-        android.util.Base64.decode(base64Data, android.util.Base64.DEFAULT)
-
-    fun saveFileToStorage(data: ByteArray, filename: String): File {
-        val file = File(context.getExternalFilesDir(null), filename)
-        file.outputStream().use { it.write(data) }
-        return file
-    }
-
     suspend fun getUserCredits(): ApiResult<JSONObject> {
-    return try {
-        Log.d("ApiService", "🔄 Getting user credits from: $baseUrl/user/credits")
-        
-        // REMOVE the Firebase check - let the server handle authentication
-        // val firebaseUser = FirebaseAuth.getInstance().currentUser
-        // if (firebaseUser == null) {
-        //     Log.e("ApiService", "❌ No Firebase user - cannot get credits")
-        //     return ApiResult.Error("User not authenticated", 401)
-        // }
+        return try {
+            Log.d("ApiService", "🔄 Getting user credits from: $baseUrl/user/credits")
 
-        val request = Request.Builder()
-            .url("$baseUrl/user/credits")
-            .get()
-            .build()
+            val request = Request.Builder()
+                .url("$baseUrl/user/credits")
+                .get()
+                .build()
 
-        client.newCall(request).execute().use { response ->
-            val respBody = response.body?.string() ?: "{}"
-            Log.d("ApiService", "💰 Credits response: ${response.code} - Body: $respBody")
-            
-            if (response.isSuccessful) {
-                try {
-                    val jsonResponse = JSONObject(respBody)
-                    Log.d("ApiService", "✅ Credits success: ${jsonResponse.toString()}")
-                    ApiResult.Success(jsonResponse)
-                } catch (e: Exception) {
-                    Log.e("ApiService", "❌ JSON parsing error for credits", e)
-                    ApiResult.Error("Invalid server response format", response.code)
-                }
-            } else {
-                Log.e("ApiService", "❌ Server error: HTTP ${response.code}")
-                when (response.code) {
-                    401 -> ApiResult.Error("Authentication failed - please log in again", 401)
-                    429 -> ApiResult.Error("Rate limit exceeded - please wait", 429)
-                    else -> ApiResult.Error("Server error: ${response.code}", response.code)
+            client.newCall(request).execute().use { response ->
+                val respBody = response.body?.string() ?: "{}"
+                Log.d("ApiService", "💰 Credits response: ${response.code}")
+                
+                if (response.isSuccessful) {
+                    try {
+                        val jsonResponse = JSONObject(respBody)
+                        Log.d("ApiService", "✅ Credits success: ${jsonResponse.toString()}")
+                        ApiResult.Success(jsonResponse)
+                    } catch (e: Exception) {
+                        Log.e("ApiService", "❌ JSON parsing error for credits", e)
+                        ApiResult.Error("Invalid server response format", response.code)
+                    }
+                } else {
+                    Log.e("ApiService", "❌ Server error: HTTP ${response.code}")
+                    when (response.code) {
+                        401 -> ApiResult.Error("Authentication failed", 401)
+                        429 -> ApiResult.Error("Rate limit exceeded", 429)
+                        else -> ApiResult.Error("Server error: ${response.code}", response.code)
+                    }
                 }
             }
+        } catch (e: Exception) {
+            val analysis = analyzeNetworkException(e, "$baseUrl/user/credits")
+            Log.e("ApiService", analysis)
+            ApiResult.Error("Network error: ${e.message ?: "Unknown error"}")
         }
-    } catch (e: Exception) {
-        Log.e("ApiService", "💥 Network exception while fetching credits: ${e.message}", e)
-        ApiResult.Error("Network error: ${e.message ?: "Unknown error"}")
     }
-}
-    
+
     suspend fun testSecureAuth(): ApiResult<JSONObject> {
         return try {
             val request = Request.Builder()
@@ -286,80 +360,141 @@ class ApiService(private val context: Context) {
                 }
             }
         } catch (e: Exception) {
+            val analysis = analyzeNetworkException(e, "$baseUrl/security-test")
+            Log.e("ApiService", analysis)
             ApiResult.Error("Test failed: ${e.message ?: "Unknown error"}")
         }
     }
 
+    // ==================== DEBUG & UTILITY METHODS ====================
+
     suspend fun debugAuthenticationFlow(): String {
-    return try {
-        val debugInfo = StringBuilder()
-        debugInfo.appendLine("=== AUTHENTICATION DEBUG ===")
-        
-        // 1. Firebase Auth State
-        val firebaseUser = FirebaseAuth.getInstance().currentUser
-        debugInfo.appendLine("1. FIREBASE AUTH STATE:")
-        debugInfo.appendLine("   • UID: ${firebaseUser?.uid ?: "NULL"}")
-        debugInfo.appendLine("   • Email: ${firebaseUser?.email ?: "NULL"}")
-        debugInfo.appendLine("   • Email Verified: ${firebaseUser?.isEmailVerified ?: false}")
-        
-        // 2. Basic Network Check
-        debugInfo.appendLine("2. NETWORK CHECK:")
-        try {
-            val healthResult = testConnection()
-            when (healthResult) {
-                is ApiResult.Success -> debugInfo.appendLine("   • Server Reachable: ✅ YES")
-                is ApiResult.Error -> debugInfo.appendLine("   • Server Reachable: ❌ NO - ${healthResult.message}")
-            }
-        } catch (e: Exception) {
-            debugInfo.appendLine("   • Server Reachable: 💥 CRASHED - ${e.message}")
-        }
-        
-        // 3. Credits Endpoint Test (the one that's failing)
-        debugInfo.appendLine("3. CREDITS ENDPOINT TEST:")
-        try {
-            val creditsResult = getUserCredits()
-            when (creditsResult) {
-                is ApiResult.Success -> {
-                    val credits = creditsResult.data.optInt("available_credits", -1)
-                    debugInfo.appendLine("   • Status: ✅ SUCCESS")
-                    debugInfo.appendLine("   • Credits: $credits")
+        return try {
+            val debugInfo = StringBuilder()
+            debugInfo.appendLine("=== AUTHENTICATION DEBUG ===")
+            
+            // 1. Firebase Auth State
+            val firebaseUser = FirebaseAuth.getInstance().currentUser
+            debugInfo.appendLine("1. FIREBASE AUTH STATE:")
+            debugInfo.appendLine("   • UID: ${firebaseUser?.uid ?: "NULL"}")
+            debugInfo.appendLine("   • Email: ${firebaseUser?.email ?: "NULL"}")
+            debugInfo.appendLine("   • Email Verified: ${firebaseUser?.isEmailVerified ?: false}")
+            
+            // 2. Basic Network Check
+            debugInfo.appendLine("2. NETWORK CHECK:")
+            try {
+                val healthResult = testConnection()
+                when (healthResult) {
+                    is ApiResult.Success -> debugInfo.appendLine("   • Server Reachable: ✅ YES")
+                    is ApiResult.Error -> debugInfo.appendLine("   • Server Reachable: ❌ NO - ${healthResult.message}")
                 }
-                is ApiResult.Error -> {
-                    debugInfo.appendLine("   • Status: ❌ FAILED")
-                    debugInfo.appendLine("   • Error: ${creditsResult.message}")
-                    debugInfo.appendLine("   • Code: ${creditsResult.code}")
-                }
+            } catch (e: Exception) {
+                debugInfo.appendLine("   • Server Reachable: 💥 CRASHED - ${e.message}")
             }
+            
+            // 3. Credits Endpoint Test
+            debugInfo.appendLine("3. CREDITS ENDPOINT TEST:")
+            try {
+                val creditsResult = getUserCredits()
+                when (creditsResult) {
+                    is ApiResult.Success -> {
+                        val credits = creditsResult.data.optInt("available_credits", -1)
+                        debugInfo.appendLine("   • Status: ✅ SUCCESS")
+                        debugInfo.appendLine("   • Credits: $credits")
+                    }
+                    is ApiResult.Error -> {
+                        debugInfo.appendLine("   • Status: ❌ FAILED")
+                        debugInfo.appendLine("   • Error: ${creditsResult.message}")
+                        debugInfo.appendLine("   • Code: ${creditsResult.code}")
+                    }
+                }
+            } catch (e: Exception) {
+                debugInfo.appendLine("   • Status: 💥 CRASHED")
+                debugInfo.appendLine("   • Error: ${e.message}")
+            }
+            
+            debugInfo.appendLine("=== END DEBUG ===")
+            debugInfo.toString()
         } catch (e: Exception) {
-            debugInfo.appendLine("   • Status: 💥 CRASHED")
-            debugInfo.appendLine("   • Error: ${e.message}")
+            "Debug failed: ${e.message}"
         }
-        
-        debugInfo.appendLine("=== END DEBUG ===")
-        debugInfo.toString()
-    } catch (e: Exception) {
-        "Debug failed: ${e.message}"
     }
-}
+
+    suspend fun runNetworkDiagnostics(): String {
+        val diagnostic = StringBuilder()
+        diagnostic.appendLine("🩺 NETWORK DIAGNOSTICS")
+        diagnostic.appendLine("=".repeat(50))
+        
+        // 1. Basic connectivity
+        diagnostic.appendLine("1. BASIC CONNECTIVITY:")
+        val hasInternet = isNetworkAvailable()
+        diagnostic.appendLine("   • Internet Access: ${if (hasInternet) "✅" else "❌"}")
+        
+        // 2. DNS Resolution test
+        diagnostic.appendLine("2. DNS RESOLUTION:")
+        try {
+            val addresses = java.net.InetAddress.getAllByName("resume-writer-api.onrender.com")
+            diagnostic.appendLine("   • Host resolved: ✅ (${addresses.size} IPs)")
+            addresses.forEach { addr ->
+                diagnostic.appendLine("     - ${addr.hostAddress}")
+            }
+        } catch (e: Exception) {
+            diagnostic.appendLine("   • Host resolution: ❌ FAILED")
+            diagnostic.appendLine("     Error: ${e.message}")
+        }
+        
+        // 3. HTTP Health check
+        diagnostic.appendLine("3. HTTP HEALTH CHECK:")
+        val healthResult = testConnection()
+        when (healthResult) {
+            is ApiResult.Success -> {
+                diagnostic.appendLine("   • API Health: ✅ SUCCESS")
+                diagnostic.appendLine("     Response: ${healthResult.data}")
+            }
+            is ApiResult.Error -> {
+                diagnostic.appendLine("   • API Health: ❌ FAILED")
+                diagnostic.appendLine("     Error: ${healthResult.message}")
+            }
+        }
+        
+        // 4. Authentication test  
+        diagnostic.appendLine("4. AUTHENTICATION TEST:")
+        val creditResult = getUserCredits()
+        when (creditResult) {
+            is ApiResult.Success -> {
+                diagnostic.appendLine("   • Auth Headers: ✅ WORKING")
+                diagnostic.appendLine("     Credits: ${creditResult.data.optInt("available_credits")}")
+            }
+            is ApiResult.Error -> {
+                diagnostic.appendLine("   • Auth Headers: ❌ FAILED")
+                diagnostic.appendLine("     Error: ${creditResult.message} (Code: ${creditResult.code})")
+            }
+        }
+        
+        diagnostic.appendLine("=".repeat(50))
+        return diagnostic.toString()
+    }
+
+    fun decodeBase64File(base64Data: String): ByteArray = 
+        android.util.Base64.decode(base64Data, android.util.Base64.DEFAULT)
+
+    fun saveFileToStorage(data: ByteArray, filename: String): File {
+        val file = File(context.getExternalFilesDir(null), filename)
+        file.outputStream().use { it.write(data) }
+        return file
+    }
 
     fun forceSyncUserManager() {
         val firebaseUser = FirebaseAuth.getInstance().currentUser
         if (firebaseUser != null) {
-            val uid = firebaseUser.uid
-            val email = firebaseUser.email ?: ""
-            
-            // This would sync with UserManager - you'll need to implement based on your UserManager
-            Log.d("ApiService", "🔄 Force synced with Firebase: $uid")
+            Log.d("ApiService", "🔄 Force synced with Firebase: ${firebaseUser.uid}")
         } else {
             Log.w("ApiService", "⚠️ Cannot sync: No Firebase user")
         }
     }
-
-    fun initializeUserSession(userId: String?) {
-        // No-op for compatibility
-        Log.d("ApiService", "initializeUserSession called with: $userId")
-    }
 }
+
+// ==================== INTERCEPTOR ====================
 
 class SafeAuthInterceptor : Interceptor {
     override fun intercept(chain: Interceptor.Chain): Response {
@@ -374,7 +509,7 @@ class SafeAuthInterceptor : Interceptor {
             requestBuilder.addHeader("Accept", "application/json")
             requestBuilder.addHeader("Content-Type", "application/json")
             
-            // Safely get Firebase user
+            // Safely get Firebase user and add auth header
             try {
                 val firebaseUser = FirebaseAuth.getInstance().currentUser
                 val userId = firebaseUser?.uid
@@ -415,63 +550,4 @@ class SafeAuthInterceptor : Interceptor {
             throw e
         }
     }
-}
-
-class ApiRepository(private val apiService: ApiService) {
-
-    suspend fun getUserCreditsSafe(): Result<Int> {
-    return try {
-        val result = getUserCredits() // call your existing suspend function
-
-        when (result) {
-            is ApiResult.Success -> {
-                val credits = result.data.optInt("credits", 0)
-                Log.d("ApiService", "✅ Credits loaded successfully: $credits")
-                Result.success(credits)
-            }
-
-            is ApiResult.Error -> {
-                Log.e("ApiService", "❌ API Error: ${result.message} (code=${result.code})")
-                Result.failure(Exception("API Error: ${result.message} (code=${result.code})"))
-            }
-        }
-
-    } catch (e: java.net.UnknownHostException) {
-        Log.e("ApiService", "🌐 No internet or host unreachable: ${e.message}")
-        Result.failure(IOException("No internet connection or host unreachable", e))
-
-    } catch (e: javax.net.ssl.SSLHandshakeException) {
-        Log.e("ApiService", "🔒 SSL Handshake failed: ${e.message}")
-        Result.failure(IOException("SSL Handshake failed", e))
-
-    } catch (e: java.net.SocketTimeoutException) {
-        Log.e("ApiService", "⏱️ Connection timed out: ${e.message}")
-        Result.failure(IOException("Connection timed out", e))
-
-    } catch (e: java.net.ConnectException) {
-        Log.e("ApiService", "🚫 Connection refused or failed: ${e.message}")
-        Result.failure(IOException("Connection refused or failed", e))
-
-    } catch (e: IOException) {
-        Log.e("ApiService", "📶 General network I/O error: ${e.message}")
-        Result.failure(IOException("Network I/O error", e))
-
-    } catch (e: Exception) {
-        Log.e("ApiService", "💥 Unexpected error: ${e::class.simpleName} - ${e.message}", e)
-        Result.failure(Exception("Unexpected error: ${e.message}", e))
-    }
-}
-
-
-suspend fun <T> safeApiCall(apiCall: suspend () -> T): Result<T> {
-    return try {
-        Result.success(apiCall())
-    } catch (e: java.io.IOException) {        // network errors
-        Result.failure(e)
-    } catch (e: javax.net.ssl.SSLHandshakeException) { // SSL errors
-        Result.failure(e)
-    } catch (e: Exception) {                // fallback for others
-        Result.failure(e)
-    }
-}
 }
