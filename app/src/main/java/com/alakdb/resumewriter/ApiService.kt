@@ -20,6 +20,7 @@ import java.net.SocketTimeoutException
 import java.net.SocketException
 import android.net.ConnectivityManager
 import android.net.NetworkCapabilities
+import kotlinx.coroutines.tasks.await
 
 // Extension functions for ResponseBody conversion
 fun String.toResponseBody(mediaType: MediaType): ResponseBody {
