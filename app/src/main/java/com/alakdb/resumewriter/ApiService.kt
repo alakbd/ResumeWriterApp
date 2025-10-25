@@ -21,6 +21,7 @@ import java.net.SocketException
 import android.net.ConnectivityManager
 import android.net.NetworkCapabilities
 import kotlinx.coroutines.tasks.await
+import com.alakdb.resumewriter.testDnsResolution
 
 // Extension functions for ResponseBody conversion
 fun String.toResponseBody(mediaType: MediaType): ResponseBody {
