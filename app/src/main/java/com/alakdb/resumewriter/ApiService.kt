@@ -373,20 +373,45 @@ class SafeAuthInterceptor : Interceptor {
 class ApiRepository(private val apiService: ApiService) {
 
     suspend fun getUserCreditsSafe(): Result<Int> {
-        return try {
-            val response = apiService.getUserCredits()  // use apiService, not 'api'
-            if (response.isSuccessful) {
-                Result.success(response.body() ?: 0)
-            } else {
-                Result.failure(Exception("API Error: ${response.code()} ${response.message()}"))
+    return try {
+        val result = getUserCredits() // call your existing suspend function
+
+        when (result) {
+            is ApiResult.Success -> {
+                val credits = result.data.optInt("credits", 0)
+                Log.d("ApiService", "✅ Credits loaded successfully: $credits")
+                Result.success(credits)
             }
-        } catch (e: IOException) {
-            Result.failure(e)
-        } catch (e: SSLHandshakeException) {
-            Result.failure(e)
-        } catch (e: Exception) {
-            Result.failure(e)
+
+            is ApiResult.Error -> {
+                Log.e("ApiService", "❌ API Error: ${result.message} (code=${result.code})")
+                Result.failure(Exception("API Error: ${result.message} (code=${result.code})"))
+            }
         }
+
+    } catch (e: java.net.UnknownHostException) {
+        Log.e("ApiService", "🌐 No internet or host unreachable: ${e.message}")
+        Result.failure(IOException("No internet connection or host unreachable", e))
+
+    } catch (e: javax.net.ssl.SSLHandshakeException) {
+        Log.e("ApiService", "🔒 SSL Handshake failed: ${e.message}")
+        Result.failure(IOException("SSL Handshake failed", e))
+
+    } catch (e: java.net.SocketTimeoutException) {
+        Log.e("ApiService", "⏱️ Connection timed out: ${e.message}")
+        Result.failure(IOException("Connection timed out", e))
+
+    } catch (e: java.net.ConnectException) {
+        Log.e("ApiService", "🚫 Connection refused or failed: ${e.message}")
+        Result.failure(IOException("Connection refused or failed", e))
+
+    } catch (e: IOException) {
+        Log.e("ApiService", "📶 General network I/O error: ${e.message}")
+        Result.failure(IOException("Network I/O error", e))
+
+    } catch (e: Exception) {
+        Log.e("ApiService", "💥 Unexpected error: ${e::class.simpleName} - ${e.message}", e)
+        Result.failure(Exception("Unexpected error: ${e.message}", e))
     }
 }
 
@@ -394,20 +419,11 @@ class ApiRepository(private val apiService: ApiService) {
 suspend fun <T> safeApiCall(apiCall: suspend () -> T): Result<T> {
     return try {
         Result.success(apiCall())
-    } catch (e: java.net.UnknownHostException) {
-        Log.e("Network", "No route to host", e)
+    } catch (e: java.io.IOException) {        // network errors
         Result.failure(e)
-    } catch (e: javax.net.ssl.SSLHandshakeException) {
-        Log.e("Network", "SSL handshake failed", e)
+    } catch (e: javax.net.ssl.SSLHandshakeException) { // SSL errors
         Result.failure(e)
-    } catch (e: java.net.SocketTimeoutException) {
-        Log.e("Network", "Timeout", e)
-        Result.failure(e)
-    } catch (e: IOException) {
-        Log.e("Network", "I/O error", e)
-        Result.failure(e)
-    } catch (e: Exception) {
-        Log.e("Network", "Unknown error", e)
+    } catch (e: Exception) {                // fallback for others
         Result.failure(e)
     }
 }
