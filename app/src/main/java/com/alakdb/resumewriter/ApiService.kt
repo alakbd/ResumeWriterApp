@@ -18,6 +18,8 @@ import java.net.UnknownHostException
 import java.net.ConnectException
 import java.net.SocketTimeoutException
 import java.net.SocketException
+import android.net.ConnectivityManager
+import android.net.NetworkCapabilities
 
 // Extension functions for ResponseBody conversion
 fun String.toResponseBody(mediaType: MediaType): ResponseBody {
