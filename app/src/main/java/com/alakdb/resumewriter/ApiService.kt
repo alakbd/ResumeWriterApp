@@ -21,6 +21,11 @@ import java.net.SocketException
 import android.net.ConnectivityManager
 import android.net.NetworkCapabilities
 import kotlinx.coroutines.tasks.await
+import java.net.InetAddress
+import kotlinx.coroutines.*
+import kotlinx.coroutines.Dispatchers
+import kotlinx.coroutines.withContext
+import java.util.concurrent.Executors
 import com.alakdb.resumewriter.testDnsResolution
 
 // Extension functions for ResponseBody conversion
