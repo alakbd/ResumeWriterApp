@@ -1,9 +1,17 @@
 <network-security-config>
-    <!-- Allow ALL cleartext traffic for now -->
-    <base-config cleartextTrafficPermitted="true">
+    <!-- Trust all certificates for this domain (TEMPORARY) -->
+    <domain-config cleartextTrafficPermitted="true">
+        <domain includeSubdomains="true">resume-writer-api.onrender.com</domain>
+        <domain includeSubdomains="true">216.24.57.7</domain>
+        <domain includeSubdomains="true">216.24.57.251</domain>
+    </domain-config>
+    
+    <!-- Base config with relaxed SSL -->
+    <base-config cleartextTrafficPermitted="false">
         <trust-anchors>
             <certificates src="system"/>
             <certificates src="user"/>
+            <certificates src="@raw/temporary_certs"/> <!-- We'll add this -->
         </trust-anchors>
     </base-config>
 </network-security-config>
