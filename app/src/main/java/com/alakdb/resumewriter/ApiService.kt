@@ -39,10 +39,11 @@ class ApiService(private val context: Context) {
     
     // Main client with authentication interceptor
     private val client = OkHttpClient.Builder()
-        .connectTimeout(30, TimeUnit.SECONDS)
-        .readTimeout(30, TimeUnit.SECONDS)
-        .writeTimeout(60, TimeUnit.SECONDS)
-        .addInterceptor(SafeAuthInterceptor())
+        .connectTimeout(15, TimeUnit.SECONDS)  // Reduced from 30
+        .readTimeout(15, TimeUnit.SECONDS)     // Reduced from 30  
+        .writeTimeout(30, TimeUnit.SECONDS)    // Reduced from 60
+        .retryOnConnectionFailure(true)
+        .addInterceptor(SimpleLoggingInterceptor())
         .build()
 
     // Simple client for health checks (no authentication needed)
@@ -64,7 +65,24 @@ class ApiService(private val context: Context) {
         data class Success<out T>(val data: T) : ApiResult<T>()
         data class Error(val message: String, val code: Int = 0) : ApiResult<Nothing>()
     }
+    
+    class SimpleLoggingInterceptor: Interceptor {
+    override fun intercept(chain: Interceptor.Chain): Response {
+        val request = chain.request()
+        Log.d("NETWORK", "➡️ REQUEST: ${request.method} ${request.url}")
+        
+        try {
+            val response = chain.proceed(request)
+            Log.d("NETWORK", "⬅️ RESPONSE: ${response.code} ${response.message}")
+            return response
+        } catch (e: Exception) {
+            Log.e("NETWORK", "💥 NETWORK ERROR: ${e.javaClass.simpleName} - ${e.message}")
+            throw e
+        }
+    }
+}
 
+    
     // ==================== FILE HANDLING METHODS ====================
 
     private fun uriToFile(uri: Uri): File {
@@ -325,16 +343,35 @@ class ApiService(private val context: Context) {
 
     suspend fun testDnsResolution(): String {
     return try {
-        Log.d("DNS Test", "Testing DNS resolution for: resume-writer-api.onrender.com")
+        Log.d("DNS", "🔍 Testing DNS resolution...")
         
-        val addresses = java.net.InetAddress.getAllByName("resume-writer-api.onrender.com")
-        val ipList = addresses.joinToString(", ") { it.hostAddress }
-        
-        Log.d("DNS Test", "✅ DNS Resolution SUCCESS: $ipList")
-        "✅ DNS Resolution SUCCESS\nIP Addresses: $ipList"
+        // Method 1: Basic DNS resolution
+        try {
+            val addresses = java.net.InetAddress.getAllByName("resume-writer-api.onrender.com")
+            val ipList = addresses.joinToString(", ") { it.hostAddress }
+            Log.d("DNS", "✅ DNS SUCCESS: $ipList")
+            return "✅ DNS Resolution SUCCESS\nIP Addresses: $ipList"
+        } catch (e: Exception) {
+            Log.e("DNS", "❌ Method 1 failed: ${e.message}")
+        }
+
+        // Method 2: Try with timeout
+        try {
+            val future = Executors.newSingleThreadExecutor().submit<Array<InetAddress>> {
+                java.net.InetAddress.getAllByName("resume-writer-api.onrender.com")
+            }
+            val addresses = future.get(10, TimeUnit.SECONDS)
+            val ipList = addresses.joinToString(", ") { it.hostAddress }
+            return "✅ DNS Resolution SUCCESS (with timeout)\nIP Addresses: $ipList"
+        } catch (e: Exception) {
+            Log.e("DNS", "❌ Method 2 failed: ${e.message}")
+        }
+
+        "❌ All DNS methods failed\nError: Unable to resolve host\n\nTry:\n1. Switch WiFi/Mobile data\n2. Restart device\n3. Check VPN/Proxy settings"
+
     } catch (e: Exception) {
-        Log.e("DNS Test", "❌ DNS Resolution FAILED: ${e.message}")
-        "❌ DNS Resolution FAILED\nError: ${e.message}\n\nPossible causes:\n• No internet connection\n• DNS server issues\n• Firewall blocking\n• Domain doesn't exist"
+        Log.e("DNS", "💥 DNS test crashed: ${e.message}")
+        "❌ DNS test crashed: ${e.message}"
     }
 }
 
@@ -547,56 +584,16 @@ suspend fun testDnsResolution(): String {
 
 class SafeAuthInterceptor : Interceptor {
     override fun intercept(chain: Interceptor.Chain): Response {
-        return try {
-            Log.d("SafeAuth", "🔄 Starting request interception...")
+        Log.d("AUTH", "🔄 Adding basic headers...")
+        
+        val request = chain.request().newBuilder()
+            .addHeader("User-Agent", "ResumeWriter-Android/1.0")
+            .addHeader("Accept", "application/json")
+            .addHeader("Content-Type", "application/json")
+            .build()
 
-            val originalRequest = chain.request()
-            val requestBuilder = originalRequest.newBuilder()
-                .addHeader("User-Agent", "ResumeWriter-Android")
-                .addHeader("Accept", "application/json")
-
-            // Only add Content-Type for requests that have a body
-            if (originalRequest.body != null) {
-                requestBuilder.addHeader("Content-Type", "application/json")
-            }
-
-            // Add X-User-ID header if Firebase user exists (optional)
-            try {
-                val firebaseUser = FirebaseAuth.getInstance().currentUser
-                val userId = firebaseUser?.uid
-                if (!userId.isNullOrBlank()) {
-                    requestBuilder.addHeader("X-User-ID", userId)
-                    Log.d("SafeAuth", "✅ Added X-User-ID: ${userId.take(8)}...")
-                } else {
-                    Log.w("SafeAuth", "⚠️ No Firebase user found — proceeding without user header")
-                }
-            } catch (e: Exception) {
-                Log.e("SafeAuth", "❌ Firebase check failed: ${e.message}")
-            }
-
-            val newRequest = requestBuilder.build()
-            Log.d("SafeAuth", "➡️ Sending request to: ${newRequest.url}")
-
-            // Proceed with request normally
-            val response = chain.proceed(newRequest)
-            Log.d("SafeAuth", "⬅️ Response: ${response.code}")
-
-            response
-
-        } catch (e: Exception) {
-            Log.e("SafeAuth", "💥 Interceptor crashed: ${e.message}", e)
-
-            // Return a fallback error response (won’t crash app)
-            Response.Builder()
-                .request(chain.request())
-                .protocol(Protocol.HTTP_1_1)
-                .code(500)
-                .message("Interceptor Error: ${e.message}")
-                .body(
-                    "{\"error\": \"SafeAuthInterceptor failed\"}"
-                        .toResponseBody("application/json".toMediaType())
-                )
-                .build()
-        }
+        Log.d("AUTH", "➡️ Sending: ${request.method} ${request.url}")
+        
+        return chain.proceed(request)
     }
 }
