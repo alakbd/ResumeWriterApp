@@ -291,45 +291,56 @@ class ApiService(private val context: Context) {
     }
 
     suspend fun debugAuthenticationFlow(): String {
-        return try {
-            val debugInfo = StringBuilder()
-            debugInfo.appendLine("=== AUTHENTICATION DEBUG ===")
-            
-            // 1. Firebase Auth State
-            val firebaseUser = FirebaseAuth.getInstance().currentUser
-            debugInfo.appendLine("1. FIREBASE AUTH STATE:")
-            debugInfo.appendLine("   • UID: ${firebaseUser?.uid ?: "NULL"}")
-            debugInfo.appendLine("   • Email: ${firebaseUser?.email ?: "NULL"}")
-            debugInfo.appendLine("   • Email Verified: ${firebaseUser?.isEmailVerified ?: false}")
-            
-            // 2. Test credits endpoint (the one that's failing)
-            debugInfo.appendLine("2. CREDITS ENDPOINT TEST:")
-            val creditsRequest = Request.Builder()
-                .url("$baseUrl/user/credits")
-                .get()
-                .build()
-
-            try {
-                val response = client.newCall(creditsRequest).execute()
-                val respBody = response.body?.string() ?: "{}"
-                debugInfo.appendLine("   • HTTP Status: ${response.code}")
-                debugInfo.appendLine("   • Response: $respBody")
-                
-                if (response.code == 401 || respBody.contains("Missing X-User-ID")) {
-                    debugInfo.appendLine("   ❌ AUTH FAILED: X-User-ID header missing or invalid")
-                } else if (response.isSuccessful) {
-                    debugInfo.appendLine("   ✅ AUTH SUCCESS")
-                }
-            } catch (e: Exception) {
-                debugInfo.appendLine("   ❌ Request failed: ${e.message}")
+    return try {
+        val debugInfo = StringBuilder()
+        debugInfo.appendLine("=== AUTHENTICATION DEBUG ===")
+        
+        // 1. Firebase Auth State
+        val firebaseUser = FirebaseAuth.getInstance().currentUser
+        debugInfo.appendLine("1. FIREBASE AUTH STATE:")
+        debugInfo.appendLine("   • UID: ${firebaseUser?.uid ?: "NULL"}")
+        debugInfo.appendLine("   • Email: ${firebaseUser?.email ?: "NULL"}")
+        debugInfo.appendLine("   • Email Verified: ${firebaseUser?.isEmailVerified ?: false}")
+        
+        // 2. Basic Network Check
+        debugInfo.appendLine("2. NETWORK CHECK:")
+        try {
+            val healthResult = testConnection()
+            when (healthResult) {
+                is ApiResult.Success -> debugInfo.appendLine("   • Server Reachable: ✅ YES")
+                is ApiResult.Error -> debugInfo.appendLine("   • Server Reachable: ❌ NO - ${healthResult.message}")
             }
-            
-            debugInfo.appendLine("=== END DEBUG ===")
-            debugInfo.toString()
         } catch (e: Exception) {
-            "Debug failed: ${e.message}"
+            debugInfo.appendLine("   • Server Reachable: 💥 CRASHED - ${e.message}")
         }
+        
+        // 3. Credits Endpoint Test (the one that's failing)
+        debugInfo.appendLine("3. CREDITS ENDPOINT TEST:")
+        try {
+            val creditsResult = getUserCredits()
+            when (creditsResult) {
+                is ApiResult.Success -> {
+                    val credits = creditsResult.data.optInt("available_credits", -1)
+                    debugInfo.appendLine("   • Status: ✅ SUCCESS")
+                    debugInfo.appendLine("   • Credits: $credits")
+                }
+                is ApiResult.Error -> {
+                    debugInfo.appendLine("   • Status: ❌ FAILED")
+                    debugInfo.appendLine("   • Error: ${creditsResult.message}")
+                    debugInfo.appendLine("   • Code: ${creditsResult.code}")
+                }
+            }
+        } catch (e: Exception) {
+            debugInfo.appendLine("   • Status: 💥 CRASHED")
+            debugInfo.appendLine("   • Error: ${e.message}")
+        }
+        
+        debugInfo.appendLine("=== END DEBUG ===")
+        debugInfo.toString()
+    } catch (e: Exception) {
+        "Debug failed: ${e.message}"
     }
+}
 
     fun forceSyncUserManager() {
         val firebaseUser = FirebaseAuth.getInstance().currentUser
