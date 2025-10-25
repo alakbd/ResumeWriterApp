@@ -509,22 +509,38 @@ class SafeAuthInterceptor : Interceptor {
             // Add basic headers
             requestBuilder.addHeader("User-Agent", "ResumeWriter-Android")
             requestBuilder.addHeader("Accept", "application/json")
-            requestBuilder.addHeader("Content-Type", "application/json")
+            
+            // Only add Content-Type for requests that have a body
+            if (originalRequest.body != null) {
+                requestBuilder.addHeader("Content-Type", "application/json")
+            }
             
             // Safely get Firebase user and add auth header
             try {
                 val firebaseUser = FirebaseAuth.getInstance().currentUser
-                val userId = firebaseUser?.uid
+                firebaseUser?.let { user ->
+                    user.getIdToken(false).addOnCompleteListener { task ->
+                        if (task.isSuccessful) {
+                            val token = task.result?.token
+                            token?.let {
+                                requestBuilder.addHeader("Authorization", "Bearer $it")
+                                Log.d("SafeAuth", "✅ Added Auth token: ${it.take(10)}...")
+                            }
+                        }
+                    }.await() // Wait for token
+                }
                 
+                val userId = firebaseUser?.uid
                 if (!userId.isNullOrBlank()) {
                     requestBuilder.addHeader("X-User-ID", userId)
                     Log.d("SafeAuth", "✅ Added X-User-ID: ${userId.take(8)}...")
                 } else {
-                    Log.w("SafeAuth", "⚠️ No user ID available")
+                    Log.w("SafeAuth", "⚠️ No user ID available - user may not be logged in")
+                    // Don't throw, just continue without auth header
                 }
             } catch (e: Exception) {
-                Log.e("SafeAuth", "❌ Firebase error: ${e.message}")
-                // Continue without auth header rather than crashing
+                Log.e("SafeAuth", "❌ Firebase auth error: ${e.message}")
+                // Continue without auth headers rather than crashing
             }
             
             val newRequest = requestBuilder.build()
@@ -539,17 +555,14 @@ class SafeAuthInterceptor : Interceptor {
         } catch (e: Exception) {
             Log.e("SafeAuth", "💥 INTERCEPTOR CRASHED: ${e.message}", e)
             
-            // Detailed error analysis
-            when {
-                e is UnknownHostException -> Log.e("SafeAuth", "❌ DNS FAILED - Cannot resolve host")
-                e is SSLHandshakeException -> Log.e("SafeAuth", "❌ SSL FAILED - Certificate issue")
-                e is ConnectException -> Log.e("SafeAuth", "❌ CONNECTION REFUSED - Server down?")
-                e is SocketTimeoutException -> Log.e("SafeAuth", "❌ TIMEOUT - Server not responding")
-                else -> Log.e("SafeAuth", "❌ UNKNOWN NETWORK ERROR: ${e.javaClass.simpleName}")
-            }
-            
-            // Re-throw to let the caller handle it
-            throw e
+            // Return a mock response instead of crashing
+            Response.Builder()
+                .request(chain.request())
+                .protocol(Protocol.HTTP_1_1)
+                .code(500)
+                .message("Interceptor Error: ${e.message}")
+                .body("{\"error\": \"Authentication interceptor failed\"}".toResponseBody("application/json".toMediaType()))
+                .build()
         }
     }
 }
