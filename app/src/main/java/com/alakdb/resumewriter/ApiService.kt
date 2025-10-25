@@ -132,16 +132,22 @@ class ApiService(private val context: Context) {
         return analysis.toString()
     }
 
-    private fun isNetworkAvailable(): Boolean {
-        return try {
-            val connectivityManager = context.getSystemService(Context.CONNECTIVITY_SERVICE) as ConnectivityManager
-            val network = connectivityManager.activeNetwork
-            val capabilities = connectivityManager.getNetworkCapabilities(network)
-            capabilities != null && capabilities.hasCapability(NetworkCapabilities.NET_CAPABILITY_INTERNET)
-        } catch (e: Exception) {
-            false
-        }
+    fun isNetworkAvailable(): Boolean {
+    return try {
+        val connectivityManager = getSystemService(Context.CONNECTIVITY_SERVICE) as ConnectivityManager
+        val network = connectivityManager.activeNetwork ?: return false
+        val capabilities = connectivityManager.getNetworkCapabilities(network) ?: return false
+        
+        val hasInternet = capabilities.hasCapability(NetworkCapabilities.NET_CAPABILITY_INTERNET)
+        val hasNetwork = capabilities.hasCapability(NetworkCapabilities.NET_CAPABILITY_VALIDATED)
+        
+        Log.d("NetworkCheck", "Internet: $hasInternet, Validated: $hasNetwork")
+        hasInternet && hasNetwork
+    } catch (e: Exception) {
+        Log.e("NetworkCheck", "Network check failed: ${e.message}")
+        false
     }
+}
 
     // ==================== API METHODS ====================
 
@@ -191,30 +197,38 @@ class ApiService(private val context: Context) {
     }
 
     suspend fun testConnection(): ApiResult<JSONObject> {
-        return try {
-            Log.d("ApiService", "Testing connection to: $baseUrl/health")
-            
-            val request = Request.Builder()
-                .url("$baseUrl/health")
-                .get()
-                .build()
-
-            val response = simpleClient.newCall(request).execute()
-            val body = response.body?.string()
-            
-            Log.d("ApiService", "Connection test response: ${response.code}")
-            
-            if (response.isSuccessful && body != null) {
-                ApiResult.Success(JSONObject(body))
-            } else {
-                ApiResult.Error("HTTP ${response.code}: ${response.message}")
-            }
+    return try {
+        Log.d("ApiService", "Testing connection to: $baseUrl/health")
+        
+        // First test DNS resolution
+        try {
+            java.net.InetAddress.getAllByName("resume-writer-api.onrender.com")
         } catch (e: Exception) {
-            val analysis = analyzeNetworkException(e, "$baseUrl/health")
-            Log.e("ApiService", analysis)
-            ApiResult.Error("Connection failed: ${e.message ?: "Unknown error"}")
+            Log.e("ApiService", "❌ DNS Resolution failed: ${e.message}")
+            return ApiResult.Error("DNS Resolution Failed: ${e.message}")
         }
+        
+        val request = Request.Builder()
+            .url("$baseUrl/health")
+            .get()
+            .build()
+
+        val response = simpleClient.newCall(request).execute()
+        val body = response.body?.string()
+        
+        Log.d("ApiService", "Connection test response: ${response.code}")
+        
+        if (response.isSuccessful && body != null) {
+            ApiResult.Success(JSONObject(body))
+        } else {
+            ApiResult.Error("HTTP ${response.code}: ${response.message}")
+        }
+    } catch (e: Exception) {
+        val analysis = analyzeNetworkException(e, "$baseUrl/health")
+        Log.e("ApiService", analysis)
+        ApiResult.Error("Connection failed: ${e.message ?: "Unknown error"}")
     }
+}
 
     suspend fun waitForServerWakeUp(maxAttempts: Int = 12, delayBetweenAttempts: Long = 10000L): Boolean {
         return try {
@@ -493,6 +507,21 @@ class ApiService(private val context: Context) {
         } else {
             Log.w("ApiService", "⚠️ Cannot sync: No Firebase user")
         }
+    }
+}
+
+suspend fun testDnsResolution(): String {
+    return try {
+        Log.d("DNS Test", "Testing DNS resolution for: resume-writer-api.onrender.com")
+        
+        val addresses = java.net.InetAddress.getAllByName("resume-writer-api.onrender.com")
+        val ipList = addresses.joinToString(", ") { it.hostAddress }
+        
+        Log.d("DNS Test", "✅ DNS Resolution SUCCESS: $ipList")
+        "✅ DNS Resolution SUCCESS\nIP Addresses: $ipList"
+    } catch (e: Exception) {
+        Log.e("DNS Test", "❌ DNS Resolution FAILED: ${e.message}")
+        "❌ DNS Resolution FAILED\nError: ${e.message}\n\nPossible causes:\n• No internet connection\n• DNS server issues\n• Firewall blocking\n• Domain doesn't exist"
     }
 }
 
