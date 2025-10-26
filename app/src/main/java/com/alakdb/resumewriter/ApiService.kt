@@ -80,6 +80,8 @@ class ApiService(private val context: Context) {
     }
 
     // ADD TO ApiService - A client that bypasses SSL issues
+    private val client: OkHttpClient = createUnsafeOkHttpClient()
+
     private fun createUnsafeOkHttpClient(): OkHttpClient {
         return try {
             val trustAllCerts = arrayOf<javax.net.ssl.X509TrustManager>(object : javax.net.ssl.X509TrustManager {
@@ -99,7 +101,7 @@ class ApiService(private val context: Context) {
                 .writeTimeout(30, TimeUnit.SECONDS)
                 .retryOnConnectionFailure(true)
                 .addInterceptor(SimpleLoggingInterceptor())
-                .addInterceptor(SafeAuthInterceptor())
+                .addInterceptor(SafeAuthInterceptor(context)) // Pass context here
                 .build()
         } catch (e: Exception) {
             Log.e("SSL", "Failed to create unsafe client, using regular one: ${e.message}")
@@ -109,7 +111,7 @@ class ApiService(private val context: Context) {
                 .writeTimeout(30, TimeUnit.SECONDS)
                 .retryOnConnectionFailure(true)
                 .addInterceptor(SimpleLoggingInterceptor())
-                .addInterceptor(SafeAuthInterceptor())
+                .addInterceptor(SafeAuthInterceptor(context)) // Pass context here
                 .build()
         }
     }
