@@ -70,24 +70,43 @@ class ResumeGenerationActivity : AppCompatActivity() {
         testBasicApiCall()
 
         // 🔧 DEBUG: Auto-check authentication state
-        lifecycleScope.launch {
-            Log.d("ResumeActivity", "🔄 Initializing UserManager sync...")
+         lifecycleScope.launch {
+        Log.d("ResumeActivity", "🔄 Initial auth setup...")
+        
+        // First, check current auth state
+        val isLoggedIn = userManager.isUserLoggedIn()
+        Log.d("ResumeActivity", "Initial auth state: $isLoggedIn")
+        
+        if (isLoggedIn) {
+            // User appears logged in - update UI optimistically
+            withContext(Dispatchers.Main) {
+                binding.creditText.text = "Credits: Loading..."
+            }
             
-            userManager.emergencySyncWithFirebase()
-            debugUserManagerState()
-            
-            if (ensureUserAuthenticated()) {
-                Log.d("ResumeActivity", "✅ User authenticated - testing API connection")
-                testApiConnection()
+            // Then try to sync with server
+            if (isNetworkAvailable()) {
+                updateCreditDisplay()
             } else {
-                Log.w("ResumeActivity", "⚠️ User not authenticated - skipping API test")
+                // Offline - show cached credits
+                val cachedCredits = userManager.getCachedCredits()
                 withContext(Dispatchers.Main) {
-                    binding.creditText.text = "Credits: Please log in"
-                    binding.layoutConnectionStatus.visibility = View.GONE
+                    binding.creditText.text = "Credits: $cachedCredits (offline)"
                 }
+            }
+        } else {
+            // Definitely not logged in
+            withContext(Dispatchers.Main) {
+                binding.creditText.text = "Credits: Please log in"
+            }
+        }
+        
+            // Test basic connectivity (non-blocking)
+            if (isNetworkAvailable()) {
+            testBasicApiCall()
             }
         }
     }
+}
 
     override fun onResume() {
     super.onResume()
@@ -289,6 +308,39 @@ override fun onStop() {
     super.onStop()
     // Unregister network callback
     connectivityManager.unregisterNetworkCallback(networkCallback)
+}
+
+private suspend fun revalidateAuthState() {
+    Log.d("AuthRevalidation", "🔄 Revalidating authentication state...")
+    
+    try {
+        // Force sync with Firebase
+        userManager.emergencySyncWithFirebase()
+        
+        val isLoggedIn = userManager.isUserLoggedIn()
+        val firebaseUser = FirebaseAuth.getInstance().currentUser
+        
+        Log.d("AuthRevalidation", "After sync - Logged in: $isLoggedIn, Firebase: ${firebaseUser != null}")
+        
+        withContext(Dispatchers.Main) {
+            if (isLoggedIn) {
+                // Update UI to reflect logged in state
+                binding.creditText.text = "Credits: Loading..."
+                lifecycleScope.launch {
+                    updateCreditDisplay()
+                }
+                checkGenerateButtonState()
+                Log.d("AuthRevalidation", "✅ Auth revalidated - user is logged in")
+            } else {
+                // User actually needs to log in
+                binding.creditText.text = "Credits: Please log in"
+                showError("Session expired. Please log in again.")
+                Log.w("AuthRevalidation", "❌ Auth revalidation failed - user needs to login")
+            }
+        }
+    } catch (e: Exception) {
+        Log.e("AuthRevalidation", "💥 Revalidation failed: ${e.message}")
+    }
 }
 
     /** ---------------- Check email/email sending Verification ---------------- **/
