@@ -1,32 +1,28 @@
 package com.alakdb.resumewriter
 
 import android.content.Context
+import android.net.ConnectivityManager
+import android.net.NetworkCapabilities
 import android.net.Uri
 import android.util.Log
+import com.google.firebase.auth.FirebaseAuth
 import com.google.gson.Gson
+import kotlinx.coroutines.*
+import kotlinx.coroutines.Dispatchers
+import kotlinx.coroutines.withContext
 import okhttp3.*
 import okhttp3.MediaType.Companion.toMediaType
 import okhttp3.RequestBody.Companion.toRequestBody
 import org.json.JSONObject
 import java.io.File
 import java.io.IOException
-import java.util.concurrent.TimeUnit
-import com.google.firebase.auth.FirebaseAuth
-import okhttp3.MultipartBody
-import javax.net.ssl.SSLHandshakeException
-import java.net.UnknownHostException
 import java.net.ConnectException
-import java.net.SocketTimeoutException
-import java.net.SocketException
-import android.net.ConnectivityManager
-import android.net.NetworkCapabilities
-import kotlinx.coroutines.tasks.await
 import java.net.InetAddress
-import kotlinx.coroutines.*
-import kotlinx.coroutines.Dispatchers
-import kotlinx.coroutines.withContext
-import java.util.concurrent.Executors
-import com.alakdb.resumewriter.testDnsResolution
+import java.net.SocketException
+import java.net.SocketTimeoutException
+import java.net.UnknownHostException
+import java.util.concurrent.TimeUnit
+import javax.net.ssl.SSLHandshakeException
 
 // Extension functions for ResponseBody conversion
 fun String.toResponseBody(mediaType: MediaType): ResponseBody {
@@ -42,9 +38,7 @@ class ApiService(private val context: Context) {
     private val gson = Gson()
     private val baseUrl = "https://resume-writer-api.onrender.com/"
 
-     private val client: OkHttpClient = createUnsafeOkHttpClient()
-    
-    
+    private val client: OkHttpClient = createUnsafeOkHttpClient()
 
     // Simple client for health checks (no authentication needed)
     private val simpleClient = OkHttpClient.Builder()
@@ -55,8 +49,8 @@ class ApiService(private val context: Context) {
     // Data classes for API requests
     data class DeductCreditRequest(val user_id: String)
     data class GenerateResumeRequest(
-        val resume_text: String, 
-        val job_description: String, 
+        val resume_text: String,
+        val job_description: String,
         val tone: String = "Professional"
     )
 
@@ -65,58 +59,61 @@ class ApiService(private val context: Context) {
         data class Success<out T>(val data: T) : ApiResult<T>()
         data class Error(val message: String, val code: Int = 0) : ApiResult<Nothing>()
     }
-    
-    class SimpleLoggingInterceptor: Interceptor {
-    override fun intercept(chain: Interceptor.Chain): Response {
-        val request = chain.request()
-        Log.d("NETWORK", "➡️ REQUEST: ${request.method} ${request.url}")
-        
-        try {
+
+    class SimpleLoggingInterceptor : Interceptor {
+        override fun intercept(chain: Interceptor.Chain): Response {
+            val request = chain.request()
+
+            // Log on background thread to avoid main thread issues
+            CoroutineScope(Dispatchers.IO).launch {
+                Log.d("NETWORK", "➡️ REQUEST: ${request.method} ${request.url}")
+            }
+
             val response = chain.proceed(request)
-            Log.d("NETWORK", "⬅️ RESPONSE: ${response.code} ${response.message}")
+
+            CoroutineScope(Dispatchers.IO).launch {
+                Log.d("NETWORK", "⬅️ RESPONSE: ${response.code} ${response.message}")
+            }
+
             return response
-        } catch (e: Exception) {
-            Log.e("NETWORK", "💥 NETWORK ERROR: ${e.javaClass.simpleName} - ${e.message}")
-            throw e
         }
     }
-}
 
-        // ADD TO ApiService - A client that bypasses SSL issues
-private fun createUnsafeOkHttpClient(): OkHttpClient {
-    return try {
-        val trustAllCerts = arrayOf<javax.net.ssl.X509TrustManager>(object : javax.net.ssl.X509TrustManager {
-            override fun checkClientTrusted(chain: Array<java.security.cert.X509Certificate>, authType: String) = Unit
-            override fun checkServerTrusted(chain: Array<java.security.cert.X509Certificate>, authType: String) = Unit
-            override fun getAcceptedIssuers() = arrayOf<java.security.cert.X509Certificate>()
-        })
+    // ADD TO ApiService - A client that bypasses SSL issues
+    private fun createUnsafeOkHttpClient(): OkHttpClient {
+        return try {
+            val trustAllCerts = arrayOf<javax.net.ssl.X509TrustManager>(object : javax.net.ssl.X509TrustManager {
+                override fun checkClientTrusted(chain: Array<java.security.cert.X509Certificate>, authType: String) = Unit
+                override fun checkServerTrusted(chain: Array<java.security.cert.X509Certificate>, authType: String) = Unit
+                override fun getAcceptedIssuers() = arrayOf<java.security.cert.X509Certificate>()
+            })
 
-        val sslContext = javax.net.ssl.SSLContext.getInstance("SSL")
-        sslContext.init(null, trustAllCerts, java.security.SecureRandom())
+            val sslContext = javax.net.ssl.SSLContext.getInstance("SSL")
+            sslContext.init(null, trustAllCerts, java.security.SecureRandom())
 
-        OkHttpClient.Builder()
-            .sslSocketFactory(sslContext.socketFactory, trustAllCerts[0])
-            .hostnameVerifier { _, _ -> true }
-            .connectTimeout(15, TimeUnit.SECONDS)  // timeout here
-            .readTimeout(15, TimeUnit.SECONDS)     // timeout here
-            .writeTimeout(30, TimeUnit.SECONDS)    // timeout here
-            .retryOnConnectionFailure(true)
-            .addInterceptor(SimpleLoggingInterceptor())
-            .addInterceptor(SafeAuthInterceptor())
-            .build()
-    } catch (e: Exception) {
-        Log.e("SSL", "Failed to create unsafe client, using regular one: ${e.message}")
-        OkHttpClient.Builder()
-            .connectTimeout(15, TimeUnit.SECONDS)
-            .readTimeout(15, TimeUnit.SECONDS)
-            .writeTimeout(30, TimeUnit.SECONDS)
-            .retryOnConnectionFailure(true)
-            .addInterceptor(SimpleLoggingInterceptor())
-            .addInterceptor(SafeAuthInterceptor())
-            .build()
+            OkHttpClient.Builder()
+                .sslSocketFactory(sslContext.socketFactory, trustAllCerts[0])
+                .hostnameVerifier { _, _ -> true }
+                .connectTimeout(15, TimeUnit.SECONDS)
+                .readTimeout(15, TimeUnit.SECONDS)
+                .writeTimeout(30, TimeUnit.SECONDS)
+                .retryOnConnectionFailure(true)
+                .addInterceptor(SimpleLoggingInterceptor())
+                .addInterceptor(SafeAuthInterceptor())
+                .build()
+        } catch (e: Exception) {
+            Log.e("SSL", "Failed to create unsafe client, using regular one: ${e.message}")
+            OkHttpClient.Builder()
+                .connectTimeout(15, TimeUnit.SECONDS)
+                .readTimeout(15, TimeUnit.SECONDS)
+                .writeTimeout(30, TimeUnit.SECONDS)
+                .retryOnConnectionFailure(true)
+                .addInterceptor(SimpleLoggingInterceptor())
+                .addInterceptor(SafeAuthInterceptor())
+                .build()
+        }
     }
-}
-    
+
     // ==================== FILE HANDLING METHODS ====================
 
     private fun uriToFile(uri: Uri): File {
@@ -124,7 +121,7 @@ private fun createUnsafeOkHttpClient(): OkHttpClient {
             val input = context.contentResolver.openInputStream(uri)
                 ?: throw IOException("Failed to open URI: $uri")
             val file = File.createTempFile("upload_", "_tmp", context.cacheDir)
-            input.use { inputStream -> 
+            input.use { inputStream ->
                 file.outputStream().use { outputStream ->
                     inputStream.copyTo(outputStream)
                 }
@@ -151,7 +148,7 @@ private fun createUnsafeOkHttpClient(): OkHttpClient {
         analysis.appendLine("URL: $url")
         analysis.appendLine("Exception: ${e.javaClass.simpleName}")
         analysis.appendLine("Message: ${e.message}")
-        
+
         when (e) {
             is UnknownHostException -> {
                 analysis.appendLine("❌ DNS RESOLUTION FAILED")
@@ -182,40 +179,37 @@ private fun createUnsafeOkHttpClient(): OkHttpClient {
                 analysis.appendLine("   • Non-network related error")
             }
         }
-        
+
         return analysis.toString()
     }
 
     fun isNetworkAvailable(): Boolean {
-    return try {
-        val connectivityManager = context.getSystemService(Context.CONNECTIVITY_SERVICE) as ConnectivityManager
-        val network = connectivityManager.activeNetwork ?: return false
-        val capabilities = connectivityManager.getNetworkCapabilities(network) ?: return false
-        
-        val hasInternet = capabilities.hasCapability(NetworkCapabilities.NET_CAPABILITY_INTERNET)
-        val hasNetwork = capabilities.hasCapability(NetworkCapabilities.NET_CAPABILITY_VALIDATED)
-        
-        Log.d("NetworkCheck", "Internet: $hasInternet, Validated: $hasNetwork")
-        hasInternet && hasNetwork
-    } catch (e: Exception) {
-        Log.e("NetworkCheck", "Network check failed: ${e.message}")
-        false
+        return try {
+            val connectivityManager = context.getSystemService(Context.CONNECTIVITY_SERVICE) as ConnectivityManager
+            val network = connectivityManager.activeNetwork ?: return false
+            val capabilities = connectivityManager.getNetworkCapabilities(network) ?: return false
+
+            val hasInternet = capabilities.hasCapability(NetworkCapabilities.NET_CAPABILITY_INTERNET)
+            val hasNetwork = capabilities.hasCapability(NetworkCapabilities.NET_CAPABILITY_VALIDATED)
+
+            Log.d("NetworkCheck", "Internet: $hasInternet, Validated: $hasNetwork")
+            hasInternet && hasNetwork
+        } catch (e: Exception) {
+            Log.e("NetworkCheck", "Network check failed: ${e.message}")
+            false
+        }
     }
-}
 
-
-
-    
     // ==================== API METHODS ====================
 
     suspend fun generateResumeFromFiles(
-        resumeUri: Uri, 
-        jobDescUri: Uri, 
+        resumeUri: Uri,
+        jobDescUri: Uri,
         tone: String = "Professional"
-    ): ApiResult<JSONObject> {
-        return try {
+    ): ApiResult<JSONObject> = withContext(Dispatchers.IO) {
+        try {
             Log.d("ApiService", "Generating resume from files")
-            
+
             val resumeFile = uriToFile(resumeUri)
             val jobDescFile = uriToFile(jobDescUri)
 
@@ -224,9 +218,9 @@ private fun createUnsafeOkHttpClient(): OkHttpClient {
             val body = MultipartBody.Builder()
                 .setType(MultipartBody.FORM)
                 .addFormDataPart("tone", tone)
-                .addFormDataPart("resume_file", resumeFile.name, 
+                .addFormDataPart("resume_file", resumeFile.name,
                     resumeFile.asRequestBody("application/pdf".toMediaType()))
-                .addFormDataPart("job_description_file", jobDescFile.name, 
+                .addFormDataPart("job_description_file", jobDescFile.name,
                     jobDescFile.asRequestBody("application/pdf".toMediaType()))
                 .build()
 
@@ -238,12 +232,12 @@ private fun createUnsafeOkHttpClient(): OkHttpClient {
             client.newCall(request).execute().use { response ->
                 val respBody = response.body?.string() ?: "{}"
                 Log.d("ApiService", "Generate resume from files response: ${response.code}")
-                
+
                 if (!response.isSuccessful) {
                     val errorMsg = "HTTP ${response.code}: ${response.message}"
-                    return ApiResult.Error(errorMsg, response.code)
+                    return@withContext ApiResult.Error(errorMsg, response.code)
                 }
-                
+
                 ApiResult.Success(JSONObject(respBody))
             }
         } catch (e: Exception) {
@@ -253,49 +247,49 @@ private fun createUnsafeOkHttpClient(): OkHttpClient {
         }
     }
 
-    suspend fun testConnection(): ApiResult<JSONObject> {
-    return try {
-        Log.d("ApiService", "Testing connection to: $baseUrl/health")
-        
-        // First test DNS resolution
+    suspend fun testConnection(): ApiResult<JSONObject> = withContext(Dispatchers.IO) {
         try {
-            java.net.InetAddress.getAllByName("resume-writer-api.onrender.com")
-        } catch (e: Exception) {
-            Log.e("ApiService", "❌ DNS Resolution failed: ${e.message}")
-            return ApiResult.Error("DNS Resolution Failed: ${e.message}")
-        }
-        
-        val request = Request.Builder()
-            .url("$baseUrl/health")
-            .get()
-            .build()
+            Log.d("ApiService", "Testing connection to: $baseUrl/health")
 
-        val response = simpleClient.newCall(request).execute()
-        val body = response.body?.string()
-        
-        Log.d("ApiService", "Connection test response: ${response.code}")
-        
-        if (response.isSuccessful && body != null) {
-            ApiResult.Success(JSONObject(body))
-        } else {
-            ApiResult.Error("HTTP ${response.code}: ${response.message}")
+            // First test DNS resolution
+            try {
+                InetAddress.getAllByName("resume-writer-api.onrender.com")
+            } catch (e: Exception) {
+                Log.e("ApiService", "❌ DNS Resolution failed: ${e.message}")
+                return@withContext ApiResult.Error("DNS Resolution Failed: ${e.message}")
+            }
+
+            val request = Request.Builder()
+                .url("$baseUrl/health")
+                .get()
+                .build()
+
+            val response = simpleClient.newCall(request).execute()
+            val body = response.body?.string()
+
+            Log.d("ApiService", "Connection test response: ${response.code}")
+
+            if (response.isSuccessful && body != null) {
+                ApiResult.Success(JSONObject(body))
+            } else {
+                ApiResult.Error("HTTP ${response.code}: ${response.message}")
+            }
+        } catch (e: Exception) {
+            val analysis = analyzeNetworkException(e, "$baseUrl/health")
+            Log.e("ApiService", analysis)
+            ApiResult.Error("Connection failed: ${e.message ?: "Unknown error"}")
         }
-    } catch (e: Exception) {
-        val analysis = analyzeNetworkException(e, "$baseUrl/health")
-        Log.e("ApiService", analysis)
-        ApiResult.Error("Connection failed: ${e.message ?: "Unknown error"}")
     }
-}
 
     suspend fun waitForServerWakeUp(maxAttempts: Int = 12, delayBetweenAttempts: Long = 10000L): Boolean {
         return try {
             Log.d("ServerWakeUp", "🔄 Waiting for server to wake up...")
-            
+
             repeat(maxAttempts) { attempt ->
                 try {
                     Log.d("ServerWakeUp", "Attempt ${attempt + 1}/$maxAttempts")
                     val result = testConnection()
-                
+
                     when (result) {
                         is ApiResult.Success -> {
                             Log.d("ServerWakeUp", "✅ Server is awake and responding!")
@@ -308,12 +302,12 @@ private fun createUnsafeOkHttpClient(): OkHttpClient {
                 } catch (e: Exception) {
                     Log.w("ServerWakeUp", "🚨 Connection attempt ${attempt + 1} failed: ${e.message}")
                 }
-            
+
                 if (attempt < maxAttempts - 1) {
-                    kotlinx.coroutines.delay(delayBetweenAttempts)
+                    delay(delayBetweenAttempts)
                 }
             }
-            
+
             Log.e("ServerWakeUp", "❌ Server failed to wake up after $maxAttempts attempts")
             false
         } catch (e: Exception) {
@@ -322,19 +316,19 @@ private fun createUnsafeOkHttpClient(): OkHttpClient {
         }
     }
 
-    suspend fun deductCredit(userId: String): ApiResult<JSONObject> {
-        return try {
+    suspend fun deductCredit(userId: String): ApiResult<JSONObject> = withContext(Dispatchers.IO) {
+        try {
             val requestBody = DeductCreditRequest(userId)
             val body = gson.toJson(requestBody).toRequestBody("application/json".toMediaType())
-            
+
             val request = Request.Builder()
                 .url("$baseUrl/deduct-credit")
                 .post(body)
                 .build()
-            
+
             client.newCall(request).execute().use { response ->
                 val respBody = response.body?.string() ?: "{}"
-                
+
                 if (response.isSuccessful) {
                     ApiResult.Success(JSONObject(respBody))
                 } else {
@@ -349,22 +343,22 @@ private fun createUnsafeOkHttpClient(): OkHttpClient {
     }
 
     suspend fun generateResume(
-        resumeText: String, 
-        jobDescription: String, 
+        resumeText: String,
+        jobDescription: String,
         tone: String = "Professional"
-    ): ApiResult<JSONObject> {
-        return try {
+    ): ApiResult<JSONObject> = withContext(Dispatchers.IO) {
+        try {
             val requestBody = GenerateResumeRequest(resumeText, jobDescription, tone)
             val body = gson.toJson(requestBody).toRequestBody("application/json".toMediaType())
-            
+
             val request = Request.Builder()
                 .url("$baseUrl/generate-resume")
                 .post(body)
                 .build()
-            
+
             client.newCall(request).execute().use { response ->
                 val respBody = response.body?.string() ?: "{}"
-                
+
                 if (response.isSuccessful) {
                     ApiResult.Success(JSONObject(respBody))
                 } else {
@@ -379,49 +373,48 @@ private fun createUnsafeOkHttpClient(): OkHttpClient {
     }
 
     suspend fun testDnsResolution(): String = withContext(Dispatchers.IO) {
-    try {
-        Log.d("DNS", "🔍 Testing DNS resolution...")
+        try {
+            Log.d("DNS", "🔍 Testing DNS resolution...")
 
-        // Method 1: Basic DNS resolution
-        val method1Result = try {
-            val addresses = InetAddress.getAllByName("resume-writer-api.onrender.com")
-           val ipList = addresses.joinToString(", ") { addr: InetAddress -> addr.hostAddress.orEmpty() }
-            Log.d("DNS", "✅ Method 1 SUCCESS: $ipList")
-            "✅ DNS Resolution SUCCESS\nIP Addresses: $ipList"
-        } catch (e: Exception) {
-            Log.e("DNS", "❌ Method 1 failed: ${e.message}")
-            null
-        }
-
-        if (method1Result != null) return@withContext method1Result
-
-        // Method 2: With timeout (using coroutine withTimeout instead of Executors)
-        val method2Result = try {
-            val addresses = withTimeout(10_000L) {
-                InetAddress.getAllByName("resume-writer-api.onrender.com")
+            // Method 1: Basic DNS resolution
+            val method1Result = try {
+                val addresses = InetAddress.getAllByName("resume-writer-api.onrender.com")
+                val ipList = addresses.joinToString(", ") { addr: InetAddress -> addr.hostAddress.orEmpty() }
+                Log.d("DNS", "✅ Method 1 SUCCESS: $ipList")
+                "✅ DNS Resolution SUCCESS\nIP Addresses: $ipList"
+            } catch (e: Exception) {
+                Log.e("DNS", "❌ Method 1 failed: ${e.message}")
+                null
             }
-            val ipList = addresses.joinToString(", ") { addr: InetAddress -> addr.hostAddress.orEmpty() }
-            Log.d("DNS", "✅ Method 2 SUCCESS: $ipList")
-            "✅ DNS Resolution SUCCESS (with timeout)\nIP Addresses: $ipList"
+
+            if (method1Result != null) return@withContext method1Result
+
+            // Method 2: With timeout (using coroutine withTimeout instead of Executors)
+            val method2Result = try {
+                val addresses = withTimeout(10_000L) {
+                    InetAddress.getAllByName("resume-writer-api.onrender.com")
+                }
+                val ipList = addresses.joinToString(", ") { addr: InetAddress -> addr.hostAddress.orEmpty() }
+                Log.d("DNS", "✅ Method 2 SUCCESS: $ipList")
+                "✅ DNS Resolution SUCCESS (with timeout)\nIP Addresses: $ipList"
+            } catch (e: Exception) {
+                Log.e("DNS", "❌ Method 2 failed: ${e.message}")
+                null
+            }
+
+            if (method2Result != null) return@withContext method2Result
+
+            // If all methods failed
+            "❌ All DNS methods failed\nError: Unable to resolve host\n\nTry:\n1. Switch WiFi/Mobile data\n2. Restart device\n3. Check VPN/Proxy settings"
+
         } catch (e: Exception) {
-            Log.e("DNS", "❌ Method 2 failed: ${e.message}")
-            null
+            Log.e("DNS", "💥 DNS test crashed: ${e.message}")
+            "❌ DNS test crashed: ${e.message}"
         }
-
-        if (method2Result != null) return@withContext method2Result
-
-        // If all methods failed
-        "❌ All DNS methods failed\nError: Unable to resolve host\n\nTry:\n1. Switch WiFi/Mobile data\n2. Restart device\n3. Check VPN/Proxy settings"
-
-    } catch (e: Exception) {
-        Log.e("DNS", "💥 DNS test crashed: ${e.message}")
-        "❌ DNS test crashed: ${e.message}"
     }
-}
 
-    
-    suspend fun getUserCredits(): ApiResult<JSONObject> {
-        return try {
+    suspend fun getUserCredits(): ApiResult<JSONObject> = withContext(Dispatchers.IO) {
+        try {
             Log.d("ApiService", "🔄 Getting user credits from: $baseUrl/user/credits")
 
             val request = Request.Builder()
@@ -432,7 +425,7 @@ private fun createUnsafeOkHttpClient(): OkHttpClient {
             client.newCall(request).execute().use { response ->
                 val respBody = response.body?.string() ?: "{}"
                 Log.d("ApiService", "💰 Credits response: ${response.code}")
-                
+
                 if (response.isSuccessful) {
                     try {
                         val jsonResponse = JSONObject(respBody)
@@ -458,8 +451,8 @@ private fun createUnsafeOkHttpClient(): OkHttpClient {
         }
     }
 
-    suspend fun testSecureAuth(): ApiResult<JSONObject> {
-        return try {
+    suspend fun testSecureAuth(): ApiResult<JSONObject> = withContext(Dispatchers.IO) {
+        try {
             val request = Request.Builder()
                 .url("$baseUrl/security-test")
                 .post("".toRequestBody("application/json".toMediaType()))
@@ -467,7 +460,7 @@ private fun createUnsafeOkHttpClient(): OkHttpClient {
 
             client.newCall(request).execute().use { response ->
                 val respBody = response.body?.string() ?: "{}"
-                
+
                 if (response.isSuccessful) {
                     ApiResult.Success(JSONObject(respBody))
                 } else {
@@ -483,24 +476,23 @@ private fun createUnsafeOkHttpClient(): OkHttpClient {
 
     // ==================== DEBUG & UTILITY METHODS ====================
 
-    suspend fun debugHttpConnection(): String {
-    return withContext(Dispatchers.IO) {
+    suspend fun debugHttpConnection(): String = withContext(Dispatchers.IO) {
         try {
             val debug = StringBuilder()
             debug.appendLine("🔌 HTTP CONNECTION DEBUG")
             debug.appendLine("=".repeat(50))
-            
+
             // Test 1: Direct HTTP (bypass HTTPS)
             debug.appendLine("1. HTTP (port 80) test:")
             try {
                 val client = OkHttpClient.Builder()
-                    .connectTimeout(5, TimeUnit.SECONDS)  // Reduced timeout
+                    .connectTimeout(5, TimeUnit.SECONDS)
                     .build()
-                
+
                 val request = Request.Builder()
-                    .url("http://resume-writer-api.onrender.com/health") // HTTP, not HTTPS
+                    .url("http://resume-writer-api.onrender.com/health")
                     .build()
-                
+
                 val response = client.newCall(request).execute()
                 debug.appendLine("   ✅ SUCCESS: HTTP ${response.code}")
                 val body = response.body?.string()?.take(50) ?: "No body"
@@ -516,11 +508,11 @@ private fun createUnsafeOkHttpClient(): OkHttpClient {
                 val client = OkHttpClient.Builder()
                     .connectTimeout(5, TimeUnit.SECONDS)
                     .build()
-                
+
                 val request = Request.Builder()
                     .url("https://resume-writer-api.onrender.com/health")
                     .build()
-                
+
                 val response = client.newCall(request).execute()
                 debug.appendLine("   ✅ SUCCESS: HTTPS ${response.code}")
                 val body = response.body?.string()?.take(50) ?: "No body"
@@ -536,8 +528,8 @@ private fun createUnsafeOkHttpClient(): OkHttpClient {
                 val request = Request.Builder()
                     .url("https://resume-writer-api.onrender.com/health")
                     .build()
-                
-                val response = client.newCall(request).execute() // Using your unsafe client
+
+                val response = client.newCall(request).execute()
                 debug.appendLine("   ✅ SUCCESS: HTTPS ${response.code}")
                 val body = response.body?.string()?.take(50) ?: "No body"
                 debug.appendLine("   Body: $body...")
@@ -563,20 +555,19 @@ private fun createUnsafeOkHttpClient(): OkHttpClient {
             "HTTP debug failed: ${e.message}"
         }
     }
-}
-    
-    suspend fun debugAuthenticationFlow(): String {
-        return try {
+
+    suspend fun debugAuthenticationFlow(): String = withContext(Dispatchers.IO) {
+        try {
             val debugInfo = StringBuilder()
             debugInfo.appendLine("=== AUTHENTICATION DEBUG ===")
-            
+
             // 1. Firebase Auth State
             val firebaseUser = FirebaseAuth.getInstance().currentUser
             debugInfo.appendLine("1. FIREBASE AUTH STATE:")
             debugInfo.appendLine("   • UID: ${firebaseUser?.uid ?: "NULL"}")
             debugInfo.appendLine("   • Email: ${firebaseUser?.email ?: "NULL"}")
             debugInfo.appendLine("   • Email Verified: ${firebaseUser?.isEmailVerified ?: false}")
-            
+
             // 2. Basic Network Check
             debugInfo.appendLine("2. NETWORK CHECK:")
             try {
@@ -588,7 +579,7 @@ private fun createUnsafeOkHttpClient(): OkHttpClient {
             } catch (e: Exception) {
                 debugInfo.appendLine("   • Server Reachable: 💥 CRASHED - ${e.message}")
             }
-            
+
             // 3. Credits Endpoint Test
             debugInfo.appendLine("3. CREDITS ENDPOINT TEST:")
             try {
@@ -609,7 +600,7 @@ private fun createUnsafeOkHttpClient(): OkHttpClient {
                 debugInfo.appendLine("   • Status: 💥 CRASHED")
                 debugInfo.appendLine("   • Error: ${e.message}")
             }
-            
+
             debugInfo.appendLine("=== END DEBUG ===")
             debugInfo.toString()
         } catch (e: Exception) {
@@ -617,20 +608,20 @@ private fun createUnsafeOkHttpClient(): OkHttpClient {
         }
     }
 
-    suspend fun runNetworkDiagnostics(): String {
+    suspend fun runNetworkDiagnostics(): String = withContext(Dispatchers.IO) {
         val diagnostic = StringBuilder()
         diagnostic.appendLine("🩺 NETWORK DIAGNOSTICS")
         diagnostic.appendLine("=".repeat(50))
-        
+
         // 1. Basic connectivity
         diagnostic.appendLine("1. BASIC CONNECTIVITY:")
         val hasInternet = isNetworkAvailable()
         diagnostic.appendLine("   • Internet Access: ${if (hasInternet) "✅" else "❌"}")
-        
+
         // 2. DNS Resolution test
         diagnostic.appendLine("2. DNS RESOLUTION:")
         try {
-            val addresses = java.net.InetAddress.getAllByName("resume-writer-api.onrender.com")
+            val addresses = InetAddress.getAllByName("resume-writer-api.onrender.com")
             diagnostic.appendLine("   • Host resolved: ✅ (${addresses.size} IPs)")
             addresses.forEach { addr ->
                 diagnostic.appendLine("     - ${addr.hostAddress}")
@@ -639,7 +630,7 @@ private fun createUnsafeOkHttpClient(): OkHttpClient {
             diagnostic.appendLine("   • Host resolution: ❌ FAILED")
             diagnostic.appendLine("     Error: ${e.message}")
         }
-        
+
         // 3. HTTP Health check
         diagnostic.appendLine("3. HTTP HEALTH CHECK:")
         val healthResult = testConnection()
@@ -653,8 +644,8 @@ private fun createUnsafeOkHttpClient(): OkHttpClient {
                 diagnostic.appendLine("     Error: ${healthResult.message}")
             }
         }
-        
-        // 4. Authentication test  
+
+        // 4. Authentication test
         diagnostic.appendLine("4. AUTHENTICATION TEST:")
         val creditResult = getUserCredits()
         when (creditResult) {
@@ -667,12 +658,12 @@ private fun createUnsafeOkHttpClient(): OkHttpClient {
                 diagnostic.appendLine("     Error: ${creditResult.message} (Code: ${creditResult.code})")
             }
         }
-        
+
         diagnostic.appendLine("=".repeat(50))
-        return diagnostic.toString()
+        diagnostic.toString()
     }
 
-    fun decodeBase64File(base64Data: String): ByteArray = 
+    fun decodeBase64File(base64Data: String): ByteArray =
         android.util.Base64.decode(base64Data, android.util.Base64.DEFAULT)
 
     fun saveFileToStorage(data: ByteArray, filename: String): File {
@@ -691,35 +682,21 @@ private fun createUnsafeOkHttpClient(): OkHttpClient {
     }
 }
 
-suspend fun testDnsResolution(): String {
-    return try {
-        Log.d("DNS Test", "Testing DNS resolution for: resume-writer-api.onrender.com")
-        
-        val addresses = java.net.InetAddress.getAllByName("resume-writer-api.onrender.com")
-        val ipList = addresses.joinToString(", ") { it.hostAddress.orEmpty() }
-        
-        Log.d("DNS Test", "✅ DNS Resolution SUCCESS: $ipList")
-        "✅ DNS Resolution SUCCESS\nIP Addresses: $ipList"
-    } catch (e: Exception) {
-        Log.e("DNS Test", "❌ DNS Resolution FAILED: ${e.message}")
-        "❌ DNS Resolution FAILED\nError: ${e.message}\n\nPossible causes:\n• No internet connection\n• DNS server issues\n• Firewall blocking\n• Domain doesn't exist"
-    }
-}
-
 // ==================== INTERCEPTOR ====================
 
 class SafeAuthInterceptor : Interceptor {
     override fun intercept(chain: Interceptor.Chain): Response {
-        Log.d("AUTH", "🔄 Adding basic headers...")
-        
+        // Move logging to background thread
+        CoroutineScope(Dispatchers.IO).launch {
+            Log.d("AUTH", "🔄 Adding basic headers...")
+        }
+
         val request = chain.request().newBuilder()
             .addHeader("User-Agent", "ResumeWriter-Android/1.0")
             .addHeader("Accept", "application/json")
             .addHeader("Content-Type", "application/json")
             .build()
 
-        Log.d("AUTH", "➡️ Sending: ${request.method} ${request.url}")
-        
         return chain.proceed(request)
     }
 }
