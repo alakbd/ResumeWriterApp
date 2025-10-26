@@ -16,6 +16,7 @@ class UserManager(private val context: Context) {
         context.getSharedPreferences("user_prefs", Context.MODE_PRIVATE)
     private val auth: FirebaseAuth = FirebaseAuth.getInstance()
     private val db: FirebaseFirestore = FirebaseFirestore.getInstance()
+    private val lifecycleScope = CoroutineScope(Dispatchers.IO)
 
     companion object {
         private const val USER_EMAIL_KEY = "user_email"
