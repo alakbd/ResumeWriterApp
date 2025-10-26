@@ -258,7 +258,7 @@ fun isUserLoggedIn(): Boolean {
         // If Firebase user exists but local data is missing, sync it
         if (userId.isNullOrBlank()) {
             Log.w("UserManager", "🔄 Syncing local data from Firebase...")
-            saveUserDataLocally(firebaseUser.email ?: "", firebaseUser.uid)
+            saveUserDataLocally(firebaseUser?.email ?: "", firebaseUser?.uid ?: "")
         }
         
         return true
@@ -357,32 +357,32 @@ fun getUserIdForHeaders(): String? {
         // Priority 1: Direct Firebase (most reliable)
         val firebaseUser = FirebaseAuth.getInstance().currentUser
         val firebaseUid = firebaseUser?.uid
-        
+
         if (!firebaseUid.isNullOrBlank()) {
             Log.d("UserManager", "🔥 Using Firebase UID for headers: ${firebaseUid.take(8)}...")
-            
+
             // Emergency sync to local storage
             try {
                 if (getCurrentUserId() != firebaseUid) {
-                    saveUserDataLocally(firebaseUser.email ?: "", firebaseUid)
+                    saveUserDataLocally(firebaseUser?.email ?: "", firebaseUid)
                 }
             } catch (e: Exception) {
                 Log.w("UserManager", "⚠️ Local sync failed but we have Firebase UID")
             }
-            
+
             return firebaseUid
         }
-        
+
         // Priority 2: Local storage
         val localUid = getCurrentUserId()
         if (!localUid.isNullOrBlank()) {
             Log.d("UserManager", "📱 Using local UID for headers: ${localUid.take(8)}...")
             return localUid
         }
-        
+
         Log.e("UserManager", "❌ NO UID AVAILABLE FOR HEADERS")
         null
-        
+
     } catch (e: Exception) {
         Log.e("UserManager", "💥 Header UID retrieval failed: ${e.message}")
         null
