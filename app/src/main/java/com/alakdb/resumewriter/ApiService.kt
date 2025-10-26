@@ -380,35 +380,39 @@ private fun createUnsafeOkHttpClient(): OkHttpClient {
         }
     }
 
-    suspend fun testDnsResolution(): String {
-    return try {
+    suspend fun testDnsResolution(): String = withContext(Dispatchers.IO) {
+    try {
         Log.d("DNS", "🔍 Testing DNS resolution...")
 
         // Method 1: Basic DNS resolution
-        try {
-            val addresses = java.net.InetAddress.getAllByName("resume-writer-api.onrender.com")
+        val method1Result = try {
+            val addresses = InetAddress.getAllByName("resume-writer-api.onrender.com")
             val ipList = addresses.joinToString(", ") { addr: InetAddress -> addr.hostAddress }
-            Log.d("DNS", "✅ DNS SUCCESS: $ipList")
+            Log.d("DNS", "✅ Method 1 SUCCESS: $ipList")
             "✅ DNS Resolution SUCCESS\nIP Addresses: $ipList"
         } catch (e: Exception) {
             Log.e("DNS", "❌ Method 1 failed: ${e.message}")
             null
-        }?.let { return it }  // Only return if Method 1 succeeded
+        }
 
-        // Method 2: DNS resolution with timeout
-        try {
-            val future = Executors.newSingleThreadExecutor().submit<Array<InetAddress>> {
-                java.net.InetAddress.getAllByName("resume-writer-api.onrender.com")
+        if (method1Result != null) return@withContext method1Result
+
+        // Method 2: With timeout (using coroutine withTimeout instead of Executors)
+        val method2Result = try {
+            val addresses = withTimeout(10_000L) {
+                InetAddress.getAllByName("resume-writer-api.onrender.com")
             }
-            val addresses = future.get(10, TimeUnit.SECONDS)
             val ipList = addresses.joinToString(", ") { addr: InetAddress -> addr.hostAddress }
+            Log.d("DNS", "✅ Method 2 SUCCESS: $ipList")
             "✅ DNS Resolution SUCCESS (with timeout)\nIP Addresses: $ipList"
         } catch (e: Exception) {
             Log.e("DNS", "❌ Method 2 failed: ${e.message}")
             null
-        }?.let { return it }  // Only return if Method 2 succeeded
+        }
 
-        // If both methods failed
+        if (method2Result != null) return@withContext method2Result
+
+        // If all methods failed
         "❌ All DNS methods failed\nError: Unable to resolve host\n\nTry:\n1. Switch WiFi/Mobile data\n2. Restart device\n3. Check VPN/Proxy settings"
 
     } catch (e: Exception) {
