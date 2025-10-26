@@ -4,6 +4,7 @@ import android.content.Context
 import android.content.Intent
 import kotlinx.coroutines.tasks.await
 import android.net.ConnectivityManager
+import android.net.Network
 import android.net.NetworkCapabilities
 import android.net.Uri
 import android.os.Bundle
@@ -52,6 +53,23 @@ class ResumeGenerationActivity : AppCompatActivity() {
         const val RETRY_DELAY_MS = 3000L
     }
 
+    private val connectivityManager by lazy {
+        getSystemService(Context.CONNECTIVITY_SERVICE) as ConnectivityManager
+    }
+
+    private val networkCallback = object : ConnectivityManager.NetworkCallback() {
+        override fun onAvailable(network: Network) {
+            Log.d("NetworkState", "📡 Network available - revalidating auth state")
+            lifecycleScope.launch {
+                revalidateAuthState()
+            }
+        }
+        
+        override fun onLost(network: Network) {
+            Log.d("NetworkState", "📡 Network lost")
+        }
+    }
+
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
         binding = ActivityResumeGenerationBinding.inflate(layoutInflater)
@@ -66,81 +84,98 @@ class ResumeGenerationActivity : AppCompatActivity() {
         checkEmailVerification()
         checkGenerateButtonState()
 
-         // 🔧 TEST BASIC CONNECTIVITY FIRST
+        // 🔧 TEST BASIC CONNECTIVITY FIRST
         testBasicApiCall()
 
         // 🔧 DEBUG: Auto-check authentication state
-         lifecycleScope.launch {
-        Log.d("ResumeActivity", "🔄 Initial auth setup...")
-        
-        // First, check current auth state
-        val isLoggedIn = userManager.isUserLoggedIn()
-        Log.d("ResumeActivity", "Initial auth state: $isLoggedIn")
-        
-        if (isLoggedIn) {
-            // User appears logged in - update UI optimistically
-            withContext(Dispatchers.Main) {
-                binding.creditText.text = "Credits: Loading..."
-            }
+        lifecycleScope.launch {
+            Log.d("ResumeActivity", "🔄 Initial auth setup...")
             
-            // Then try to sync with server
-            if (isNetworkAvailable()) {
-                updateCreditDisplay()
-            } else {
-                // Offline - show cached credits
-                val cachedCredits = userManager.getCachedCredits()
+            // First, check current auth state
+            val isLoggedIn = userManager.isUserLoggedIn()
+            Log.d("ResumeActivity", "Initial auth state: $isLoggedIn")
+            
+            if (isLoggedIn) {
+                // User appears logged in - update UI optimistically
                 withContext(Dispatchers.Main) {
-                    binding.creditText.text = "Credits: $cachedCredits (offline)"
+                    binding.creditText.text = "Credits: Loading..."
                 }
-            }
-        } else {
-            // Definitely not logged in
-            withContext(Dispatchers.Main) {
-                binding.creditText.text = "Credits: Please log in"
-            }
-        }
-        
-            // Test basic connectivity (non-blocking)
-            if (isNetworkAvailable()) {
-            testBasicApiCall()
-            }
-        }
-    }
-}
-
-    override fun onResume() {
-    super.onResume()
-    
-    lifecycleScope.launch {
-        Log.d("ResumeActivity", "🔄 onResume - refreshing data...")
-        
-        try {
-            // Add initial delay to let system stabilize
-            delay(1000L)
-            
-            val authValid = checkAuthenticationState()
-            
-            if (authValid) {
-                // Only update credits if we have a stable connection
+                
+                // Then try to sync with server
                 if (isNetworkAvailable()) {
                     updateCreditDisplay()
                 } else {
-                    binding.creditText.text = "Credits: Offline"
+                    // Offline - show cached credits
+                    val cachedCredits = userManager.getCachedCredits()
+                    withContext(Dispatchers.Main) {
+                        binding.creditText.text = "Credits: $cachedCredits (offline)"
+                    }
+                }
+            } else {
+                // Definitely not logged in
+                withContext(Dispatchers.Main) {
+                    binding.creditText.text = "Credits: Please log in"
                 }
             }
             
-            withContext(Dispatchers.Main) {
-                checkGenerateButtonState()
-            }
-        } catch (e: Exception) {
-            Log.e("ResumeActivity", "❌ onResume failed: ${e.message}", e)
-            withContext(Dispatchers.Main) {
-                binding.creditText.text = "Credits: Error"
-                // Don't show error toast here to avoid spamming user
+            // Test basic connectivity (non-blocking)
+            if (isNetworkAvailable()) {
+                testBasicApiCall()
             }
         }
     }
-}
+
+    override fun onStart() {
+        super.onStart()
+        // Register network callback
+        connectivityManager.registerDefaultNetworkCallback(networkCallback)
+    }
+
+    override fun onStop() {
+        super.onStop()
+        // Unregister network callback
+        try {
+            connectivityManager.unregisterNetworkCallback(networkCallback)
+        } catch (e: Exception) {
+            Log.w("NetworkState", "Failed to unregister network callback: ${e.message}")
+        }
+    }
+
+    override fun onResume() {
+        super.onResume()
+        
+        lifecycleScope.launch {
+            Log.d("ResumeActivity", "🔄 onResume - refreshing data...")
+            
+            try {
+                // Add initial delay to let system stabilize
+                delay(1000L)
+                
+                val authValid = checkAuthenticationState()
+                
+                if (authValid) {
+                    // Only update credits if we have a stable connection
+                    if (isNetworkAvailable()) {
+                        updateCreditDisplay()
+                    } else {
+                        withContext(Dispatchers.Main) {
+                            binding.creditText.text = "Credits: Offline"
+                        }
+                    }
+                }
+                
+                withContext(Dispatchers.Main) {
+                    checkGenerateButtonState()
+                }
+            } catch (e: Exception) {
+                Log.e("ResumeActivity", "❌ onResume failed: ${e.message}", e)
+                withContext(Dispatchers.Main) {
+                    binding.creditText.text = "Credits: Error"
+                    // Don't show error toast here to avoid spamming user
+                }
+            }
+        }
+    }
 
     /** ---------------- File Picker Setup ---------------- **/
     private fun registerFilePickers() {
@@ -204,7 +239,7 @@ class ResumeGenerationActivity : AppCompatActivity() {
         
         // 🔧 DEBUG BUTTON
         binding.btnDebugAuth.setOnClickListener {
-            runComprehensiveNetworkTest()  // This calls the new method
+            runComprehensiveNetworkTest()
         }
         
         // 🔧 HEADER TEST BUTTON
@@ -228,120 +263,91 @@ class ResumeGenerationActivity : AppCompatActivity() {
         }
     }
 
-      /** ---------------- NEW NETWORK TEST METHOD - ADD THIS ---------------- **/
+    /** ---------------- NETWORK TEST METHOD ---------------- **/
     private fun runComprehensiveNetworkTest() {
-    lifecycleScope.launch {
-        try {
-            binding.tvGeneratedResume.text = "🩺 Running comprehensive network test..."
-            
-            val results = StringBuilder()
-            results.appendLine("🌐 COMPREHENSIVE NETWORK TEST")
-            results.appendLine("=".repeat(60))
-            
-            // Test 1: Basic connectivity
-            results.appendLine("1. BASIC CONNECTIVITY:")
-            results.appendLine("   • Internet: ✅ (DNS resolves to: 216.24.57.7, 216.24.57.251)")
-            
-            // Test 2: HTTP connection debugging
-            results.appendLine("\n2. HTTP CONNECTION TESTS:")
-            try {
-                val httpDebug = withTimeout(30000) { // 30 second timeout
-                    apiService.debugHttpConnection()
-                }
-                results.append(httpDebug)
-            } catch (e: TimeoutCancellationException) {
-                results.appendLine("   ⏰ TIMEOUT: HTTP tests took too long")
-            } catch (e: Exception) {
-                results.appendLine("   💥 CRASHED: ${e.message}")
-            }
-            
-            // Test 3: Test with the unsafe client
-            results.appendLine("\n3. UNSAFE CLIENT TEST:")
-            try {
-                val testResult = withTimeout(15000) { // 15 second timeout
-                    apiService.testConnection()
-                }
-                when (testResult) {
-                    is ApiService.ApiResult.Success -> 
-                        results.appendLine("   ✅ SUCCESS: ${testResult.data}")
-                    is ApiService.ApiResult.Error -> 
-                        results.appendLine("   ❌ FAILED: ${testResult.message}")
-                }
-            } catch (e: TimeoutCancellationException) {
-                results.appendLine("   ⏰ TIMEOUT: Test took too long")
-            } catch (e: Exception) {
-                results.appendLine("   💥 CRASHED: ${e.message}")
-            }
-            
-            binding.tvGeneratedResume.text = results.toString()
-            
-        } catch (e: Exception) {
-            binding.tvGeneratedResume.text = "💥 Main test crashed: ${e.message}"
-        }
-    }
-}
-
-    private val connectivityManager by lazy {
-    getSystemService(Context.CONNECTIVITY_SERVICE) as ConnectivityManager
-}
-
-private val networkCallback = object : ConnectivityManager.NetworkCallback() {
-    override fun onAvailable(network: Network) {
-        Log.d("NetworkState", "📡 Network available - revalidating auth state")
         lifecycleScope.launch {
-            revalidateAuthState()
-        }
-    }
-    
-    override fun onLost(network: Network) {
-        Log.d("NetworkState", "📡 Network lost")
-    }
-}
-
-override fun onStart() {
-    super.onStart()
-    // Register network callback
-    connectivityManager.registerDefaultNetworkCallback(networkCallback)
-}
-
-override fun onStop() {
-    super.onStop()
-    // Unregister network callback
-    connectivityManager.unregisterNetworkCallback(networkCallback)
-}
-
-private suspend fun revalidateAuthState() {
-    Log.d("AuthRevalidation", "🔄 Revalidating authentication state...")
-    
-    try {
-        // Force sync with Firebase
-        userManager.emergencySyncWithFirebase()
-        
-        val isLoggedIn = userManager.isUserLoggedIn()
-        val firebaseUser = FirebaseAuth.getInstance().currentUser
-        
-        Log.d("AuthRevalidation", "After sync - Logged in: $isLoggedIn, Firebase: ${firebaseUser != null}")
-        
-        withContext(Dispatchers.Main) {
-            if (isLoggedIn) {
-                // Update UI to reflect logged in state
-                binding.creditText.text = "Credits: Loading..."
-                lifecycleScope.launch {
-                    updateCreditDisplay()
+            try {
+                binding.tvGeneratedResume.text = "🩺 Running comprehensive network test..."
+                
+                val results = StringBuilder()
+                results.appendLine("🌐 COMPREHENSIVE NETWORK TEST")
+                results.appendLine("=".repeat(60))
+                
+                // Test 1: Basic connectivity
+                results.appendLine("1. BASIC CONNECTIVITY:")
+                results.appendLine("   • Internet: ✅ (DNS resolves to: 216.24.57.7, 216.24.57.251)")
+                
+                // Test 2: HTTP connection debugging
+                results.appendLine("\n2. HTTP CONNECTION TESTS:")
+                try {
+                    val httpDebug = withTimeout(30000) { // 30 second timeout
+                        apiService.debugHttpConnection()
+                    }
+                    results.append(httpDebug)
+                } catch (e: TimeoutCancellationException) {
+                    results.appendLine("   ⏰ TIMEOUT: HTTP tests took too long")
+                } catch (e: Exception) {
+                    results.appendLine("   💥 CRASHED: ${e.message}")
                 }
-                checkGenerateButtonState()
-                Log.d("AuthRevalidation", "✅ Auth revalidated - user is logged in")
-            } else {
-                // User actually needs to log in
-                binding.creditText.text = "Credits: Please log in"
-                showError("Session expired. Please log in again.")
-                Log.w("AuthRevalidation", "❌ Auth revalidation failed - user needs to login")
+                
+                // Test 3: Test with the unsafe client
+                results.appendLine("\n3. UNSAFE CLIENT TEST:")
+                try {
+                    val testResult = withTimeout(15000) { // 15 second timeout
+                        apiService.testConnection()
+                    }
+                    when (testResult) {
+                        is ApiService.ApiResult.Success -> 
+                            results.appendLine("   ✅ SUCCESS: ${testResult.data}")
+                        is ApiService.ApiResult.Error -> 
+                            results.appendLine("   ❌ FAILED: ${testResult.message}")
+                    }
+                } catch (e: TimeoutCancellationException) {
+                    results.appendLine("   ⏰ TIMEOUT: Test took too long")
+                } catch (e: Exception) {
+                    results.appendLine("   💥 CRASHED: ${e.message}")
+                }
+                
+                binding.tvGeneratedResume.text = results.toString()
+                
+            } catch (e: Exception) {
+                binding.tvGeneratedResume.text = "💥 Main test crashed: ${e.message}"
             }
         }
-    } catch (e: Exception) {
-        Log.e("AuthRevalidation", "💥 Revalidation failed: ${e.message}")
     }
-}
+
+    private suspend fun revalidateAuthState() {
+        Log.d("AuthRevalidation", "🔄 Revalidating authentication state...")
+        
+        try {
+            // Force sync with Firebase
+            userManager.emergencySyncWithFirebase()
+            
+            val isLoggedIn = userManager.isUserLoggedIn()
+            val firebaseUser = FirebaseAuth.getInstance().currentUser
+            
+            Log.d("AuthRevalidation", "After sync - Logged in: $isLoggedIn, Firebase: ${firebaseUser != null}")
+            
+            withContext(Dispatchers.Main) {
+                if (isLoggedIn) {
+                    // Update UI to reflect logged in state
+                    binding.creditText.text = "Credits: Loading..."
+                    lifecycleScope.launch {
+                        updateCreditDisplay()
+                    }
+                    checkGenerateButtonState()
+                    Log.d("AuthRevalidation", "✅ Auth revalidated - user is logged in")
+                } else {
+                    // User actually needs to log in
+                    binding.creditText.text = "Credits: Please log in"
+                    showError("Session expired. Please log in again.")
+                    Log.w("AuthRevalidation", "❌ Auth revalidation failed - user needs to login")
+                }
+            }
+        } catch (e: Exception) {
+            Log.e("AuthRevalidation", "💥 Revalidation failed: ${e.message}")
+        }
+    }
 
     /** ---------------- Check email/email sending Verification ---------------- **/
     private fun checkEmailVerification() {
@@ -399,38 +405,38 @@ private suspend fun revalidateAuthState() {
     }
     
     /** ---------------- API Connection Test ---------------- **/
-private fun testBasicApiCall() {
-    lifecycleScope.launch {
-        try {
-            binding.tvConnectionStatus.text = "Testing basic API call..."
-            binding.progressConnection.visibility = View.VISIBLE
-            
-            Log.d("BasicTest", "🔄 Testing basic API call without authentication...")
-            
-            // Test the health endpoint first (no auth required)
-            val result = apiService.testConnection()
-            
-            when (result) {
-                is ApiService.ApiResult.Success -> {
-                    binding.tvConnectionStatus.text = "✅ Basic API works!"
-                    Log.d("BasicTest", "✅ Basic API call SUCCESS: ${result.data}")
-                    showMessage("Basic connectivity: ✅ WORKING")
+    private fun testBasicApiCall() {
+        lifecycleScope.launch {
+            try {
+                binding.tvConnectionStatus.text = "Testing basic API call..."
+                binding.progressConnection.visibility = View.VISIBLE
+                
+                Log.d("BasicTest", "🔄 Testing basic API call without authentication...")
+                
+                // Test the health endpoint first (no auth required)
+                val result = apiService.testConnection()
+                
+                when (result) {
+                    is ApiService.ApiResult.Success -> {
+                        binding.tvConnectionStatus.text = "✅ Basic API works!"
+                        Log.d("BasicTest", "✅ Basic API call SUCCESS: ${result.data}")
+                        showMessage("Basic connectivity: ✅ WORKING")
+                    }
+                    is ApiService.ApiResult.Error -> {
+                        binding.tvConnectionStatus.text = "❌ Basic API failed: ${result.message}"
+                        Log.e("BasicTest", "❌ Basic API call FAILED: ${result.message}")
+                        showMessage("Basic connectivity: ❌ FAILED - ${result.message}")
+                    }
                 }
-                is ApiService.ApiResult.Error -> {
-                    binding.tvConnectionStatus.text = "❌ Basic API failed: ${result.message}"
-                    Log.e("BasicTest", "❌ Basic API call FAILED: ${result.message}")
-                    showMessage("Basic connectivity: ❌ FAILED - ${result.message}")
-                }
+            } catch (e: Exception) {
+                binding.tvConnectionStatus.text = "💥 Test crashed: ${e.message}"
+                Log.e("BasicTest", "💥 Test crashed", e)
+                showMessage("Test crashed: ${e.message}")
+            } finally {
+                binding.progressConnection.visibility = View.GONE
             }
-        } catch (e: Exception) {
-            binding.tvConnectionStatus.text = "💥 Test crashed: ${e.message}"
-            Log.e("BasicTest", "💥 Test crashed", e)
-            showMessage("Test crashed: ${e.message}")
-        } finally {
-            binding.progressConnection.visibility = View.GONE
         }
     }
-}
     
     private fun testApiConnection() {
         binding.layoutConnectionStatus.visibility = View.VISIBLE
@@ -490,7 +496,6 @@ private fun testBasicApiCall() {
         }
     }
 
-    // ADD THIS MISSING METHOD:
     private fun showMessage(message: String) {
         Toast.makeText(this, message, Toast.LENGTH_LONG).show()
     }
@@ -501,37 +506,35 @@ private fun testBasicApiCall() {
         val capabilities = connectivityManager.getNetworkCapabilities(network) ?: return false
         return capabilities.hasCapability(NetworkCapabilities.NET_CAPABILITY_INTERNET)
     }
-
-
     
     private suspend fun ensureUserAuthenticated(): Boolean {
-    return try {
-        val userManagerLoggedIn = userManager.isUserLoggedIn()
-        val firebaseUser = FirebaseAuth.getInstance().currentUser
-        
-        Log.d("AUTH_CHECK", "UserManager: $userManagerLoggedIn, Firebase: ${firebaseUser != null}")
-        
-        if (userManagerLoggedIn) {
-            Log.d("AUTH_CHECK", "✅ User properly authenticated")
-            true
-        } else {
-            Log.e("AUTH_CHECK", "❌ User not authenticated")
+        return try {
+            val userManagerLoggedIn = userManager.isUserLoggedIn()
+            val firebaseUser = FirebaseAuth.getInstance().currentUser
+            
+            Log.d("AUTH_CHECK", "UserManager: $userManagerLoggedIn, Firebase: ${firebaseUser != null}")
+            
+            if (userManagerLoggedIn) {
+                Log.d("AUTH_CHECK", "✅ User properly authenticated")
+                true
+            } else {
+                Log.e("AUTH_CHECK", "❌ User not authenticated")
+                withContext(Dispatchers.Main) {
+                    showError("Please log in to continue")
+                    binding.creditText.text = "Credits: Please log in"
+                }
+                false
+            }
+            
+        } catch (e: Exception) {
+            Log.e("AUTH_CHECK", "💥 Authentication check failed: ${e.message}", e)
             withContext(Dispatchers.Main) {
-                showError("Please log in to continue")
-                binding.creditText.text = "Credits: Please log in"
+                showError("Authentication system error")
+                binding.creditText.text = "Credits: Error"
             }
             false
         }
-        
-    } catch (e: Exception) {
-        Log.e("AUTH_CHECK", "💥 Authentication check failed: ${e.message}", e)
-        withContext(Dispatchers.Main) {
-            showError("Authentication system error")
-            binding.creditText.text = "Credits: Error"
-        }
-        false
     }
-}
 
     private suspend fun safeApiCall(block: suspend () -> Unit) {
         try {
@@ -560,156 +563,156 @@ private fun testBasicApiCall() {
 
     /** ---------------- Resume Generation ---------------- **/
     private fun generateResumeFromFiles() {
-    val resumeUri = selectedResumeUri ?: return showError("Please select resume file")
-    val jobDescUri = selectedJobDescUri ?: return showError("Please select job description file")
+        val resumeUri = selectedResumeUri ?: return showError("Please select resume file")
+        val jobDescUri = selectedJobDescUri ?: return showError("Please select job description file")
 
-    disableGenerateButton("Processing...")
+        disableGenerateButton("Processing...")
 
-    lifecycleScope.launch {
-        try {
-            if (!ensureAuthenticatedBeforeApiCall()) {
+        lifecycleScope.launch {
+            try {
+                if (!ensureAuthenticatedBeforeApiCall()) {
+                    resetGenerateButton()
+                    return@launch
+                }
+
+                Log.d("ResumeActivity", "Checking user credits")
+                val creditResult = safeApiCallWithResult("getUserCredits") { 
+                    apiService.getUserCredits() 
+                }
+                
+                when (creditResult) {
+                    is ApiService.ApiResult.Success -> {
+                        val credits = creditResult.data.optInt("available_credits", 0)
+                        Log.d("ResumeActivity", "User has $credits credits")
+                        
+                        if (credits <= 0) {
+                            showErrorAndReset("Insufficient credits. Please purchase more.")
+                            return@launch
+                        }
+
+                        Log.d("ResumeActivity", "Generating resume from files")
+                        val genResult = safeApiCallWithResult("generateResumeFromFiles") { 
+                            apiService.generateResumeFromFiles(resumeUri, jobDescUri) 
+                        }
+                        handleGenerationResult(genResult)
+                    }
+                    is ApiService.ApiResult.Error -> {
+                        Log.e("ResumeActivity", "Failed to get credits: ${creditResult.message}")
+                        showErrorAndReset("Failed to check credits: ${creditResult.message}")
+                        
+                        if (creditResult.code == 401) {
+                            showError("Authentication failed. Please log out and log in again.")
+                            userManager.logout()
+                            checkGenerateButtonState()
+                        }
+                    }
+                }
+            } catch (e: Exception) {
+                Log.e("ResumeActivity", "Exception in generateResumeFromFiles: ${e.message}", e)
+                showErrorAndReset("Generation failed: ${e.message}")
+            } finally {
                 resetGenerateButton()
-                return@launch
             }
-
-            Log.d("ResumeActivity", "Checking user credits")
-            val creditResult = safeApiCall("getUserCredits") { 
-                apiService.getUserCredits() 
-            }
-            
-            when (creditResult) {
-                is ApiService.ApiResult.Success -> {
-                    val credits = creditResult.data.optInt("available_credits", 0)
-                    Log.d("ResumeActivity", "User has $credits credits")
-                    
-                    if (credits <= 0) {
-                        showErrorAndReset("Insufficient credits. Please purchase more.")
-                        return@launch
-                    }
-
-                    Log.d("ResumeActivity", "Generating resume from files")
-                    val genResult = safeApiCall("generateResumeFromFiles") { 
-                        apiService.generateResumeFromFiles(resumeUri, jobDescUri) 
-                    }
-                    handleGenerationResult(genResult)
-                }
-                is ApiService.ApiResult.Error -> {
-                    Log.e("ResumeActivity", "Failed to get credits: ${creditResult.message}")
-                    showErrorAndReset("Failed to check credits: ${creditResult.message}")
-                    
-                    if (creditResult.code == 401) {
-                        showError("Authentication failed. Please log out and log in again.")
-                        userManager.logout()
-                        checkGenerateButtonState()
-                    }
-                }
-            }
-        } catch (e: Exception) {
-            Log.e("ResumeActivity", "Exception in generateResumeFromFiles: ${e.message}", e)
-            showErrorAndReset("Generation failed: ${e.message}")
-        } finally {
-            resetGenerateButton()
         }
     }
-}
 
     private fun generateResumeFromText() {
-    val resumeText = binding.etResumeText.text.toString().trim()
-    val jobDesc = binding.etJobDescription.text.toString().trim()
+        val resumeText = binding.etResumeText.text.toString().trim()
+        val jobDesc = binding.etJobDescription.text.toString().trim()
 
-    if (resumeText.isEmpty() || jobDesc.isEmpty()) {
-        showError("Please enter both resume text and job description")
-        return
-    }
+        if (resumeText.isEmpty() || jobDesc.isEmpty()) {
+            showError("Please enter both resume text and job description")
+            return
+        }
 
-    disableGenerateButton("Processing...")
+        disableGenerateButton("Processing...")
 
-    lifecycleScope.launch {
-        try {
-            if (!ensureAuthenticatedBeforeApiCall()) {
+        lifecycleScope.launch {
+            try {
+                if (!ensureAuthenticatedBeforeApiCall()) {
+                    resetGenerateButton()
+                    return@launch
+                }
+
+                val creditResult = safeApiCallWithResult("getUserCredits") { 
+                    apiService.getUserCredits() 
+                }
+                when (creditResult) {
+                    is ApiService.ApiResult.Success -> {
+                        val credits = creditResult.data.optInt("available_credits", 0)
+                        Log.d("ResumeActivity", "User has $credits credits")
+                        if (credits <= 0) {
+                            showErrorAndReset("Insufficient credits. Please purchase more.")
+                            return@launch
+                        }
+                        
+                        Log.d("ResumeActivity", "Generating resume from text input")
+                        val genResult = safeApiCallWithResult("generateResume") { 
+                            apiService.generateResume(resumeText, jobDesc) 
+                        }
+                        handleGenerationResult(genResult)
+                    }
+                    is ApiService.ApiResult.Error -> {
+                        Log.e("ResumeActivity", "Failed to check credits: ${creditResult.message}")
+                        showErrorAndReset("Failed to check credits: ${creditResult.message}")
+                        
+                        if (creditResult.code == 401) {
+                            showError("Authentication failed. Please log out and log in again.")
+                            userManager.logout()
+                            checkGenerateButtonState()
+                        }
+                    }
+                }
+            } catch (e: Exception) {
+                Log.e("ResumeActivity", "Exception in generateResumeFromText: ${e.message}", e)
+                showErrorAndReset("Generation failed: ${e.message}")
+            } finally {
                 resetGenerateButton()
-                return@launch
             }
-
-            val creditResult = safeApiCall("getUserCredits") { 
-                apiService.getUserCredits() 
-            }
-            when (creditResult) {
-                is ApiService.ApiResult.Success -> {
-                    val credits = creditResult.data.optInt("available_credits", 0)
-                    Log.d("ResumeActivity", "User has $credits credits")
-                    if (credits <= 0) {
-                        showErrorAndReset("Insufficient credits. Please purchase more.")
-                        return@launch
-                    }
-                    
-                    Log.d("ResumeActivity", "Generating resume from text input")
-                    val genResult = safeApiCall("generateResume") { 
-                        apiService.generateResume(resumeText, jobDesc) 
-                    }
-                    handleGenerationResult(genResult)
-                }
-                is ApiService.ApiResult.Error -> {
-                    Log.e("ResumeActivity", "Failed to check credits: ${creditResult.message}")
-                    showErrorAndReset("Failed to check credits: ${creditResult.message}")
-                    
-                    if (creditResult.code == 401) {
-                        showError("Authentication failed. Please log out and log in again.")
-                        userManager.logout()
-                        checkGenerateButtonState()
-                    }
-                }
-            }
-        } catch (e: Exception) {
-            Log.e("ResumeActivity", "Exception in generateResumeFromText: ${e.message}", e)
-            showErrorAndReset("Generation failed: ${e.message}")
-        } finally {
-            resetGenerateButton()
         }
     }
-}
 
-    private suspend fun <T> safeApiCall(
-    operation: String,
-    maxRetries: Int = 2,
-    block: suspend () -> ApiService.ApiResult<T>
-): ApiService.ApiResult<T> {
-    var lastError: Exception? = null
-    
-    repeat(maxRetries) { attempt ->
-        try {
-            // Check authentication before each attempt
-            if (!ensureAuthenticatedBeforeApiCall()) {
-                return ApiService.ApiResult.Error("Authentication failed", 401)
+    private suspend fun <T> safeApiCallWithResult(
+        operation: String,
+        maxRetries: Int = 2,
+        block: suspend () -> ApiService.ApiResult<T>
+    ): ApiService.ApiResult<T> {
+        var lastError: Exception? = null
+        
+        repeat(maxRetries) { attempt ->
+            try {
+                // Check authentication before each attempt
+                if (!ensureAuthenticatedBeforeApiCall()) {
+                    return ApiService.ApiResult.Error("Authentication failed", 401)
+                }
+                
+                val result = block()
+                if (result is ApiService.ApiResult.Success) {
+                    return result
+                }
+                
+                // If it's an auth error, don't retry
+                if (result is ApiService.ApiResult.Error && result.code == 401) {
+                    return result
+                }
+                
+                Log.w("SafeApiCall", "Attempt $attempt failed for $operation: ${(result as? ApiService.ApiResult.Error)?.message}")
+                
+            } catch (e: Exception) {
+                lastError = e
+                Log.e("SafeApiCall", "Exception in $operation attempt $attempt: ${e.message}")
             }
             
-            val result = block()
-            if (result is ApiService.ApiResult.Success) {
-                return result
+            if (attempt < maxRetries - 1) {
+                delay(1000L * (attempt + 1)) // Exponential backoff
             }
-            
-            // If it's an auth error, don't retry
-            if (result is ApiService.ApiResult.Error && result.code == 401) {
-                return result
-            }
-            
-            Log.w("SafeApiCall", "Attempt $attempt failed for $operation: ${(result as? ApiService.ApiResult.Error)?.message}")
-            
-        } catch (e: Exception) {
-            lastError = e
-            Log.e("SafeApiCall", "Exception in $operation attempt $attempt: ${e.message}")
         }
         
-        if (attempt < maxRetries - 1) {
-            delay(1000L * (attempt + 1)) // Exponential backoff
-        }
+        return ApiService.ApiResult.Error(
+            lastError?.message ?: "All retry attempts failed for $operation", 
+            0
+        )
     }
-    
-    return ApiService.ApiResult.Error(
-        lastError?.message ?: "All retry attempts failed for $operation", 
-        0
-    )
-}
 
     /** ---------------- Display & Download ---------------- **/
     private fun displayGeneratedResume(resumeData: JSONObject) {
@@ -794,93 +797,92 @@ private fun testBasicApiCall() {
     /** ---------------- Credit Display ---------------- **/
     private suspend fun updateCreditDisplay() {
         ensureApiCooldown()
-    try {
-        // Add delay to prevent rapid successive calls
-        delay(500L)
-        
-        // Check authentication first
-        if (!userManager.isUserLoggedIn()) {
-            runOnUiThread {
-                binding.creditText.text = "Credits: Please log in"
+        try {
+            // Add delay to prevent rapid successive calls
+            delay(500L)
+            
+            // Check authentication first
+            if (!userManager.isUserLoggedIn()) {
+                runOnUiThread {
+                    binding.creditText.text = "Credits: Please log in"
+                }
+                return
             }
-            return
-        }
 
-        Log.d("ResumeActivity", "🔄 Updating credit display...")
-        
-        val result = apiService.getUserCredits()
-        when (result) {
-            is ApiService.ApiResult.Success -> {
-                runOnUiThread {
-                    try {
-                        val credits = result.data.optInt("available_credits", 0)
-                        binding.creditText.text = "Credits: $credits"
-                        Log.d("ResumeActivity", "✅ Credits updated: $credits")
-                    } catch (e: Exception) {
-                        binding.creditText.text = "Credits: Error"
-                        Log.e("ResumeActivity", "❌ Error parsing credits response", e)
-                    }
-                }
-            }
-            is ApiService.ApiResult.Error -> {
-                Log.w("ResumeGeneration", "Failed to get credits: ${result.message} (Code: ${result.code})")
-                runOnUiThread {
-                    when (result.code) {
-                        401 -> {
-                            binding.creditText.text = "Credits: Auth Error"
-                            showError("Authentication failed. Please log out and log in again.")
-                            userManager.logout()
-                        }
-                        429 -> {
-                            binding.creditText.text = "Credits: Rate Limited"
-                            showError("Too many requests. Please wait a moment.")
-                        }
-                        else -> {
-                            val cachedCredits = userManager.getCachedCredits()
-                            binding.creditText.text = "Credits: $cachedCredits (cached)"
-                            Log.w("ResumeActivity", "Using cached credits due to API error: ${result.message}")
+            Log.d("ResumeActivity", "🔄 Updating credit display...")
+            
+            val result = apiService.getUserCredits()
+            when (result) {
+                is ApiService.ApiResult.Success -> {
+                    runOnUiThread {
+                        try {
+                            val credits = result.data.optInt("available_credits", 0)
+                            binding.creditText.text = "Credits: $credits"
+                            Log.d("ResumeActivity", "✅ Credits updated: $credits")
+                        } catch (e: Exception) {
+                            binding.creditText.text = "Credits: Error"
+                            Log.e("ResumeActivity", "❌ Error parsing credits response", e)
                         }
                     }
                 }
+                is ApiService.ApiResult.Error -> {
+                    Log.w("ResumeGeneration", "Failed to get credits: ${result.message} (Code: ${result.code})")
+                    runOnUiThread {
+                        when (result.code) {
+                            401 -> {
+                                binding.creditText.text = "Credits: Auth Error"
+                                showError("Authentication failed. Please log out and log in again.")
+                                userManager.logout()
+                            }
+                            429 -> {
+                                binding.creditText.text = "Credits: Rate Limited"
+                                showError("Too many requests. Please wait a moment.")
+                            }
+                            else -> {
+                                val cachedCredits = userManager.getCachedCredits()
+                                binding.creditText.text = "Credits: $cachedCredits (cached)"
+                                Log.w("ResumeActivity", "Using cached credits due to API error: ${result.message}")
+                            }
+                        }
+                    }
+                }
             }
-        }
-    } catch (e: Exception) {
-        Log.e("ResumeGeneration", "Credit update failed", e)
-        runOnUiThread {
-            binding.creditText.text = "Credits: --"
+        } catch (e: Exception) {
+            Log.e("ResumeGeneration", "Credit update failed", e)
+            runOnUiThread {
+                binding.creditText.text = "Credits: --"
+            }
         }
     }
-}
 
     private suspend fun checkAuthenticationState(): Boolean {
-    return try {
-        userManager.emergencySyncWithFirebase()
-        
-        val isLoggedIn = userManager.isUserLoggedIn()
-        val firebaseUser = FirebaseAuth.getInstance().currentUser
-        
-        Log.d("AuthCheck", "UserManager logged in: $isLoggedIn")
-        Log.d("AuthCheck", "Firebase user: ${firebaseUser?.uid}")
-        
-        if (!isLoggedIn || firebaseUser == null) {
-            withContext(Dispatchers.Main) {
-                showError("Please log in to continue")
-                binding.creditText.text = "Credits: Please log in"
+        return try {
+            userManager.emergencySyncWithFirebase()
+            
+            val isLoggedIn = userManager.isUserLoggedIn()
+            val firebaseUser = FirebaseAuth.getInstance().currentUser
+            
+            Log.d("AuthCheck", "UserManager logged in: $isLoggedIn")
+            Log.d("AuthCheck", "Firebase user: ${firebaseUser?.uid}")
+            
+            if (!isLoggedIn || firebaseUser == null) {
+                withContext(Dispatchers.Main) {
+                    showError("Please log in to continue")
+                    binding.creditText.text = "Credits: Please log in"
+                }
+                return false
             }
-            return false
+            
+            true
+        } catch (e: Exception) {
+            Log.e("AuthCheck", "Authentication check failed", e)
+            withContext(Dispatchers.Main) {
+                showError("Authentication error: ${e.message}")
+                binding.creditText.text = "Credits: Auth Error"
+            }
+            false
         }
-        
-        true
-    } catch (e: Exception) {
-        Log.e("AuthCheck", "Authentication check failed", e)
-        withContext(Dispatchers.Main) {
-            showError("Authentication error: ${e.message}")
-            binding.creditText.text = "Credits: Auth Error"
-        }
-        false
     }
-}
-    
     
     /** ---------------- Debug Methods ---------------- **/
     private fun runApiServiceDebug() {
@@ -925,97 +927,97 @@ private fun testBasicApiCall() {
     
     // 🔧 NEW DEBUG METHODS
     private fun testBasicConnectivity() {
-    lifecycleScope.launch {
-        try {
-            binding.tvGeneratedResume.text = "Testing basic connectivity..."
-            
-            // Test 1: Can we reach ANY external site?
-            val client = OkHttpClient.Builder()
-                .connectTimeout(10, TimeUnit.SECONDS)
-                .build()
-            
-            val googleRequest = Request.Builder()
-                .url("https://www.google.com")
-                .build()
-            
-            val googleResponse = client.newCall(googleRequest).execute()
-            val googleSuccess = googleResponse.isSuccessful
-            
-            // Test 2: Can we reach your API?
-            val apiRequest = Request.Builder()
-                .url("https://resume-writer-api.onrender.com/health")
-                .build()
-            
-            val apiResponse = client.newCall(apiRequest).execute()
-            val apiSuccess = apiResponse.isSuccessful
-            
-            binding.tvGeneratedResume.text = """
-                📊 BASIC CONNECTIVITY TEST:
-                • Google: ${if (googleSuccess) "✅" else "❌"}
-                • Your API: ${if (apiSuccess) "✅" else "❌"}
+        lifecycleScope.launch {
+            try {
+                binding.tvGeneratedResume.text = "Testing basic connectivity..."
                 
-                ${if (!googleSuccess) "❌ Cannot reach internet" else ""}
-                ${if (googleSuccess && !apiSuccess) "❌ Internet works but API blocked" else ""}
-                ${if (apiSuccess) "✅ Everything works!" else ""}
-            """.trimIndent()
-            
-        } catch (e: Exception) {
-            binding.tvGeneratedResume.text = "💥 Test crashed: ${e.message}"
+                // Test 1: Can we reach ANY external site?
+                val client = OkHttpClient.Builder()
+                    .connectTimeout(10, TimeUnit.SECONDS)
+                    .build()
+                
+                val googleRequest = Request.Builder()
+                    .url("https://www.google.com")
+                    .build()
+                
+                val googleResponse = client.newCall(googleRequest).execute()
+                val googleSuccess = googleResponse.isSuccessful
+                
+                // Test 2: Can we reach your API?
+                val apiRequest = Request.Builder()
+                    .url("https://resume-writer-api.onrender.com/health")
+                    .build()
+                
+                val apiResponse = client.newCall(apiRequest).execute()
+                val apiSuccess = apiResponse.isSuccessful
+                
+                binding.tvGeneratedResume.text = """
+                    📊 BASIC CONNECTIVITY TEST:
+                    • Google: ${if (googleSuccess) "✅" else "❌"}
+                    • Your API: ${if (apiSuccess) "✅" else "❌"}
+                    
+                    ${if (!googleSuccess) "❌ Cannot reach internet" else ""}
+                    ${if (googleSuccess && !apiSuccess) "❌ Internet works but API blocked" else ""}
+                    ${if (apiSuccess) "✅ Everything works!" else ""}
+                """.trimIndent()
+                
+            } catch (e: Exception) {
+                binding.tvGeneratedResume.text = "💥 Test crashed: ${e.message}"
+            }
         }
     }
-}
     
     private fun testHeaderSending() {
-    lifecycleScope.launch {
-        try {
-            binding.tvGeneratedResume.text = "🔧 Running Network Diagnostics..."
-            binding.progressGenerate.visibility = View.VISIBLE
-            
-            val diagnostic = StringBuilder()
-            diagnostic.appendLine("🩺 NETWORK DIAGNOSTICS")
-            diagnostic.appendLine("=".repeat(50))
-            
-            // Test 1: Basic Network Connectivity
-            diagnostic.appendLine("1. BASIC CONNECTIVITY:")
-            val hasInternet = isNetworkAvailable()
-            diagnostic.appendLine("   • Internet Access: ${if (hasInternet) "✅" else "❌"}")
-            
-            if (!hasInternet) {
-                diagnostic.appendLine("   ⚠️  No internet connection detected")
-                diagnostic.appendLine("   💡 Check: WiFi/Mobile data, Airplane mode")
-            }
-            
-            // Test 2: DNS Resolution
-            diagnostic.appendLine("\n2. DNS RESOLUTION:")
-            val dnsResult = apiService.testDnsResolution()
-            diagnostic.appendLine("   • $dnsResult")
-            
-            // Test 3: HTTP Connection
-            diagnostic.appendLine("\n3. HTTP CONNECTION:")
-            val healthResult = apiService.testConnection()
-            when (healthResult) {
-                is ApiService.ApiResult.Success -> {
-                    diagnostic.appendLine("   • API Health: ✅ SUCCESS")
-                    diagnostic.appendLine("     Response: ${healthResult.data}")
+        lifecycleScope.launch {
+            try {
+                binding.tvGeneratedResume.text = "🔧 Running Network Diagnostics..."
+                binding.progressGenerate.visibility = View.VISIBLE
+                
+                val diagnostic = StringBuilder()
+                diagnostic.appendLine("🩺 NETWORK DIAGNOSTICS")
+                diagnostic.appendLine("=".repeat(50))
+                
+                // Test 1: Basic Network Connectivity
+                diagnostic.appendLine("1. BASIC CONNECTIVITY:")
+                val hasInternet = isNetworkAvailable()
+                diagnostic.appendLine("   • Internet Access: ${if (hasInternet) "✅" else "❌"}")
+                
+                if (!hasInternet) {
+                    diagnostic.appendLine("   ⚠️  No internet connection detected")
+                    diagnostic.appendLine("   💡 Check: WiFi/Mobile data, Airplane mode")
                 }
-                is ApiService.ApiResult.Error -> {
-                    diagnostic.appendLine("   • API Health: ❌ FAILED")
-                    diagnostic.appendLine("     Error: ${healthResult.message}")
+                
+                // Test 2: DNS Resolution
+                diagnostic.appendLine("\n2. DNS RESOLUTION:")
+                val dnsResult = apiService.testDnsResolution()
+                diagnostic.appendLine("   • $dnsResult")
+                
+                // Test 3: HTTP Connection
+                diagnostic.appendLine("\n3. HTTP CONNECTION:")
+                val healthResult = apiService.testConnection()
+                when (healthResult) {
+                    is ApiService.ApiResult.Success -> {
+                        diagnostic.appendLine("   • API Health: ✅ SUCCESS")
+                        diagnostic.appendLine("     Response: ${healthResult.data}")
+                    }
+                    is ApiService.ApiResult.Error -> {
+                        diagnostic.appendLine("   • API Health: ❌ FAILED")
+                        diagnostic.appendLine("     Error: ${healthResult.message}")
+                    }
                 }
+                
+                diagnostic.appendLine("=".repeat(50))
+                
+                binding.tvGeneratedResume.text = diagnostic.toString()
+                
+            } catch (e: Exception) {
+                Log.e("NetworkTest", "💥 Test crashed: ${e.message}", e)
+                binding.tvGeneratedResume.text = "💥 TEST CRASHED\n\n${e.javaClass.simpleName}: ${e.message}"
+            } finally {
+                binding.progressGenerate.visibility = View.GONE
             }
-            
-            diagnostic.appendLine("=".repeat(50))
-            
-            binding.tvGeneratedResume.text = diagnostic.toString()
-            
-        } catch (e: Exception) {
-            Log.e("NetworkTest", "💥 Test crashed: ${e.message}", e)
-            binding.tvGeneratedResume.text = "💥 TEST CRASHED\n\n${e.javaClass.simpleName}: ${e.message}"
-        } finally {
-            binding.progressGenerate.visibility = View.GONE
         }
     }
-}
 
     private fun debugUserManagerState() {
         Log.d("🔧 DEBUG", "=== USER MANAGER STATE ===")
@@ -1046,39 +1048,39 @@ private fun testBasicApiCall() {
     }
 
     private fun quickNetworkTest() {
-    lifecycleScope.launch {
-        try {
-            binding.tvGeneratedResume.text = "🔍 Testing network connection..."
-            binding.progressGenerate.visibility = View.VISIBLE
-            
-            // Test 1: Basic connectivity
-            val hasNet = isNetworkAvailable()
-            Log.d("QuickTest", "Basic internet: $hasNet")
-            
-            // Test 2: Try the health endpoint (no auth required)
-            binding.tvGeneratedResume.text = "Testing server connectivity..."
-            val healthResult = apiService.testConnection()
-            
-            when (healthResult) {
-                is ApiService.ApiResult.Success -> {
-                    binding.tvGeneratedResume.text = "✅ SERVER CONNECTED!\n${healthResult.data}"
-                    showMessage("✅ Server is reachable!")
+        lifecycleScope.launch {
+            try {
+                binding.tvGeneratedResume.text = "🔍 Testing network connection..."
+                binding.progressGenerate.visibility = View.VISIBLE
+                
+                // Test 1: Basic connectivity
+                val hasNet = isNetworkAvailable()
+                Log.d("QuickTest", "Basic internet: $hasNet")
+                
+                // Test 2: Try the health endpoint (no auth required)
+                binding.tvGeneratedResume.text = "Testing server connectivity..."
+                val healthResult = apiService.testConnection()
+                
+                when (healthResult) {
+                    is ApiService.ApiResult.Success -> {
+                        binding.tvGeneratedResume.text = "✅ SERVER CONNECTED!\n${healthResult.data}"
+                        showMessage("✅ Server is reachable!")
+                    }
+                    is ApiService.ApiResult.Error -> {
+                        binding.tvGeneratedResume.text = "❌ SERVER UNREACHABLE\n${healthResult.message}"
+                        showMessage("❌ Cannot reach server: ${healthResult.message}")
+                    }
                 }
-                is ApiService.ApiResult.Error -> {
-                    binding.tvGeneratedResume.text = "❌ SERVER UNREACHABLE\n${healthResult.message}"
-                    showMessage("❌ Cannot reach server: ${healthResult.message}")
-                }
+                
+            } catch (e: Exception) {
+                binding.tvGeneratedResume.text = "💥 TEST CRASHED\n${e.message}"
+                Log.e("QuickTest", "Test failed", e)
+                showMessage("Test crashed: ${e.message}")
+            } finally {
+                binding.progressGenerate.visibility = View.GONE
             }
-            
-        } catch (e: Exception) {
-            binding.tvGeneratedResume.text = "💥 TEST CRASHED\n${e.message}"
-            Log.e("QuickTest", "Test failed", e)
-            showMessage("Test crashed: ${e.message}")
-        } finally {
-            binding.progressGenerate.visibility = View.GONE
         }
     }
-}
 
     /** ---------------- Helpers ---------------- **/
     private fun disableGenerateButton(text: String) {
@@ -1130,19 +1132,20 @@ private fun testBasicApiCall() {
         )
         Log.d("ResumeActivity", "Connection status updated: $message")
     }
+    
     private var lastApiCallTime = 0L
     private val API_COOLDOWN_MS = 1000L // 1 second between API calls
 
     private suspend fun ensureApiCooldown() {
-    val currentTime = System.currentTimeMillis()
-    val timeSinceLastCall = currentTime - lastApiCallTime
-    
-    if (timeSinceLastCall < API_COOLDOWN_MS) {
-        delay(API_COOLDOWN_MS - timeSinceLastCall)
+        val currentTime = System.currentTimeMillis()
+        val timeSinceLastCall = currentTime - lastApiCallTime
+        
+        if (timeSinceLastCall < API_COOLDOWN_MS) {
+            delay(API_COOLDOWN_MS - timeSinceLastCall)
+        }
+        
+        lastApiCallTime = System.currentTimeMillis()
     }
-    
-    lastApiCallTime = System.currentTimeMillis()
-}
 
     private fun showServerWakeupMessage() {
         Toast.makeText(
@@ -1153,29 +1156,29 @@ private fun testBasicApiCall() {
     }
 
     private fun handleGenerationResult(result: ApiService.ApiResult<JSONObject>) {
-    when (result) {
-        is ApiService.ApiResult.Success -> {
-            Log.d("ResumeActivity", "Resume generation success: ${result.data}")
-            currentGeneratedResume = result.data
-            displayGeneratedResume(result.data)
-            showSuccess("Resume generated successfully!")
+        when (result) {
+            is ApiService.ApiResult.Success -> {
+                Log.d("ResumeActivity", "Resume generation success: ${result.data}")
+                currentGeneratedResume = result.data
+                displayGeneratedResume(result.data)
+                showSuccess("Resume generated successfully!")
 
-            if (result.data.has("remaining_credits")) {
-                val remaining = result.data.getInt("remaining_credits")
-                lifecycleScope.launch {
-                    withContext(Dispatchers.Main) {
-                        binding.creditText.text = "Credits: $remaining"
+                if (result.data.has("remaining_credits")) {
+                    val remaining = result.data.getInt("remaining_credits")
+                    lifecycleScope.launch {
+                        withContext(Dispatchers.Main) {
+                            binding.creditText.text = "Credits: $remaining"
+                        }
+                    }
+                } else {
+                    lifecycleScope.launch {
+                        updateCreditDisplay()
                     }
                 }
-            } else {
-                lifecycleScope.launch {
-                    updateCreditDisplay()
-                }
             }
-        }
-        is ApiService.ApiResult.Error -> {
-            Log.e("ResumeActivity", "Resume generation failed: ${result.message}")
-            showError("Generation failed: ${result.message}")
+            is ApiService.ApiResult.Error -> {
+                Log.e("ResumeActivity", "Resume generation failed: ${result.message}")
+                showError("Generation failed: ${result.message}")
             }
         }
     }
