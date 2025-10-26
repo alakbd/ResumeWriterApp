@@ -252,13 +252,13 @@ fun isUserLoggedIn(): Boolean {
         val firebaseUser = auth.currentUser
         val localUid = prefs.getString(USER_ID_KEY, null)
         
-        Log.d("UserManager", "Auth Check - Firebase: ${firebaseUser?.uid?.take(8)}, Local: ${localUid?.take(8)}")
+        Log.d("UserManager", "Auth Check - Firebase: ${firebaseUser != null}, Local: ${!localUid.isNullOrBlank()}")
         
-        // Case 1: Firebase user exists (definitely logged in)
+        // Primary: Firebase user exists
         if (firebaseUser != null) {
             Log.d("UserManager", "✅ User logged in (Firebase confirmed)")
             
-            // Ensure local data is synced
+            // Ensure local data matches Firebase
             if (localUid != firebaseUser.uid) {
                 Log.w("UserManager", "🔄 Syncing local data with Firebase...")
                 saveUserDataLocally(firebaseUser.email ?: "", firebaseUser.uid)
@@ -266,27 +266,19 @@ fun isUserLoggedIn(): Boolean {
             return true
         }
         
-        // Case 2: No Firebase user but we have local data (offline/network issue)
+        // Fallback: Local data exists (might be offline)
         if (!localUid.isNullOrBlank()) {
-            Log.w("UserManager", "⚠️ No Firebase user but local data exists - may be offline")
-            
-            // Try to sync with Firebase (non-blocking)
-            lifecycleScope.launch {
-                emergencySyncWithFirebase()
-            }
-            
-            // For UI purposes, consider user as logged in if we have local data
-            // This prevents the "please log in" message during network transitions
+            Log.w("UserManager", "⚠️ Using local auth data (Firebase might be offline)")
             return true
         }
         
-        // Case 3: No data at all (definitely not logged in)
+        // No auth data at all
         Log.w("UserManager", "❌ No auth data found")
         false
         
     } catch (e: Exception) {
         Log.e("UserManager", "💥 Auth check failed: ${e.message}")
-        // In case of error, check if we have local data as fallback
+        // In case of error, fallback to local data check
         !prefs.getString(USER_ID_KEY, null).isNullOrBlank()
     }
 }
