@@ -244,37 +244,47 @@ fun resendVerificationEmail(onComplete: (Boolean, String?) -> Unit) {
 /** Check if user is logged in - ENHANCED for UID-based auth */
 /** Check if user is logged in - RELAXED for better user experience */
 fun isUserLoggedIn(): Boolean {
-    val firebaseUser = auth.currentUser
-    val userId = getCurrentUserId()
-    
-    Log.d("UserManager", "Login check - Firebase: ${firebaseUser != null}, UserID: ${!userId.isNullOrBlank()}")
-    
-    // Primary check: Firebase user exists (most reliable)
-    val isLoggedIn = firebaseUser != null
-    
-    if (isLoggedIn) {
-        Log.d("UserManager", "✅ User logged in (Firebase): ${firebaseUser?.uid?.take(8)}...")
+    return try {
+        val firebaseUser = auth.currentUser
+        val localUid = prefs.getString(USER_ID_KEY, null)
         
-        // If Firebase user exists but local data is missing, sync it
-        if (userId.isNullOrBlank()) {
-            Log.w("UserManager", "🔄 Syncing local data from Firebase...")
-            saveUserDataLocally(firebaseUser?.email ?: "", firebaseUser?.uid ?: "")
+        Log.d("UserManager", "Auth Check - Firebase: ${firebaseUser?.uid?.take(8)}, Local: ${localUid?.take(8)}")
+        
+        // Case 1: Firebase user exists (definitely logged in)
+        if (firebaseUser != null) {
+            Log.d("UserManager", "✅ User logged in (Firebase confirmed)")
+            
+            // Ensure local data is synced
+            if (localUid != firebaseUser.uid) {
+                Log.w("UserManager", "🔄 Syncing local data with Firebase...")
+                saveUserDataLocally(firebaseUser.email ?: "", firebaseUser.uid)
+            }
+            return true
         }
         
-        return true
-    }
-    
-    // Fallback: If no Firebase user but we have local user data
-    if (!userId.isNullOrBlank()) {
-        Log.w("UserManager", "⚠️ Firebase user missing but local data exists - attempting sync")
-        emergencySyncWithFirebase()
+        // Case 2: No Firebase user but we have local data (offline/network issue)
+        if (!localUid.isNullOrBlank()) {
+            Log.w("UserManager", "⚠️ No Firebase user but local data exists - may be offline")
+            
+            // Try to sync with Firebase (non-blocking)
+            lifecycleScope.launch {
+                emergencySyncWithFirebase()
+            }
+            
+            // For UI purposes, consider user as logged in if we have local data
+            // This prevents the "please log in" message during network transitions
+            return true
+        }
         
-        // Check again after sync attempt
-        return auth.currentUser != null
+        // Case 3: No data at all (definitely not logged in)
+        Log.w("UserManager", "❌ No auth data found")
+        false
+        
+    } catch (e: Exception) {
+        Log.e("UserManager", "💥 Auth check failed: ${e.message}")
+        // In case of error, check if we have local data as fallback
+        !prefs.getString(USER_ID_KEY, null).isNullOrBlank()
     }
-    
-    Log.w("UserManager", "❌ User not logged in - no Firebase user and no local data")
-    return false
 }
 
     /** Get current user email */
@@ -283,7 +293,7 @@ fun isUserLoggedIn(): Boolean {
     }
 
  
-    /** Get current user ID - ENHANCED with proper synchronization */
+/** Get current user ID - ENHANCED with proper synchronization */
 /** Get current user ID - SIMPLIFIED and RELIABLE */
 fun getCurrentUserId(): String? {
     return try {
