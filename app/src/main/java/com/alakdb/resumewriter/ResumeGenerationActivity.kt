@@ -209,6 +209,47 @@ class ResumeGenerationActivity : AppCompatActivity() {
         }
     }
 
+      /** ---------------- NEW NETWORK TEST METHOD - ADD THIS ---------------- **/
+    private fun runComprehensiveNetworkTest() {
+        lifecycleScope.launch {
+            try {
+                binding.tvGeneratedResume.text = "🩺 Running comprehensive network test..."
+                
+                val results = StringBuilder()
+                results.appendLine("🌐 COMPREHENSIVE NETWORK TEST")
+                results.appendLine("=".repeat(60))
+                
+                // Test 1: Basic connectivity (you already have this working)
+                results.appendLine("1. BASIC CONNECTIVITY:")
+                results.appendLine("   • Internet: ✅ (DNS resolves to: 216.24.57.7, 216.24.57.251)")
+                
+                // Test 2: HTTP connection debugging
+                results.appendLine("\n2. HTTP CONNECTION TESTS:")
+                val httpDebug = apiService.debugHttpConnection()
+                results.append(httpDebug)
+                
+                // Test 3: Test with the unsafe client
+                results.appendLine("\n3. UNSAFE CLIENT TEST:")
+                try {
+                    val testResult = apiService.testConnection()
+                    when (testResult) {
+                        is ApiService.ApiResult.Success -> 
+                            results.appendLine("   ✅ SUCCESS: ${testResult.data}")
+                        is ApiService.ApiResult.Error -> 
+                            results.appendLine("   ❌ FAILED: ${testResult.message}")
+                    }
+                } catch (e: Exception) {
+                    results.appendLine("   💥 CRASHED: ${e.message}")
+                }
+                
+                binding.tvGeneratedResume.text = results.toString()
+                
+            } catch (e: Exception) {
+                binding.tvGeneratedResume.text = "💥 Test crashed: ${e.message}"
+            }
+        }
+    }
+
     /** ---------------- Check email/email sending Verification ---------------- **/
     private fun checkEmailVerification() {
         val user = FirebaseAuth.getInstance().currentUser
@@ -368,46 +409,7 @@ private fun testBasicApiCall() {
         return capabilities.hasCapability(NetworkCapabilities.NET_CAPABILITY_INTERNET)
     }
 
-  /** ---------------- NEW NETWORK TEST METHOD - ADD THIS ---------------- **/
-    private fun runComprehensiveNetworkTest() {
-        lifecycleScope.launch {
-            try {
-                binding.tvGeneratedResume.text = "🩺 Running comprehensive network test..."
-                
-                val results = StringBuilder()
-                results.appendLine("🌐 COMPREHENSIVE NETWORK TEST")
-                results.appendLine("=".repeat(60))
-                
-                // Test 1: Basic connectivity (you already have this working)
-                results.appendLine("1. BASIC CONNECTIVITY:")
-                results.appendLine("   • Internet: ✅ (DNS resolves to: 216.24.57.7, 216.24.57.251)")
-                
-                // Test 2: HTTP connection debugging
-                results.appendLine("\n2. HTTP CONNECTION TESTS:")
-                val httpDebug = apiService.debugHttpConnection()
-                results.append(httpDebug)
-                
-                // Test 3: Test with the unsafe client
-                results.appendLine("\n3. UNSAFE CLIENT TEST:")
-                try {
-                    val testResult = apiService.testConnection()
-                    when (testResult) {
-                        is ApiService.ApiResult.Success -> 
-                            results.appendLine("   ✅ SUCCESS: ${testResult.data}")
-                        is ApiService.ApiResult.Error -> 
-                            results.appendLine("   ❌ FAILED: ${testResult.message}")
-                    }
-                } catch (e: Exception) {
-                    results.appendLine("   💥 CRASHED: ${e.message}")
-                }
-                
-                binding.tvGeneratedResume.text = results.toString()
-                
-            } catch (e: Exception) {
-                binding.tvGeneratedResume.text = "💥 Test crashed: ${e.message}"
-            }
-        }
-    }
+
     
     private suspend fun ensureUserAuthenticated(): Boolean {
         return try {
