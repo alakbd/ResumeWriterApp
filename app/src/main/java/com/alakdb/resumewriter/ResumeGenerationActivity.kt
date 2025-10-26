@@ -262,6 +262,35 @@ class ResumeGenerationActivity : AppCompatActivity() {
     }
 }
 
+    private val connectivityManager by lazy {
+    getSystemService(Context.CONNECTIVITY_SERVICE) as ConnectivityManager
+}
+
+private val networkCallback = object : ConnectivityManager.NetworkCallback() {
+    override fun onAvailable(network: Network) {
+        Log.d("NetworkState", "📡 Network available - revalidating auth state")
+        lifecycleScope.launch {
+            revalidateAuthState()
+        }
+    }
+    
+    override fun onLost(network: Network) {
+        Log.d("NetworkState", "📡 Network lost")
+    }
+}
+
+override fun onStart() {
+    super.onStart()
+    // Register network callback
+    connectivityManager.registerDefaultNetworkCallback(networkCallback)
+}
+
+override fun onStop() {
+    super.onStop()
+    // Unregister network callback
+    connectivityManager.unregisterNetworkCallback(networkCallback)
+}
+
     /** ---------------- Check email/email sending Verification ---------------- **/
     private fun checkEmailVerification() {
         val user = FirebaseAuth.getInstance().currentUser
