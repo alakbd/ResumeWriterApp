@@ -38,8 +38,6 @@ class ApiService(private val context: Context) {
     private val gson = Gson()
     private val baseUrl = "https://resume-writer-api.onrender.com/"
 
-    private val client: OkHttpClient = createUnsafeOkHttpClient()
-
     // Simple client for health checks (no authentication needed)
     private val simpleClient = OkHttpClient.Builder()
         .connectTimeout(10, TimeUnit.SECONDS)
@@ -79,7 +77,7 @@ class ApiService(private val context: Context) {
         }
     }
 
-    // ADD TO ApiService - A client that bypasses SSL issues
+    // Main client with authentication
     private val client: OkHttpClient = createUnsafeOkHttpClient()
 
     private fun createUnsafeOkHttpClient(): OkHttpClient {
@@ -101,7 +99,7 @@ class ApiService(private val context: Context) {
                 .writeTimeout(30, TimeUnit.SECONDS)
                 .retryOnConnectionFailure(true)
                 .addInterceptor(SimpleLoggingInterceptor())
-                .addInterceptor(SafeAuthInterceptor(context)) // Pass context here
+                .addInterceptor(SafeAuthInterceptor(context))
                 .build()
         } catch (e: Exception) {
             Log.e("SSL", "Failed to create unsafe client, using regular one: ${e.message}")
@@ -111,7 +109,7 @@ class ApiService(private val context: Context) {
                 .writeTimeout(30, TimeUnit.SECONDS)
                 .retryOnConnectionFailure(true)
                 .addInterceptor(SimpleLoggingInterceptor())
-                .addInterceptor(SafeAuthInterceptor(context)) // Pass context here
+                .addInterceptor(SafeAuthInterceptor(context))
                 .build()
         }
     }
