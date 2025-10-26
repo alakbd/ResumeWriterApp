@@ -385,7 +385,7 @@ private fun createUnsafeOkHttpClient(): OkHttpClient {
         // Method 1: Basic DNS resolution
         val method1Result = try {
             val addresses = InetAddress.getAllByName("resume-writer-api.onrender.com")
-            val ipList = addresses.joinToString(", ") { addr: InetAddress -> addr.hostAddress }
+           val ipList = addresses.joinToString(", ") { addr: InetAddress -> addr.hostAddress.orEmpty() }
             Log.d("DNS", "✅ Method 1 SUCCESS: $ipList")
             "✅ DNS Resolution SUCCESS\nIP Addresses: $ipList"
         } catch (e: Exception) {
@@ -400,7 +400,7 @@ private fun createUnsafeOkHttpClient(): OkHttpClient {
             val addresses = withTimeout(10_000L) {
                 InetAddress.getAllByName("resume-writer-api.onrender.com")
             }
-            val ipList = addresses.joinToString(", ") { addr: InetAddress -> addr.hostAddress }
+            val ipList = addresses.joinToString(", ") { addr: InetAddress -> addr.hostAddress.orEmpty() }
             Log.d("DNS", "✅ Method 2 SUCCESS: $ipList")
             "✅ DNS Resolution SUCCESS (with timeout)\nIP Addresses: $ipList"
         } catch (e: Exception) {
@@ -675,7 +675,7 @@ suspend fun testDnsResolution(): String {
         Log.d("DNS Test", "Testing DNS resolution for: resume-writer-api.onrender.com")
         
         val addresses = java.net.InetAddress.getAllByName("resume-writer-api.onrender.com")
-        val ipList = addresses.joinToString(", ") { it.hostAddress }
+        val ipList = addresses.joinToString(", ") { it.hostAddress.orEmpty() }
         
         Log.d("DNS Test", "✅ DNS Resolution SUCCESS: $ipList")
         "✅ DNS Resolution SUCCESS\nIP Addresses: $ipList"
