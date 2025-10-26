@@ -91,37 +91,35 @@ class ApiService(private val context: Context) {
 private fun createUnsafeOkHttpClient(): OkHttpClient {
     return try {
         // Create a trust manager that does not validate certificate chains
-        val trustAllCerts = arrayOf<okhttp3.CertificatePinner>(object : okhttp3.CertificatePinner {
-            // Empty pinner - trust all certificates
+        val trustAllCerts = arrayOf<javax.net.ssl.X509TrustManager>(object : javax.net.ssl.X509TrustManager {
+            override fun checkClientTrusted(chain: Array<java.security.cert.X509Certificate>, authType: String) = Unit
+            override fun checkServerTrusted(chain: Array<java.security.cert.X509Certificate>, authType: String) = Unit
+            override fun getAcceptedIssuers() = arrayOf<java.security.cert.X509Certificate>()
         })
         
         val sslContext = javax.net.ssl.SSLContext.getInstance("SSL")
-        sslContext.init(null, null, java.security.SecureRandom())
+        sslContext.init(null, trustAllCerts, java.security.SecureRandom())
         
         OkHttpClient.Builder()
-            .sslSocketFactory(sslContext.socketFactory, getTrustManager())
+            .sslSocketFactory(sslContext.socketFactory, trustAllCerts[0])
             .hostnameVerifier { _, _ -> true } // Trust all hostnames
             .connectTimeout(15, TimeUnit.SECONDS)
             .readTimeout(15, TimeUnit.SECONDS)
             .addInterceptor(SimpleLoggingInterceptor())
+            .addInterceptor(SafeAuthInterceptor())
             .build()
     } catch (e: Exception) {
-        Log.e("SSL", "Failed to create unsafe client, using regular one")
+        Log.e("SSL", "Failed to create unsafe client, using regular one: ${e.message}")
+        // Fallback to regular client
         OkHttpClient.Builder()
             .connectTimeout(15, TimeUnit.SECONDS)
             .readTimeout(15, TimeUnit.SECONDS)
             .addInterceptor(SimpleLoggingInterceptor())
+            .addInterceptor(SafeAuthInterceptor())
             .build()
     }
 }
 
-private fun getTrustManager(): javax.net.ssl.X509TrustManager {
-    return object : javax.net.ssl.X509TrustManager {
-        override fun checkClientTrusted(chain: Array<java.security.cert.X509Certificate>, authType: String) = Unit
-        override fun checkServerTrusted(chain: Array<java.security.cert.X509Certificate>, authType: String) = Unit
-        override fun getAcceptedIssuers() = arrayOf<java.security.cert.X509Certificate>()
-    }
-}
     
     // ==================== FILE HANDLING METHODS ====================
 
