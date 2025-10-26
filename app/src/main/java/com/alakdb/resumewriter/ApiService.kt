@@ -484,63 +484,84 @@ private fun createUnsafeOkHttpClient(): OkHttpClient {
     // ==================== DEBUG & UTILITY METHODS ====================
 
     suspend fun debugHttpConnection(): String {
-    return try {
-        val debug = StringBuilder()
-        debug.appendLine("🔌 HTTP CONNECTION DEBUG")
-        debug.appendLine("=".repeat(50))
-        
-        // Test 1: Direct HTTP (bypass HTTPS)
-        debug.appendLine("1. HTTP (port 80) test:")
+    return withContext(Dispatchers.IO) {
         try {
-            val client = OkHttpClient.Builder()
-                .connectTimeout(10, TimeUnit.SECONDS)
-                .build()
+            val debug = StringBuilder()
+            debug.appendLine("🔌 HTTP CONNECTION DEBUG")
+            debug.appendLine("=".repeat(50))
             
-            val request = Request.Builder()
-                .url("http://resume-writer-api.onrender.com/health") // HTTP, not HTTPS
-                .build()
-            
-            val response = client.newCall(request).execute()
-            debug.appendLine("   ✅ SUCCESS: HTTP ${response.code}")
-            debug.appendLine("   Body: ${response.body?.string()?.take(100)}")
-        } catch (e: Exception) {
-            debug.appendLine("   ❌ FAILED: ${e.javaClass.simpleName} - ${e.message}")
-        }
+            // Test 1: Direct HTTP (bypass HTTPS)
+            debug.appendLine("1. HTTP (port 80) test:")
+            try {
+                val client = OkHttpClient.Builder()
+                    .connectTimeout(5, TimeUnit.SECONDS)  // Reduced timeout
+                    .build()
+                
+                val request = Request.Builder()
+                    .url("http://resume-writer-api.onrender.com/health") // HTTP, not HTTPS
+                    .build()
+                
+                val response = client.newCall(request).execute()
+                debug.appendLine("   ✅ SUCCESS: HTTP ${response.code}")
+                val body = response.body?.string()?.take(50) ?: "No body"
+                debug.appendLine("   Body: $body...")
+            } catch (e: Exception) {
+                debug.appendLine("   ❌ FAILED: ${e.javaClass.simpleName}")
+                debug.appendLine("   Error: ${e.message}")
+            }
 
-        // Test 2: HTTPS with IP address (bypass DNS)
-        debug.appendLine("\n2. HTTPS with IP test:")
-        try {
-            val client = OkHttpClient.Builder()
-                .connectTimeout(10, TimeUnit.SECONDS)
-                .hostnameVerifier { _, _ -> true } // Bypass hostname verification
-                .build()
-            
-            val request = Request.Builder()
-                .url("https://216.24.57.7/health") // Use the IP directly
-                .addHeader("Host", "resume-writer-api.onrender.com") // Important for virtual hosting
-                .build()
-            
-            val response = client.newCall(request).execute()
-            debug.appendLine("   ✅ SUCCESS: HTTPS ${response.code}")
-        } catch (e: Exception) {
-            debug.appendLine("   ❌ FAILED: ${e.javaClass.simpleName} - ${e.message}")
-        }
+            // Test 2: HTTPS with normal client
+            debug.appendLine("\n2. HTTPS with normal client:")
+            try {
+                val client = OkHttpClient.Builder()
+                    .connectTimeout(5, TimeUnit.SECONDS)
+                    .build()
+                
+                val request = Request.Builder()
+                    .url("https://resume-writer-api.onrender.com/health")
+                    .build()
+                
+                val response = client.newCall(request).execute()
+                debug.appendLine("   ✅ SUCCESS: HTTPS ${response.code}")
+                val body = response.body?.string()?.take(50) ?: "No body"
+                debug.appendLine("   Body: $body...")
+            } catch (e: Exception) {
+                debug.appendLine("   ❌ FAILED: ${e.javaClass.simpleName}")
+                debug.appendLine("   Error: ${e.message}")
+            }
 
-        // Test 3: Check if port 443 is reachable
-        debug.appendLine("\n3. Port 443 connectivity:")
-        try {
-            val socket = java.net.Socket()
-            socket.connect(java.net.InetSocketAddress("216.24.57.7", 443), 10000)
-            socket.close()
-            debug.appendLine("   ✅ SUCCESS: Port 443 is open")
-        } catch (e: Exception) {
-            debug.appendLine("   ❌ FAILED: ${e.message}")
-        }
+            // Test 3: HTTPS with unsafe client
+            debug.appendLine("\n3. HTTPS with unsafe client:")
+            try {
+                val request = Request.Builder()
+                    .url("https://resume-writer-api.onrender.com/health")
+                    .build()
+                
+                val response = client.newCall(request).execute() // Using your unsafe client
+                debug.appendLine("   ✅ SUCCESS: HTTPS ${response.code}")
+                val body = response.body?.string()?.take(50) ?: "No body"
+                debug.appendLine("   Body: $body...")
+            } catch (e: Exception) {
+                debug.appendLine("   ❌ FAILED: ${e.javaClass.simpleName}")
+                debug.appendLine("   Error: ${e.message}")
+            }
 
-        debug.appendLine("=".repeat(50))
-        debug.toString()
-    } catch (e: Exception) {
-        "HTTP debug failed: ${e.message}"
+            // Test 4: Port connectivity test
+            debug.appendLine("\n4. Port connectivity:")
+            try {
+                val socket = java.net.Socket()
+                socket.connect(java.net.InetSocketAddress("216.24.57.7", 443), 5000)
+                socket.close()
+                debug.appendLine("   ✅ SUCCESS: Port 443 is open")
+            } catch (e: Exception) {
+                debug.appendLine("   ❌ FAILED: ${e.message}")
+            }
+
+            debug.appendLine("=".repeat(50))
+            debug.toString()
+        } catch (e: Exception) {
+            "HTTP debug failed: ${e.message}"
+        }
     }
 }
     
