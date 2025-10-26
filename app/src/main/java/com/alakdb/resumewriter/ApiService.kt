@@ -103,8 +103,6 @@ private fun createUnsafeOkHttpClient(): OkHttpClient {
         OkHttpClient.Builder()
             .sslSocketFactory(sslContext.socketFactory, trustAllCerts[0])
             .hostnameVerifier { _, _ -> true } // Trust all hostnames
-            .connectTimeout(15, TimeUnit.SECONDS)
-            .readTimeout(15, TimeUnit.SECONDS)
             .addInterceptor(SimpleLoggingInterceptor())
             .addInterceptor(SafeAuthInterceptor())
             .build()
@@ -385,29 +383,32 @@ private fun createUnsafeOkHttpClient(): OkHttpClient {
     suspend fun testDnsResolution(): String {
     return try {
         Log.d("DNS", "🔍 Testing DNS resolution...")
-        
+
         // Method 1: Basic DNS resolution
         try {
             val addresses = java.net.InetAddress.getAllByName("resume-writer-api.onrender.com")
-            val ipList = addresses.joinToString(", ") { it.hostAddress }
+            val ipList = addresses.joinToString(", ") { addr: InetAddress -> addr.hostAddress }
             Log.d("DNS", "✅ DNS SUCCESS: $ipList")
-            return "✅ DNS Resolution SUCCESS\nIP Addresses: $ipList"
+            "✅ DNS Resolution SUCCESS\nIP Addresses: $ipList"
         } catch (e: Exception) {
             Log.e("DNS", "❌ Method 1 failed: ${e.message}")
-        }
+            null
+        }?.let { return it }  // Only return if Method 1 succeeded
 
-        // Method 2: Try with timeout
+        // Method 2: DNS resolution with timeout
         try {
             val future = Executors.newSingleThreadExecutor().submit<Array<InetAddress>> {
                 java.net.InetAddress.getAllByName("resume-writer-api.onrender.com")
             }
             val addresses = future.get(10, TimeUnit.SECONDS)
-            val ipList = addresses.joinToString(", ") { it.hostAddress }
-            return "✅ DNS Resolution SUCCESS (with timeout)\nIP Addresses: $ipList"
+            val ipList = addresses.joinToString(", ") { addr: InetAddress -> addr.hostAddress }
+            "✅ DNS Resolution SUCCESS (with timeout)\nIP Addresses: $ipList"
         } catch (e: Exception) {
             Log.e("DNS", "❌ Method 2 failed: ${e.message}")
-        }
+            null
+        }?.let { return it }  // Only return if Method 2 succeeded
 
+        // If both methods failed
         "❌ All DNS methods failed\nError: Unable to resolve host\n\nTry:\n1. Switch WiFi/Mobile data\n2. Restart device\n3. Check VPN/Proxy settings"
 
     } catch (e: Exception) {
