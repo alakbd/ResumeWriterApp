@@ -424,40 +424,33 @@ private fun testBasicApiCall() {
 
     
     private suspend fun ensureUserAuthenticated(): Boolean {
-        return try {
-            userManager.emergencySyncWithFirebase()
-            
-            if (!userManager.isUserLoggedIn()) {
-                Log.e("ResumeActivity", "❌ User not logged in after sync")
-                withContext(Dispatchers.Main) {
-                    showError("Please log in to continue")
-                    binding.creditText.text = "Credits: Please log in"
-                }
-                return false
-            }
-            
-            val userId = userManager.getCurrentUserId()
-            if (userId.isNullOrBlank()) {
-                Log.e("ResumeActivity", "❌ User ID is null/blank after sync")
-                withContext(Dispatchers.Main) {
-                    showError("Authentication error. Please log out and log in again.")
-                    binding.creditText.text = "Credits: Auth error"
-                }
-                return false
-            }
-            
-            Log.d("ResumeActivity", "✅ User authenticated: ${userId.take(8)}...")
+    return try {
+        val userManagerLoggedIn = userManager.isUserLoggedIn()
+        val firebaseUser = FirebaseAuth.getInstance().currentUser
+        
+        Log.d("AUTH_CHECK", "UserManager: $userManagerLoggedIn, Firebase: ${firebaseUser != null}")
+        
+        if (userManagerLoggedIn) {
+            Log.d("AUTH_CHECK", "✅ User properly authenticated")
             true
-            
-        } catch (e: Exception) {
-            Log.e("ResumeActivity", "💥 Authentication check failed: ${e.message}", e)
+        } else {
+            Log.e("AUTH_CHECK", "❌ User not authenticated")
             withContext(Dispatchers.Main) {
-                showError("Authentication system error. Please restart the app.")
-                binding.creditText.text = "Credits: System error"
+                showError("Please log in to continue")
+                binding.creditText.text = "Credits: Please log in"
             }
             false
         }
+        
+    } catch (e: Exception) {
+        Log.e("AUTH_CHECK", "💥 Authentication check failed: ${e.message}", e)
+        withContext(Dispatchers.Main) {
+            showError("Authentication system error")
+            binding.creditText.text = "Credits: Error"
+        }
+        false
     }
+}
 
     private suspend fun safeApiCall(block: suspend () -> Unit) {
         try {
