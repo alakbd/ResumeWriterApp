@@ -239,7 +239,7 @@ class ResumeGenerationActivity : AppCompatActivity() {
         
         // 🔧 DEBUG BUTTON
         binding.btnDebugAuth.setOnClickListener {
-            runComprehensiveNetworkTest()
+             debugAuthFlow()
         }
         
         // 🔧 HEADER TEST BUTTON
@@ -1082,6 +1082,67 @@ class ResumeGenerationActivity : AppCompatActivity() {
         }
     }
 
+private fun debugAuthFlow() {
+    lifecycleScope.launch {
+        try {
+            binding.tvGeneratedResume.text = "🔐 Debugging Authentication Flow..."
+            
+            val debugInfo = StringBuilder()
+            debugInfo.appendLine("🔐 AUTHENTICATION DEBUG")
+            debugInfo.appendLine("=".repeat(50))
+            
+            // 1. Check UserManager state
+            debugInfo.appendLine("1. USER MANAGER STATE:")
+            debugInfo.appendLine("   • isUserLoggedIn(): ${userManager.isUserLoggedIn()}")
+            debugInfo.appendLine("   • getCurrentUserId(): ${userManager.getCurrentUserId()}")
+            debugInfo.appendLine("   • getCurrentUserEmail(): ${userManager.getCurrentUserEmail()}")
+            
+            // 2. Check Firebase Auth state
+            val firebaseUser = FirebaseAuth.getInstance().currentUser
+            debugInfo.appendLine("\n2. FIREBASE AUTH STATE:")
+            debugInfo.appendLine("   • Current User: ${firebaseUser?.uid ?: "NULL"}")
+            debugInfo.appendLine("   • Email: ${firebaseUser?.email ?: "NULL"}")
+            debugInfo.appendLine("   • Verified: ${firebaseUser?.isEmailVerified ?: false}")
+            
+            // 3. Test basic API (no auth)
+            debugInfo.appendLine("\n3. BASIC API TEST (no auth):")
+            val healthResult = apiService.testConnection()
+            when (healthResult) {
+                is ApiService.ApiResult.Success -> {
+                    debugInfo.appendLine("   • Health Endpoint: ✅ SUCCESS")
+                }
+                is ApiService.ApiResult.Error -> {
+                    debugInfo.appendLine("   • Health Endpoint: ❌ FAILED - ${healthResult.message}")
+                }
+            }
+            
+            // 4. Test authenticated API
+            debugInfo.appendLine("\n4. AUTHENTICATED API TEST:")
+            if (userManager.isUserLoggedIn()) {
+                val creditsResult = apiService.getUserCredits()
+                when (creditsResult) {
+                    is ApiService.ApiResult.Success -> {
+                        debugInfo.appendLine("   • Credits Endpoint: ✅ SUCCESS")
+                        debugInfo.appendLine("   • Credits: ${creditsResult.data.optInt("available_credits", -1)}")
+                    }
+                    is ApiService.ApiResult.Error -> {
+                        debugInfo.appendLine("   • Credits Endpoint: ❌ FAILED")
+                        debugInfo.appendLine("   • Error: ${creditsResult.message}")
+                        debugInfo.appendLine("   • Code: ${creditsResult.code}")
+                    }
+                }
+            } else {
+                debugInfo.appendLine("   • Credits Endpoint: ❌ SKIPPED (not logged in)")
+            }
+            
+            debugInfo.appendLine("=".repeat(50))
+            binding.tvGeneratedResume.text = debugInfo.toString()
+            
+        } catch (e: Exception) {
+            binding.tvGeneratedResume.text = "💥 Auth debug failed: ${e.message}"
+        }
+    }
+}
     /** ---------------- Helpers ---------------- **/
     private fun disableGenerateButton(text: String) {
         binding.btnGenerateResume.isEnabled = false
