@@ -41,15 +41,10 @@ class ApiService(private val context: Context) {
 
     private val gson = Gson()
     private val baseUrl = "https://resume-writer-api.onrender.com/"
+
+     private val client: OkHttpClient = createUnsafeOkHttpClient()
     
-    // Main client with authentication interceptor
-    private val client = createUnsafeOkHttpClient() // UPDATE your client declaration to use the unsafe one temporarily
-        .connectTimeout(15, TimeUnit.SECONDS)  // Reduced from 30
-        .readTimeout(15, TimeUnit.SECONDS)     // Reduced from 30  
-        .writeTimeout(30, TimeUnit.SECONDS)    // Reduced from 60
-        .retryOnConnectionFailure(true)
-        .addInterceptor(SimpleLoggingInterceptor())
-        .build()
+    
 
     // Simple client for health checks (no authentication needed)
     private val simpleClient = OkHttpClient.Builder()
@@ -90,34 +85,37 @@ class ApiService(private val context: Context) {
         // ADD TO ApiService - A client that bypasses SSL issues
 private fun createUnsafeOkHttpClient(): OkHttpClient {
     return try {
-        // Create a trust manager that does not validate certificate chains
         val trustAllCerts = arrayOf<javax.net.ssl.X509TrustManager>(object : javax.net.ssl.X509TrustManager {
             override fun checkClientTrusted(chain: Array<java.security.cert.X509Certificate>, authType: String) = Unit
             override fun checkServerTrusted(chain: Array<java.security.cert.X509Certificate>, authType: String) = Unit
             override fun getAcceptedIssuers() = arrayOf<java.security.cert.X509Certificate>()
         })
-        
+
         val sslContext = javax.net.ssl.SSLContext.getInstance("SSL")
         sslContext.init(null, trustAllCerts, java.security.SecureRandom())
-        
+
         OkHttpClient.Builder()
             .sslSocketFactory(sslContext.socketFactory, trustAllCerts[0])
-            .hostnameVerifier { _, _ -> true } // Trust all hostnames
+            .hostnameVerifier { _, _ -> true }
+            .connectTimeout(15, TimeUnit.SECONDS)  // timeout here
+            .readTimeout(15, TimeUnit.SECONDS)     // timeout here
+            .writeTimeout(30, TimeUnit.SECONDS)    // timeout here
+            .retryOnConnectionFailure(true)
             .addInterceptor(SimpleLoggingInterceptor())
             .addInterceptor(SafeAuthInterceptor())
             .build()
     } catch (e: Exception) {
         Log.e("SSL", "Failed to create unsafe client, using regular one: ${e.message}")
-        // Fallback to regular client
         OkHttpClient.Builder()
             .connectTimeout(15, TimeUnit.SECONDS)
             .readTimeout(15, TimeUnit.SECONDS)
+            .writeTimeout(30, TimeUnit.SECONDS)
+            .retryOnConnectionFailure(true)
             .addInterceptor(SimpleLoggingInterceptor())
             .addInterceptor(SafeAuthInterceptor())
             .build()
     }
 }
-
     
     // ==================== FILE HANDLING METHODS ====================
 
