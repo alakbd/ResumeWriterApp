@@ -684,18 +684,31 @@ class ApiService(private val context: Context) {
 
 // ==================== INTERCEPTOR ====================
 
-class SafeAuthInterceptor : Interceptor {
+class SafeAuthInterceptor(private val context: Context) : Interceptor {
     override fun intercept(chain: Interceptor.Chain): Response {
-        // Move logging to background thread
-        CoroutineScope(Dispatchers.IO).launch {
-            Log.d("AUTH", "🔄 Adding basic headers...")
-        }
-
-        val request = chain.request().newBuilder()
+        val userManager = UserManager(context)
+        val userId = userManager.getCurrentUserId()
+        
+        val requestBuilder = chain.request().newBuilder()
             .addHeader("User-Agent", "ResumeWriter-Android/1.0")
             .addHeader("Accept", "application/json")
             .addHeader("Content-Type", "application/json")
-            .build()
+        
+        // Add user ID header if available
+        if (!userId.isNullOrBlank()) {
+            requestBuilder.addHeader("User-Id", userId)
+            Log.d("AUTH_HEADER", "✅ Adding User-Id header: ${userId.take(8)}...")
+        } else {
+            Log.w("AUTH_HEADER", "⚠️ No User-Id available for headers")
+        }
+        
+        val request = requestBuilder.build()
+        
+        // Log the request
+        CoroutineScope(Dispatchers.IO).launch {
+            Log.d("NETWORK", "➡️ REQUEST: ${request.method} ${request.url}")
+            Log.d("NETWORK", "➡️ HEADERS: ${request.headers}")
+        }
 
         return chain.proceed(request)
     }
