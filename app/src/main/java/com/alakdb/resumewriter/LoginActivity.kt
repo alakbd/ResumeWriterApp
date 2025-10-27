@@ -1,5 +1,6 @@
 package com.alakdb.resumewriter
 
+import android.content.Context
 import android.content.Intent
 import android.os.Bundle
 import android.util.Log
@@ -9,8 +10,6 @@ import androidx.appcompat.app.AppCompatActivity
 import com.google.firebase.auth.FirebaseAuth
 import com.google.firebase.auth.FirebaseUser
 import com.alakdb.resumewriter.databinding.ActivityLoginBinding
-import androidx.lifecycle.lifecycleScope
-import kotlinx.coroutines.launch
 
 class LoginActivity : AppCompatActivity() {
     private lateinit var binding: ActivityLoginBinding
@@ -65,13 +64,11 @@ class LoginActivity : AppCompatActivity() {
                 attemptLogin(email, password)
             }
         }
-           // 🔧 ADD THIS DEBUG BUTTON
-    binding.btnDebugLogin.setOnClickListener {
-        debugLoginState()
-    }
 
-    // ... your other click listeners ...
-}
+        // Debug button
+        binding.btnDebugLogin.setOnClickListener {
+            debugLoginState()
+        }
 
         binding.btnForgotPassword.setOnClickListener {
             val email = binding.etLoginEmail.text.toString().trim()
@@ -212,36 +209,36 @@ class LoginActivity : AppCompatActivity() {
     }
 
     private fun debugLoginState() {
-    Log.d("LOGIN_DEBUG", "=== LOGIN ACTIVITY DEBUG ===")
-    
-    val auth = FirebaseAuth.getInstance()
-    val userManager = UserManager(this)
-    
-    Log.d("LOGIN_DEBUG", "1. CURRENT STATE:")
-    Log.d("LOGIN_DEBUG", "   • Firebase User: ${auth.currentUser?.uid ?: "NULL"}")
-    Log.d("LOGIN_DEBUG", "   • UserManager UID: ${userManager.getCurrentUserId() ?: "NULL"}")
-    Log.d("LOGIN_DEBUG", "   • UserManager Email: ${userManager.getCurrentUserEmail() ?: "NULL"}")
-    Log.d("LOGIN_DEBUG", "   • isUserLoggedIn(): ${userManager.isUserLoggedIn()}")
-    
-    // Check SharedPreferences directly
-    val prefs = getSharedPreferences("user_prefs", Context.MODE_PRIVATE)
-    Log.d("LOGIN_DEBUG", "2. SHARED PREFERENCES:")
-    Log.d("LOGIN_DEBUG", "   • user_id: ${prefs.getString("user_id", "NULL")}")
-    Log.d("LOGIN_DEBUG", "   • user_email: ${prefs.getString("user_email", "NULL")}")
-    Log.d("LOGIN_DEBUG", "   • is_registered: ${prefs.getBoolean("is_registered", false)}")
-    
-    Log.d("LOGIN_DEBUG", "3. INPUT FIELDS:")
-    Log.d("LOGIN_DEBUG", "   • Email: ${binding.etLoginEmail.text}")
-    Log.d("LOGIN_DEBUG", "   • Password: ${if (binding.etLoginPassword.text.isNotEmpty()) "***" else "EMPTY"}")
-    
-    Log.d("LOGIN_DEBUG", "=== END DEBUG ===")
-    
-    // Show result in Toast
-    val firebaseUser = auth.currentUser?.uid ?: "NULL"
-    val localUid = userManager.getCurrentUserId() ?: "NULL"
-    
-    Toast.makeText(this, "Firebase: $firebaseUser, Local: $localUid", Toast.LENGTH_LONG).show()
-}
+        Log.d("LOGIN_DEBUG", "=== LOGIN ACTIVITY DEBUG ===")
+        
+        val auth = FirebaseAuth.getInstance()
+        val userManager = UserManager(this)
+        
+        Log.d("LOGIN_DEBUG", "1. CURRENT STATE:")
+        Log.d("LOGIN_DEBUG", "   • Firebase User: ${auth.currentUser?.uid ?: "NULL"}")
+        Log.d("LOGIN_DEBUG", "   • UserManager UID: ${userManager.getCurrentUserId() ?: "NULL"}")
+        Log.d("LOGIN_DEBUG", "   • UserManager Email: ${userManager.getCurrentUserEmail() ?: "NULL"}")
+        Log.d("LOGIN_DEBUG", "   • isUserLoggedIn(): ${userManager.isUserLoggedIn()}")
+        
+        // Check SharedPreferences directly
+        val prefs = getSharedPreferences("user_prefs", Context.MODE_PRIVATE)
+        Log.d("LOGIN_DEBUG", "2. SHARED PREFERENCES:")
+        Log.d("LOGIN_DEBUG", "   • user_id: ${prefs.getString("user_id", "NULL")}")
+        Log.d("LOGIN_DEBUG", "   • user_email: ${prefs.getString("user_email", "NULL")}")
+        Log.d("LOGIN_DEBUG", "   • is_registered: ${prefs.getBoolean("is_registered", false)}")
+        
+        Log.d("LOGIN_DEBUG", "3. INPUT FIELDS:")
+        Log.d("LOGIN_DEBUG", "   • Email: ${binding.etLoginEmail.text}")
+        Log.d("LOGIN_DEBUG", "   • Password: ${if (binding.etLoginPassword.text.isNotEmpty()) "***" else "EMPTY"}")
+        
+        Log.d("LOGIN_DEBUG", "=== END DEBUG ===")
+        
+        // Show result in Toast
+        val firebaseUser = auth.currentUser?.uid ?: "NULL"
+        val localUid = userManager.getCurrentUserId() ?: "NULL"
+        
+        Toast.makeText(this, "Firebase: $firebaseUser, Local: $localUid", Toast.LENGTH_LONG).show()
+    }
 
     private fun onLoginSuccess(user: FirebaseUser) {
         Log.d("LOGIN_DEBUG", "=== START onLoginSuccess ===")
