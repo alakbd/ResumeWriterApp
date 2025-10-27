@@ -88,6 +88,13 @@
             android:text="Forgot Password?"
             android:layout_marginBottom="12dp"/>
 
+        <Button
+            android:id="@+id/btnDebugLogin"
+            android:layout_width="wrap_content"
+            android:layout_height="wrap_content"
+            android:text="🔧 Debug Login"
+            android:layout_marginTop="16dp" />
+
         <!-- Go to Register -->
         <Button
             android:layout_width="match_parent"
