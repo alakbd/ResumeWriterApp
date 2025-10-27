@@ -65,6 +65,13 @@ class LoginActivity : AppCompatActivity() {
                 attemptLogin(email, password)
             }
         }
+           // 🔧 ADD THIS DEBUG BUTTON
+    binding.btnDebugLogin.setOnClickListener {
+        debugLoginState()
+    }
+
+    // ... your other click listeners ...
+}
 
         binding.btnForgotPassword.setOnClickListener {
             val email = binding.etLoginEmail.text.toString().trim()
