@@ -203,30 +203,45 @@ private fun openEmailApp() {
 }
 
     private fun onLoginSuccess(user: FirebaseUser) {
-    // ⚠️ CRITICAL MISSING LINE: Save user data to UserManager
-    userManager.saveUserDataLocally(user.email ?: "", user.uid)
+        Log.d("LOGIN_DEBUG", "=== START onLoginSuccess ===")
+        Log.d("LOGIN_DEBUG", "Firebase User UID: ${user.uid}")
+        Log.d("LOGIN_DEBUG", "Firebase User Email: ${user.email}")
+    
+        // ⚠️ CRITICAL: Save user data to UserManager
+        Log.d("LOGIN_DEBUG", "Calling saveUserDataLocally...")
+        userManager.saveUserDataLocally(user.email ?: "", user.uid)
+    
+        // Verify it was saved
+        val savedUid = userManager.getCurrentUserId()
+        val savedEmail = userManager.getCurrentUserEmail()
+        Log.d("LOGIN_DEBUG", "After save - Local UID: $savedUid")
+        Log.d("LOGIN_DEBUG", "After save - Local Email: $savedEmail")
+    
+        // Double-check Firebase state
+        val currentFirebaseUser = FirebaseAuth.getInstance().currentUser
+        Log.d("LOGIN_DEBUG", "Current Firebase User: ${currentFirebaseUser?.uid ?: "NULL"}")
     
     // Ensure admin mode is disabled for regular login
-    creditManager.setAdminMode(false)
+        creditManager.setAdminMode(false)
     
     // Initialize user session and credits
-    creditManager.resetResumeCooldown()
+        creditManager.resetResumeCooldown()
     
     // Sync user credits from Firestore
-    userManager.syncUserCredits { success, credits ->
-        if (success) {
-            Log.d("LoginActivity", "User credits synced: $credits")
-        } else {
-            Log.w("LoginActivity", "Failed to sync user credits")
+        userManager.syncUserCredits { success, credits ->
+            if (success) {
+                Log.d("LOGIN_DEBUG", "User credits synced: $credits")
+            } else {
+                Log.w("LOGIN_DEBUG", "Failed to sync user credits")
+            }
         }
+    
+        Log.d("LOGIN_DEBUG", "✅ Login successful - proceeding to MainActivity")
+        Log.d("LOGIN_DEBUG", "=== END onLoginSuccess ===")
+    
+        showMessage("Login successful!")
+        proceedToMainActivity()
     }
-    
-    Log.d("LoginActivity", "✅ Login successful - UID: ${user.uid}, Email: ${user.email}")
-    Log.d("LoginActivity", "✅ User data saved to local storage")
-    showMessage("Login successful!")
-    
-    proceedToMainActivity()
-}
 
     private fun onLoginFailure(error: String?) {
         val errorMessage = error ?: "Login failed. Please check your credentials."
