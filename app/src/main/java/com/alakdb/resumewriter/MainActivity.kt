@@ -30,6 +30,12 @@ class MainActivity : AppCompatActivity() {
         userManager.logCurrentUserState()
         userManager.debugStoredData()
 
+        Log.d("MAIN_ACTIVITY_DEBUG", "=== MAIN ACTIVITY START ===")
+        Log.d("MAIN_ACTIVITY_DEBUG", "Firebase User: ${auth.currentUser?.uid ?: "NULL"}")
+        Log.d("MAIN_ACTIVITY_DEBUG", "UserManager UID: ${userManager.getCurrentUserId() ?: "NULL"}")
+        Log.d("MAIN_ACTIVITY_DEBUG", "UserManager isLoggedIn: ${userManager.isUserLoggedIn()}")
+        Log.d("MAIN_ACTIVITY_DEBUG", "=== MAIN ACTIVITY END ===")
+    
         // Check authentication - redirect to login if not authenticated
         if (!checkAuthentication()) {
             return // Will start LoginActivity and finish this one
