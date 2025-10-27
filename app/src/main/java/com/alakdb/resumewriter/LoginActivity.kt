@@ -202,6 +202,44 @@ class LoginActivity : AppCompatActivity() {
         }
     }
 
+    private fun debugLoginState() {
+    lifecycleScope.launch {
+        try {
+            binding.tvGeneratedResume.text = "🔍 REAL-TIME LOGIN DEBUG..."
+            
+            val debug = StringBuilder()
+            debug.appendLine("🚨 IMMEDIATE LOGIN STATE CHECK")
+            debug.appendLine("=".repeat(50))
+            
+            // Check current state in LoginActivity
+            val auth = FirebaseAuth.getInstance()
+            val userManager = UserManager(this@LoginActivity)
+            
+            debug.appendLine("1. CURRENT STATE IN LOGIN ACTIVITY:")
+            debug.appendLine("   • Firebase User: ${auth.currentUser?.uid ?: "NULL"}")
+            debug.appendLine("   • UserManager UID: ${userManager.getCurrentUserId() ?: "NULL"}")
+            debug.appendLine("   • UserManager isLoggedIn: ${userManager.isUserLoggedIn()}")
+            
+            // Test login directly
+            debug.appendLine("\n2. TESTING LOGIN FLOW:")
+            debug.appendLine("   • Email: ${binding.etLoginEmail.text}")
+            debug.appendLine("   • Password: ${"*".repeat(binding.etLoginPassword.text.length)}")
+            
+            if (binding.etLoginEmail.text.isNotEmpty() && binding.etLoginPassword.text.isNotEmpty()) {
+                debug.appendLine("   • ✅ Ready to test login")
+            } else {
+                debug.appendLine("   • ❌ Enter email and password first")
+            }
+            
+            debug.appendLine("=".repeat(50))
+            binding.tvGeneratedResume.text = debug.toString()
+            
+        } catch (e: Exception) {
+            binding.tvGeneratedResume.text = "💥 Debug failed: ${e.message}"
+        }
+    }
+}
+
     private fun onLoginSuccess(user: FirebaseUser) {
         Log.d("LOGIN_DEBUG", "=== START onLoginSuccess ===")
         Log.d("LOGIN_DEBUG", "Firebase User UID: ${user.uid}")
