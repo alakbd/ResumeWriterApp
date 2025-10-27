@@ -14,6 +14,7 @@ class MainActivity : AppCompatActivity() {
     private lateinit var userManager: UserManager
     private lateinit var creditManager: CreditManager
     private lateinit var billingManager: BillingManager
+    private lateinit var auth: FirebaseAuth  // ✅ ADDED THIS LINE
 
     private var adminTapCount = 0
     private var isBillingInitialized = false
@@ -23,18 +24,21 @@ class MainActivity : AppCompatActivity() {
         binding = ActivityMainBinding.inflate(layoutInflater)
         setContentView(binding.root)
 
+        // Initialize Firebase Auth
+        auth = FirebaseAuth.getInstance()  // ✅ ADDED THIS LINE
+
         // Initialize managers first
         initializeManagers()
 
         // DEBUG: Check current state
-        userManager.logCurrentUserState()
-        userManager.debugStoredData()
-
         Log.d("MAIN_ACTIVITY_DEBUG", "=== MAIN ACTIVITY START ===")
         Log.d("MAIN_ACTIVITY_DEBUG", "Firebase User: ${auth.currentUser?.uid ?: "NULL"}")
         Log.d("MAIN_ACTIVITY_DEBUG", "UserManager UID: ${userManager.getCurrentUserId() ?: "NULL"}")
         Log.d("MAIN_ACTIVITY_DEBUG", "UserManager isLoggedIn: ${userManager.isUserLoggedIn()}")
         Log.d("MAIN_ACTIVITY_DEBUG", "=== MAIN ACTIVITY END ===")
+
+        userManager.logCurrentUserState()
+        userManager.debugStoredData()
     
         // Check authentication - redirect to login if not authenticated
         if (!checkAuthentication()) {
@@ -52,36 +56,37 @@ class MainActivity : AppCompatActivity() {
     }
 
     private fun checkAuthentication(): Boolean {
-    // Check if fresh install - force login
-    if (userManager.isFreshInstall()) {
-        Log.d("MainActivity", "🚨 Fresh install detected - forcing login")
-        redirectToLogin()
-        return false
+        // Check if fresh install - force login
+        if (userManager.isFreshInstall()) {
+            Log.d("MainActivity", "🚨 Fresh install detected - forcing login")
+            redirectToLogin()
+            return false
+        }
+        
+        // Check if user is properly logged in
+        if (!userManager.isUserLoggedIn()) {
+            Log.d("MainActivity", "❌ User not logged in - redirecting to login")
+            redirectToLogin()
+            return false
+        }
+        
+        Log.d("MainActivity", "✅ User authenticated - proceeding to main screen")
+        return true
     }
-    
-    // Check if user is properly logged in
-    if (!userManager.isUserLoggedIn()) {
-        Log.d("MainActivity", "❌ User not logged in - redirecting to login")
-        redirectToLogin()
-        return false
-    }
-    
-    Log.d("MainActivity", "✅ User authenticated - proceeding to main screen")
-    return true
-}
 
-private fun redirectToLogin() {
-    val intent = Intent(this, LoginActivity::class.java)
-    intent.flags = Intent.FLAG_ACTIVITY_NEW_TASK or Intent.FLAG_ACTIVITY_CLEAR_TASK
-    startActivity(intent)
-    finish()
-}
+    private fun redirectToLogin() {
+        val intent = Intent(this, LoginActivity::class.java)
+        intent.flags = Intent.FLAG_ACTIVITY_NEW_TASK or Intent.FLAG_ACTIVITY_CLEAR_TASK
+        startActivity(intent)
+        finish()
+    }
 
     private fun initializeApp() {
         setupClickListeners()
         initializeBilling()
         loadUserData()
         updateAdminIndicator()
+        checkEmailVerification()
     }
 
     private fun setupClickListeners() {
@@ -188,12 +193,12 @@ private fun redirectToLogin() {
         if (availableCredits <= 0) {
             showMessage("Not enough credits! Please purchase more.")
             return
-    }
+        }
 
-    // Open the new Resume Generation Activity
-    val intent = Intent(this, ResumeGenerationActivity::class.java)
-    startActivity(intent)
-}
+        // Open the new Resume Generation Activity
+        val intent = Intent(this, ResumeGenerationActivity::class.java)
+        startActivity(intent)
+    }
 
     private fun purchaseProduct(productId: String) {
         if (!isBillingInitialized) {
@@ -297,13 +302,12 @@ private fun redirectToLogin() {
     }
 
     private fun checkEmailVerification() {
-    val userManager = UserManager(this)
-    val user = userManager.getCurrentFirebaseUser()
-    
-    if (user != null && !user.isEmailVerified) {
-        showVerificationReminder(user.email)
+        val user = userManager.getCurrentFirebaseUser()
+        
+        if (user != null && !user.isEmailVerified) {
+            showVerificationReminder(user.email)
+        }
     }
-}
 
     private fun showVerificationReminder(email: String?) {
         AlertDialog.Builder(this)
@@ -320,7 +324,6 @@ private fun redirectToLogin() {
     }
 
     private fun resendVerification() {
-        val userManager = UserManager(this)
         userManager.resendVerificationEmail { success, error ->
             if (success) {
                 showMessage("Verification email sent!")
@@ -329,6 +332,4 @@ private fun redirectToLogin() {
             }
         }
     }
-
-    
 }
