@@ -302,7 +302,7 @@ class ResumeGenerationActivity : AppCompatActivity() {
         
         // 🔧 DEBUG BUTTON
         binding.btnDebugAuth.setOnClickListener {
-             debugAuthFlow()
+             debugLoginState()
         }
         
         // 🔧 HEADER TEST BUTTON
