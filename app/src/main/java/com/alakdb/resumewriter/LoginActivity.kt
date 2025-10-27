@@ -39,11 +39,17 @@ class LoginActivity : AppCompatActivity() {
     }
     
     private fun cleanupStaleData() {
-    // If no Firebase user but we have local data, clear it
-    val firebaseUser = firebaseAuth.currentUser
-    if (firebaseUser == null) {
-        userManager.logout() // This clears all local data
-        Log.d("LoginActivity", "🔄 Cleaned up stale local data - no Firebase user")
+        val firebaseUser = firebaseAuth.currentUser
+        val localUid = userManager.getCurrentUserId()
+    
+        Log.d("LoginActivity", "🔄 Cleanup check - Firebase: ${firebaseUser?.uid ?: "NULL"}, Local: ${localUid ?: "NULL"}")
+    
+    // Only clear if we have local data but no Firebase user
+    if (firebaseUser == null && localUid != null) {
+        Log.w("LoginActivity", "⚠️ Clearing stale local data - no matching Firebase user")
+        userManager.logout()
+    } else if (firebaseUser != null && localUid != null) {
+        Log.d("LoginActivity", "✅ Data consistent - Firebase and local UID match")
     }
 }
 
@@ -197,6 +203,9 @@ private fun openEmailApp() {
 }
 
     private fun onLoginSuccess(user: FirebaseUser) {
+    // ⚠️ CRITICAL MISSING LINE: Save user data to UserManager
+    userManager.saveUserDataLocally(user.email ?: "", user.uid)
+    
     // Ensure admin mode is disabled for regular login
     creditManager.setAdminMode(false)
     
@@ -213,6 +222,7 @@ private fun openEmailApp() {
     }
     
     Log.d("LoginActivity", "✅ Login successful - UID: ${user.uid}, Email: ${user.email}")
+    Log.d("LoginActivity", "✅ User data saved to local storage")
     showMessage("Login successful!")
     
     proceedToMainActivity()
