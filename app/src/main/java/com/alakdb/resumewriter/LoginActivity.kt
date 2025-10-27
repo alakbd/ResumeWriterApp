@@ -228,8 +228,11 @@ class LoginActivity : AppCompatActivity() {
         Log.d("LOGIN_DEBUG", "   • is_registered: ${prefs.getBoolean("is_registered", false)}")
         
         Log.d("LOGIN_DEBUG", "3. INPUT FIELDS:")
-        Log.d("LOGIN_DEBUG", "   • Email: ${binding.etLoginEmail.text}")
-        Log.d("LOGIN_DEBUG", "   • Password: ${if (binding.etLoginPassword.text.isNotEmpty()) "***" else "EMPTY"}")
+        val emailText = binding.etLoginEmail.text?.toString() ?: ""
+        val passwordText = binding.etLoginPassword.text?.toString() ?: ""
+
+        Log.d("LOGIN_DEBUG", "   • Email: $emailText")
+        Log.d("LOGIN_DEBUG", "   • Password: ${if (passwordText.isNotEmpty()) "***" else "EMPTY"}")
         
         Log.d("LOGIN_DEBUG", "=== END DEBUG ===")
         
