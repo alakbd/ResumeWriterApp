@@ -141,41 +141,72 @@ class ResumeGenerationActivity : AppCompatActivity() {
         }
     }
 
+    private fun checkCreditState() {
+    creditManager.debugCreditState() // Log current state
+    
+    if (!creditManager.canGenerateResume()) {
+        if (creditManager.hasUsedCreditRecently()) {
+            showMessage("Please wait before generating another resume")
+        } else {
+            showMessage("Not enough credits available")
+        }
+        finish()
+        return
+    }
+}
+
+private fun deductCreditForResume() {
+    creditManager.useCreditForResume { success ->
+        if (success) {
+            Log.d("ResumeActivity", "✅ Credit deducted for resume generation")
+            // Proceed with resume generation
+            generateResumeContent()
+        } else {
+            Log.e("ResumeActivity", "❌ Failed to deduct credit")
+            showMessage("Failed to use credit. Please try again.")
+            finish()
+        }
+    }
+}
+    
     override fun onResume() {
-        super.onResume()
-        
-        lifecycleScope.launch {
-            Log.d("ResumeActivity", "🔄 onResume - refreshing data...")
-            
-            try {
-                // Add initial delay to let system stabilize
-                delay(1000L)
-                
-                val authValid = checkAuthenticationState()
-                
-                if (authValid) {
-                    // Only update credits if we have a stable connection
-                    if (isNetworkAvailable()) {
-                        updateCreditDisplay()
-                    } else {
-                        withContext(Dispatchers.Main) {
-                            binding.creditText.text = "Credits: Offline"
-                        }
+    super.onResume()
+
+    // 🕒 Reset cooldown immediately when returning to this screen
+    creditManager.resetResumeCooldown()
+
+    lifecycleScope.launch {
+        Log.d("ResumeActivity", "🔄 onResume - refreshing data...")
+
+        try {
+            // Add initial delay to let system stabilize
+            delay(1000L)
+
+            val authValid = checkAuthenticationState()
+
+            if (authValid) {
+                // Only update credits if we have a stable connection
+                if (isNetworkAvailable()) {
+                    updateCreditDisplay()
+                } else {
+                    withContext(Dispatchers.Main) {
+                        binding.creditText.text = "Credits: Offline"
                     }
                 }
-                
-                withContext(Dispatchers.Main) {
-                    checkGenerateButtonState()
-                }
-            } catch (e: Exception) {
-                Log.e("ResumeActivity", "❌ onResume failed: ${e.message}", e)
-                withContext(Dispatchers.Main) {
-                    binding.creditText.text = "Credits: Error"
-                    // Don't show error toast here to avoid spamming user
-                }
+            }
+
+            withContext(Dispatchers.Main) {
+                checkGenerateButtonState()
+            }
+        } catch (e: Exception) {
+            Log.e("ResumeActivity", "❌ onResume failed: ${e.message}", e)
+            withContext(Dispatchers.Main) {
+                binding.creditText.text = "Credits: Error"
+                // Avoid showing toast spam
             }
         }
     }
+}
 
     /** ---------------- File Picker Setup ---------------- **/
     private fun registerFilePickers() {
