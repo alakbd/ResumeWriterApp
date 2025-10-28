@@ -14,7 +14,7 @@ class MainActivity : AppCompatActivity() {
     private lateinit var userManager: UserManager
     private lateinit var creditManager: CreditManager
     private lateinit var billingManager: BillingManager
-    private lateinit var auth: FirebaseAuth  // ✅ ADDED THIS LINE
+    private lateinit var auth: FirebaseAuth
 
     private var adminTapCount = 0
     private var isBillingInitialized = false
@@ -25,21 +25,23 @@ class MainActivity : AppCompatActivity() {
         setContentView(binding.root)
 
         // Initialize Firebase Auth
-        auth = FirebaseAuth.getInstance()  // ✅ ADDED THIS LINE
+        auth = FirebaseAuth.getInstance()
 
         // Initialize managers first
         initializeManagers()
 
-        // DEBUG: Check current state
+        // DEBUG: Check current state with new validation methods
         Log.d("MAIN_ACTIVITY_DEBUG", "=== MAIN ACTIVITY START ===")
         Log.d("MAIN_ACTIVITY_DEBUG", "Firebase User: ${auth.currentUser?.uid ?: "NULL"}")
-        Log.d("MAIN_ACTIVITY_DEBUG", "UserManager UID: ${userManager.getCurrentUserId() ?: "NULL"}")
-        Log.d("MAIN_ACTIVITY_DEBUG", "UserManager isLoggedIn: ${userManager.isUserLoggedIn()}")
+        
+        // Use new debug methods
+        userManager.debugUserState()
+        creditManager.debugCreditState()
+        
+        Log.d("MAIN_ACTIVITY_DEBUG", "User Data Persisted: ${userManager.isUserDataPersisted()}")
+        Log.d("MAIN_ACTIVITY_DEBUG", "Credit Data Persisted: ${creditManager.isCreditDataPersisted()}")
         Log.d("MAIN_ACTIVITY_DEBUG", "=== MAIN ACTIVITY END ===")
 
-        userManager.logCurrentUserState()
-        userManager.debugStoredData()
-    
         // Check authentication - redirect to login if not authenticated
         if (!checkAuthentication()) {
             return // Will start LoginActivity and finish this one
@@ -61,6 +63,17 @@ class MainActivity : AppCompatActivity() {
             Log.d("MainActivity", "🚨 Fresh install detected - forcing login")
             redirectToLogin()
             return false
+        }
+        
+        // NEW: Check if user data is properly persisted
+        if (!userManager.isUserDataPersisted()) {
+            Log.w("MainActivity", "⚠️ User data not persisted - attempting emergency sync")
+            val syncSuccess = userManager.emergencySyncWithFirebase()
+            if (!syncSuccess) {
+                Log.e("MainActivity", "❌ Emergency sync failed - forcing login")
+                redirectToLogin()
+                return false
+            }
         }
         
         // Check if user is properly logged in
@@ -87,6 +100,9 @@ class MainActivity : AppCompatActivity() {
         loadUserData()
         updateAdminIndicator()
         checkEmailVerification()
+        
+        // NEW: Auto-resync if needed
+        userManager.autoResyncIfNeeded()
     }
 
     private fun setupClickListeners() {
@@ -108,31 +124,67 @@ class MainActivity : AppCompatActivity() {
         binding.tvVersion.setOnClickListener { handleAdminTap() }
         binding.btnAdminAccess.setOnClickListener { navigateToAdmin() }
 
-        // Logout Button
+        // Logout Button - UPDATED with proper data clearing
         binding.btnLogout.setOnClickListener {
-            userManager.logout()
-            val intent = Intent(this, LoginActivity::class.java)
-            intent.flags = Intent.FLAG_ACTIVITY_CLEAR_TOP or Intent.FLAG_ACTIVITY_NEW_TASK
-            startActivity(intent)
-            finish()
+            showLogoutConfirmation()
         }
 
-        // Refresh Button
+        // Refresh Button - UPDATED with force sync
         binding.btnRefresh.setOnClickListener {
             binding.btnRefresh.isEnabled = false
             binding.btnRefresh.text = "Refreshing..."
-            creditManager.syncWithFirebase { success, _ ->
-                binding.btnRefresh.isEnabled = true
-                binding.btnRefresh.text = "Refresh"
-                if (success) {
-                    updateCreditDisplay()
-                    showMessage("Data refreshed successfully!")
-                } else {
-                    updateCreditDisplay()
-                    showMessage("Failed to refresh. Using local data.")
+            
+            // Use force sync for both managers
+            userManager.forceSyncWithFirebase { userSuccess ->
+                creditManager.forceSyncWithFirebase { creditSuccess, credits ->
+                    binding.btnRefresh.isEnabled = true
+                    binding.btnRefresh.text = "Refresh"
+                    
+                    if (userSuccess && creditSuccess) {
+                        updateCreditDisplay()
+                        showMessage("Data refreshed successfully!")
+                        Log.d("MainActivity", "Force sync completed successfully")
+                    } else {
+                        updateCreditDisplay()
+                        showMessage("Partial sync. Using available data.")
+                        Log.w("MainActivity", "Force sync partially failed - User: $userSuccess, Credits: $creditSuccess")
+                    }
                 }
             }
         }
+
+        // NEW: Debug button (optional - you can remove this in production)
+        binding.tvVersion.setOnLongClickListener {
+            showDebugInfo()
+            true
+        }
+    }
+
+    private fun showLogoutConfirmation() {
+        AlertDialog.Builder(this)
+            .setTitle("Logout")
+            .setMessage("Are you sure you want to logout?")
+            .setPositiveButton("Logout") { _, _ ->
+                performLogout()
+            }
+            .setNegativeButton("Cancel", null)
+            .show()
+    }
+
+    private fun performLogout() {
+        Log.d("MainActivity", "Performing logout with data clearing")
+        
+        // Clear all data from both managers
+        userManager.clearUserData()
+        creditManager.clearCreditData()
+        
+        // Firebase logout
+        auth.signOut()
+        
+        val intent = Intent(this, LoginActivity::class.java)
+        intent.flags = Intent.FLAG_ACTIVITY_CLEAR_TOP or Intent.FLAG_ACTIVITY_NEW_TASK
+        startActivity(intent)
+        finish()
     }
 
     private fun handleAdminTap() {
@@ -174,24 +226,29 @@ class MainActivity : AppCompatActivity() {
         binding.btnGenerateCv.isEnabled = false
         binding.btnGenerateCv.text = "Loading..."
 
-        creditManager.syncWithFirebase { success, _ ->
+        // NEW: Use auto-sync method for credits
+        creditManager.getCreditsWithAutoSync { credits ->
             binding.btnGenerateCv.isEnabled = true
             updateGenerateButton()
 
-            if (success) {
+            if (credits >= 0) {
                 updateCreditDisplay()
-                showMessage("Data synchronized")
+                showMessage("Data loaded successfully")
             } else {
                 updateCreditDisplay()
-                showMessage("Using local data")
+                showMessage("Using cached data")
             }
         }
     }
 
     private fun generateCV() {
-        val availableCredits = creditManager.getAvailableCredits()
-        if (availableCredits <= 0) {
-            showMessage("Not enough credits! Please purchase more.")
+        // NEW: Use the enhanced resume generation check
+        if (!creditManager.canGenerateResume()) {
+            if (creditManager.getAvailableCredits() <= 0) {
+                showMessage("Not enough credits! Please purchase more.")
+            } else {
+                showMessage("Please wait before generating another resume.")
+            }
             return
         }
 
@@ -221,9 +278,14 @@ class MainActivity : AppCompatActivity() {
             updatePurchaseButtons()
             showMessage(message)
             if (success) {
-                creditManager.syncWithFirebase { syncSuccess, _ ->
+                // NEW: Force sync after purchase to ensure credits are updated
+                creditManager.forceSyncWithFirebase { syncSuccess, credits ->
                     updateCreditDisplay()
-                    if (syncSuccess) showMessage("Credits updated successfully!")
+                    if (syncSuccess) {
+                        showMessage("Credits updated successfully!")
+                    } else {
+                        showMessage("Purchase completed but sync failed. Credits will update soon.")
+                    }
                 }
             }
         }
@@ -253,8 +315,14 @@ class MainActivity : AppCompatActivity() {
 
     private fun updateGenerateButton() {
         val available = creditManager.getAvailableCredits()
-        binding.btnGenerateCv.isEnabled = available > 0
-        binding.btnGenerateCv.text = if (available > 0) "Generate CV (1 Credit)" else "No Credits Available"
+        val canGenerate = creditManager.canGenerateResume()
+        
+        binding.btnGenerateCv.isEnabled = canGenerate
+        binding.btnGenerateCv.text = when {
+            !canGenerate && available > 0 -> "Please Wait..."
+            available > 0 -> "Generate CV (1 Credit)"
+            else -> "No Credits Available"
+        }
     }
 
     private fun navigateToAdmin() {
@@ -288,10 +356,16 @@ class MainActivity : AppCompatActivity() {
     override fun onResume() {
         super.onResume()
         if (::creditManager.isInitialized) {
-            // Refresh credit display when returning from WebView
+            // NEW: Auto-resync when returning to the app
+            userManager.autoResyncIfNeeded()
+            
+            // Refresh credit display when returning from other activities
             creditManager.syncWithFirebase { success, _ ->
                 updateCreditDisplay()
                 updateAdminIndicator()
+                
+                // NEW: Reset resume cooldown when returning from WebView
+                creditManager.resetResumeCooldown()
             }
         }
     }
@@ -331,5 +405,26 @@ class MainActivity : AppCompatActivity() {
                 showMessage("Failed to send verification: $error")
             }
         }
+    }
+
+    // NEW: Debug info dialog
+    private fun showDebugInfo() {
+        val userState = """
+            === DEBUG INFO ===
+            Firebase UID: ${auth.currentUser?.uid ?: "NULL"}
+            Local UID: ${userManager.getCurrentUserId() ?: "NULL"}
+            User Data Persisted: ${userManager.isUserDataPersisted()}
+            Credit Data Persisted: ${creditManager.isCreditDataPersisted()}
+            Available Credits: ${creditManager.getAvailableCredits()}
+            Can Generate Resume: ${creditManager.canGenerateResume()}
+            Admin Mode: ${creditManager.isAdminMode()}
+            Billing Ready: $isBillingInitialized
+        """.trimIndent()
+
+        AlertDialog.Builder(this)
+            .setTitle("Debug Information")
+            .setMessage(userState)
+            .setPositiveButton("OK", null)
+            .show()
     }
 }
