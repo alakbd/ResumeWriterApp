@@ -27,6 +27,11 @@ class LoginActivity : AppCompatActivity() {
         creditManager = CreditManager(this)
         firebaseAuth = FirebaseAuth.getInstance()
 
+        // NEW: Debug initial state
+        Log.d("LoginActivity", "=== LOGIN ACTIVITY STARTED ===")
+        userManager.debugUserState()
+        creditManager.debugCreditState()
+
         // Clean up stale data
         cleanupStaleData()
 
@@ -49,7 +54,8 @@ class LoginActivity : AppCompatActivity() {
         // Only clear if we have local data but no Firebase user
         if (firebaseUser == null && localUid != null) {
             Log.w("LoginActivity", "⚠️ Clearing stale local data - no matching Firebase user")
-            userManager.logout()
+            userManager.clearUserData()
+            creditManager.clearCreditData()
         } else if (firebaseUser != null && localUid != null) {
             Log.d("LoginActivity", "✅ Data consistent - Firebase and local UID match")
         }
@@ -65,7 +71,7 @@ class LoginActivity : AppCompatActivity() {
             }
         }
 
-        // Debug button
+        // Debug button - UPDATED with better debugging
         binding.btnDebugLogin.setOnClickListener {
             debugLoginState()
         }
@@ -219,6 +225,8 @@ class LoginActivity : AppCompatActivity() {
         Log.d("LOGIN_DEBUG", "   • UserManager UID: ${userManager.getCurrentUserId() ?: "NULL"}")
         Log.d("LOGIN_DEBUG", "   • UserManager Email: ${userManager.getCurrentUserEmail() ?: "NULL"}")
         Log.d("LOGIN_DEBUG", "   • isUserLoggedIn(): ${userManager.isUserLoggedIn()}")
+        Log.d("LOGIN_DEBUG", "   • User Data Persisted: ${userManager.isUserDataPersisted()}")
+        Log.d("LOGIN_DEBUG", "   • Credit Data Persisted: ${creditManager.isCreditDataPersisted()}")
         
         // Check SharedPreferences directly
         val prefs = getSharedPreferences("user_prefs", Context.MODE_PRIVATE)
@@ -243,6 +251,7 @@ class LoginActivity : AppCompatActivity() {
         Toast.makeText(this, "Firebase: $firebaseUser, Local: $localUid", Toast.LENGTH_LONG).show()
     }
 
+    // NEW: Enhanced login success handling with synchronization
     private fun onLoginSuccess(user: FirebaseUser) {
         Log.d("LOGIN_DEBUG", "=== START onLoginSuccess ===")
         Log.d("LOGIN_DEBUG", "Firebase User UID: ${user.uid}")
@@ -265,23 +274,48 @@ class LoginActivity : AppCompatActivity() {
         // Ensure admin mode is disabled for regular login
         creditManager.setAdminMode(false)
         
-        // Initialize user session and credits
+        // NEW: Initialize credit data
         creditManager.resetResumeCooldown()
         
-        // Sync user credits from Firestore
-        userManager.syncUserCredits { success, credits ->
-            if (success) {
-                Log.d("LOGIN_DEBUG", "User credits synced: $credits")
-            } else {
-                Log.w("LOGIN_DEBUG", "Failed to sync user credits")
-            }
-        }
-        
-        Log.d("LOGIN_DEBUG", "✅ Login successful - proceeding to MainActivity")
+        Log.d("LOGIN_DEBUG", "✅ Login successful - starting synchronization")
         Log.d("LOGIN_DEBUG", "=== END onLoginSuccess ===")
         
-        showMessage("Login successful!")
-        proceedToMainActivity()
+        showMessage("Login successful! Syncing data...")
+        
+        // NEW: Use the enhanced synchronization flow
+        synchronizeAndProceed()
+    }
+
+    // NEW: Enhanced synchronization method
+    private fun synchronizeAndProceed() {
+        Log.d("LoginActivity", "🔄 Starting data synchronization...")
+        
+        // Force sync user data first
+        userManager.forceSyncWithFirebase { userSuccess ->
+            if (userSuccess) {
+                Log.d("LoginActivity", "✅ User data synced successfully")
+                
+                // Then force sync credits
+                creditManager.forceSyncWithFirebase { creditSuccess, credits ->
+                    if (creditSuccess) {
+                        Log.d("LoginActivity", "✅ Credits synced successfully: $credits")
+                        showMessage("Data synchronized successfully!")
+                    } else {
+                        Log.w("LoginActivity", "⚠️ Credit sync failed but proceeding")
+                        showMessage("Login successful - using cached data")
+                    }
+                    
+                    // Proceed to main activity regardless of credit sync result
+                    proceedToMainActivity()
+                }
+            } else {
+                Log.e("LoginActivity", "❌ User data sync failed")
+                showMessage("Login successful but sync incomplete")
+                
+                // Still proceed to main activity
+                proceedToMainActivity()
+            }
+        }
     }
 
     private fun onLoginFailure(error: String?) {
@@ -306,10 +340,18 @@ class LoginActivity : AppCompatActivity() {
         binding.etLoginPassword.isEnabled = !inProgress
     }
 
+    // UPDATED: Enhanced navigation with better logging
     private fun proceedToMainActivity() {
         Log.d("LOGIN_NAVIGATION", "=== NAVIGATING TO MAIN ACTIVITY ===")
-        Log.d("LOGIN_NAVIGATION", "Firebase User Before: ${FirebaseAuth.getInstance().currentUser?.uid ?: "NULL"}")
-        Log.d("LOGIN_NAVIGATION", "UserManager UID Before: ${userManager.getCurrentUserId() ?: "NULL"}")
+        
+        // Final state verification
+        val firebaseUser = FirebaseAuth.getInstance().currentUser
+        val userManagerUid = userManager.getCurrentUserId()
+        
+        Log.d("LOGIN_NAVIGATION", "Final State - Firebase: ${firebaseUser?.uid ?: "NULL"}")
+        Log.d("LOGIN_NAVIGATION", "Final State - UserManager: $userManagerUid")
+        Log.d("LOGIN_NAVIGATION", "Final State - User Data Persisted: ${userManager.isUserDataPersisted()}")
+        Log.d("LOGIN_NAVIGATION", "Final State - Credit Data Persisted: ${creditManager.isCreditDataPersisted()}")
         
         val intent = Intent(this, MainActivity::class.java).apply {
             flags = Intent.FLAG_ACTIVITY_NEW_TASK or Intent.FLAG_ACTIVITY_CLEAR_TASK
@@ -322,5 +364,31 @@ class LoginActivity : AppCompatActivity() {
 
     private fun showMessage(message: String) {
         Toast.makeText(this, message, Toast.LENGTH_SHORT).show()
+    }
+
+    // NEW: Handle network connectivity changes
+    override fun onResume() {
+        super.onResume()
+        
+        // Auto-resync if user is logged in but data might be stale
+        if (userManager.isUserLoggedIn()) {
+            Log.d("LoginActivity", "Resuming - auto-resyncing if needed")
+            userManager.autoResyncIfNeeded()
+        }
+    }
+
+    // NEW: Emergency recovery method
+    private fun attemptEmergencyRecovery() {
+        Log.w("LoginActivity", "🆘 Attempting emergency recovery...")
+        
+        val success = userManager.emergencySyncWithFirebase()
+        if (success) {
+            showMessage("Recovery successful - proceeding to main")
+            proceedToMainActivity()
+        } else {
+            showMessage("Recovery failed - please login again")
+            userManager.clearUserData()
+            creditManager.clearCreditData()
+        }
     }
 }
