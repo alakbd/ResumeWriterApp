@@ -158,7 +158,38 @@ class ResumeGenerationActivity : AppCompatActivity() {
         return
     }
 }
+    
+private fun generateResumeContent() {
+        Log.d("ResumeGeneration", "Starting resume content generation")
+        
+        if (!creditManager.canGenerateResume()) {
+            showMessage("Cannot generate resume at this time")
+            return
+        }
 
+        // Show confirmation dialog before deducting credit
+        showCreditDeductionConfirmation()
+    }
+
+    // NEW: Credit deduction with confirmation
+    private fun showCreditDeductionConfirmation() {
+        AlertDialog.Builder(this)
+            .setTitle("Use Credit")
+            .setMessage("This will use 1 credit from your account. Continue?")
+            .setPositiveButton("Yes") { dialog, _ ->
+                deductCreditForResume()
+                dialog.dismiss()
+            }
+            .setNegativeButton("Cancel") { dialog, _ ->
+                dialog.dismiss()
+                finish() // Go back if user cancels
+            }
+            .setOnCancelListener {
+                finish() // Go back if user cancels
+            }
+            .show()
+    }
+    
 private fun deductCreditForResume() {
     creditManager.useCreditForResume { success ->
         if (success) {
