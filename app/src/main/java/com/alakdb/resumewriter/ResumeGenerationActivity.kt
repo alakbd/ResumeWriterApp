@@ -32,6 +32,7 @@ import java.io.File
 import okhttp3.OkHttpClient
 import okhttp3.Request
 
+
 class ResumeGenerationActivity : AppCompatActivity() {
 
     private lateinit var binding: ActivityResumeGenerationBinding
@@ -43,6 +44,7 @@ class ResumeGenerationActivity : AppCompatActivity() {
     private var selectedJobDescUri: Uri? = null
     private var currentGeneratedResume: JSONObject? = null
 
+    private lateinit var creditManager: CreditManager
     private lateinit var resumePicker: ActivityResultLauncher<String>
     private lateinit var jobDescPicker: ActivityResultLauncher<String>
     private var lastToastTime: Long = 0
@@ -78,6 +80,8 @@ class ResumeGenerationActivity : AppCompatActivity() {
         userManager = UserManager(this)
         apiService = ApiService(this)
         auth = FirebaseAuth.getInstance()
+        creditManager = CreditManager(this)
+
 
         registerFilePickers()
         setupUI()
