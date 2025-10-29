@@ -307,7 +307,7 @@ private fun deductCreditForResume() {
                 when (creditsResult) {
                     is ApiService.ApiResult.Success -> {
                         debugInfo.appendLine("   • Credits Endpoint: ✅ SUCCESS")
-                        debugInfo.appendLine("   • Credits: ${creditsResult.data.optInt("available_credits", -1)}")
+                        debugInfo.appendLine("   • Credits: ${creditsResult.data?.available_credits ?: -1}")
                     }
                     is ApiService.ApiResult.Error -> {
                         debugInfo.appendLine("   • Credits Endpoint: ❌ FAILED")
@@ -711,7 +711,7 @@ private fun deductCreditForResume() {
                 
                 when (creditResult) {
                     is ApiService.ApiResult.Success -> {
-                        val credits = creditResult.data.optInt("available_credits", 0)
+                        val credits = creditResult.data?.available_credits ?: 0
                         Log.d("ResumeActivity", "User has $credits credits")
                         
                         if (credits <= 0) {
@@ -768,7 +768,7 @@ private fun deductCreditForResume() {
                 }
                 when (creditResult) {
                     is ApiService.ApiResult.Success -> {
-                        val credits = creditResult.data.optInt("available_credits", 0)
+                        val credits = creditResult.data?.available_credits ?: 0
                         Log.d("ResumeActivity", "User has $credits credits")
                         if (credits <= 0) {
                             showErrorAndReset("Insufficient credits. Please purchase more.")
@@ -945,7 +945,7 @@ private fun deductCreditForResume() {
                 is ApiService.ApiResult.Success -> {
                     runOnUiThread {
                         try {
-                            val credits = result.data.optInt("available_credits", 0)
+                            val credits = result.data.available_credits
                             binding.creditText.text = "Credits: $credits"
                             Log.d("ResumeActivity", "✅ Credits updated: $credits")
                         } catch (e: Exception) {
