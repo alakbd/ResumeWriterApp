@@ -220,7 +220,9 @@ class ResumeGenerationActivity : AppCompatActivity() {
         binding.btnRetryConnection.setOnClickListener { testApiConnection() }
         
         binding.btnDebugAuth.setOnClickListener {
-            debugAuthFlow()
+            //debugAuthFlow()
+            testFileUpload()
+            true
         }
     }
 
@@ -518,6 +520,73 @@ private fun generateResumeFromText() {
     return ApiService.ApiResult.Error(errorMessage, 0)
 }
 
+private fun testFileUpload() {
+    val resumeUri = selectedResumeUri ?: return showError("No resume file selected")
+    val jobDescUri = selectedJobDescUri ?: return showError("No job description file selected")
+
+    lifecycleScope.launch {
+        try {
+            binding.tvGeneratedResume.text = "Testing file upload..."
+            
+            // Test file reading
+            val resumeFileName = getFileName(resumeUri)
+            val jobDescFileName = getFileName(jobDescUri)
+            
+            var debugInfo = "📁 File Info:\n"
+            debugInfo += "• Resume: $resumeFileName\n"
+            debugInfo += "• Job Desc: $jobDescFileName\n\n"
+            
+            // Test file content extraction
+            debugInfo += "🔍 Testing file content extraction...\n"
+            
+            try {
+                val resumeText = apiService.extractTextFromUploadFile(
+                    object : UploadFile {
+                        override fun readBytes(): ByteArray {
+                            return contentResolver.openInputStream(resumeUri)?.readBytes() ?: byteArrayOf()
+                        }
+                        override fun getFilename(): String? = resumeFileName
+                    }
+                )
+                val jobText = apiService.extractTextFromUploadFile(
+                    object : UploadFile {
+                        override fun readBytes(): ByteArray {
+                            return contentResolver.openInputStream(jobDescUri)?.readBytes() ?: byteArrayOf()
+                        }
+                        override fun getFilename(): String? = jobDescFileName
+                    }
+                )
+                
+                debugInfo += "✅ File extraction successful!\n"
+                debugInfo += "• Resume chars: ${resumeText.length}\n"
+                debugInfo += "• Job desc chars: ${jobText.length}\n"
+                debugInfo += "• Resume preview: ${resumeText.take(100)}...\n"
+                debugInfo += "• Job preview: ${jobText.take(100)}...\n"
+                
+            } catch (e: Exception) {
+                debugInfo += "❌ File extraction failed: ${e.message}\n"
+            }
+            
+            // Test API connection
+            debugInfo += "\n🌐 Testing API connection...\n"
+            val healthResult = apiService.testConnection()
+            when (healthResult) {
+                is ApiService.ApiResult.Success -> {
+                    debugInfo += "✅ API is reachable\n"
+                }
+                is ApiService.ApiResult.Error -> {
+                    debugInfo += "❌ API unreachable: ${healthResult.message}\n"
+                }
+            }
+            
+            binding.tvGeneratedResume.text = debugInfo
+            
+        } catch (e: Exception) {
+            binding.tvGeneratedResume.text = "💥 Test failed: ${e.message}"
+        }
+    }
+}
+    
     private suspend fun ensureAuthenticatedBeforeApiCall(): Boolean {
         if (!userManager.isUserLoggedIn()) {
             Log.e("ResumeActivity", "❌ User not logged in for API call")
