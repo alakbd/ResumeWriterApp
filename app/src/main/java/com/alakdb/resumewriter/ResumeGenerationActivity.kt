@@ -472,35 +472,50 @@ private fun generateResumeFromText() {
     
     repeat(maxRetries) { attempt ->
         try {
+            Log.d("SafeApiCall", "🔄 Attempt ${attempt + 1}/$maxRetries for $operation")
+            
             if (!ensureAuthenticatedBeforeApiCall()) {
+                Log.e("SafeApiCall", "❌ Authentication failed for $operation")
                 return ApiService.ApiResult.Error("Authentication failed", 401)
             }
             
             val result = block()
-            if (result is ApiService.ApiResult.Success) {
-                return result
-            }
             
-            if (result is ApiService.ApiResult.Error && result.code == 401) {
-                return result
+            when (result) {
+                is ApiService.ApiResult.Success -> {
+                    Log.d("SafeApiCall", "✅ $operation succeeded on attempt ${attempt + 1}")
+                    return result
+                }
+                is ApiService.ApiResult.Error -> {
+                    Log.w("SafeApiCall", "⚠️ $operation failed on attempt ${attempt + 1}: ${result.message} (Code: ${result.code})")
+                    
+                    // If it's an auth error, don't retry
+                    if (result.code == 401) {
+                        return result
+                    }
+                    
+                    // If it's a client error (4xx), don't retry
+                    if (result.code in 400..499) {
+                        return result
+                    }
+                }
             }
-            
-            Log.w("SafeApiCall", "Attempt $attempt failed for $operation: ${(result as? ApiService.ApiResult.Error)?.message}")
             
         } catch (e: Exception) {
             lastError = e
-            Log.e("SafeApiCall", "Exception in $operation attempt $attempt: ${e.message}")
+            Log.e("SafeApiCall", "💥 Exception in $operation attempt ${attempt + 1}: ${e.message}", e)
         }
         
         if (attempt < maxRetries - 1) {
-            delay(1000L * (attempt + 1))
+            val delayTime = 1000L * (attempt + 1)
+            Log.d("SafeApiCall", "⏳ Waiting $delayTime ms before retry...")
+            delay(delayTime)
         }
     }
     
-    return ApiService.ApiResult.Error(
-        lastError?.message ?: "All retry attempts failed for $operation", 
-        0
-    )
+    val errorMessage = lastError?.message ?: "All retry attempts failed for $operation"
+    Log.e("SafeApiCall", "❌ $errorMessage")
+    return ApiService.ApiResult.Error(errorMessage, 0)
 }
 
     private suspend fun ensureAuthenticatedBeforeApiCall(): Boolean {
