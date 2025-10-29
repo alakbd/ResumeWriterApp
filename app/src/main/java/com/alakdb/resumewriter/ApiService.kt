@@ -36,7 +36,7 @@ fun ByteArray.toResponseBody(mediaType: MediaType): ResponseBody {
 class ApiService(private val context: Context) {
 
     private val gson = Gson()
-    private val baseUrl = "https://resume-writer-api.onrender.com"
+    private val baseUrl = "https://resume-writer-api.onrender.com/"
 
     // Simple client for health checks (no authentication needed)
     private val simpleClient = OkHttpClient.Builder()
