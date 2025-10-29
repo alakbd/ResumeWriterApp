@@ -1313,32 +1313,32 @@ class ResumeGenerationActivity : AppCompatActivity() {
     private fun <T> handleGenerationResult(result: ApiService.ApiResult<T>) {
         when (result) {
             is ApiService.ApiResult.Success -> {
-                when (val data = result.data) {
-                    is ApiService.GenerateResumeResponse -> {
-                        Log.d("ResumeActivity", "Resume generation success: ${data.message}")
-                        currentGeneratedResume = data
-                        displayGeneratedResume(data)
-                        showSuccess("Resume generated successfully!")
+                val data = result.data
+                if (data is ApiService.GenerateResumeResponse) {
+                    Log.d("ResumeActivity", "✅ Resume generation success: ${data.message}")
 
-                        // Update credits display with the new remaining credits
-                        val remaining = data.remaining_credits
-                        lifecycleScope.launch {
-                            withContext(Dispatchers.Main) {
-                                binding.creditText.text = "Credits: $remaining"
-                            }
-                        }
-                    }
-                    else -> {
-                        Log.e("ResumeActivity", "Unexpected response type: ${data?.javaClass}")
-                        showError("Unexpected response from server")
-                    }
+                // Save current generated resume
+                currentGeneratedResume = data
+
+                // Display resume
+                displayGeneratedResume(data)
+                showSuccess("Resume generated successfully!")
+
+                // Update remaining credits display
+                lifecycleScope.launch(Dispatchers.Main) {
+                    binding.creditText.text = "Credits: ${data.remaining_credits}"
                 }
+            } else {
+                // Safety net for unexpected type
+                Log.e("ResumeActivity", "❌ Unexpected response type: ${data?.javaClass}")
+                showError("Unexpected response from server")
             }
+        }
             is ApiService.ApiResult.Error -> {
-                Log.e("ResumeActivity", "Resume generation failed: ${result.message}")
+                Log.e("ResumeActivity", "❌ Resume generation failed: ${result.message}")
                 showError("Generation failed: ${result.message}")
-                
-                // Refresh credits display in case of error
+
+                // Refresh credits display even on error
                 lifecycleScope.launch {
                     updateCreditDisplay()
                 }
