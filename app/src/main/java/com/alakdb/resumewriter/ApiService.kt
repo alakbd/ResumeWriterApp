@@ -696,10 +696,10 @@ class SafeAuthInterceptor(private val context: Context) : Interceptor {
         
         // Add user ID header if available
         if (!userId.isNullOrBlank()) {
-            requestBuilder.addHeader("User-Id", userId)
+            requestBuilder.addHeader("X-User-ID", userId)
             Log.d("AUTH_HEADER", "✅ Adding User-Id header: ${userId.take(8)}...")
         } else {
-            Log.w("AUTH_HEADER", "⚠️ No User-Id available for headers")
+            Log.w("AUTH_HEADER", "⚠️ No X-User-ID available for headers")
         }
         
         val request = requestBuilder.build()
