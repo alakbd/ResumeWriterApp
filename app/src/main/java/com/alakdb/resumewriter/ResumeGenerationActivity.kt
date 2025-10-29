@@ -776,9 +776,9 @@ private fun deductCreditForResume() {
                         }
                         
                         Log.d("ResumeActivity", "Generating resume from text input")
-                        val genResult = safeApiCallWithResult("generateResume") { 
-                            apiService.generateResume(resumeText, jobDesc) 
-                        }
+                            val genResult = safeApiCallWithResult("generateResumeFromText") { 
+                                apiService.generateResumeFromText(resumeText, jobDesc) 
+                            }
                         handleGenerationResult(genResult)
                     }
                     is ApiService.ApiResult.Error -> {
