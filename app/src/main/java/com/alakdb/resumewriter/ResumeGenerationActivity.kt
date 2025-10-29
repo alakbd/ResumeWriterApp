@@ -249,12 +249,15 @@ class ResumeGenerationActivity : AppCompatActivity() {
 
     lifecycleScope.launch {
         try {
+            Log.d("ResumeActivity", "🚀 Starting resume generation from files...")
+            
             if (!ensureAuthenticatedBeforeApiCall()) {
                 resetGenerateButton()
                 return@launch
             }
 
-            Log.d("ResumeActivity", "Checking user credits")
+            Log.d("ResumeActivity", "✅ User authenticated, checking credits...")
+            
             val creditResult = safeApiCallWithResult<ApiService.UserCreditsResponse>("getUserCredits") { 
                 apiService.getUserCredits() 
             }
@@ -262,23 +265,62 @@ class ResumeGenerationActivity : AppCompatActivity() {
             when (creditResult) {
                 is ApiService.ApiResult.Success -> {
                     val credits = creditResult.data.available_credits
-                    Log.d("ResumeActivity", "User has $credits credits")
+                    Log.d("ResumeActivity", "💰 User has $credits credits")
 
                     if (credits <= 0) {
                         showErrorAndReset("Insufficient credits. Please purchase more.")
                         return@launch
                     }
 
-                    Log.d("ResumeActivity", "Generating resume from files")
+                    Log.d("ResumeActivity", "📤 Generating resume from files...")
+                    
+                    // Test file extraction first
+                    try {
+                        val resumeText = apiService.extractTextFromUploadFile(
+                            object : UploadFile {
+                                override fun readBytes(): ByteArray {
+                                    return contentResolver.openInputStream(resumeUri)?.readBytes() ?: byteArrayOf()
+                                }
+                                override fun getFilename(): String? = getFileName(resumeUri)
+                            }
+                        )
+                        val jobText = apiService.extractTextFromUploadFile(
+                            object : UploadFile {
+                                override fun readBytes(): ByteArray {
+                                    return contentResolver.openInputStream(jobDescUri)?.readBytes() ?: byteArrayOf()
+                                }
+                                override fun getFilename(): String? = getFileName(jobDescUri)
+                            }
+                        )
+                        
+                        Log.d("ResumeActivity", "📄 Resume text length: ${resumeText.length}")
+                        Log.d("ResumeActivity", "📄 Job desc text length: ${jobText.length}")
+                        
+                        if (resumeText.length < 50) {
+                            showErrorAndReset("Resume file appears to be empty or too short")
+                            return@launch
+                        }
+                        if (jobText.length < 20) {
+                            showErrorAndReset("Job description file appears to be empty or too short")
+                            return@launch
+                        }
+                    } catch (e: Exception) {
+                        Log.e("ResumeActivity", "❌ File extraction failed: ${e.message}", e)
+                        showErrorAndReset("Failed to read files: ${e.message}")
+                        return@launch
+                    }
+
                     val genResult = safeApiCallWithResult<ApiService.GenerateResumeResponse>("generateResumeFromFiles") { 
+                        Log.d("ResumeActivity", "📡 Calling API...")
                         apiService.generateResumeFromFiles(resumeUri, jobDescUri) 
                     }
 
+                    Log.d("ResumeActivity", "📨 API Response received: ${genResult is ApiService.ApiResult.Success}")
                     handleGenerationResult(genResult)
                 }
 
                 is ApiService.ApiResult.Error -> {
-                    Log.e("ResumeActivity", "Failed to get credits: ${creditResult.message}")
+                    Log.e("ResumeActivity", "❌ Failed to get credits: ${creditResult.message} (Code: ${creditResult.code})")
                     showErrorAndReset("Failed to check credits: ${creditResult.message}")
 
                     if (creditResult.code == 401) {
@@ -289,7 +331,7 @@ class ResumeGenerationActivity : AppCompatActivity() {
                 }
             }
         } catch (e: Exception) {
-            Log.e("ResumeActivity", "Exception in generateResumeFromFiles: ${e.message}", e)
+            Log.e("ResumeActivity", "💥 Exception in generateResumeFromFiles: ${e.message}", e)
             showErrorAndReset("Generation failed: ${e.message}")
         } finally {
             resetGenerateButton()
@@ -297,65 +339,58 @@ class ResumeGenerationActivity : AppCompatActivity() {
     }
 }
 
-private fun generateResumeFromText() {
-    val resumeText = binding.etResumeText.text.toString().trim()
-    val jobDesc = binding.etJobDescription.text.toString().trim()
-
-    if (resumeText.isEmpty() || jobDesc.isEmpty()) {
-        showError("Please enter both resume text and job description")
-        return
-    }
-
-    disableGenerateButton("Processing...")
-
-    lifecycleScope.launch {
+    suspend fun generateResumeFromText(
+        resumeText: String,
+        jobDescription: String,
+        tone: String = "Professional"
+    ): ApiResult<GenerateResumeResponse> = withContext(Dispatchers.IO) {
         try {
-            if (!ensureAuthenticatedBeforeApiCall()) {
-                resetGenerateButton()
-                return@launch
-            }
+            Log.d("ApiService", "📝 Generating resume from text...")
 
-            val creditResult = safeApiCallWithResult<ApiService.UserCreditsResponse>("getUserCredits") { 
-                apiService.getUserCredits() 
-            }
+            val requestBody = GenerateResumeRequest(resumeText, jobDescription, tone)
+            val body = gson.toJson(requestBody).toRequestBody("application/json".toMediaType())
 
-            when (creditResult) {
-                is ApiService.ApiResult.Success -> {
-                    val credits = creditResult.data.available_credits
-                    Log.d("ResumeActivity", "User has $credits credits")
+            val request = Request.Builder()
+                .url("$baseUrl/generate-resume")
+                .addHeader("Accept", "application/json")
+                .post(body)
+                .build()
 
-                    if (credits <= 0) {
-                        showErrorAndReset("Insufficient credits. Please purchase more.")
-                        return@launch
+            Log.d("ApiService", "➡️ Sending text-based resume generation request")
+
+            client.newCall(request).execute().use { response ->
+                val respBody = response.body?.string() ?: "{}"
+                Log.d("ApiService", "📬 Text-based resume generation response: ${response.code}")
+
+                return@withContext if (response.isSuccessful) {
+                    try {
+                        val jsonResponse = JSONObject(respBody)
+                        val resumeResponse = GenerateResumeResponse(
+                            success = jsonResponse.optBoolean("success", false),
+                            resume_text = jsonResponse.optString("resume_text", ""),
+                            remaining_credits = jsonResponse.optInt("remaining_credits", 0),
+                            generation_id = jsonResponse.optString("generation_id", null),
+                            docx_url = jsonResponse.optString("docx_url", ""),
+                            pdf_url = jsonResponse.optString("pdf_url", ""),
+                            message = jsonResponse.optString("message", "")
+                        )
+                        ApiResult.Success(resumeResponse)
+                    } catch (e: Exception) {
+                        Log.e("ApiService", "❌ JSON parsing error", e)
+                        ApiResult.Error("Invalid server response format", response.code)
                     }
-
-                    Log.d("ResumeActivity", "Generating resume from text input")
-                    val genResult = safeApiCallWithResult<ApiService.GenerateResumeResponse>("generateResumeFromText") { 
-                        apiService.generateResumeFromText(resumeText, jobDesc) 
-                    }
-
-                    handleGenerationResult(genResult)
-                }
-
-                is ApiService.ApiResult.Error -> {
-                    Log.e("ResumeActivity", "Failed to check credits: ${creditResult.message}")
-                    showErrorAndReset("Failed to check credits: ${creditResult.message}")
-
-                    if (creditResult.code == 401) {
-                        showError("Authentication failed. Please log out and log in again.")
-                        userManager.logout()
-                        checkGenerateButtonState()
-                    }
+                } else {
+                    val errorMsg = "HTTP ${response.code}: ${response.message} – $respBody"
+                    Log.e("ApiService", errorMsg)
+                    ApiResult.Error(errorMsg, response.code)
                 }
             }
         } catch (e: Exception) {
-            Log.e("ResumeActivity", "Exception in generateResumeFromText: ${e.message}", e)
-            showErrorAndReset("Generation failed: ${e.message}")
-        } finally {
-            resetGenerateButton()
+            val analysis = analyzeNetworkException(e, "$baseUrl/generate-resume")
+            Log.e("ApiService", analysis)
+            ApiResult.Error("Text resume generation failed: ${e.message}")
         }
     }
-}
 
     /** ---------------- Display & Download ---------------- **/
     private fun displayGeneratedResume(resumeData: ApiService.GenerateResumeResponse) {
