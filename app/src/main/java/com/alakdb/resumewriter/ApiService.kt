@@ -203,49 +203,77 @@ class ApiService(private val context: Context) {
     // ==================== API METHODS ====================
 
     suspend fun generateResumeFromFiles(
-        resumeUri: Uri,
-        jobDescUri: Uri,
-        tone: String = "Professional"
-    ): ApiResult<JSONObject> = withContext(Dispatchers.IO) {
-        try {
-            Log.d("ApiService", "Generating resume from files")
+    resumeUri: Uri,
+    jobDescUri: Uri,
+    tone: String = "Professional"
+): ApiResult<JSONObject> = withContext(Dispatchers.IO) {
+    try {
+        Log.d("ApiService", "📄 Generating resume from files...")
 
-            val resumeFile = uriToFile(resumeUri)
-            val jobDescFile = uriToFile(jobDescUri)
+        // Convert Uris to files
+        val resumeFile = uriToFile(resumeUri)
+        val jobDescFile = uriToFile(jobDescUri)
 
-            Log.d("ApiService", "Files: resume=${resumeFile.name}, jobDesc=${jobDescFile.name}")
+        Log.d("ApiService", "✅ Files selected: resume=${resumeFile.name}, jobDesc=${jobDescFile.name}")
 
-            val body = MultipartBody.Builder()
-                .setType(MultipartBody.FORM)
-                .addFormDataPart("tone", tone)
-                .addFormDataPart("resume_file", resumeFile.name,
-                    resumeFile.asRequestBody("application/pdf".toMediaType()))
-                .addFormDataPart("job_description_file", jobDescFile.name,
-                    jobDescFile.asRequestBody("application/pdf".toMediaType()))
-                .build()
-
-            val request = Request.Builder()
-                .url("$baseUrl/generate-resume-from-files")
-                .post(body)
-                .build()
-
-            client.newCall(request).execute().use { response ->
-                val respBody = response.body?.string() ?: "{}"
-                Log.d("ApiService", "Generate resume from files response: ${response.code}")
-
-                if (!response.isSuccessful) {
-                    val errorMsg = "HTTP ${response.code}: ${response.message}"
-                    return@withContext ApiResult.Error(errorMsg, response.code)
-                }
-
-                ApiResult.Success(JSONObject(respBody))
+        // Detect MIME type automatically
+        fun getMimeType(file: File): String {
+            return when {
+                file.name.endsWith(".pdf", true) -> "application/pdf"
+                file.name.endsWith(".docx", true) -> "application/vnd.openxmlformats-officedocument.wordprocessingml.document"
+                else -> "application/octet-stream"
             }
-        } catch (e: Exception) {
-            val analysis = analyzeNetworkException(e, "$baseUrl/generate-resume-from-files")
-            Log.e("ApiService", analysis)
-            ApiResult.Error("File resume generation failed: ${e.message}")
         }
+
+        val resumeMime = getMimeType(resumeFile)
+        val jobDescMime = getMimeType(jobDescFile)
+
+        val body = MultipartBody.Builder()
+            .setType(MultipartBody.FORM)
+            .addFormDataPart("tone", tone)
+            .addFormDataPart(
+                "resume_file",
+                resumeFile.name,
+                resumeFile.asRequestBody(resumeMime.toMediaType())
+            )
+            .addFormDataPart(
+                "job_description_file",
+                jobDescFile.name,
+                jobDescFile.asRequestBody(jobDescMime.toMediaType())
+            )
+            .build()
+
+        // Get user ID for credit tracking
+        val userManager = UserManager(context)
+        val userId = userManager.getCurrentUserId() ?: ""
+
+        val request = Request.Builder()
+            .url("$baseUrl/generate-resume-from-files")
+            .addHeader("X-User-ID", userId)
+            .addHeader("Accept", "application/json")
+            .post(body)
+            .build()
+
+        Log.d("ApiService", "➡️ Sending file-based resume generation request to: $baseUrl/generate-resume-from-files")
+
+        client.newCall(request).execute().use { response ->
+            val respBody = response.body?.string() ?: "{}"
+            Log.d("ApiService", "📬 File-based resume generation response: ${response.code}")
+
+            return@withContext if (response.isSuccessful) {
+                ApiResult.Success(JSONObject(respBody))
+            } else {
+                val errorMsg = "HTTP ${response.code}: ${response.message} – $respBody"
+                Log.e("ApiService", errorMsg)
+                ApiResult.Error(errorMsg, response.code)
+            }
+        }
+    } catch (e: Exception) {
+        val analysis = analyzeNetworkException(e, "$baseUrl/generate-resume-from-files")
+        Log.e("ApiService", analysis)
+        ApiResult.Error("File resume generation failed: ${e.message}")
     }
+}
 
     suspend fun testConnection(): ApiResult<JSONObject> = withContext(Dispatchers.IO) {
         try {
