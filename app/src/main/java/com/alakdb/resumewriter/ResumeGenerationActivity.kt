@@ -240,120 +240,120 @@ class ResumeGenerationActivity : AppCompatActivity() {
 
     /** ---------------- Resume Generation ---------------- **/
     private fun generateResumeFromFiles() {
-        val resumeUri = selectedResumeUri ?: return showError("Please select resume file")
-        val jobDescUri = selectedJobDescUri ?: return showError("Please select job description file")
+    val resumeUri = selectedResumeUri ?: return showError("Please select resume file")
+    val jobDescUri = selectedJobDescUri ?: return showError("Please select job description file")
 
-        disableGenerateButton("Processing...")
+    disableGenerateButton("Processing...")
 
-        lifecycleScope.launch {
-            try {
-                if (!ensureAuthenticatedBeforeApiCall()) {
-                    resetGenerateButton()
-                    return@launch
-                }
-
-                Log.d("ResumeActivity", "Checking user credits")
-                val creditResult = safeApiCallWithResult("getUserCredits") { 
-                    apiService.getUserCredits() 
-                }
-
-                when (creditResult) {
-                    is ApiService.ApiResult.Success -> {
-                        val credits = creditResult.data.available_credits
-                        Log.d("ResumeActivity", "User has $credits credits")
-
-                        if (credits <= 0) {
-                            showErrorAndReset("Insufficient credits. Please purchase more.")
-                            return@launch
-                        }
-
-                        Log.d("ResumeActivity", "Generating resume from files")
-                        val genResult = safeApiCallWithResult("generateResumeFromFiles") { 
-                            apiService.generateResumeFromFiles(resumeUri, jobDescUri) 
-                        }
-
-                        handleGenerationResult(genResult)
-                    }
-
-                    is ApiService.ApiResult.Error -> {
-                        Log.e("ResumeActivity", "Failed to get credits: ${creditResult.message}")
-                        showErrorAndReset("Failed to check credits: ${creditResult.message}")
-
-                        if (creditResult.code == 401) {
-                            showError("Authentication failed. Please log out and log in again.")
-                            userManager.logout()
-                            checkGenerateButtonState()
-                        }
-                    }
-                }
-            } catch (e: Exception) {
-                Log.e("ResumeActivity", "Exception in generateResumeFromFiles: ${e.message}", e)
-                showErrorAndReset("Generation failed: ${e.message}")
-            } finally {
+    lifecycleScope.launch {
+        try {
+            if (!ensureAuthenticatedBeforeApiCall()) {
                 resetGenerateButton()
+                return@launch
             }
+
+            Log.d("ResumeActivity", "Checking user credits")
+            val creditResult = safeApiCallWithResult<ApiService.UserCreditsResponse>("getUserCredits") { 
+                apiService.getUserCredits() 
+            }
+
+            when (creditResult) {
+                is ApiService.ApiResult.Success -> {
+                    val credits = creditResult.data.available_credits
+                    Log.d("ResumeActivity", "User has $credits credits")
+
+                    if (credits <= 0) {
+                        showErrorAndReset("Insufficient credits. Please purchase more.")
+                        return@launch
+                    }
+
+                    Log.d("ResumeActivity", "Generating resume from files")
+                    val genResult = safeApiCallWithResult<ApiService.GenerateResumeResponse>("generateResumeFromFiles") { 
+                        apiService.generateResumeFromFiles(resumeUri, jobDescUri) 
+                    }
+
+                    handleGenerationResult(genResult)
+                }
+
+                is ApiService.ApiResult.Error -> {
+                    Log.e("ResumeActivity", "Failed to get credits: ${creditResult.message}")
+                    showErrorAndReset("Failed to check credits: ${creditResult.message}")
+
+                    if (creditResult.code == 401) {
+                        showError("Authentication failed. Please log out and log in again.")
+                        userManager.logout()
+                        checkGenerateButtonState()
+                    }
+                }
+            }
+        } catch (e: Exception) {
+            Log.e("ResumeActivity", "Exception in generateResumeFromFiles: ${e.message}", e)
+            showErrorAndReset("Generation failed: ${e.message}")
+        } finally {
+            resetGenerateButton()
         }
     }
+}
 
-    private fun generateResumeFromText() {
-        val resumeText = binding.etResumeText.text.toString().trim()
-        val jobDesc = binding.etJobDescription.text.toString().trim()
+private fun generateResumeFromText() {
+    val resumeText = binding.etResumeText.text.toString().trim()
+    val jobDesc = binding.etJobDescription.text.toString().trim()
 
-        if (resumeText.isEmpty() || jobDesc.isEmpty()) {
-            showError("Please enter both resume text and job description")
-            return
-        }
+    if (resumeText.isEmpty() || jobDesc.isEmpty()) {
+        showError("Please enter both resume text and job description")
+        return
+    }
 
-        disableGenerateButton("Processing...")
+    disableGenerateButton("Processing...")
 
-        lifecycleScope.launch {
-            try {
-                if (!ensureAuthenticatedBeforeApiCall()) {
-                    resetGenerateButton()
-                    return@launch
-                }
-
-                val creditResult = safeApiCallWithResult("getUserCredits") { 
-                    apiService.getUserCredits() 
-                }
-
-                when (creditResult) {
-                    is ApiService.ApiResult.Success -> {
-                        val credits = creditResult.data.available_credits
-                        Log.d("ResumeActivity", "User has $credits credits")
-
-                        if (credits <= 0) {
-                            showErrorAndReset("Insufficient credits. Please purchase more.")
-                            return@launch
-                        }
-
-                        Log.d("ResumeActivity", "Generating resume from text input")
-                        val genResult = safeApiCallWithResult("generateResumeFromText") { 
-                            apiService.generateResumeFromText(resumeText, jobDesc) 
-                        }
-
-                        handleGenerationResult(genResult)
-                    }
-
-                    is ApiService.ApiResult.Error -> {
-                        Log.e("ResumeActivity", "Failed to check credits: ${creditResult.message}")
-                        showErrorAndReset("Failed to check credits: ${creditResult.message}")
-
-                        if (creditResult.code == 401) {
-                            showError("Authentication failed. Please log out and log in again.")
-                            userManager.logout()
-                            checkGenerateButtonState()
-                        }
-                    }
-                }
-            } catch (e: Exception) {
-                Log.e("ResumeActivity", "Exception in generateResumeFromText: ${e.message}", e)
-                showErrorAndReset("Generation failed: ${e.message}")
-            } finally {
+    lifecycleScope.launch {
+        try {
+            if (!ensureAuthenticatedBeforeApiCall()) {
                 resetGenerateButton()
+                return@launch
             }
+
+            val creditResult = safeApiCallWithResult<ApiService.UserCreditsResponse>("getUserCredits") { 
+                apiService.getUserCredits() 
+            }
+
+            when (creditResult) {
+                is ApiService.ApiResult.Success -> {
+                    val credits = creditResult.data.available_credits
+                    Log.d("ResumeActivity", "User has $credits credits")
+
+                    if (credits <= 0) {
+                        showErrorAndReset("Insufficient credits. Please purchase more.")
+                        return@launch
+                    }
+
+                    Log.d("ResumeActivity", "Generating resume from text input")
+                    val genResult = safeApiCallWithResult<ApiService.GenerateResumeResponse>("generateResumeFromText") { 
+                        apiService.generateResumeFromText(resumeText, jobDesc) 
+                    }
+
+                    handleGenerationResult(genResult)
+                }
+
+                is ApiService.ApiResult.Error -> {
+                    Log.e("ResumeActivity", "Failed to check credits: ${creditResult.message}")
+                    showErrorAndReset("Failed to check credits: ${creditResult.message}")
+
+                    if (creditResult.code == 401) {
+                        showError("Authentication failed. Please log out and log in again.")
+                        userManager.logout()
+                        checkGenerateButtonState()
+                    }
+                }
+            }
+        } catch (e: Exception) {
+            Log.e("ResumeActivity", "Exception in generateResumeFromText: ${e.message}", e)
+            showErrorAndReset("Generation failed: ${e.message}")
+        } finally {
+            resetGenerateButton()
         }
     }
+}
 
     /** ---------------- Display & Download ---------------- **/
     private fun displayGeneratedResume(resumeData: ApiService.GenerateResumeResponse) {
@@ -463,45 +463,45 @@ class ResumeGenerationActivity : AppCompatActivity() {
     }
 
     /** ---------------- Helper Methods ---------------- **/
-    private suspend fun safeApiCallWithResult(
-        operation: String,
-        maxRetries: Int = 2,
-        block: suspend () -> ApiService.ApiResult<*>
-    ): ApiService.ApiResult<*> {
-        var lastError: Exception? = null
-        
-        repeat(maxRetries) { attempt ->
-            try {
-                if (!ensureAuthenticatedBeforeApiCall()) {
-                    return ApiService.ApiResult.Error("Authentication failed", 401)
-                }
-                
-                val result = block()
-                if (result is ApiService.ApiResult.Success) {
-                    return result
-                }
-                
-                if (result is ApiService.ApiResult.Error && result.code == 401) {
-                    return result
-                }
-                
-                Log.w("SafeApiCall", "Attempt $attempt failed for $operation: ${(result as? ApiService.ApiResult.Error)?.message}")
-                
-            } catch (e: Exception) {
-                lastError = e
-                Log.e("SafeApiCall", "Exception in $operation attempt $attempt: ${e.message}")
+    private suspend fun <T> safeApiCallWithResult(
+    operation: String,
+    maxRetries: Int = 2,
+    block: suspend () -> ApiService.ApiResult<T>
+): ApiService.ApiResult<T> {
+    var lastError: Exception? = null
+    
+    repeat(maxRetries) { attempt ->
+        try {
+            if (!ensureAuthenticatedBeforeApiCall()) {
+                return ApiService.ApiResult.Error("Authentication failed", 401)
             }
             
-            if (attempt < maxRetries - 1) {
-                delay(1000L * (attempt + 1))
+            val result = block()
+            if (result is ApiService.ApiResult.Success) {
+                return result
             }
+            
+            if (result is ApiService.ApiResult.Error && result.code == 401) {
+                return result
+            }
+            
+            Log.w("SafeApiCall", "Attempt $attempt failed for $operation: ${(result as? ApiService.ApiResult.Error)?.message}")
+            
+        } catch (e: Exception) {
+            lastError = e
+            Log.e("SafeApiCall", "Exception in $operation attempt $attempt: ${e.message}")
         }
         
-        return ApiService.ApiResult.Error(
-            lastError?.message ?: "All retry attempts failed for $operation", 
-            0
-        )
+        if (attempt < maxRetries - 1) {
+            delay(1000L * (attempt + 1))
+        }
     }
+    
+    return ApiService.ApiResult.Error(
+        lastError?.message ?: "All retry attempts failed for $operation", 
+        0
+    )
+}
 
     private suspend fun ensureAuthenticatedBeforeApiCall(): Boolean {
         if (!userManager.isUserLoggedIn()) {
