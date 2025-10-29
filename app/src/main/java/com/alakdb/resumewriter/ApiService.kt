@@ -40,8 +40,8 @@ class ApiService(private val context: Context) {
 
     // Simple client for health checks (no authentication needed)
     private val simpleClient = OkHttpClient.Builder()
-        .connectTimeout(10, TimeUnit.SECONDS)
-        .readTimeout(10, TimeUnit.SECONDS)
+        .connectTimeout(30, TimeUnit.SECONDS)
+        .readTimeout(30, TimeUnit.SECONDS)
         .build()
 
     // Data classes for API requests
@@ -94,9 +94,9 @@ class ApiService(private val context: Context) {
             OkHttpClient.Builder()
                 .sslSocketFactory(sslContext.socketFactory, trustAllCerts[0])
                 .hostnameVerifier { _, _ -> true }
-                .connectTimeout(15, TimeUnit.SECONDS)
-                .readTimeout(15, TimeUnit.SECONDS)
-                .writeTimeout(30, TimeUnit.SECONDS)
+                .connectTimeout(30, TimeUnit.SECONDS)
+                .readTimeout(30, TimeUnit.SECONDS)
+                .writeTimeout(60, TimeUnit.SECONDS)
                 .retryOnConnectionFailure(true)
                 .addInterceptor(SimpleLoggingInterceptor())
                 .addInterceptor(SafeAuthInterceptor(context))
@@ -104,9 +104,9 @@ class ApiService(private val context: Context) {
         } catch (e: Exception) {
             Log.e("SSL", "Failed to create unsafe client, using regular one: ${e.message}")
             OkHttpClient.Builder()
-                .connectTimeout(15, TimeUnit.SECONDS)
-                .readTimeout(15, TimeUnit.SECONDS)
-                .writeTimeout(30, TimeUnit.SECONDS)
+                .connectTimeout(30, TimeUnit.SECONDS)
+                .readTimeout(30, TimeUnit.SECONDS)
+                .writeTimeout(60, TimeUnit.SECONDS)
                 .retryOnConnectionFailure(true)
                 .addInterceptor(SimpleLoggingInterceptor())
                 .addInterceptor(SafeAuthInterceptor(context))
