@@ -45,11 +45,27 @@ class ApiService(private val context: Context) {
         .build()
 
     // Data classes for API requests
-    data class DeductCreditRequest(val user_id: String)
     data class GenerateResumeRequest(
         val resume_text: String,
         val job_description: String,
         val tone: String = "Professional"
+    )
+
+    // Data class for API responses
+    data class GenerateResumeResponse(
+        val success: Boolean,
+        val resume_text: String,
+        val remaining_credits: Int,
+        val generation_id: String?,
+        val docx_url: String,
+        val pdf_url: String,
+        val message: String
+    )
+
+    data class UserCreditsResponse(
+        val available_credits: Int,
+        val used_credits: Int,
+        val total_credits: Int
     )
 
     // API Result sealed class
@@ -203,77 +219,197 @@ class ApiService(private val context: Context) {
     // ==================== API METHODS ====================
 
     suspend fun generateResumeFromFiles(
-    resumeUri: Uri,
-    jobDescUri: Uri,
-    tone: String = "Professional"
-): ApiResult<JSONObject> = withContext(Dispatchers.IO) {
-    try {
-        Log.d("ApiService", "📄 Generating resume from files...")
+        resumeUri: Uri,
+        jobDescUri: Uri,
+        tone: String = "Professional"
+    ): ApiResult<GenerateResumeResponse> = withContext(Dispatchers.IO) {
+        try {
+            Log.d("ApiService", "📄 Generating resume from files...")
 
-        // Convert Uris to files
-        val resumeFile = uriToFile(resumeUri)
-        val jobDescFile = uriToFile(jobDescUri)
+            // Convert Uris to files
+            val resumeFile = uriToFile(resumeUri)
+            val jobDescFile = uriToFile(jobDescUri)
 
-        Log.d("ApiService", "✅ Files selected: resume=${resumeFile.name}, jobDesc=${jobDescFile.name}")
+            Log.d("ApiService", "✅ Files selected: resume=${resumeFile.name}, jobDesc=${jobDescFile.name}")
 
-        // Detect MIME type automatically
-        fun getMimeType(file: File): String {
-            return when {
-                file.name.endsWith(".pdf", true) -> "application/pdf"
-                file.name.endsWith(".docx", true) -> "application/vnd.openxmlformats-officedocument.wordprocessingml.document"
-                else -> "application/octet-stream"
+            // Detect MIME type automatically
+            fun getMimeType(file: File): String {
+                return when {
+                    file.name.endsWith(".pdf", true) -> "application/pdf"
+                    file.name.endsWith(".docx", true) -> "application/vnd.openxmlformats-officedocument.wordprocessingml.document"
+                    else -> "application/octet-stream"
+                }
             }
-        }
 
-        val resumeMime = getMimeType(resumeFile)
-        val jobDescMime = getMimeType(jobDescFile)
+            val resumeMime = getMimeType(resumeFile)
+            val jobDescMime = getMimeType(jobDescFile)
 
-        val body = MultipartBody.Builder()
-            .setType(MultipartBody.FORM)
-            .addFormDataPart("tone", tone)
-            .addFormDataPart(
-                "resume_file",
-                resumeFile.name,
-                resumeFile.asRequestBody(resumeMime.toMediaType())
-            )
-            .addFormDataPart(
-                "job_description_file",
-                jobDescFile.name,
-                jobDescFile.asRequestBody(jobDescMime.toMediaType())
-            )
-            .build()
+            val body = MultipartBody.Builder()
+                .setType(MultipartBody.FORM)
+                .addFormDataPart("tone", tone)
+                .addFormDataPart(
+                    "resume_file",
+                    resumeFile.name,
+                    resumeFile.asRequestBody(resumeMime.toMediaType())
+                )
+                .addFormDataPart(
+                    "job_description_file",
+                    jobDescFile.name,
+                    jobDescFile.asRequestBody(jobDescMime.toMediaType())
+                )
+                .build()
 
-        // Get user ID for credit tracking
-        val userManager = UserManager(context)
-        val userId = userManager.getCurrentUserId() ?: ""
+            val request = Request.Builder()
+                .url("$baseUrl/generate-resume-from-files")
+                .addHeader("Accept", "application/json")
+                .post(body)
+                .build()
 
-        val request = Request.Builder()
-            .url("$baseUrl/generate-resume-from-files")
-            .addHeader("X-User-ID", userId)
-            .addHeader("Accept", "application/json")
-            .post(body)
-            .build()
+            Log.d("ApiService", "➡️ Sending file-based resume generation request to: $baseUrl/generate-resume-from-files")
 
-        Log.d("ApiService", "➡️ Sending file-based resume generation request to: $baseUrl/generate-resume-from-files")
+            client.newCall(request).execute().use { response ->
+                val respBody = response.body?.string() ?: "{}"
+                Log.d("ApiService", "📬 File-based resume generation response: ${response.code}")
 
-        client.newCall(request).execute().use { response ->
-            val respBody = response.body?.string() ?: "{}"
-            Log.d("ApiService", "📬 File-based resume generation response: ${response.code}")
-
-            return@withContext if (response.isSuccessful) {
-                ApiResult.Success(JSONObject(respBody))
-            } else {
-                val errorMsg = "HTTP ${response.code}: ${response.message} – $respBody"
-                Log.e("ApiService", errorMsg)
-                ApiResult.Error(errorMsg, response.code)
+                return@withContext if (response.isSuccessful) {
+                    try {
+                        val jsonResponse = JSONObject(respBody)
+                        val resumeResponse = GenerateResumeResponse(
+                            success = jsonResponse.optBoolean("success", false),
+                            resume_text = jsonResponse.optString("resume_text", ""),
+                            remaining_credits = jsonResponse.optInt("remaining_credits", 0),
+                            generation_id = jsonResponse.optString("generation_id", null),
+                            docx_url = jsonResponse.optString("docx_url", ""),
+                            pdf_url = jsonResponse.optString("pdf_url", ""),
+                            message = jsonResponse.optString("message", "")
+                        )
+                        ApiResult.Success(resumeResponse)
+                    } catch (e: Exception) {
+                        Log.e("ApiService", "❌ JSON parsing error", e)
+                        ApiResult.Error("Invalid server response format", response.code)
+                    }
+                } else {
+                    val errorMsg = "HTTP ${response.code}: ${response.message} – $respBody"
+                    Log.e("ApiService", errorMsg)
+                    ApiResult.Error(errorMsg, response.code)
+                }
             }
+        } catch (e: Exception) {
+            val analysis = analyzeNetworkException(e, "$baseUrl/generate-resume-from-files")
+            Log.e("ApiService", analysis)
+            ApiResult.Error("File resume generation failed: ${e.message}")
         }
-    } catch (e: Exception) {
-        val analysis = analyzeNetworkException(e, "$baseUrl/generate-resume-from-files")
-        Log.e("ApiService", analysis)
-        ApiResult.Error("File resume generation failed: ${e.message}")
     }
-}
+
+    suspend fun generateResumeFromText(
+        resumeText: String,
+        jobDescription: String,
+        tone: String = "Professional"
+    ): ApiResult<GenerateResumeResponse> = withContext(Dispatchers.IO) {
+        try {
+            Log.d("ApiService", "📝 Generating resume from text...")
+
+            val requestBody = GenerateResumeRequest(resumeText, jobDescription, tone)
+            val body = gson.toJson(requestBody).toRequestBody("application/json".toMediaType())
+
+            val request = Request.Builder()
+                .url("$baseUrl/generate-resume")
+                .addHeader("Accept", "application/json")
+                .post(body)
+                .build()
+
+            Log.d("ApiService", "➡️ Sending text-based resume generation request")
+
+            client.newCall(request).execute().use { response ->
+                val respBody = response.body?.string() ?: "{}"
+                Log.d("ApiService", "📬 Text-based resume generation response: ${response.code}")
+
+                return@withContext if (response.isSuccessful) {
+                    try {
+                        val jsonResponse = JSONObject(respBody)
+                        val resumeResponse = GenerateResumeResponse(
+                            success = jsonResponse.optBoolean("success", false),
+                            resume_text = jsonResponse.optString("resume_text", ""),
+                            remaining_credits = jsonResponse.optInt("remaining_credits", 0),
+                            generation_id = jsonResponse.optString("generation_id", null),
+                            docx_url = jsonResponse.optString("docx_url", ""),
+                            pdf_url = jsonResponse.optString("pdf_url", ""),
+                            message = jsonResponse.optString("message", "")
+                        )
+                        ApiResult.Success(resumeResponse)
+                    } catch (e: Exception) {
+                        Log.e("ApiService", "❌ JSON parsing error", e)
+                        ApiResult.Error("Invalid server response format", response.code)
+                    }
+                } else {
+                    val errorMsg = "HTTP ${response.code}: ${response.message} – $respBody"
+                    Log.e("ApiService", errorMsg)
+                    ApiResult.Error(errorMsg, response.code)
+                }
+            }
+        } catch (e: Exception) {
+            val analysis = analyzeNetworkException(e, "$baseUrl/generate-resume")
+            Log.e("ApiService", analysis)
+            ApiResult.Error("Text resume generation failed: ${e.message}")
+        }
+    }
+
+    suspend fun validateFiles(
+        resumeUri: Uri? = null,
+        jobDescUri: Uri? = null
+    ): ApiResult<JSONObject> = withContext(Dispatchers.IO) {
+        try {
+            Log.d("ApiService", "🔍 Validating files...")
+
+            val bodyBuilder = MultipartBody.Builder().setType(MultipartBody.FORM)
+
+            resumeUri?.let { uri ->
+                val resumeFile = uriToFile(uri)
+                val mimeType = when {
+                    resumeFile.name.endsWith(".pdf", true) -> "application/pdf"
+                    resumeFile.name.endsWith(".docx", true) -> "application/vnd.openxmlformats-officedocument.wordprocessingml.document"
+                    else -> "application/octet-stream"
+                }
+                bodyBuilder.addFormDataPart(
+                    "resume_file",
+                    resumeFile.name,
+                    resumeFile.asRequestBody(mimeType.toMediaType())
+                )
+            }
+
+            jobDescUri?.let { uri ->
+                val jobDescFile = uriToFile(uri)
+                val mimeType = when {
+                    jobDescFile.name.endsWith(".pdf", true) -> "application/pdf"
+                    jobDescFile.name.endsWith(".docx", true) -> "application/vnd.openxmlformats-officedocument.wordprocessingml.document"
+                    else -> "application/octet-stream"
+                }
+                bodyBuilder.addFormDataPart(
+                    "job_description_file",
+                    jobDescFile.name,
+                    jobDescFile.asRequestBody(mimeType.toMediaType())
+                )
+            }
+
+            val body = bodyBuilder.build()
+
+            val request = Request.Builder()
+                .url("$baseUrl/validate-files")
+                .post(body)
+                .build()
+
+            client.newCall(request).execute().use { response ->
+                val respBody = response.body?.string() ?: "{}"
+                if (response.isSuccessful) {
+                    ApiResult.Success(JSONObject(respBody))
+                } else {
+                    ApiResult.Error("HTTP ${response.code}: ${response.message}", response.code)
+                }
+            }
+        } catch (e: Exception) {
+            ApiResult.Error("File validation failed: ${e.message}")
+        }
+    }
 
     suspend fun testConnection(): ApiResult<JSONObject> = withContext(Dispatchers.IO) {
         try {
@@ -344,104 +480,7 @@ class ApiService(private val context: Context) {
         }
     }
 
-    suspend fun deductCredit(userId: String): ApiResult<JSONObject> = withContext(Dispatchers.IO) {
-        try {
-            val requestBody = DeductCreditRequest(userId)
-            val body = gson.toJson(requestBody).toRequestBody("application/json".toMediaType())
-
-            val request = Request.Builder()
-                .url("$baseUrl/deduct-credit")
-                .post(body)
-                .build()
-
-            client.newCall(request).execute().use { response ->
-                val respBody = response.body?.string() ?: "{}"
-
-                if (response.isSuccessful) {
-                    ApiResult.Success(JSONObject(respBody))
-                } else {
-                    ApiResult.Error("HTTP ${response.code}", response.code)
-                }
-            }
-        } catch (e: Exception) {
-            val analysis = analyzeNetworkException(e, "$baseUrl/deduct-credit")
-            Log.e("ApiService", analysis)
-            ApiResult.Error("Request failed: ${e.message ?: "Unknown error"}")
-        }
-    }
-
-    suspend fun generateResume(
-        resumeText: String,
-        jobDescription: String,
-        tone: String = "Professional"
-    ): ApiResult<JSONObject> = withContext(Dispatchers.IO) {
-        try {
-            val requestBody = GenerateResumeRequest(resumeText, jobDescription, tone)
-            val body = gson.toJson(requestBody).toRequestBody("application/json".toMediaType())
-
-            val request = Request.Builder()
-                .url("$baseUrl/generate-resume")
-                .post(body)
-                .build()
-
-            client.newCall(request).execute().use { response ->
-                val respBody = response.body?.string() ?: "{}"
-
-                if (response.isSuccessful) {
-                    ApiResult.Success(JSONObject(respBody))
-                } else {
-                    ApiResult.Error("HTTP ${response.code}", response.code)
-                }
-            }
-        } catch (e: Exception) {
-            val analysis = analyzeNetworkException(e, "$baseUrl/generate-resume")
-            Log.e("ApiService", analysis)
-            ApiResult.Error("Request failed: ${e.message ?: "Unknown error"}")
-        }
-    }
-
-    suspend fun testDnsResolution(): String = withContext(Dispatchers.IO) {
-        try {
-            Log.d("DNS", "🔍 Testing DNS resolution...")
-
-            // Method 1: Basic DNS resolution
-            val method1Result = try {
-                val addresses = InetAddress.getAllByName("resume-writer-api.onrender.com")
-                val ipList = addresses.joinToString(", ") { addr: InetAddress -> addr.hostAddress.orEmpty() }
-                Log.d("DNS", "✅ Method 1 SUCCESS: $ipList")
-                "✅ DNS Resolution SUCCESS\nIP Addresses: $ipList"
-            } catch (e: Exception) {
-                Log.e("DNS", "❌ Method 1 failed: ${e.message}")
-                null
-            }
-
-            if (method1Result != null) return@withContext method1Result
-
-            // Method 2: With timeout (using coroutine withTimeout instead of Executors)
-            val method2Result = try {
-                val addresses = withTimeout(10_000L) {
-                    InetAddress.getAllByName("resume-writer-api.onrender.com")
-                }
-                val ipList = addresses.joinToString(", ") { addr: InetAddress -> addr.hostAddress.orEmpty() }
-                Log.d("DNS", "✅ Method 2 SUCCESS: $ipList")
-                "✅ DNS Resolution SUCCESS (with timeout)\nIP Addresses: $ipList"
-            } catch (e: Exception) {
-                Log.e("DNS", "❌ Method 2 failed: ${e.message}")
-                null
-            }
-
-            if (method2Result != null) return@withContext method2Result
-
-            // If all methods failed
-            "❌ All DNS methods failed\nError: Unable to resolve host\n\nTry:\n1. Switch WiFi/Mobile data\n2. Restart device\n3. Check VPN/Proxy settings"
-
-        } catch (e: Exception) {
-            Log.e("DNS", "💥 DNS test crashed: ${e.message}")
-            "❌ DNS test crashed: ${e.message}"
-        }
-    }
-
-    suspend fun getUserCredits(): ApiResult<JSONObject> = withContext(Dispatchers.IO) {
+    suspend fun getUserCredits(): ApiResult<UserCreditsResponse> = withContext(Dispatchers.IO) {
         try {
             Log.d("ApiService", "🔄 Getting user credits from: $baseUrl/user/credits")
 
@@ -457,8 +496,13 @@ class ApiService(private val context: Context) {
                 if (response.isSuccessful) {
                     try {
                         val jsonResponse = JSONObject(respBody)
-                        Log.d("ApiService", "✅ Credits success: ${jsonResponse.toString()}")
-                        ApiResult.Success(jsonResponse)
+                        val creditsResponse = UserCreditsResponse(
+                            available_credits = jsonResponse.optInt("available_credits", 0),
+                            used_credits = jsonResponse.optInt("used_credits", 0),
+                            total_credits = jsonResponse.optInt("total_credits", 0)
+                        )
+                        Log.d("ApiService", "✅ Credits success: $creditsResponse")
+                        ApiResult.Success(creditsResponse)
                     } catch (e: Exception) {
                         Log.e("ApiService", "❌ JSON parsing error for credits", e)
                         ApiResult.Error("Invalid server response format", response.code)
@@ -499,6 +543,34 @@ class ApiService(private val context: Context) {
             val analysis = analyzeNetworkException(e, "$baseUrl/security-test")
             Log.e("ApiService", analysis)
             ApiResult.Error("Test failed: ${e.message ?: "Unknown error"}")
+        }
+    }
+
+    // ==================== DOWNLOAD METHODS ====================
+
+    suspend fun downloadFile(url: String): ApiResult<ByteArray> = withContext(Dispatchers.IO) {
+        try {
+            Log.d("ApiService", "📥 Downloading file from: $url")
+
+            val request = Request.Builder()
+                .url(url)
+                .get()
+                .build()
+
+            client.newCall(request).execute().use { response ->
+                if (response.isSuccessful) {
+                    val bytes = response.body?.bytes()
+                    if (bytes != null) {
+                        ApiResult.Success(bytes)
+                    } else {
+                        ApiResult.Error("Empty response body")
+                    }
+                } else {
+                    ApiResult.Error("Download failed: HTTP ${response.code}")
+                }
+            }
+        } catch (e: Exception) {
+            ApiResult.Error("Download failed: ${e.message}")
         }
     }
 
@@ -614,9 +686,8 @@ class ApiService(private val context: Context) {
                 val creditsResult = getUserCredits()
                 when (creditsResult) {
                     is ApiResult.Success -> {
-                        val credits = creditsResult.data.optInt("available_credits", -1)
                         debugInfo.appendLine("   • Status: ✅ SUCCESS")
-                        debugInfo.appendLine("   • Credits: $credits")
+                        debugInfo.appendLine("   • Credits: ${creditsResult.data.available_credits}")
                     }
                     is ApiResult.Error -> {
                         debugInfo.appendLine("   • Status: ❌ FAILED")
@@ -679,7 +750,7 @@ class ApiService(private val context: Context) {
         when (creditResult) {
             is ApiResult.Success -> {
                 diagnostic.appendLine("   • Auth Headers: ✅ WORKING")
-                diagnostic.appendLine("     Credits: ${creditResult.data.optInt("available_credits")}")
+                diagnostic.appendLine("     Credits: ${creditResult.data.available_credits}")
             }
             is ApiResult.Error -> {
                 diagnostic.appendLine("   • Auth Headers: ❌ FAILED")
@@ -708,6 +779,47 @@ class ApiService(private val context: Context) {
             Log.w("ApiService", "⚠️ Cannot sync: No Firebase user")
         }
     }
+
+    suspend fun testDnsResolution(): String = withContext(Dispatchers.IO) {
+        try {
+            Log.d("DNS", "🔍 Testing DNS resolution...")
+
+            // Method 1: Basic DNS resolution
+            val method1Result = try {
+                val addresses = InetAddress.getAllByName("resume-writer-api.onrender.com")
+                val ipList = addresses.joinToString(", ") { addr: InetAddress -> addr.hostAddress.orEmpty() }
+                Log.d("DNS", "✅ Method 1 SUCCESS: $ipList")
+                "✅ DNS Resolution SUCCESS\nIP Addresses: $ipList"
+            } catch (e: Exception) {
+                Log.e("DNS", "❌ Method 1 failed: ${e.message}")
+                null
+            }
+
+            if (method1Result != null) return@withContext method1Result
+
+            // Method 2: With timeout (using coroutine withTimeout instead of Executors)
+            val method2Result = try {
+                val addresses = withTimeout(10_000L) {
+                    InetAddress.getAllByName("resume-writer-api.onrender.com")
+                }
+                val ipList = addresses.joinToString(", ") { addr: InetAddress -> addr.hostAddress.orEmpty() }
+                Log.d("DNS", "✅ Method 2 SUCCESS: $ipList")
+                "✅ DNS Resolution SUCCESS (with timeout)\nIP Addresses: $ipList"
+            } catch (e: Exception) {
+                Log.e("DNS", "❌ Method 2 failed: ${e.message}")
+                null
+            }
+
+            if (method2Result != null) return@withContext method2Result
+
+            // If all methods failed
+            "❌ All DNS methods failed\nError: Unable to resolve host\n\nTry:\n1. Switch WiFi/Mobile data\n2. Restart device\n3. Check VPN/Proxy settings"
+
+        } catch (e: Exception) {
+            Log.e("DNS", "💥 DNS test crashed: ${e.message}")
+            "❌ DNS test crashed: ${e.message}"
+        }
+    }
 }
 
 // ==================== INTERCEPTOR ====================
@@ -720,12 +832,11 @@ class SafeAuthInterceptor(private val context: Context) : Interceptor {
         val requestBuilder = chain.request().newBuilder()
             .addHeader("User-Agent", "ResumeWriter-Android/1.0")
             .addHeader("Accept", "application/json")
-            .addHeader("Content-Type", "application/json")
         
         // Add user ID header if available
         if (!userId.isNullOrBlank()) {
             requestBuilder.addHeader("X-User-ID", userId)
-            Log.d("AUTH_HEADER", "✅ Adding User-Id header: ${userId.take(8)}...")
+            Log.d("AUTH_HEADER", "✅ Adding X-User-ID header: ${userId.take(8)}...")
         } else {
             Log.w("AUTH_HEADER", "⚠️ No X-User-ID available for headers")
         }
