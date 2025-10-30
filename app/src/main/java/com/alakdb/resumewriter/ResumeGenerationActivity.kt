@@ -411,9 +411,6 @@ class ResumeGenerationActivity : AppCompatActivity() {
 
             binding.creditText.text = "Credits: $remaining"
             
-            // Update cached credits
-            userManager.cacheCredits(remaining)
-            
         } catch (e: Exception) {
             Log.e("ResumeActivity", "Error displaying resume: ${e.message}", e)
             showToast("Error displaying resume: ${e.message}", true)
@@ -489,8 +486,6 @@ class ResumeGenerationActivity : AppCompatActivity() {
                         lifecycleScope.launch {
                             withContext(Dispatchers.Main) {
                                 binding.creditText.text = "Credits: $remaining"
-                                // Update cached credits
-                                userManager.cacheCredits(remaining)
                             }
                         }
                     }
@@ -618,7 +613,6 @@ class ResumeGenerationActivity : AppCompatActivity() {
                         try {
                             val credits = result.data.available_credits
                             binding.creditText.text = "Credits: $credits"
-                            userManager.cacheCredits(credits) // Cache the credits
                             Log.d("ResumeActivity", "✅ Credits updated: $credits")
                         } catch (e: Exception) {
                             binding.creditText.text = "Credits: Error"
