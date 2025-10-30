@@ -245,6 +245,19 @@ private fun recordApiCall() {
         }
     }
 
+    private fun checkStoragePermission(): Boolean {
+    return if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.M) {
+        if (checkSelfPermission(android.Manifest.permission.WRITE_EXTERNAL_STORAGE) == PackageManager.PERMISSION_GRANTED) {
+            true
+        } else {
+            requestPermissions(arrayOf(android.Manifest.permission.WRITE_EXTERNAL_STORAGE), 1001)
+            false
+        }
+    } else {
+        true
+    }
+}
+    
     /** ---------------- UI Setup ---------------- **/
     private fun setupUI() {
         binding.btnSelectResume.setOnClickListener { resumePicker.launch("application/*") }
@@ -281,11 +294,20 @@ private fun recordApiCall() {
         selectedResumeUri != null && selectedJobDescUri != null -> generateResumeFromFiles()
         binding.etResumeText.text.isNotEmpty() && binding.etJobDescription.text.isNotEmpty() -> generateResumeFromText()
         else -> showToast("Please provide both resume and job description", true)
+        }
     }
-}
-
-        binding.btnDownloadDocx.setOnClickListener { downloadFile("docx") }
-        binding.btnDownloadPdf.setOnClickListener { downloadFile("pdf") }
+        binding.btnDownloadDocx.setOnClickListener { 
+            if (checkStoragePermission()) {
+                downloadFile("docx") 
+            }
+        }
+        binding.btnDownloadPdf.setOnClickListener { 
+            if (checkStoragePermission()) {
+                downloadFile("pdf") 
+            }
+        }
+        //binding.btnDownloadDocx.setOnClickListener { downloadFile("docx") }
+       //binding.btnDownloadPdf.setOnClickListener { downloadFile("pdf") }
         binding.btnBack.setOnClickListener { finish() }
         binding.btnRetryConnection.setOnClickListener { 
             // Rate limiting protection for manual retry
