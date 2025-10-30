@@ -31,6 +31,11 @@ import java.util.concurrent.TimeUnit
 import java.io.File
 import okhttp3.OkHttpClient
 import okhttp3.Request
+import android.os.Build
+import android.content.pm.PackageManager
+import android.Manifest
+import androidx.core.app.ActivityCompat
+import androidx.core.content.ContextCompat
 
 class ResumeGenerationActivity : AppCompatActivity() {
 
