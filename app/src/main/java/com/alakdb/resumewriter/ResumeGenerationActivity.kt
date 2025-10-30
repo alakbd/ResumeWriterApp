@@ -34,6 +34,11 @@ import okhttp3.Request
 
 class ResumeGenerationActivity : AppCompatActivity() {
 
+    private val MIN_API_CALL_INTERVAL = 5000L // 5 seconds between API calls
+    private val MAX_REQUESTS_PER_MINUTE = 6
+    private val MAX_RETRIES = 1
+    private val RETRY_DELAY = 15000L
+
     private lateinit var binding: ActivityResumeGenerationBinding
     private lateinit var apiService: ApiService
     private lateinit var auth: FirebaseAuth
@@ -77,7 +82,7 @@ private fun canMakeApiCall(): Boolean {
     }
     
     // Check minimum time between calls
-    if (now - lastApiCallTime < MIN_TIME_BETWEEN_CALLS) {
+    if (now - lastApiCallTime < MIN_API_CALL_INTERVAL) {
         Log.w("RateLimit", "❌ Too soon since last API call: ${now - lastApiCallTime}ms")
         showToast("Please wait 5 seconds between requests", true)
         return false
@@ -260,15 +265,14 @@ private fun recordApiCall() {
         }
 
         binding.btnGenerateResume.setOnClickListener {
-            if (!userManager.isUserLoggedIn()) {
-            showToast("Please log in to generate resumes", true)
-            return@setOnClickListener
-        }
+    if (!userManager.isUserLoggedIn()) {
+        showToast("Please log in to generate resumes", true)
+        return@setOnClickListener
+    }
     
-        // ENHANCED RATE LIMIT CHECK
-        if (!canMakeApiCall()) {
-        // Toast already shown in canMakeApiCall()
-            return@setOnClickListener
+    // ENHANCED RATE LIMIT CHECK
+    if (!canMakeApiCall()) {
+        return@setOnClickListener
     }
     
     recordApiCall() // Record the attempt
