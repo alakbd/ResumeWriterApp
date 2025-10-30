@@ -132,33 +132,35 @@ class ApiService(private val context: Context) {
 
     // ==================== FILE HANDLING METHODS ====================
 
-    private fun uriToFile(uri: Uri): File {
-        return try {
-            val input = context.contentResolver.openInputStream(uri)
-                ?: throw IOException("Failed to open URI: $uri")
+    def uriToFile(uri: Uri): File {
+    val input = context.contentResolver.openInputStream(uri)
+        ?: throw IOException("Failed to open URI: $uri")
 
-            // Get file extension from URI (fallback to "tmp")
-            val extension = uri.path?.substringAfterLast('.', "") ?: "tmp"
+    // Get the original file name
+    val originalName = getFileName(uri) ?: "upload_file"
+    
+    // Create file in cache directory with original name
+    val tempDir = context.cacheDir
+    val tempFile = File(tempDir, originalName)
+    
+    // If file already exists, add a timestamp to make it unique
+    if (tempFile.exists()) {
+        val timestamp = System.currentTimeMillis()
+        val nameWithoutExt = originalName.substringBeforeLast('.')
+        val extension = originalName.substringAfterLast('.', "").takeIf { it.isNotBlank() } ?: "tmp"
+        val uniqueName = "${nameWithoutExt}_$timestamp.$extension"
+        tempFile = File(tempDir, uniqueName)
+    }
 
-        // Create temp file with the original extension
-        val file = File.createTempFile("upload_", ".$extension", context.cacheDir)
-
-        input.use { inputStream ->
-            file.outputStream().use { outputStream ->
-                inputStream.copyTo(outputStream)
-            }
+    input.use { inputStream ->
+        tempFile.outputStream().use { outputStream ->
+            inputStream.copyTo(outputStream)
         }
-
-        file
-    } catch (e: Exception) {
-        Log.e("ApiService", "Error converting URI to file: ${e.message}")
-        throw e
     }
+    
+    Log.d("FileUpload", "✅ Created temp file: ${tempFile.name} (original: $originalName)")
+    return tempFile
 }
-
-    private fun File.asRequestBody(mediaType: MediaType): RequestBody {
-        return this.inputStream().readBytes().toRequestBody(mediaType)
-    }
 
     // ==================== NETWORK DIAGNOSTICS ====================
 
