@@ -11,6 +11,7 @@ import kotlinx.coroutines.*
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.withContext
 import okhttp3.*
+import okhttp3.MediaType
 import okhttp3.MediaType.Companion.toMediaType
 import okhttp3.RequestBody.Companion.toRequestBody
 import org.json.JSONObject
@@ -23,6 +24,9 @@ import java.net.SocketTimeoutException
 import java.net.UnknownHostException
 import java.util.concurrent.TimeUnit
 import javax.net.ssl.SSLHandshakeException
+import android.provider.OpenableColumns
+import okhttp3.MultipartBody
+import java.io.IOException
 
 // Extension functions for ResponseBody conversion
 fun String.toResponseBody(mediaType: MediaType): ResponseBody {
@@ -31,6 +35,9 @@ fun String.toResponseBody(mediaType: MediaType): ResponseBody {
 
 fun ByteArray.toResponseBody(mediaType: MediaType): ResponseBody {
     return ResponseBody.create(mediaType, this)
+}
+private fun File.asRequestBody(mediaType: String): okhttp3.RequestBody {
+    return this.inputStream().readBytes().toRequestBody(mediaType.toMediaType())
 }
 
 class ApiService(private val context: Context) {
@@ -161,7 +168,6 @@ class ApiService(private val context: Context) {
     return tempFile
 }
 
-// Adding helper function
 private fun getFileNameFromUri(uri: Uri): String? {
     return try {
         context.contentResolver.query(uri, null, null, null, null)?.use { cursor ->
@@ -248,44 +254,44 @@ private fun getFileNameFromUri(uri: Uri): String? {
         try {
             Log.d("ApiService", "📄 Generating resume from files...")
 
-            // Convert Uris to files
-            val resumeFile = uriToFile(resumeUri)
-            val jobDescFile = uriToFile(jobDescUri)
+        // Convert Uris to files
+        val resumeFile = uriToFile(resumeUri)
+        val jobDescFile = uriToFile(jobDescUri)
 
-            Log.d("ApiService", "✅ Files selected: resume=${resumeFile.name}, jobDesc=${jobDescFile.name}")
+        Log.d("ApiService", "✅ Files selected: resume=${resumeFile.name}, jobDesc=${jobDescFile.name}")
 
-            // Detect MIME type automatically
-            fun getMimeType(file: File): String {
-                return when {
-                    file.name.endsWith(".pdf", true) -> "application/pdf"
-                    file.name.endsWith(".docx", true) -> "application/vnd.openxmlformats-officedocument.wordprocessingml.document"
-                    else -> "application/octet-stream"
-                }
+        // Detect MIME type automatically
+        fun getMimeType(file: File): String {
+            return when {
+                file.name.endsWith(".pdf", true) -> "application/pdf"
+                file.name.endsWith(".docx", true) -> "application/vnd.openxmlformats-officedocument.wordprocessingml.document"
+                else -> "application/octet-stream"
             }
+        }
 
-            val resumeMime = getMimeType(resumeFile)
-            val jobDescMime = getMimeType(jobDescFile)
+        val resumeMime = getMimeType(resumeFile)
+        val jobDescMime = getMimeType(jobDescFile)
 
-            val body = MultipartBody.Builder()
-                .setType(MultipartBody.FORM)
-                .addFormDataPart("tone", tone)
-                .addFormDataPart(
-                    "resume_file",
-                    resumeFile.name,
-                    resumeFile.asRequestBody(resumeMime.toMediaType())
-                )
-                .addFormDataPart(
-                    "job_description_file",
-                    jobDescFile.name,
-                    jobDescFile.asRequestBody(jobDescMime.toMediaType())
-                )
-                .build()
+        val body = MultipartBody.Builder()
+            .setType(MultipartBody.FORM)
+            .addFormDataPart("tone", tone)
+            .addFormDataPart(
+                "resume_file",
+                resumeFile.name,
+                resumeFile.asRequestBody(resumeMime)  // This should work now
+            )
+            .addFormDataPart(
+                "job_description_file", 
+                jobDescFile.name,
+                jobDescFile.asRequestBody(jobDescMime)  // This should work now
+            )
+            .build()
 
-            val request = Request.Builder()
-                .url("$baseUrl/generate-resume-from-files")
-                .addHeader("Accept", "application/json")
-                .post(body)
-                .build()
+        val request = Request.Builder()
+            .url("$baseUrl/generate-resume-from-files")
+            .addHeader("Accept", "application/json")
+            .post(body)
+            .build()
 
             Log.d("ApiService", "➡️ Sending file-based resume generation request to: $baseUrl/generate-resume-from-files")
 
