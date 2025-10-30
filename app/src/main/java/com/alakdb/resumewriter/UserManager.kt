@@ -34,7 +34,12 @@ class UserManager(private val context: Context) {
     // -----------------------
     // STORAGE VALIDATION & DEBUG
     // -----------------------
-
+    // Add this method to your existing UserManager class
+fun cacheCredits(credits: Int) {
+    val prefs = context.getSharedPreferences("user_prefs", Context.MODE_PRIVATE)
+    prefs.edit().putInt("cached_credits", credits).apply()
+    Log.d("UserManager", "Cached credits: $credits")
+}
     /**
      * 🔍 Validate that user data is properly persisted
      */
