@@ -50,13 +50,54 @@ class ResumeGenerationActivity : AppCompatActivity() {
     private val TOAST_COOLDOWN_MS = 3000L
 
     // Rate limiting protection
-    private var lastApiCallTime: Long = 0
-    private val MIN_API_CALL_INTERVAL = 2000L // 2 seconds between API calls
+    private val apiCallTimestamps = mutableListOf<Long>()
+private var lastApiCallTime: Long = 0
 
-    private companion object {
-        const val MAX_RETRIES = 2 // Reduced from 4 to avoid rate limits
-        const val RETRY_DELAY_MS = 5000L // Increased delay between retries
+// Conservative limits - PREVENT hitting server limits
+private companion object {
+    const val MAX_REQUESTS_PER_MINUTE = 6  // Even more conservative
+    const val MIN_TIME_BETWEEN_CALLS = 5000L // 5 seconds between API calls
+    const val MAX_RETRIES = 1 // Only retry once
+    const val RETRY_DELAY = 15000L // 15 seconds for retry
+}
+
+private fun canMakeApiCall(): Boolean {
+    val now = System.currentTimeMillis()
+    
+    // Remove calls older than 1 minute
+    apiCallTimestamps.removeAll { timestamp ->
+        now - timestamp > 60000L
     }
+    
+    // Check per-minute limit
+    if (apiCallTimestamps.size >= MAX_REQUESTS_PER_MINUTE) {
+        Log.w("RateLimit", "❌ Client-side rate limit: ${apiCallTimestamps.size}/$MAX_REQUESTS_PER_MINUTE calls in last minute")
+        showToast("Too many requests. Please wait a minute.", true)
+        return false
+    }
+    
+    // Check minimum time between calls
+    if (now - lastApiCallTime < MIN_TIME_BETWEEN_CALLS) {
+        Log.w("RateLimit", "❌ Too soon since last API call: ${now - lastApiCallTime}ms")
+        showToast("Please wait 5 seconds between requests", true)
+        return false
+    }
+    
+    return true
+}
+
+private fun recordApiCall() {
+    val now = System.currentTimeMillis()
+    apiCallTimestamps.add(now)
+    lastApiCallTime = now
+    
+    // Keep list from growing too large
+    if (apiCallTimestamps.size > 20) {
+        apiCallTimestamps.removeAt(0)
+    }
+    
+    Log.d("RateLimit", "📊 API calls in last minute: ${apiCallTimestamps.size}/$MAX_REQUESTS_PER_MINUTE")
+}
 
     private val connectivityManager by lazy {
         getSystemService(Context.CONNECTIVITY_SERVICE) as ConnectivityManager
@@ -220,24 +261,24 @@ class ResumeGenerationActivity : AppCompatActivity() {
 
         binding.btnGenerateResume.setOnClickListener {
             if (!userManager.isUserLoggedIn()) {
-                showToast("Please log in to generate resumes", true)
-                return@setOnClickListener
-            }
-            
-            // Rate limiting protection
-            val currentTime = System.currentTimeMillis()
-            if (currentTime - lastApiCallTime < MIN_API_CALL_INTERVAL) {
-                showToast("Please wait before making another request", true)
-                return@setOnClickListener
-            }
-            lastApiCallTime = currentTime
-            
-            when {
-                selectedResumeUri != null && selectedJobDescUri != null -> generateResumeFromFiles()
-                binding.etResumeText.text.isNotEmpty() && binding.etJobDescription.text.isNotEmpty() -> generateResumeFromText()
-                else -> showToast("Please provide both resume and job description", true)
-            }
+            showToast("Please log in to generate resumes", true)
+            return@setOnClickListener
         }
+    
+        // ENHANCED RATE LIMIT CHECK
+        if (!canMakeApiCall()) {
+        // Toast already shown in canMakeApiCall()
+            return@setOnClickListener
+    }
+    
+    recordApiCall() // Record the attempt
+    
+    when {
+        selectedResumeUri != null && selectedJobDescUri != null -> generateResumeFromFiles()
+        binding.etResumeText.text.isNotEmpty() && binding.etJobDescription.text.isNotEmpty() -> generateResumeFromText()
+        else -> showToast("Please provide both resume and job description", true)
+    }
+}
 
         binding.btnDownloadDocx.setOnClickListener { downloadFile("docx") }
         binding.btnDownloadPdf.setOnClickListener { downloadFile("pdf") }
@@ -515,45 +556,63 @@ class ResumeGenerationActivity : AppCompatActivity() {
 
     /** ---------------- Consolidated Helper Methods ---------------- **/
     private suspend fun <T> safeApiCallWithResult(
-        operation: String,
-        maxRetries: Int = MAX_RETRIES,
-        block: suspend () -> ApiService.ApiResult<T>
-    ): ApiService.ApiResult<T> {
-        var lastError: Exception? = null
-        
-        repeat(maxRetries) { attempt ->
-            try {
-                if (!ensureUserAuthenticated()) {
-                    return ApiService.ApiResult.Error("Authentication failed", 401)
-                }
-                
-                val result = block()
-                if (result is ApiService.ApiResult.Success) {
+    operation: String,
+    maxRetries: Int = MAX_RETRIES,
+    block: suspend () -> ApiService.ApiResult<T>
+): ApiService.ApiResult<T> {
+    var lastError: Exception? = null
+    
+    // Initial attempt + retries
+    for (attempt in 0..maxRetries) {
+        try {
+            Log.d("SafeApiCall", "🔧 Attempt ${attempt + 1} for $operation")
+            
+            val result = block()
+            
+            when {
+                result is ApiService.ApiResult.Success -> {
+                    Log.d("SafeApiCall", "✅ $operation succeeded on attempt ${attempt + 1}")
                     return result
                 }
-                
-                // Don't retry on rate limit errors
-                if (result is ApiService.ApiResult.Error && (result.code == 429 || result.code == 401)) {
+                result is ApiService.ApiResult.Error && result.code == 429 -> {
+                    // RATE LIMIT - Wait much longer and don't retry too much
+                    val waitTime = 30000L // Always wait 30 seconds for rate limits
+                    Log.w("SafeApiCall", "⏳ Rate limit hit on $operation, waiting ${waitTime/1000}s")
+                    showToast("Server busy. Waiting 30 seconds...", true)
+                    delay(waitTime)
+                    if (attempt == maxRetries) {
+                        return ApiService.ApiResult.Error("Rate limit exceeded. Please wait before trying again.", 429)
+                    }
+                }
+                result is ApiService.ApiResult.Error && result.code in 500..599 -> {
+                    // Server error - retry with backoff
+                    val waitTime = (attempt + 1) * 10000L // 10, 20, 30 seconds
+                    Log.w("SafeApiCall", "🔄 Server error on $operation, retrying in ${waitTime/1000}s")
+                    showToast("Server error, retrying...", true)
+                    delay(waitTime)
+                }
+                else -> {
+                    // Client error or other - don't retry
                     return result
                 }
-                
-                Log.w("SafeApiCall", "Attempt $attempt failed for $operation: ${(result as? ApiService.ApiResult.Error)?.message}")
-                
-            } catch (e: Exception) {
-                lastError = e
-                Log.e("SafeApiCall", "Exception in $operation attempt $attempt: ${e.message}")
             }
             
-            if (attempt < maxRetries - 1) {
-                delay(RETRY_DELAY_MS * (attempt + 1)) // Exponential backoff
+        } catch (e: Exception) {
+            lastError = e
+            Log.e("SafeApiCall", "❌ Exception in $operation attempt ${attempt + 1}: ${e.message}")
+            
+            if (attempt < maxRetries) {
+                val waitTime = (attempt + 1) * 5000L
+                delay(waitTime)
             }
         }
-        
-        return ApiService.ApiResult.Error(
-            lastError?.message ?: "All retry attempts failed for $operation", 
-            0
-        )
     }
+    
+    return ApiService.ApiResult.Error(
+        "Service temporarily unavailable. Please try again later.",
+        503
+    )
+}
 
     private suspend fun ensureUserAuthenticated(): Boolean {
         return try {
@@ -587,74 +646,49 @@ class ResumeGenerationActivity : AppCompatActivity() {
     }
 
     private suspend fun updateCreditDisplay() {
-        try {
-            // Rate limiting: don't update credits too frequently
-            val currentTime = System.currentTimeMillis()
-            if (currentTime - lastApiCallTime < MIN_API_CALL_INTERVAL) {
-                Log.d("CreditUpdate", "Skipping credit update due to rate limiting")
-                return
+    // ENHANCED RATE LIMIT CHECK
+    if (!canMakeApiCall()) {
+        Log.d("CreditUpdate", "⏳ Skipping credit update due to client-side rate limiting")
+        return
+    }
+    
+    recordApiCall()
+    
+    try {
+        delay(2000L) // Additional safety delay
+        
+        if (!userManager.isUserLoggedIn()) {
+            withContext(Dispatchers.Main) {
+                binding.creditText.text = "Credits: Please log in"
             }
-            
-            delay(500L)
-            
-            if (!userManager.isUserLoggedIn()) {
-                runOnUiThread {
-                    binding.creditText.text = "Credits: Please log in"
-                }
-                return
-            }
+            return
+        }
 
-            Log.d("ResumeActivity", "🔄 Updating credit display...")
-            
-            val result = apiService.getUserCredits()
-            when (result) {
-                is ApiService.ApiResult.Success -> {
-                    runOnUiThread {
-                        try {
-                            val credits = result.data.available_credits
-                            binding.creditText.text = "Credits: $credits"
-                            Log.d("ResumeActivity", "✅ Credits updated: $credits")
-                        } catch (e: Exception) {
-                            binding.creditText.text = "Credits: Error"
-                            Log.e("ResumeActivity", "❌ Error parsing credits response", e)
-                        }
-                    }
-                }
-                is ApiService.ApiResult.Error -> {
-                    Log.w("ResumeGeneration", "Failed to get credits: ${result.message} (Code: ${result.code})")
-                    runOnUiThread {
-                        when (result.code) {
-                            401 -> {
-                                binding.creditText.text = "Credits: Auth Error"
-                                showToast("Authentication failed. Please log out and log in again.", true)
-                                userManager.logout()
-                            }
-                            429 -> {
-                                binding.creditText.text = "Credits: Rate Limited"
-                                showToast("Too many requests. Please wait a moment.", true)
-                                // Use cached credits when rate limited
-                                val cachedCredits = userManager.getCachedCredits()
-                                if (cachedCredits > 0) {
-                                    binding.creditText.text = "Credits: $cachedCredits (cached)"
-                                }
-                            }
-                            else -> {
-                                val cachedCredits = userManager.getCachedCredits()
-                                binding.creditText.text = "Credits: $cachedCredits (cached)"
-                                Log.w("ResumeActivity", "Using cached credits due to API error: ${result.message}")
-                            }
-                        }
-                    }
+        Log.d("ResumeActivity", "🔄 Updating credit display...")
+        
+        val result = apiService.getUserCredits()
+        when (result) {
+            is ApiService.ApiResult.Success -> {
+                withContext(Dispatchers.Main) {
+                    val credits = result.data.available_credits
+                    binding.creditText.text = "Credits: $credits"
+                    Log.d("ResumeActivity", "✅ Credits updated: $credits")
                 }
             }
-        } catch (e: Exception) {
-            Log.e("ResumeGeneration", "Credit update failed", e)
-            runOnUiThread {
-                val cachedCredits = userManager.getCachedCredits()
-                binding.creditText.text = "Credits: $cachedCredits (cached)"
+            is ApiService.ApiResult.Error -> {
+                Log.w("ResumeActivity", "Failed to get credits: ${result.message}")
+                if (result.code == 429) {
+                    withContext(Dispatchers.Main) {
+                        binding.creditText.text = "Credits: Rate Limited"
+                        showToast("Too many credit checks. Please wait 1 minute.", true)
+                    }
+                }
             }
         }
+    } catch (e: Exception) {
+        Log.e("ResumeActivity", "Credit update failed", e)
     }
+}
 
     private fun disableGenerateButton(text: String) {
         binding.btnGenerateResume.isEnabled = false
