@@ -251,8 +251,8 @@ private fun getFileNameFromUri(uri: Uri): String? {
         jobDescUri: Uri,
         tone: String = "Professional"
     ): ApiResult<GenerateResumeResponse> = withContext(Dispatchers.IO) {
-        try {
-            Log.d("ApiService", "📄 Generating resume from files...")
+    try {
+        Log.d("ApiService", "📄 Generating resume from files...")
 
         // Convert Uris to files
         val resumeFile = uriToFile(resumeUri)
@@ -278,50 +278,58 @@ private fun getFileNameFromUri(uri: Uri): String? {
             .addFormDataPart(
                 "resume_file",
                 resumeFile.name,
-                resumeFile.asRequestBody(resumeMime)  // Now passing MediaType
+                resumeFile.asRequestBody(resumeMime)
             )
             .addFormDataPart(
                 "job_description_file", 
                 jobDescFile.name,
-                jobDescFile.asRequestBody(jobDescMime)  // Now passing MediaType
+                jobDescFile.asRequestBody(jobDescMime)
             )
             .build()
 
-            Log.d("ApiService", "➡️ Sending file-based resume generation request to: $baseUrl/generate-resume-from-files")
+        // CREATE THE REQUEST VARIABLE - This was missing
+        val request = Request.Builder()
+            .url("$baseUrl/generate-resume-from-files")
+            .addHeader("Accept", "application/json")
+            .post(body)
+            .build()
 
-            client.newCall(request).execute().use { response ->
-                val respBody = response.body?.string() ?: "{}"
-                Log.d("ApiService", "📬 File-based resume generation response: ${response.code}")
+        Log.d("ApiService", "➡️ Sending file-based resume generation request to: $baseUrl/generate-resume-from-files")
 
-                return@withContext if (response.isSuccessful) {
-                    try {
-                        val jsonResponse = JSONObject(respBody)
-                        val resumeResponse = GenerateResumeResponse(
-                            success = jsonResponse.optBoolean("success", false),
-                            resume_text = jsonResponse.optString("resume_text", ""),
-                            remaining_credits = jsonResponse.optInt("remaining_credits", 0),
-                            generation_id = jsonResponse.optString("generation_id", null),
-                            docx_url = jsonResponse.optString("docx_url", ""),
-                            pdf_url = jsonResponse.optString("pdf_url", ""),
-                            message = jsonResponse.optString("message", "")
-                        )
-                        ApiResult.Success(resumeResponse)
-                    } catch (e: Exception) {
-                        Log.e("ApiService", "❌ JSON parsing error", e)
-                        ApiResult.Error("Invalid server response format", response.code)
-                    }
-                } else {
-                    val errorMsg = "HTTP ${response.code}: ${response.message} – $respBody"
-                    Log.e("ApiService", errorMsg)
-                    ApiResult.Error(errorMsg, response.code)
+        // EXECUTE THE REQUEST - This part was probably missing
+        client.newCall(request).execute().use { response ->
+            val respBody = response.body?.string() ?: "{}"
+            Log.d("ApiService", "📬 File-based resume generation response: ${response.code}")
+
+            return@withContext if (response.isSuccessful) {
+                try {
+                    val jsonResponse = JSONObject(respBody)
+                    val resumeResponse = GenerateResumeResponse(
+                        success = jsonResponse.optBoolean("success", false),
+                        resume_text = jsonResponse.optString("resume_text", ""),
+                        remaining_credits = jsonResponse.optInt("remaining_credits", 0),
+                        generation_id = jsonResponse.optString("generation_id", null),
+                        docx_url = jsonResponse.optString("docx_url", ""),
+                        pdf_url = jsonResponse.optString("pdf_url", ""),
+                        message = jsonResponse.optString("message", "")
+                    )
+                    ApiResult.Success(resumeResponse)
+                } catch (e: Exception) {
+                    Log.e("ApiService", "❌ JSON parsing error", e)
+                    ApiResult.Error("Invalid server response format", response.code)
                 }
+            } else {
+                val errorMsg = "HTTP ${response.code}: ${response.message} – $respBody"
+                Log.e("ApiService", errorMsg)
+                ApiResult.Error(errorMsg, response.code)
             }
-        } catch (e: Exception) {
-            val analysis = analyzeNetworkException(e, "$baseUrl/generate-resume-from-files")
-            Log.e("ApiService", analysis)
-            ApiResult.Error("File resume generation failed: ${e.message}")
         }
+    } catch (e: Exception) {
+        val analysis = analyzeNetworkException(e, "$baseUrl/generate-resume-from-files")
+        Log.e("ApiService", analysis)
+        ApiResult.Error("File resume generation failed: ${e.message}")
     }
+}
 
     suspend fun generateResumeFromText(
         resumeText: String,
