@@ -129,35 +129,33 @@ class ResumeGenerationActivity : AppCompatActivity() {
     }
 
     override fun onResume() {
-        super.onResume()
-        creditManager.resetResumeCooldown()
+    super.onResume()
+    creditManager.resetResumeCooldown()
 
-        lifecycleScope.launch {
-            try {
-                delay(1000L)
-                val authValid = checkAuthenticationState()
+    lifecycleScope.launch {
+        try {
+            delay(1000L)
+            val authValid = checkAuthenticationState()
 
-                if (authValid) {
-                    if (isNetworkAvailable()) {
-                        updateCreditDisplay()
-                    } else {
-                        withContext(Dispatchers.Main) {
-                            binding.creditText.text = "Credits: Offline"
-                        }
-                    }
-                }
-
+            if (authValid) {
+                // Only update UI with cached credits; do NOT call /user/credits automatically
+                val cachedCredits = userManager.getCachedCredits()
                 withContext(Dispatchers.Main) {
-                    checkGenerateButtonState()
+                    binding.creditText.text = "Credits: $cachedCredits (cached)"
                 }
-            } catch (e: Exception) {
-                Log.e("ResumeActivity", "❌ onResume failed: ${e.message}", e)
-                withContext(Dispatchers.Main) {
-                    binding.creditText.text = "Credits: Error"
-                }
+            }
+
+            withContext(Dispatchers.Main) {
+                checkGenerateButtonState()
+            }
+        } catch (e: Exception) {
+            Log.e("ResumeActivity", "❌ onResume failed: ${e.message}", e)
+            withContext(Dispatchers.Main) {
+                binding.creditText.text = "Credits: Error"
             }
         }
     }
+}
 
     /** ---------------- File Picker Setup ---------------- **/
     private fun registerFilePickers() {
@@ -669,34 +667,33 @@ private fun generateResumeFromText() {
     // ... Add any other missing helper methods as needed
 
     private suspend fun revalidateAuthState() {
-        Log.d("AuthRevalidation", "🔄 Revalidating authentication state...")
-        
-        try {
-            userManager.emergencySyncWithFirebase()
-            
-            val isLoggedIn = userManager.isUserLoggedIn()
-            val firebaseUser = FirebaseAuth.getInstance().currentUser
-            
-            Log.d("AuthRevalidation", "After sync - Logged in: $isLoggedIn, Firebase: ${firebaseUser != null}")
-            
-            withContext(Dispatchers.Main) {
-                if (isLoggedIn) {
-                    binding.creditText.text = "Credits: Loading..."
-                    lifecycleScope.launch {
-                        updateCreditDisplay()
-                    }
-                    checkGenerateButtonState()
-                    Log.d("AuthRevalidation", "✅ Auth revalidated - user is logged in")
-                } else {
-                    binding.creditText.text = "Credits: Please log in"
-                    showError("Session expired. Please log in again.")
-                    Log.w("AuthRevalidation", "❌ Auth revalidation failed - user needs to login")
-                }
+    Log.d("AuthRevalidation", "🔄 Revalidating authentication state...")
+
+    try {
+        userManager.emergencySyncWithFirebase()
+
+        val isLoggedIn = userManager.isUserLoggedIn()
+        val firebaseUser = FirebaseAuth.getInstance().currentUser
+
+        Log.d("AuthRevalidation", "After sync - Logged in: $isLoggedIn, Firebase: ${firebaseUser != null}")
+
+        withContext(Dispatchers.Main) {
+            if (isLoggedIn) {
+                // Only update UI using cached credits
+                val cachedCredits = userManager.getCachedCredits()
+                binding.creditText.text = "Credits: $cachedCredits (cached)"
+                checkGenerateButtonState()
+                Log.d("AuthRevalidation", "✅ Auth revalidated - user is logged in")
+            } else {
+                binding.creditText.text = "Credits: Please log in"
+                showError("Session expired. Please log in again.")
+                Log.w("AuthRevalidation", "❌ Auth revalidation failed - user needs to login")
             }
-        } catch (e: Exception) {
-            Log.e("AuthRevalidation", "💥 Revalidation failed: ${e.message}")
         }
+    } catch (e: Exception) {
+        Log.e("AuthRevalidation", "💥 Revalidation failed: ${e.message}")
     }
+}
 
     private fun checkEmailVerification() {
         val user = FirebaseAuth.getInstance().currentUser
