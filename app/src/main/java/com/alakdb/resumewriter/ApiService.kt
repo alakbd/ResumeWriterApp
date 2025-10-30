@@ -26,7 +26,7 @@ import java.util.concurrent.TimeUnit
 import javax.net.ssl.SSLHandshakeException
 import android.provider.OpenableColumns
 import okhttp3.MultipartBody
-import java.io.IOException
+
 
 // Extension functions for ResponseBody conversion
 fun String.toResponseBody(mediaType: MediaType): ResponseBody {
