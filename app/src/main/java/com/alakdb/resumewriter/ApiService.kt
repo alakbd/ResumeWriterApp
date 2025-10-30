@@ -136,18 +136,25 @@ class ApiService(private val context: Context) {
         return try {
             val input = context.contentResolver.openInputStream(uri)
                 ?: throw IOException("Failed to open URI: $uri")
-            val file = File.createTempFile("upload_", "_tmp", context.cacheDir)
-            input.use { inputStream ->
-                file.outputStream().use { outputStream ->
-                    inputStream.copyTo(outputStream)
-                }
+
+            // Get file extension from URI (fallback to "tmp")
+            val extension = uri.path?.substringAfterLast('.', "") ?: "tmp"
+
+        // Create temp file with the original extension
+        val file = File.createTempFile("upload_", ".$extension", context.cacheDir)
+
+        input.use { inputStream ->
+            file.outputStream().use { outputStream ->
+                inputStream.copyTo(outputStream)
             }
-            file
-        } catch (e: Exception) {
-            Log.e("ApiService", "Error converting URI to file: ${e.message}")
-            throw e
         }
+
+        file
+    } catch (e: Exception) {
+        Log.e("ApiService", "Error converting URI to file: ${e.message}")
+        throw e
     }
+}
 
     private fun File.asRequestBody(mediaType: MediaType): RequestBody {
         return this.inputStream().readBytes().toRequestBody(mediaType)
