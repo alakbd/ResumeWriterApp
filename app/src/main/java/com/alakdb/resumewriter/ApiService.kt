@@ -132,25 +132,24 @@ class ApiService(private val context: Context) {
 
     // ==================== FILE HANDLING METHODS ====================
 
-    def uriToFile(uri: Uri): File {
+    private fun uriToFile(uri: Uri): File {
     val input = context.contentResolver.openInputStream(uri)
         ?: throw IOException("Failed to open URI: $uri")
 
-    // Get the original file name
-    val originalName = getFileName(uri) ?: "upload_file"
+    // Get the original file name with extension
+    val originalName = getFileNameFromUri(uri) ?: "upload_file"
     
-    // Create file in cache directory with original name
-    val tempDir = context.cacheDir
-    val tempFile = File(tempDir, originalName)
-    
-    // If file already exists, add a timestamp to make it unique
-    if (tempFile.exists()) {
-        val timestamp = System.currentTimeMillis()
-        val nameWithoutExt = originalName.substringBeforeLast('.')
-        val extension = originalName.substringAfterLast('.', "").takeIf { it.isNotBlank() } ?: "tmp"
-        val uniqueName = "${nameWithoutExt}_$timestamp.$extension"
-        tempFile = File(tempDir, uniqueName)
+    // Create temp file with the original extension
+    val extension = if (originalName.contains(".")) {
+        originalName.substringAfterLast('.', "").takeIf { it.isNotBlank() } ?: "tmp"
+    } else {
+        "tmp"
     }
+    val baseName = originalName.substringBeforeLast('.').takeIf { it.isNotBlank() } ?: "upload"
+    
+    // Sanitize filename for safety
+    val sanitizedName = baseName.replace(Regex("[^a-zA-Z0-9.-]"), "_")
+    val tempFile = File.createTempFile("${sanitizedName}_", ".$extension", context.cacheDir)
 
     input.use { inputStream ->
         tempFile.outputStream().use { outputStream ->
@@ -158,8 +157,22 @@ class ApiService(private val context: Context) {
         }
     }
     
-    Log.d("FileUpload", "✅ Created temp file: ${tempFile.name} (original: $originalName)")
+    Log.d("FileUpload", "✅ Created temp file: ${tempFile.name} from original: $originalName")
     return tempFile
+}
+
+// Adding helper function
+private fun getFileNameFromUri(uri: Uri): String? {
+    return try {
+        context.contentResolver.query(uri, null, null, null, null)?.use { cursor ->
+            val nameIndex = cursor.getColumnIndex(OpenableColumns.DISPLAY_NAME)
+            cursor.moveToFirst()
+            cursor.getString(nameIndex)
+        }
+    } catch (e: Exception) {
+        Log.e("ApiService", "Failed to get file name from URI: ${e.message}", e)
+        null
+    }
 }
 
     // ==================== NETWORK DIAGNOSTICS ====================
