@@ -481,47 +481,47 @@ class ApiService(private val context: Context) {
     }
 
     suspend fun getUserCredits(): ApiResult<UserCreditsResponse> = withContext(Dispatchers.IO) {
-        try {
-            Log.d("ApiService", "🔄 Getting user credits from: $baseUrl/user/credits")
+    try {
+        Log.d("ApiService", "🔄 Getting user credits from: $baseUrl/user/credits")
 
-            val request = Request.Builder()
-                .url("$baseUrl/user/credits")
-                .get()
-                .build()
+        val request = Request.Builder()
+            .url("$baseUrl/user/credits")
+            .get()
+            .build()
 
-            client.newCall(request).execute().use { response ->
-                val respBody = response.body?.string() ?: "{}"
-                Log.d("ApiService", "💰 Credits response: ${response.code}")
+        client.newCall(request).execute().use { response ->
+            val respBody = response.body?.string() ?: "{}"
+            Log.d("ApiService", "💰 Credits response: ${response.code}")
 
-                if (response.isSuccessful) {
-                    try {
-                        val jsonResponse = JSONObject(respBody)
-                        val creditsResponse = UserCreditsResponse(
-                            available_credits = jsonResponse.optInt("available_credits", 0),
-                            used_credits = jsonResponse.optInt("used_credits", 0),
-                            total_credits = jsonResponse.optInt("total_credits", 0)
-                        )
-                        Log.d("ApiService", "✅ Credits success: $creditsResponse")
-                        ApiResult.Success(creditsResponse)
-                    } catch (e: Exception) {
-                        Log.e("ApiService", "❌ JSON parsing error for credits", e)
-                        ApiResult.Error("Invalid server response format", response.code)
-                    }
-                } else {
-                    Log.e("ApiService", "❌ Server error: HTTP ${response.code}")
-                    when (response.code) {
-                        401 -> ApiResult.Error("Authentication failed", 401)
-                        429 -> ApiResult.Error("Rate limit exceeded", 429)
-                        else -> ApiResult.Error("Server error: ${response.code}", response.code)
-                    }
+            if (response.isSuccessful) {
+                try {
+                    val jsonResponse = JSONObject(respBody)
+                    val creditsResponse = UserCreditsResponse(
+                        available_credits = jsonResponse.optInt("available_credits", 0),
+                        used_credits = jsonResponse.optInt("used_credits", 0),
+                        total_credits = jsonResponse.optInt("total_credits", 0)
+                    )
+                    Log.d("ApiService", "✅ Credits success: $creditsResponse")
+                    ApiResult.Success(creditsResponse)
+                } catch (e: Exception) {
+                    Log.e("ApiService", "❌ JSON parsing error for credits", e)
+                    ApiResult.Error("Invalid server response format", response.code)
+                }
+            } else {
+                Log.e("ApiService", "❌ Server error: HTTP ${response.code}")
+                when (response.code) {
+                    401 -> ApiResult.Error("Authentication failed", 401)
+                    429 -> ApiResult.Error("Rate limit exceeded. Please wait before trying again.", 429)
+                    else -> ApiResult.Error("Server error: ${response.code}", response.code)
                 }
             }
-        } catch (e: Exception) {
-            val analysis = analyzeNetworkException(e, "$baseUrl/user/credits")
-            Log.e("ApiService", analysis)
-            ApiResult.Error("Network error: ${e.message ?: "Unknown error"}")
         }
+    } catch (e: Exception) {
+        val analysis = analyzeNetworkException(e, "$baseUrl/user/credits")
+        Log.e("ApiService", analysis)
+        ApiResult.Error("Network error: ${e.message ?: "Unknown error"}")
     }
+}
 
     suspend fun testSecureAuth(): ApiResult<JSONObject> = withContext(Dispatchers.IO) {
         try {
