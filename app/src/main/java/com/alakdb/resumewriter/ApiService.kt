@@ -799,25 +799,25 @@ private fun getFileNameFromUri(uri: Uri): String? {
         android.util.Base64.decode(base64Data, android.util.Base64.DEFAULT)
 
     fun saveFileToStorage(data: ByteArray, filename: String): File {
-    // Use the public Downloads directory instead of internal storage
+    // Use the public Downloads directory
     val downloadsDir = Environment.getExternalStoragePublicDirectory(Environment.DIRECTORY_DOWNLOADS)
     
-    // Create the filename with your preferred format
-    val formattedFilename = if (filename.startsWith("generated_resume_")) {
-        // Replace the default name with your preferred format
-        "SkillSync_Resume.${filename.substringAfterLast('.')}"
+    // Always use the preferred filename format
+    val formattedFilename = if (filename.contains("generated_resume_")) {
+        // Extract the generation ID if available
+        val generationId = filename.substringAfter("generated_resume_").substringBeforeLast(".")
+        val extension = filename.substringAfterLast(".")
+        "SkillSync_Resume_${generationId}.${extension}"
+    } else if (!filename.startsWith("SkillSync_Resume")) {
+        val extension = filename.substringAfterLast(".")
+        "SkillSync_Resume.${extension}"
     } else {
-        // Ensure it has your preferred name
-        if (!filename.startsWith("SkillSync_Resume")) {
-            "SkillSync_Resume.${filename.substringAfterLast('.')}"
-        } else {
-            filename
-        }
+        filename
     }
     
     val file = File(downloadsDir, formattedFilename)
     
-    // Handle duplicate files by adding a number
+    // Handle duplicate files
     var finalFile = file
     var counter = 1
     while (finalFile.exists()) {
@@ -827,15 +827,23 @@ private fun getFileNameFromUri(uri: Uri): String? {
         counter++
     }
     
-    file.outputStream().use { it.write(data) }
-    
-    // Notify the system about the new file so it appears in Downloads
-    val intent = Intent(Intent.ACTION_MEDIA_SCANNER_SCAN_FILE)
-    intent.data = Uri.fromFile(finalFile)
-    context.sendBroadcast(intent)
-    
-    Log.d("FileSave", "✅ File saved to Downloads: ${finalFile.absolutePath}")
-    return finalFile
+    try {
+        finalFile.outputStream().use { it.write(data) }
+        
+        // Notify the system about the new file
+        val intent = Intent(Intent.ACTION_MEDIA_SCANNER_SCAN_FILE)
+        intent.data = Uri.fromFile(finalFile)
+        context.sendBroadcast(intent)
+        
+        Log.d("FileSave", "✅ File saved to Downloads: ${finalFile.absolutePath}")
+        return finalFile
+    } catch (e: Exception) {
+        Log.e("FileSave", "❌ Failed to save file: ${e.message}", e)
+        // Fallback to cache directory if Downloads fails
+        val cacheFile = File(context.cacheDir, formattedFilename)
+        cacheFile.outputStream().use { it.write(data) }
+        return cacheFile
+    }
 }
 
     fun forceSyncUserManager() {
