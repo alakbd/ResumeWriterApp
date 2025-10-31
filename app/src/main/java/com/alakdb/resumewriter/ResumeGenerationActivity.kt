@@ -43,6 +43,10 @@ class ResumeGenerationActivity : AppCompatActivity() {
     private val MAX_REQUESTS_PER_MINUTE = 6
     private val MAX_RETRIES = 1
     private val RETRY_DELAY = 15000L
+    
+    // Lazy initialization for better performance
+    private val creditManager: CreditManager by lazy { CreditManager(this) }
+    private val auth: FirebaseAuth by lazy { FirebaseAuth.getInstance() }
 
     private lateinit var binding: ActivityResumeGenerationBinding
     private lateinit var apiService: ApiService
@@ -71,25 +75,25 @@ private companion object {
     const val RETRY_DELAY = 15000L // 15 seconds for retry
 }
 
+// More efficient rate limiting
 private fun canMakeApiCall(): Boolean {
     val now = System.currentTimeMillis()
     
-    // Remove calls older than 1 minute
-    apiCallTimestamps.removeAll { timestamp ->
-        now - timestamp > 60000L
-    }
+    // Clean up old timestamps (older than 1 minute)
+    val oneMinuteAgo = now - 60000L
+    apiCallTimestamps.removeAll { it < oneMinuteAgo }
     
     // Check per-minute limit
     if (apiCallTimestamps.size >= MAX_REQUESTS_PER_MINUTE) {
-        Log.w("RateLimit", "❌ Client-side rate limit: ${apiCallTimestamps.size}/$MAX_REQUESTS_PER_MINUTE calls in last minute")
-        showToast("Too many requests. Please wait a minute.", true)
+        val timeToWait = (apiCallTimestamps.first() + 60000L - now) / 1000
+        showToast("Too many requests. Please wait ${timeToWait}s", true)
         return false
     }
     
     // Check minimum time between calls
     if (now - lastApiCallTime < MIN_API_CALL_INTERVAL) {
-        Log.w("RateLimit", "❌ Too soon since last API call: ${now - lastApiCallTime}ms")
-        showToast("Please wait 5 seconds between requests", true)
+        val timeToWait = (MIN_API_CALL_INTERVAL - (now - lastApiCallTime)) / 1000
+        showToast("Please wait ${timeToWait}s between requests", true)
         return false
     }
     
@@ -227,6 +231,8 @@ private fun recordApiCall() {
         }
     }
 
+    
+
     /** ---------------- File Picker Setup ---------------- **/
     private fun registerFilePickers() {
         resumePicker = registerForActivityResult(ActivityResultContracts.GetContent()) { uri ->
@@ -250,16 +256,39 @@ private fun recordApiCall() {
         }
     }
 
-    private fun checkStoragePermission(): Boolean {
+    // Improved storage permission check
+private fun checkStoragePermission(): Boolean {
     return if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.M) {
-        if (checkSelfPermission(android.Manifest.permission.WRITE_EXTERNAL_STORAGE) == PackageManager.PERMISSION_GRANTED) {
-            true
-        } else {
-            requestPermissions(arrayOf(android.Manifest.permission.WRITE_EXTERNAL_STORAGE), 1001)
-            false
+        when {
+            ContextCompat.checkSelfPermission(this, Manifest.permission.WRITE_EXTERNAL_STORAGE) == PackageManager.PERMISSION_GRANTED -> {
+                true
+            }
+            ActivityCompat.shouldShowRequestPermissionRationale(this, Manifest.permission.WRITE_EXTERNAL_STORAGE) -> {
+                showToast("Storage permission is required to save resumes", true)
+                ActivityCompat.requestPermissions(this, arrayOf(Manifest.permission.WRITE_EXTERNAL_STORAGE), 1001)
+                false
+            }
+            else -> {
+                ActivityCompat.requestPermissions(this, arrayOf(Manifest.permission.WRITE_EXTERNAL_STORAGE), 1001)
+                false
+            }
         }
     } else {
         true
+    }
+}
+
+// Handle permission results
+override fun onRequestPermissionsResult(requestCode: Int, permissions: Array<out String>, grantResults: IntArray) {
+    super.onRequestPermissionsResult(requestCode, permissions, grantResults)
+    when (requestCode) {
+        1001 -> {
+            if (grantResults.isNotEmpty() && grantResults[0] == PackageManager.PERMISSION_GRANTED) {
+                showToast("Storage permission granted", false)
+            } else {
+                showToast("Storage permission denied - cannot save files", true)
+            }
+        }
     }
 }
     
@@ -490,41 +519,55 @@ private fun recordApiCall() {
     }
 
     private fun downloadFile(format: String) {
-        val resumeData = currentGeneratedResume ?: return showToast("No resume generated yet", true)
-        
-        lifecycleScope.launch {
-            try {
-                val url = when (format.lowercase()) {
-                    "docx" -> resumeData.docx_url
-                    "pdf" -> resumeData.pdf_url
-                    else -> return@launch showToast("Unsupported format: $format", true)
-                }
-
-                if (url.isBlank()) {
-                    showToast("Download URL not available for $format", true)
-                    return@launch
-                }
-
-                Log.d("Download", "Downloading $format from: $url")
-                val downloadResult = apiService.downloadFile(url)
-
-                when (downloadResult) {
-                    is ApiService.ApiResult.Success -> {
-                        val fileData = downloadResult.data
-                        val fileName = "generated_resume_${resumeData.generation_id ?: "unknown"}.$format"
-                        val file = apiService.saveFileToStorage(fileData, fileName)
-                        showDownloadSuccess(file, format.uppercase())
-                    }
-                    is ApiService.ApiResult.Error -> {
-                        showToast("Download failed: ${downloadResult.message}", true)
-                    }
-                }
-            } catch (e: Exception) {
-                Log.e("ResumeActivity", "Download failed: ${e.message}", e)
-                showToast("Download failed: ${e.message}", true)
+    val resumeData = currentGeneratedResume ?: return showToast("No resume generated yet", true)
+    
+    // Check storage permission first
+    if (!checkStoragePermission()) {
+        showToast("Storage permission required to download", true)
+        return
+    }
+    
+    lifecycleScope.launch {
+        try {
+            binding.progressGenerate.visibility = View.VISIBLE
+            binding.btnDownloadDocx.isEnabled = false
+            binding.btnDownloadPdf.isEnabled = false
+            
+            val url = when (format.lowercase()) {
+                "docx" -> resumeData.docx_url
+                "pdf" -> resumeData.pdf_url
+                else -> return@launch showToast("Unsupported format: $format", true)
             }
+
+            if (url.isBlank()) {
+                showToast("Download URL not available for $format", true)
+                return@launch
+            }
+
+            Log.d("Download", "📥 Downloading $format from: $url")
+            val downloadResult = apiService.downloadFile(url)
+
+            when (downloadResult) {
+                is ApiService.ApiResult.Success -> {
+                    val fileData = downloadResult.data
+                    val fileName = "SkillSync_Resume_${resumeData.generation_id ?: System.currentTimeMillis()}.$format"
+                    val file = apiService.saveFileToStorage(fileData, fileName)
+                    showDownloadSuccess(file, format.uppercase())
+                }
+                is ApiService.ApiResult.Error -> {
+                    showToast("Download failed: ${downloadResult.message}", true)
+                }
+            }
+        } catch (e: Exception) {
+            Log.e("ResumeActivity", "Download failed: ${e.message}", e)
+            showToast("Download failed: ${e.message}", true)
+        } finally {
+            binding.progressGenerate.visibility = View.GONE
+            binding.btnDownloadDocx.isEnabled = true
+            binding.btnDownloadPdf.isEnabled = true
         }
     }
+}
 
     private fun showDownloadSuccess(file: File, format: String) {
     // Show a more informative message with file location
@@ -598,14 +641,14 @@ private fun recordApiCall() {
     }
 
     /** ---------------- Consolidated Helper Methods ---------------- **/
-    private suspend fun <T> safeApiCallWithResult(
+    // Optimized API call method
+private suspend fun <T> safeApiCallWithResult(
     operation: String,
     maxRetries: Int = MAX_RETRIES,
     block: suspend () -> ApiService.ApiResult<T>
 ): ApiService.ApiResult<T> {
     var lastError: Exception? = null
     
-    // Initial attempt + retries
     for (attempt in 0..maxRetries) {
         try {
             Log.d("SafeApiCall", "🔧 Attempt ${attempt + 1} for $operation")
@@ -614,35 +657,28 @@ private fun recordApiCall() {
             
             when {
                 result is ApiService.ApiResult.Success -> {
-                    Log.d("SafeApiCall", "✅ $operation succeeded on attempt ${attempt + 1}")
+                    Log.d("SafeApiCall", "✅ $operation succeeded")
                     return result
                 }
                 result is ApiService.ApiResult.Error && result.code == 429 -> {
-                    // RATE LIMIT - Wait much longer and don't retry too much
-                    val waitTime = 30000L // Always wait 30 seconds for rate limits
-                    Log.w("SafeApiCall", "⏳ Rate limit hit on $operation, waiting ${waitTime/1000}s")
+                    val waitTime = 30000L
+                    Log.w("SafeApiCall", "⏳ Rate limit hit, waiting ${waitTime/1000}s")
                     showToast("Server busy. Waiting 30 seconds...", true)
                     delay(waitTime)
                     if (attempt == maxRetries) {
-                        return ApiService.ApiResult.Error("Rate limit exceeded. Please wait before trying again.", 429)
+                        return ApiService.ApiResult.Error("Rate limit exceeded", 429)
                     }
                 }
                 result is ApiService.ApiResult.Error && result.code in 500..599 -> {
-                    // Server error - retry with backoff
-                    val waitTime = (attempt + 1) * 10000L // 10, 20, 30 seconds
-                    Log.w("SafeApiCall", "🔄 Server error on $operation, retrying in ${waitTime/1000}s")
-                    showToast("Server error, retrying...", true)
+                    val waitTime = (attempt + 1) * 10000L
+                    Log.w("SafeApiCall", "🔄 Server error, retrying in ${waitTime/1000}s")
                     delay(waitTime)
                 }
-                else -> {
-                    // Client error or other - don't retry
-                    return result
-                }
+                else -> return result
             }
-            
         } catch (e: Exception) {
             lastError = e
-            Log.e("SafeApiCall", "❌ Exception in $operation attempt ${attempt + 1}: ${e.message}")
+            Log.e("SafeApiCall", "❌ Exception in attempt ${attempt + 1}: ${e.message}")
             
             if (attempt < maxRetries) {
                 val waitTime = (attempt + 1) * 5000L
@@ -876,6 +912,26 @@ private fun recordApiCall() {
         }
     }
 
+    // Clear memory when needed
+private fun clearMemoryCache() {
+    selectedResumeUri = null
+    selectedJobDescUri = null
+    currentGeneratedResume = null
+    binding.etResumeText.text?.clear()
+    binding.etJobDescription.text?.clear()
+    System.gc()
+}
+
+// Optimize onDestroy
+override fun onDestroy() {
+    super.onDestroy()
+    clearMemoryCache()
+    try {
+        connectivityManager.unregisterNetworkCallback(networkCallback)
+    } catch (e: Exception) {
+        // Ignore
+    }
+}
     private fun testApiConnection() {
         binding.layoutConnectionStatus.visibility = View.VISIBLE
         binding.tvConnectionStatus.text = "Testing connection..."
