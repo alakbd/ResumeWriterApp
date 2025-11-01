@@ -313,24 +313,27 @@
             android:orientation="vertical">
 
             <ScrollView
-                android:layout_width="match_parent"
-                android:layout_height="match_parent"
-                 android:layout_weight="1"
-                android:fillViewport="true"
-                android:padding="8dp">
+            android:layout_width="match_parent"
+            android:layout_height="0dp"
+            android:layout_weight="1"
+            android:fillViewport="true"
+            android:padding="8dp">
 
-                <TextView
-                    android:id="@+id/tvGeneratedResume"
-                    android:layout_width="match_parent"
-                    android:layout_height="wrap_content"
-                    android:padding="16dp"
-                    android:text="Your generated resume will appear here...\n\nUpload files or enter text above and click Generate Resume."
-                    android:textIsSelectable="true"
-                    android:textColor="#333333"
-                    android:textSize="14sp"
-                    android:lineSpacingExtra="4dp" />
-
-            </ScrollView>
+        <TextView
+            android:id="@+id/tvGeneratedResume"
+            android:layout_width="match_parent"
+            android:layout_height="wrap_content"
+            android:padding="16dp"
+            android:text="Your generated resume will appear here...\n\nUpload files or enter text above and click Generate Resume."
+            android:textIsSelectable="true"
+            android:textColor="#333333"
+            android:textSize="14sp"
+            android:lineSpacingExtra="4dp"
+            android:focusable="false"
+            android:clickable="false"
+            android:cursorVisible="false" />
+        
+        </ScrollView>
 
         </LinearLayout>
 
