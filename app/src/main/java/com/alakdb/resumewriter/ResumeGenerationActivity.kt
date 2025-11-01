@@ -254,16 +254,7 @@ class ResumeGenerationActivity : AppCompatActivity() {
         }
     }
 
-    // Improved storage permission check
-    private fun checkStoragePermission(): Boolean {
-    return if (ContextCompat.checkSelfPermission(this, Manifest.permission.WRITE_EXTERNAL_STORAGE) == PackageManager.PERMISSION_GRANTED) {
-        true
-    } else {
-        ActivityCompat.requestPermissions(this, arrayOf(Manifest.permission.WRITE_EXTERNAL_STORAGE), 1001)
-        false
-    }
-}
-
+  
     // Handle permission results
     override fun onRequestPermissionsResult(requestCode: Int, permissions: Array<out String>, grantResults: IntArray) {
         super.onRequestPermissionsResult(requestCode, permissions, grantResults)
@@ -318,15 +309,11 @@ class ResumeGenerationActivity : AppCompatActivity() {
         }
         
         binding.btnDownloadDocx.setOnClickListener { 
-            if (checkStoragePermission()) {
                 downloadFile("docx") 
-            }
         }
         
         binding.btnDownloadPdf.setOnClickListener { 
-            if (checkStoragePermission()) {
-                downloadFile("pdf") 
-            }
+                downloadFile("pdf")  
         }
         
         binding.btnBack.setOnClickListener { finish() }
@@ -508,12 +495,7 @@ class ResumeGenerationActivity : AppCompatActivity() {
 
     private fun downloadFile(format: String) {
         val resumeData = currentGeneratedResume ?: return showToast("No resume generated yet", true)
-        
-        // Check storage permission first
-        if (!checkStoragePermission()) {
-            showToast("Storage permission required to download", true)
-            return
-        }
+    
         
         lifecycleScope.launch {
             try {
