@@ -277,7 +277,10 @@ class ResumeGenerationActivity : AppCompatActivity() {
     private fun setupUI() {
         binding.btnSelectResume.setOnClickListener { resumePicker.launch("application/*") }
         binding.btnSelectJobDesc.setOnClickListener { jobDescPicker.launch("application/*") }
-
+        // Add text change listeners
+        binding.etResumeText.addTextChangedListener(textWatcher)
+        binding.etJobDescription.addTextChangedListener(textWatcher)
+        
         binding.btnClearResume.setOnClickListener {
             selectedResumeUri = null
             binding.tvResumeFile.text = "No file selected"
@@ -338,19 +341,36 @@ class ResumeGenerationActivity : AppCompatActivity() {
         }
     }
 
-    private fun checkGenerateButtonState() {
-        val hasFiles = selectedResumeUri != null && selectedJobDescUri != null
-        val hasText = binding.etResumeText.text.isNotEmpty() && binding.etJobDescription.text.isNotEmpty()
-        val isLoggedIn = userManager.isUserLoggedIn()
-
-        binding.btnGenerateResume.isEnabled = (hasFiles || hasText) && isLoggedIn
-        binding.btnGenerateResume.text = when {
-            !isLoggedIn -> "Please Log In"
-            hasFiles -> "Generate Resume from Files (1 Credit)"
-            hasText -> "Generate Resume from Text (1 Credit)"
-            else -> "Generate Resume"
-        }
+    private val textWatcher = object : android.text.TextWatcher {
+    override fun beforeTextChanged(s: CharSequence?, start: Int, count: Int, after: Int) {}
+    override fun onTextChanged(s: CharSequence?, start: Int, before: Int, count: Int) {}
+    override fun afterTextChanged(s: android.text.Editable?) {
+        checkGenerateButtonState()
     }
+}
+
+    private fun checkGenerateButtonState() {
+    val hasFiles = selectedResumeUri != null && selectedJobDescUri != null
+    val hasText = binding.etResumeText.text.toString().isNotEmpty() && 
+                  binding.etJobDescription.text.toString().isNotEmpty()
+    val isLoggedIn = userManager.isUserLoggedIn()
+
+    val shouldEnable = (hasFiles || hasText) && isLoggedIn
+    
+    Log.d("ButtonState", "Files: $hasFiles, Text: $hasText, LoggedIn: $isLoggedIn, ShouldEnable: $shouldEnable")
+    
+    binding.btnGenerateResume.isEnabled = shouldEnable
+    
+    binding.btnGenerateResume.text = when {
+        !isLoggedIn -> "Please Log In"
+        hasFiles -> "Generate Resume from Files (1 Credit)"
+        hasText -> "Generate Resume from Text (1 Credit)"
+        else -> "Generate Resume"
+    }
+    
+    // Log the current state for debugging
+    Log.d("ButtonState", "Button enabled: ${binding.btnGenerateResume.isEnabled}")
+}
 
     /** ---------------- Resume Generation ---------------- **/
     private fun generateResumeFromFiles() {
