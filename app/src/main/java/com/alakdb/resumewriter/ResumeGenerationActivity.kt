@@ -36,6 +36,10 @@ import android.content.pm.PackageManager
 import android.Manifest
 import androidx.core.app.ActivityCompat
 import androidx.core.content.ContextCompat
+import android.content.ContentValues
+import android.os.Environment
+import android.provider.MediaStore
+import java.io.OutputStream
 
 class ResumeGenerationActivity : AppCompatActivity() {
 
