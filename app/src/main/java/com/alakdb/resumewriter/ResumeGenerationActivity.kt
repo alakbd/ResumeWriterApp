@@ -314,6 +314,13 @@ class ResumeGenerationActivity : AppCompatActivity() {
                 else -> showToast("Please provide both resume and job description", true)
             }
         }
+
+        // Make generated resume scrollable
+            binding.tvGeneratedResume.apply {
+            movementMethod = ScrollingMovementMethod()
+            isVerticalScrollBarEnabled = true
+            isScrollbarFadingEnabled = false
+            }
         
         binding.btnDownloadDocx.setOnClickListener { 
                 downloadFile("docx") 
