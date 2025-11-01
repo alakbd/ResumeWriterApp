@@ -525,39 +525,45 @@ class ResumeGenerationActivity : AppCompatActivity() {
                     val fileData = downloadResult.data
                     val fileName = "SkillSync_Resume_${resumeData.generation_id ?: System.currentTimeMillis()}.$format"
 
-                    // ✅ Modern Android-safe file saving (no permissions needed)
+                    // ✅ Save safely via MediaStore (no storage permission required)
                     val resolver = contentResolver
                     val contentValues = ContentValues().apply {
                         put(MediaStore.Downloads.DISPLAY_NAME, fileName)
-                        put(MediaStore.Downloads.MIME_TYPE, when (format.lowercase()) {
-                            "pdf" -> "application/pdf"
-                            "docx" -> "application/vnd.openxmlformats-officedocument.wordprocessingml.document"
-                            else -> "application/octet-stream"
-                        })
+                        put(
+                            MediaStore.Downloads.MIME_TYPE,
+                            when (format.lowercase()) {
+                                "pdf" -> "application/pdf"
+                                "docx" -> "application/vnd.openxmlformats-officedocument.wordprocessingml.document"
+                                else -> "application/octet-stream"
+                            }
+                        )
                         put(MediaStore.Downloads.RELATIVE_PATH, Environment.DIRECTORY_DOWNLOADS)
                     }
 
                     val uri = resolver.insert(MediaStore.Downloads.EXTERNAL_CONTENT_URI, contentValues)
                     if (uri == null) {
-                        showToast("Failed to create file in Downloads", true)
+                        showToast("❌ Failed to create file in Downloads", true)
                         return@launch
                     }
 
                     resolver.openOutputStream(uri)?.use { output ->
                         output.write(fileData)
+                        output.flush()
                     }
 
-                    showToast("$format file saved to Downloads folder!", false)
-                    showDownloadSuccess(null, format.uppercase()) // file is now in MediaStore, not File()
+                    showToast("✅ ${format.uppercase()} file saved to Downloads!", false)
+
+                    // Optional: if your showDownloadSuccess() needs to be triggered
+                    showDownloadSuccess(null, format.uppercase())
                 }
 
                 is ApiService.ApiResult.Error -> {
-                    showToast("Download failed: ${downloadResult.message}", true)
+                    showToast("❌ Download failed: ${downloadResult.message}", true)
                 }
             }
         } catch (e: Exception) {
             Log.e("ResumeActivity", "Download failed: ${e.message}", e)
-            showToast("Download failed: ${e.message}", true)
+            showToast("❌ Download failed: ${e.message}", true)
         } finally {
             binding.progressGenerate.visibility = View.GONE
             binding.btnDownloadDocx.isEnabled = true
