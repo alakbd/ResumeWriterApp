@@ -313,29 +313,29 @@
             android:orientation="vertical">
 
             <ScrollView
+                android:id="@+id/scrollResumeContainer"
                 android:layout_width="match_parent"
                 android:layout_height="match_parent"
-                 android:layout_weight="1"
+                android:layout_weight="1"
                 android:fillViewport="true"
+                android:overScrollMode="always"
+                android:scrollbars="vertical"
                 android:padding="8dp">
 
                 <TextView
                     android:id="@+id/tvGeneratedResume"
                     android:layout_width="match_parent"
-                    android:layout_height="300dp"
-                    android:gravity="top|start"
-                    android:inputType="textMultiLine"
-                    android:scrollbars="vertical"
+                    android:layout_height="wrap_content"
+                    android:inputType="textMultiLine"      
                     android:overScrollMode="always"
-                    android:padding="8dp"
+                    android:padding="16dp"
                     android:text="Your generated resume will appear here...\n\nUpload files or enter text above and click Generate Resume."
-                    android:textIsSelectable="true"
                     android:textColor="#333333"
-                    android:textSize="14sp"
-                    android:editable="true"
-                    android:cursorVisible="true"
-                    android:focusable="true"
-                    android:focusableInTouchMode="true"
+                    android:textSize="16sp"
+                    android:inputType="none"
+                    android:cursorVisible="false"
+                    android:focusable="false"
+                    android:scrollbars="vertical"
                     android:lineSpacingExtra="4dp" />
 
             </ScrollView>
