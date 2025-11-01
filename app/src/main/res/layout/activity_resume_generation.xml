@@ -65,7 +65,7 @@
                 android:id="@+id/btnRetryConnection"
                 android:layout_width="wrap_content"
                 android:layout_height="32dp"
-                android:text="Retry"
+                android:text="Update"
                 android:textSize="12sp"
                 android:background="@color/secondary"
                 android:textColor="#1976d2"
