@@ -71,10 +71,6 @@ class LoginActivity : AppCompatActivity() {
             }
         }
 
-        // Debug button - UPDATED with better debugging
-        binding.btnDebugLogin.setOnClickListener {
-            debugLoginState()
-        }
 
         binding.btnForgotPassword.setOnClickListener {
             val email = binding.etLoginEmail.text.toString().trim()
@@ -214,42 +210,7 @@ class LoginActivity : AppCompatActivity() {
         }
     }
 
-    private fun debugLoginState() {
-        Log.d("LOGIN_DEBUG", "=== LOGIN ACTIVITY DEBUG ===")
-        
-        val auth = FirebaseAuth.getInstance()
-        val userManager = UserManager(this)
-        
-        Log.d("LOGIN_DEBUG", "1. CURRENT STATE:")
-        Log.d("LOGIN_DEBUG", "   • Firebase User: ${auth.currentUser?.uid ?: "NULL"}")
-        Log.d("LOGIN_DEBUG", "   • UserManager UID: ${userManager.getCurrentUserId() ?: "NULL"}")
-        Log.d("LOGIN_DEBUG", "   • UserManager Email: ${userManager.getCurrentUserEmail() ?: "NULL"}")
-        Log.d("LOGIN_DEBUG", "   • isUserLoggedIn(): ${userManager.isUserLoggedIn()}")
-        Log.d("LOGIN_DEBUG", "   • User Data Persisted: ${userManager.isUserDataPersisted()}")
-        Log.d("LOGIN_DEBUG", "   • Credit Data Persisted: ${creditManager.isCreditDataPersisted()}")
-        
-        // Check SharedPreferences directly
-        val prefs = getSharedPreferences("user_prefs", Context.MODE_PRIVATE)
-        Log.d("LOGIN_DEBUG", "2. SHARED PREFERENCES:")
-        Log.d("LOGIN_DEBUG", "   • user_id: ${prefs.getString("user_id", "NULL")}")
-        Log.d("LOGIN_DEBUG", "   • user_email: ${prefs.getString("user_email", "NULL")}")
-        Log.d("LOGIN_DEBUG", "   • is_registered: ${prefs.getBoolean("is_registered", false)}")
-        
-        Log.d("LOGIN_DEBUG", "3. INPUT FIELDS:")
-        val emailText = binding.etLoginEmail.text?.toString() ?: ""
-        val passwordText = binding.etLoginPassword.text?.toString() ?: ""
 
-        Log.d("LOGIN_DEBUG", "   • Email: $emailText")
-        Log.d("LOGIN_DEBUG", "   • Password: ${if (passwordText.isNotEmpty()) "***" else "EMPTY"}")
-        
-        Log.d("LOGIN_DEBUG", "=== END DEBUG ===")
-        
-        // Show result in Toast
-        val firebaseUser = auth.currentUser?.uid ?: "NULL"
-        val localUid = userManager.getCurrentUserId() ?: "NULL"
-        
-        Toast.makeText(this, "Firebase: $firebaseUser, Local: $localUid", Toast.LENGTH_LONG).show()
-    }
 
     // NEW: Enhanced login success handling with synchronization
     private fun onLoginSuccess(user: FirebaseUser) {
