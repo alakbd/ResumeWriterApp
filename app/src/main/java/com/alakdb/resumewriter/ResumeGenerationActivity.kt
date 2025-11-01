@@ -336,9 +336,7 @@ class ResumeGenerationActivity : AppCompatActivity() {
             testApiConnection() 
         }
         
-        binding.btnDebugAuth.setOnClickListener {
-            debugAuthFlow()
-        }
+        //binding.btnDebugAuth.setOnClickListener {debugAuthFlow()}
     }
 
     private val textWatcher = object : android.text.TextWatcher {
