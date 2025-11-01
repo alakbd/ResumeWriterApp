@@ -494,50 +494,73 @@ class ResumeGenerationActivity : AppCompatActivity() {
     }
 
     private fun downloadFile(format: String) {
-        val resumeData = currentGeneratedResume ?: return showToast("No resume generated yet", true)
-    
-        
-        lifecycleScope.launch {
-            try {
-                binding.progressGenerate.visibility = View.VISIBLE
-                binding.btnDownloadDocx.isEnabled = false
-                binding.btnDownloadPdf.isEnabled = false
-                
-                val url = when (format.lowercase()) {
-                    "docx" -> resumeData.docx_url
-                    "pdf" -> resumeData.pdf_url
-                    else -> return@launch showToast("Unsupported format: $format", true)
-                }
+    val resumeData = currentGeneratedResume ?: return showToast("No resume generated yet", true)
 
-                if (url.isBlank()) {
-                    showToast("Download URL not available for $format", true)
-                    return@launch
-                }
+    lifecycleScope.launch {
+        try {
+            binding.progressGenerate.visibility = View.VISIBLE
+            binding.btnDownloadDocx.isEnabled = false
+            binding.btnDownloadPdf.isEnabled = false
 
-                Log.d("Download", "📥 Downloading $format from: $url")
-                val downloadResult = apiService.downloadFile(url)
-
-                when (downloadResult) {
-                    is ApiService.ApiResult.Success -> {
-                        val fileData = downloadResult.data
-                        val fileName = "SkillSync_Resume_${resumeData.generation_id ?: System.currentTimeMillis()}.$format"
-                        val file = apiService.saveFileToStorage(fileData, fileName)
-                        showDownloadSuccess(file, format.uppercase())
-                    }
-                    is ApiService.ApiResult.Error -> {
-                        showToast("Download failed: ${downloadResult.message}", true)
-                    }
-                }
-            } catch (e: Exception) {
-                Log.e("ResumeActivity", "Download failed: ${e.message}", e)
-                showToast("Download failed: ${e.message}", true)
-            } finally {
-                binding.progressGenerate.visibility = View.GONE
-                binding.btnDownloadDocx.isEnabled = true
-                binding.btnDownloadPdf.isEnabled = true
+            val url = when (format.lowercase()) {
+                "docx" -> resumeData.docx_url
+                "pdf" -> resumeData.pdf_url
+                else -> return@launch showToast("Unsupported format: $format", true)
             }
+
+            if (url.isBlank()) {
+                showToast("Download URL not available for $format", true)
+                return@launch
+            }
+
+            Log.d("Download", "📥 Downloading $format from: $url")
+            val downloadResult = apiService.downloadFile(url)
+
+            when (downloadResult) {
+                is ApiService.ApiResult.Success -> {
+                    val fileData = downloadResult.data
+                    val fileName = "SkillSync_Resume_${resumeData.generation_id ?: System.currentTimeMillis()}.$format"
+
+                    // ✅ Modern Android-safe file saving (no permissions needed)
+                    val resolver = contentResolver
+                    val contentValues = ContentValues().apply {
+                        put(MediaStore.Downloads.DISPLAY_NAME, fileName)
+                        put(MediaStore.Downloads.MIME_TYPE, when (format.lowercase()) {
+                            "pdf" -> "application/pdf"
+                            "docx" -> "application/vnd.openxmlformats-officedocument.wordprocessingml.document"
+                            else -> "application/octet-stream"
+                        })
+                        put(MediaStore.Downloads.RELATIVE_PATH, Environment.DIRECTORY_DOWNLOADS)
+                    }
+
+                    val uri = resolver.insert(MediaStore.Downloads.EXTERNAL_CONTENT_URI, contentValues)
+                    if (uri == null) {
+                        showToast("Failed to create file in Downloads", true)
+                        return@launch
+                    }
+
+                    resolver.openOutputStream(uri)?.use { output ->
+                        output.write(fileData)
+                    }
+
+                    showToast("$format file saved to Downloads folder!", false)
+                    showDownloadSuccess(null, format.uppercase()) // file is now in MediaStore, not File()
+                }
+
+                is ApiService.ApiResult.Error -> {
+                    showToast("Download failed: ${downloadResult.message}", true)
+                }
+            }
+        } catch (e: Exception) {
+            Log.e("ResumeActivity", "Download failed: ${e.message}", e)
+            showToast("Download failed: ${e.message}", true)
+        } finally {
+            binding.progressGenerate.visibility = View.GONE
+            binding.btnDownloadDocx.isEnabled = true
+            binding.btnDownloadPdf.isEnabled = true
         }
     }
+}
 
     private fun showDownloadSuccess(file: File, format: String) {
         // Show a more informative message with file location
