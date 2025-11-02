@@ -12,6 +12,7 @@ import android.provider.OpenableColumns
 import android.annotation.SuppressLint
 import android.util.Log
 import android.view.View
+import android.widget.ScrollView
 import android.widget.TextView
 import android.widget.Toast
 import androidx.activity.result.ActivityResultLauncher
