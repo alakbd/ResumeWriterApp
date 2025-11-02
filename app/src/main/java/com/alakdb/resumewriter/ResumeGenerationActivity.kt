@@ -144,8 +144,19 @@ class ResumeGenerationActivity : AppCompatActivity() {
 
         userManager = UserManager(this)
         apiService = ApiService(this)
-        // REMOVED: auth = FirebaseAuth.getInstance() - using lazy val instead
-        // REMOVED: creditManager = CreditManager(this) - using lazy val instead
+        
+       // ✅ Ensure scroll is smooth and visible
+        binding.tvGeneratedResume.isVerticalScrollBarEnabled = true
+        binding.scrollView.isSmoothScrollingEnabled = true
+        binding.scrollView.isVerticalScrollBarEnabled = true
+
+        // ✅ Optional: improve touch responsiveness
+        binding.scrollView.setOnTouchListener { v, event ->
+            v.parent.requestDisallowInterceptTouchEvent(true)
+            v.performClick()
+            false
+        }
+
 
         registerFilePickers()
         setupUI()
