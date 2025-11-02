@@ -1,8 +1,10 @@
 package com.alakdb.resumewriter
 
+import android.app.Dialog
 import android.content.Intent
 import android.util.Log
 import android.os.Bundle
+import android.webkit.WebView
 import androidx.appcompat.app.AlertDialog
 import androidx.appcompat.app.AppCompatActivity
 import com.alakdb.resumewriter.databinding.ActivityMainBinding
@@ -120,7 +122,7 @@ class MainActivity : AppCompatActivity() {
             else showMessage("Store not ready. Please wait...")
         }
 
-            // Sample Preview Buttons
+        // Sample Preview Buttons - FIXED: Proper implementation
         binding.btnViewSampleCv.setOnClickListener {
             showHtmlDialog("Sample CV", SAMPLE_CV_HTML)
         }
@@ -131,13 +133,18 @@ class MainActivity : AppCompatActivity() {
 
         binding.btnGenerateSampleResume.setOnClickListener {
             val combinedHtml = """
+                <html>
+                <head><style>body { font-family: Arial, sans-serif; margin: 20px; } h2 { color: #2c3e50; } hr { margin: 20px 0; }</style></head>
+                <body>
                 <h2>Sample CV</h2>
                 $SAMPLE_CV_HTML
                 <hr>
-                <h2>Job Description</h2>
+                <h2>Sample Job Description</h2>
                 $SAMPLE_JOB_HTML
+                </body>
+                </html>
             """.trimIndent()
-            showHtmlDialog("Sample Resume", combinedHtml)
+            showHtmlDialog("Sample Resume & Job Description", combinedHtml)
         }
 
         // Admin Access
@@ -226,21 +233,56 @@ class MainActivity : AppCompatActivity() {
         }, 2000)
     }
 
-     private fun showHtmlDialog(title: String, htmlContent: String) {
-        val dialog = Dialog(this)
-        dialog.setContentView(R.layout.dialog_webview)
-        dialog.setTitle(title)
+    // FIXED: Proper implementation of showHtmlDialog
+    private fun showHtmlDialog(title: String, htmlContent: String) {
+        try {
+            val dialog = Dialog(this)
+            dialog.setContentView(R.layout.dialog_webview)
+            dialog.setTitle(title)
+            dialog.window?.setBackgroundDrawableResource(android.R.color.white)
 
-        val webView = dialog.findViewById<WebView>(R.id.webview)
-        webView.settings.javaScriptEnabled = true
-        webView.settings.loadWithOverviewMode = true
-        webView.settings.useWideViewPort = true
-        webView.loadDataWithBaseURL(null, htmlContent, "text/html", "UTF-8", null)
+            val webView = dialog.findViewById<WebView>(R.id.webview)
+            val btnClose = dialog.findViewById<android.widget.Button>(R.id.btn_close)
 
-        val btnClose = dialog.findViewById<android.widget.Button>(R.id.btn_close)
-        btnClose.setOnClickListener { dialog.dismiss() }
+            webView.settings.javaScriptEnabled = true
+            webView.settings.loadWithOverviewMode = true
+            webView.settings.useWideViewPort = true
+            webView.settings.domStorageEnabled = true
+            
+            // Load the HTML content with proper styling
+            val styledHtml = """
+                <html>
+                <head>
+                    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+                    <style>
+                        body { 
+                            font-family: Arial, sans-serif; 
+                            line-height: 1.6; 
+                            margin: 20px; 
+                            color: #333;
+                        }
+                        h2 { color: #2c3e50; border-bottom: 2px solid #3498db; padding-bottom: 5px; }
+                        h3 { color: #34495e; margin-top: 20px; }
+                        b { color: #2c3e50; }
+                        ul { padding-left: 20px; }
+                        li { margin-bottom: 5px; }
+                    </style>
+                </head>
+                <body>
+                    $htmlContent
+                </body>
+                </html>
+            """.trimIndent()
+            
+            webView.loadDataWithBaseURL(null, styledHtml, "text/html", "UTF-8", null)
 
-        dialog.show()
+            btnClose.setOnClickListener { dialog.dismiss() }
+
+            dialog.show()
+        } catch (e: Exception) {
+            Log.e("MainActivity", "Error showing HTML dialog: ${e.message}")
+            showMessage("Error loading content. Please try again.")
+        }
     }
 
     private fun initializeBilling() {
@@ -357,7 +399,7 @@ class MainActivity : AppCompatActivity() {
         binding.btnGenerateCv.isEnabled = canGenerate
         binding.btnGenerateCv.text = when {
             !canGenerate && available > 0 -> "Please Wait..."
-            available > 0 -> "Generate CV (1 Credit)"
+            available > 0 -> "✨ Generate Tailored Résumé"
             else -> "No Credits Available"
         }
     }
@@ -444,62 +486,6 @@ class MainActivity : AppCompatActivity() {
         }
     }
 
-    companion object {
-        private const val SAMPLE_CV_HTML = """
-            <h2>John Doe</h2>
-            <p><b>Email:</b> john.doe@email.com | <b>Phone:</b> +1 234 567 8901</p>
-            <h3>Professional Summary</h3>
-            <p>Full Stack Developer with over 5 years of experience...</p>
-            <h3>Skills</h3>
-            <ul>
-                <li>JavaScript (React, Node.js)</li>
-                <li>Python (Flask, FastAPI)</li>
-                <li>Databases: PostgreSQL, MongoDB</li>
-                <li>AWS, Docker, CI/CD Pipelines</li>
-            </ul>
-            <h3>Experience</h3>
-            <p><b>Senior Software Engineer — ABC Tech</b> (2020–Present)</p>
-            <ul>
-                <li>Lead development of scalable SaaS products using React and Node.js.</li>
-                <li>Integrated AWS cloud services for storage and deployment.</li>
-            </ul>
-            <p><b>Software Developer — XYZ Labs</b> (2017–2020)</p>
-            <ul>
-                <li>Developed full-stack applications and APIs using Flask and PostgreSQL.</li>
-                <li>Collaborated in Agile teams to deliver multiple successful client projects.</li>
-            </ul>
-            <h3>Education</h3>
-            <p>B.Sc. in Computer Science — University of Technology</p>
-        """
-
-        private const val SAMPLE_JOB_HTML = """
-            <h2>Senior Full Stack Developer Position</h2>
-            <p>We are looking for an experienced Senior Full Stack Developer to join our dynamic team...</p>
-            <h3>Responsibilities</h3>
-            <ul>
-                <li>Design, develop, and maintain scalable web applications</li>
-                <li>Collaborate with cross-functional teams to define, design, and ship new features</li>
-                <li>Write clean, maintainable, and efficient code</li>
-                <li>Implement security and data protection measures</li>
-                <li>Optimize applications for maximum speed and scalability</li>
-                <li>Mentor junior developers and conduct code reviews</li>
-            </ul>
-            <h3>Requirements</h3>
-            <ul>
-                <li>5+ years of experience in full-stack development</li>
-                <li>Proficiency with JavaScript frameworks (React, Angular, or Vue)</li>
-                <li>Strong experience with Node.js and Python</li>
-                <li>Familiarity with MongoDB and PostgreSQL</li>
-                <li>Experience with cloud services (AWS, Azure, or GCP)</li>
-                <li>Knowledge of Git and CI/CD pipelines</li>
-                <li>Excellent problem-solving skills and attention to detail</li>
-            </ul>
-        """
-    }
-}
-
-
-    
     // NEW: Debug info dialog
     private fun showDebugInfo() {
         val userState = """
@@ -519,5 +505,78 @@ class MainActivity : AppCompatActivity() {
             .setMessage(userState)
             .setPositiveButton("OK", null)
             .show()
+    }
+
+    companion object {
+        private const val SAMPLE_CV_HTML = """
+            <h2>John Doe</h2>
+            <p><b>Email:</b> john.doe@email.com | <b>Phone:</b> +1 234 567 8901</p>
+            <h3>Professional Summary</h3>
+            <p>Full Stack Developer with over 5 years of experience in building scalable web applications and leading development teams. Strong expertise in JavaScript, Python, and cloud technologies.</p>
+            <h3>Technical Skills</h3>
+            <ul>
+                <li><b>Frontend:</b> React, Angular, Vue.js, TypeScript</li>
+                <li><b>Backend:</b> Node.js, Python (Flask, FastAPI), Java Spring</li>
+                <li><b>Databases:</b> PostgreSQL, MongoDB, Redis</li>
+                <li><b>Cloud & DevOps:</b> AWS, Docker, CI/CD Pipelines, Kubernetes</li>
+            </ul>
+            <h3>Professional Experience</h3>
+            <p><b>Senior Software Engineer — ABC Tech</b> (2020–Present)</p>
+            <ul>
+                <li>Led development of scalable SaaS products serving 50,000+ users</li>
+                <li>Reduced application load time by 40% through performance optimization</li>
+                <li>Mentored 3 junior developers and established code review processes</li>
+            </ul>
+            <p><b>Software Developer — XYZ Labs</b> (2017–2020)</p>
+            <ul>
+                <li>Developed full-stack applications and RESTful APIs using Flask and PostgreSQL</li>
+                <li>Collaborated in Agile teams to deliver multiple successful client projects</li>
+                <li>Implemented automated testing reducing bugs by 60%</li>
+            </ul>
+            <h3>Education</h3>
+            <p><b>B.Sc. in Computer Science</b> — University of Technology (2013-2017)</p>
+            <p>Graduated Magna Cum Laude with specialization in Software Engineering</p>
+        """
+
+        private const val SAMPLE_JOB_HTML = """
+            <h2>Senior Full Stack Developer Position</h2>
+            <p><b>Company:</b> Tech Innovations Inc.<br>
+            <b>Location:</b> Remote / San Francisco, CA<br>
+            <b>Salary Range:</b> $120,000 - $150,000</p>
+            
+            <h3>Job Description</h3>
+            <p>We are looking for an experienced Senior Full Stack Developer to join our dynamic team and help build the next generation of our platform. The ideal candidate will have strong technical skills and leadership experience.</p>
+            
+            <h3>Key Responsibilities</h3>
+            <ul>
+                <li>Design, develop, and maintain scalable web applications using modern technologies</li>
+                <li>Collaborate with cross-functional teams to define, design, and ship new features</li>
+                <li>Write clean, maintainable, and efficient code following best practices</li>
+                <li>Implement security and data protection measures</li>
+                <li>Optimize applications for maximum speed and scalability</li>
+                <li>Mentor junior developers and conduct code reviews</li>
+                <li>Participate in Agile development processes and sprint planning</li>
+            </ul>
+            
+            <h3>Requirements</h3>
+            <ul>
+                <li>5+ years of experience in full-stack development</li>
+                <li>Proficiency with JavaScript frameworks (React, Angular, or Vue)</li>
+                <li>Strong experience with Node.js and Python backend development</li>
+                <li>Familiarity with MongoDB and PostgreSQL databases</li>
+                <li>Experience with cloud services (AWS, Azure, or GCP)</li>
+                <li>Knowledge of Git and CI/CD pipelines</li>
+                <li>Excellent problem-solving skills and attention to detail</li>
+                <li>Strong communication and teamwork skills</li>
+            </ul>
+            
+            <h3>Preferred Qualifications</h3>
+            <ul>
+                <li>Experience with microservices architecture</li>
+                <li>Knowledge of containerization (Docker, Kubernetes)</li>
+                <li>Previous experience in a tech lead or mentoring role</li>
+                <li>Bachelor's degree in Computer Science or related field</li>
+            </ul>
+        """
     }
 }
