@@ -349,6 +349,35 @@ class ResumeGenerationActivity : AppCompatActivity() {
     }
 }
 
+    /** ---------------- Advanced Scroll Handling ---------------- **/
+private fun setupAdvancedScrollableResume() {
+    binding.tvGeneratedResume.apply {
+        movementMethod = ScrollingMovementMethod.getInstance()
+        
+        // Enhanced touch handling
+        setOnTouchListener { v, event ->
+            when (event.action) {
+                MotionEvent.ACTION_DOWN -> {
+                    // Allow both the TextView and parent ScrollView to scroll
+                    v.parent.requestDisallowInterceptTouchEvent(true)
+                }
+                MotionEvent.ACTION_UP -> {
+                    v.parent.requestDisallowInterceptTouchEvent(false)
+                }
+                MotionEvent.ACTION_MOVE -> {
+                    // If we've reached top/bottom, allow parent to scroll
+                    val scrollView = v.parent as? ScrollView
+                    if (!v.canScrollVertically(-1) || !v.canScrollVertically(1)) {
+                        v.parent.requestDisallowInterceptTouchEvent(false)
+                    }
+                }
+            }
+            false
+        }
+    }
+}
+
+    
     private fun checkGenerateButtonState() {
     val hasFiles = selectedResumeUri != null && selectedJobDescUri != null
     val hasText = binding.etResumeText.text.toString().isNotEmpty() && 
