@@ -41,6 +41,9 @@ import android.os.Environment
 import android.provider.MediaStore
 import android.text.method.ScrollingMovementMethod
 import java.io.OutputStream
+import android.view.MotionEvent
+import android.widget.ScrollView
+
 
 class ResumeGenerationActivity : AppCompatActivity() {
 
@@ -282,6 +285,9 @@ class ResumeGenerationActivity : AppCompatActivity() {
         binding.etResumeText.addTextChangedListener(textWatcher)
         binding.etJobDescription.addTextChangedListener(textWatcher)
         
+        //Simple scrolling setup:
+        setupScrollableResumeArea() 
+        
         binding.btnClearResume.setOnClickListener {
             selectedResumeUri = null
             binding.tvResumeFile.text = "No file selected"
@@ -345,6 +351,23 @@ class ResumeGenerationActivity : AppCompatActivity() {
     override fun onTextChanged(s: CharSequence?, start: Int, before: Int, count: Int) {}
     override fun afterTextChanged(s: android.text.Editable?) {
         checkGenerateButtonState()
+    }
+}
+
+    /** ---------------- Simple Scroll Setup ---------------- **/
+private fun setupScrollableResumeArea() {
+    binding.tvGeneratedResume.apply {
+        // Enable touch scrolling
+        movementMethod = ScrollingMovementMethod.getInstance()
+        
+        // Enable visual scrollbars
+        isVerticalScrollBarEnabled = true
+        
+        // Keep text selectable
+        setTextIsSelectable(true)
+        
+        // Remove any complex touch listeners
+        setOnTouchListener(null)
     }
 }
 
