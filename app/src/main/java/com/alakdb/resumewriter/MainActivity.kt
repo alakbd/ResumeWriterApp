@@ -440,6 +440,55 @@ class MainActivity : AppCompatActivity() {
         }
     }
 
+    companion object {
+    private const val SAMPLE_CV_HTML = """
+        <h1>John Doe</h1>
+        <p><b>Email:</b> john.doe@example.com</p>
+        <p><b>Phone:</b> +1-234-567-890</p>
+        <h2>Education</h2>
+        <ul>
+            <li>B.Sc. in Computer Science, XYZ University</li>
+        </ul>
+        <h2>Experience</h2>
+        <ul>
+            <li>Software Engineer at ABC Corp (2018-2021)</li>
+            <li>Senior Developer at DEF Ltd (2021-Present)</li>
+        </ul>
+        <h2>Skills</h2>
+        <ul>
+            <li>Java, Kotlin, Python</li>
+            <li>Android Development</li>
+            <li>Web Development</li>
+        </ul>
+    """
+
+    private const val SAMPLE_JOB_HTML = """
+        <h1>Senior Full Stack Developer Position</h1>
+        <p>We are looking for an experienced Senior Full Stack Developer to join our dynamic team. The ideal candidate will have a strong background in both front-end and back-end development, with expertise in modern JavaScript frameworks and cloud technologies.</p>
+        <h2>Responsibilities:</h2>
+        <ul>
+            <li>Design, develop, and maintain scalable web applications</li>
+            <li>Collaborate with cross-functional teams to define, design, and ship new features</li>
+            <li>Write clean, maintainable, and efficient code</li>
+            <li>Implement security and data protection measures</li>
+            <li>Optimize applications for maximum speed and scalability</li>
+            <li>Mentor junior developers and conduct code reviews</li>
+        </ul>
+        <h2>Requirements:</h2>
+        <ul>
+            <li>5+ years of experience in full-stack development</li>
+            <li>Proficiency with JavaScript frameworks (React, Angular, or Vue)</li>
+            <li>Strong experience with Node.js and Python</li>
+            <li>Familiarity with database technology such as MongoDB and PostgreSQL</li>
+            <li>Experience with cloud services (AWS, Azure, or GCP)</li>
+            <li>Knowledge of code versioning tools, such as Git</li>
+            <li>Excellent problem-solving skills and attention to detail</li>
+        </ul>
+    """
+}
+
+
+    
     // NEW: Debug info dialog
     private fun showDebugInfo() {
         val userState = """
