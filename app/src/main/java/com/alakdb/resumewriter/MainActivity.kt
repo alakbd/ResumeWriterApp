@@ -120,6 +120,7 @@ class MainActivity : AppCompatActivity() {
             else showMessage("Store not ready. Please wait...")
         }
 
+            // Sample Preview Buttons
         binding.btnViewSampleCv.setOnClickListener {
             showHtmlDialog("Sample CV", SAMPLE_CV_HTML)
         }
@@ -225,12 +226,15 @@ class MainActivity : AppCompatActivity() {
         }, 2000)
     }
 
-    private fun showHtmlDialog(title: String, htmlContent: String) {
-        val dialog = android.app.Dialog(this)
+     private fun showHtmlDialog(title: String, htmlContent: String) {
+        val dialog = Dialog(this)
         dialog.setContentView(R.layout.dialog_webview)
         dialog.setTitle(title)
 
-        val webView = dialog.findViewById<android.webkit.WebView>(R.id.webview)
+        val webView = dialog.findViewById<WebView>(R.id.webview)
+        webView.settings.javaScriptEnabled = true
+        webView.settings.loadWithOverviewMode = true
+        webView.settings.useWideViewPort = true
         webView.loadDataWithBaseURL(null, htmlContent, "text/html", "UTF-8", null)
 
         val btnClose = dialog.findViewById<android.widget.Button>(R.id.btn_close)
