@@ -316,13 +316,7 @@ class ResumeGenerationActivity : AppCompatActivity() {
             }
         }
 
-        // Make generated resume scrollable
-            binding.tvGeneratedResume.apply {
-            movementMethod = ScrollingMovementMethod()
-            isVerticalScrollBarEnabled = true
-            isScrollbarFadingEnabled = false
-            }
-        
+     
         binding.btnDownloadDocx.setOnClickListener { 
                 downloadFile("docx") 
         }
