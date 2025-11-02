@@ -68,7 +68,7 @@
         <TextView
             android:layout_width="match_parent"
             android:layout_height="wrap_content"
-            android:text="Preview Sample Résumé & Job Description"
+            android:text="Preview Sample Résumé &amp; Job Description"
             style="@style/SubTitleText"
             android:layout_marginBottom="16dp"
             android:gravity="center"/>
