@@ -285,7 +285,7 @@ class ResumeGenerationActivity : AppCompatActivity() {
         binding.etJobDescription.addTextChangedListener(textWatcher)
 
         // Add this line to enable advanced scrolling:
-            setupAdvancedScrollableResume()
+            setupScrollableResumeArea()
         
         binding.btnClearResume.setOnClickListener {
             selectedResumeUri = null
@@ -355,30 +355,19 @@ class ResumeGenerationActivity : AppCompatActivity() {
 }
 
     /** ---------------- Advanced Scroll Handling ---------------- **/
-private fun setupAdvancedScrollableResume() {
+private fun setupScrollableResumeArea() {
     binding.tvGeneratedResume.apply {
+        // This single line enables smooth touch scrolling
         movementMethod = ScrollingMovementMethod.getInstance()
         
-        // Enhanced touch handling
-        setOnTouchListener { v, event ->
-            when (event.action) {
-                MotionEvent.ACTION_DOWN -> {
-                    // Allow both the TextView and parent ScrollView to scroll
-                    v.parent.requestDisallowInterceptTouchEvent(true)
-                }
-                MotionEvent.ACTION_UP -> {
-                    v.parent.requestDisallowInterceptTouchEvent(false)
-                }
-                MotionEvent.ACTION_MOVE -> {
-                    // If we've reached top/bottom, allow parent to scroll
-                    val scrollView = v.parent as? ScrollView
-                    if (!v.canScrollVertically(-1) || !v.canScrollVertically(1)) {
-                        v.parent.requestDisallowInterceptTouchEvent(false)
-                    }
-                }
-            }
-            false
-        }
+        // Enable visual scrollbars
+        isVerticalScrollBarEnabled = true
+        
+        // Keep text selectable
+        setTextIsSelectable(true)
+        
+        // Remove any complex touch listeners that might be causing issues
+        setOnTouchListener(null)
     }
 }
 
