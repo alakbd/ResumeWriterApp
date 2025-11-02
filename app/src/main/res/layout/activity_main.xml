@@ -106,31 +106,32 @@
             
         <!-- Refresh Button -->
         <Button
-            android:layout_width="wrap_content"
-            android:layout_height="wrap_content"
             android:id="@+id/btn_refresh"
-            android:text="Refresh"
-            android:layout_marginBottom="16dp"/>
+            android:layout_width="0dp"
+            android:layout_height="wrap_content"
+            android:layout_weight="1"
+            android:text="Refresh"/>
 
         <!-- Logout Button -->
         <Button
-            android:layout_width="wrap_content"
-            android:layout_height="wrap_content"
             android:id="@+id/btn_logout"
+            android:layout_width="0dp"
+            android:layout_height="wrap_content"
+            android:layout_weight="1"
             android:text="Logout"
             android:backgroundTint="#FF0000"
             android:textColor="#FFFFFF"
-            android:layout_marginBottom="32dp"/>
+            android:layout_marginStart="8dp"
+            android:layout_marginEnd="8dp"/>
 
         <!-- Hidden Admin -->
         <TextView
-            android:layout_width="wrap_content"
-            android:layout_height="wrap_content"
             android:id="@+id/tv_version"
+            android:layout_width="0dp"
+            android:layout_height="wrap_content"
+            android:layout_weight="1"
             android:text="v1.0"
-            android:textSize="14sp"
-            android:gravity="center"
-            android:layout_marginTop="16dp"/>
+            android:gravity="center"/>
     </LinearLayout>
         
         <Button
