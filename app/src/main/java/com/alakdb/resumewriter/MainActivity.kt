@@ -445,50 +445,57 @@ class MainActivity : AppCompatActivity() {
     }
 
     companion object {
-    private const val SAMPLE_CV_HTML = """
-        <h1>John Doe</h1>
-        <p><b>Email:</b> john.doe@example.com</p>
-        <p><b>Phone:</b> +1-234-567-890</p>
-        <h2>Education</h2>
-        <ul>
-            <li>B.Sc. in Computer Science, XYZ University</li>
-        </ul>
-        <h2>Experience</h2>
-        <ul>
-            <li>Software Engineer at ABC Corp (2018-2021)</li>
-            <li>Senior Developer at DEF Ltd (2021-Present)</li>
-        </ul>
-        <h2>Skills</h2>
-        <ul>
-            <li>Java, Kotlin, Python</li>
-            <li>Android Development</li>
-            <li>Web Development</li>
-        </ul>
-    """
+        private const val SAMPLE_CV_HTML = """
+            <h2>John Doe</h2>
+            <p><b>Email:</b> john.doe@email.com | <b>Phone:</b> +1 234 567 8901</p>
+            <h3>Professional Summary</h3>
+            <p>Full Stack Developer with over 5 years of experience...</p>
+            <h3>Skills</h3>
+            <ul>
+                <li>JavaScript (React, Node.js)</li>
+                <li>Python (Flask, FastAPI)</li>
+                <li>Databases: PostgreSQL, MongoDB</li>
+                <li>AWS, Docker, CI/CD Pipelines</li>
+            </ul>
+            <h3>Experience</h3>
+            <p><b>Senior Software Engineer — ABC Tech</b> (2020–Present)</p>
+            <ul>
+                <li>Lead development of scalable SaaS products using React and Node.js.</li>
+                <li>Integrated AWS cloud services for storage and deployment.</li>
+            </ul>
+            <p><b>Software Developer — XYZ Labs</b> (2017–2020)</p>
+            <ul>
+                <li>Developed full-stack applications and APIs using Flask and PostgreSQL.</li>
+                <li>Collaborated in Agile teams to deliver multiple successful client projects.</li>
+            </ul>
+            <h3>Education</h3>
+            <p>B.Sc. in Computer Science — University of Technology</p>
+        """
 
-    private const val SAMPLE_JOB_HTML = """
-        <h1>Senior Full Stack Developer Position</h1>
-        <p>We are looking for an experienced Senior Full Stack Developer to join our dynamic team. The ideal candidate will have a strong background in both front-end and back-end development, with expertise in modern JavaScript frameworks and cloud technologies.</p>
-        <h2>Responsibilities:</h2>
-        <ul>
-            <li>Design, develop, and maintain scalable web applications</li>
-            <li>Collaborate with cross-functional teams to define, design, and ship new features</li>
-            <li>Write clean, maintainable, and efficient code</li>
-            <li>Implement security and data protection measures</li>
-            <li>Optimize applications for maximum speed and scalability</li>
-            <li>Mentor junior developers and conduct code reviews</li>
-        </ul>
-        <h2>Requirements:</h2>
-        <ul>
-            <li>5+ years of experience in full-stack development</li>
-            <li>Proficiency with JavaScript frameworks (React, Angular, or Vue)</li>
-            <li>Strong experience with Node.js and Python</li>
-            <li>Familiarity with database technology such as MongoDB and PostgreSQL</li>
-            <li>Experience with cloud services (AWS, Azure, or GCP)</li>
-            <li>Knowledge of code versioning tools, such as Git</li>
-            <li>Excellent problem-solving skills and attention to detail</li>
-        </ul>
-    """
+        private const val SAMPLE_JOB_HTML = """
+            <h2>Senior Full Stack Developer Position</h2>
+            <p>We are looking for an experienced Senior Full Stack Developer to join our dynamic team...</p>
+            <h3>Responsibilities</h3>
+            <ul>
+                <li>Design, develop, and maintain scalable web applications</li>
+                <li>Collaborate with cross-functional teams to define, design, and ship new features</li>
+                <li>Write clean, maintainable, and efficient code</li>
+                <li>Implement security and data protection measures</li>
+                <li>Optimize applications for maximum speed and scalability</li>
+                <li>Mentor junior developers and conduct code reviews</li>
+            </ul>
+            <h3>Requirements</h3>
+            <ul>
+                <li>5+ years of experience in full-stack development</li>
+                <li>Proficiency with JavaScript frameworks (React, Angular, or Vue)</li>
+                <li>Strong experience with Node.js and Python</li>
+                <li>Familiarity with MongoDB and PostgreSQL</li>
+                <li>Experience with cloud services (AWS, Azure, or GCP)</li>
+                <li>Knowledge of Git and CI/CD pipelines</li>
+                <li>Excellent problem-solving skills and attention to detail</li>
+            </ul>
+        """
+    }
 }
 
 
