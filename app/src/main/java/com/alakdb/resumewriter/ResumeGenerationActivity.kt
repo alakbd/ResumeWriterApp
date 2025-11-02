@@ -41,6 +41,7 @@ import android.os.Environment
 import android.provider.MediaStore
 import android.text.method.ScrollingMovementMethod
 import java.io.OutputStream
+import android.view.MotionEvent
 
 class ResumeGenerationActivity : AppCompatActivity() {
 
@@ -281,6 +282,9 @@ class ResumeGenerationActivity : AppCompatActivity() {
         // Add text change listeners
         binding.etResumeText.addTextChangedListener(textWatcher)
         binding.etJobDescription.addTextChangedListener(textWatcher)
+
+        // Add this line to enable advanced scrolling:
+            setupAdvancedScrollableResume()
         
         binding.btnClearResume.setOnClickListener {
             selectedResumeUri = null
@@ -315,7 +319,7 @@ class ResumeGenerationActivity : AppCompatActivity() {
                 else -> showToast("Please provide both resume and job description", true)
             }
         }
-
+        
      
         binding.btnDownloadDocx.setOnClickListener { 
                 downloadFile("docx") 
