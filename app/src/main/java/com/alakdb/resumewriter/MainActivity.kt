@@ -120,6 +120,25 @@ class MainActivity : AppCompatActivity() {
             else showMessage("Store not ready. Please wait...")
         }
 
+        binding.btnViewSampleCv.setOnClickListener {
+            showHtmlDialog("Sample CV", SAMPLE_CV_HTML)
+        }
+
+        binding.btnViewSampleJob.setOnClickListener {
+            showHtmlDialog("Sample Job Description", SAMPLE_JOB_HTML)
+        }
+
+        binding.btnGenerateSampleResume.setOnClickListener {
+            val combinedHtml = """
+                <h2>Sample CV</h2>
+                $SAMPLE_CV_HTML
+                <hr>
+                <h2>Job Description</h2>
+                $SAMPLE_JOB_HTML
+            """.trimIndent()
+            showHtmlDialog("Sample Resume", combinedHtml)
+        }
+
         // Admin Access
         binding.tvVersion.setOnClickListener { handleAdminTap() }
         binding.btnAdminAccess.setOnClickListener { navigateToAdmin() }
@@ -204,6 +223,20 @@ class MainActivity : AppCompatActivity() {
                 binding.tvVersion.text = "v1.0"
             }
         }, 2000)
+    }
+
+    private fun showHtmlDialog(title: String, htmlContent: String) {
+        val dialog = android.app.Dialog(this)
+        dialog.setContentView(R.layout.dialog_webview)
+        dialog.setTitle(title)
+
+        val webView = dialog.findViewById<android.webkit.WebView>(R.id.webview)
+        webView.loadDataWithBaseURL(null, htmlContent, "text/html", "UTF-8", null)
+
+        val btnClose = dialog.findViewById<android.widget.Button>(R.id.btn_close)
+        btnClose.setOnClickListener { dialog.dismiss() }
+
+        dialog.show()
     }
 
     private fun initializeBilling() {
