@@ -67,7 +67,7 @@
                 android:id="@+id/btn_buy_8_cv"
                 style="@style/SecondaryButton"
                 android:text="8 CV Credits - €10"
-                android:layout_marginBottom="32dp"/>
+                android:layout_marginBottom="48dp"/>
 
             <!-- Sample Preview Section -->
             <TextView
@@ -75,14 +75,17 @@
                 android:layout_height="wrap_content"
                 android:text="Preview Sample Résumé &amp; Job Description"
                 style="@style/SubTitleText"
-                android:layout_marginBottom="16dp"
+                android:layout_marginBottom="24dp"
                 android:gravity="center"/>
 
+            <!-- Added extra space (1 inch ≈ 48dp) before sample buttons -->
             <Button
                 android:layout_width="match_parent"
                 android:layout_height="wrap_content"
                 android:id="@+id/btn_view_sample_cv"
                 android:text="View Sample CV"
+                android:backgroundTint="#4CAF50"
+                android:textColor="#FFFFFF"
                 android:layout_marginBottom="12dp"/>
 
             <Button
@@ -90,6 +93,8 @@
                 android:layout_height="wrap_content"
                 android:id="@+id/btn_view_sample_job"
                 android:text="View Sample Job Description"
+                android:backgroundTint="#2196F3"
+                android:textColor="#FFFFFF"
                 android:layout_marginBottom="12dp"/>
 
             <Button
@@ -97,6 +102,8 @@
                 android:layout_height="wrap_content"
                 android:id="@+id/btn_generate_sample_resume"
                 android:text="Generate Sample Resume"
+                android:backgroundTint="#FF9800"
+                android:textColor="#FFFFFF"
                 android:layout_marginBottom="32dp"/>
 
             <!-- Admin Section (Hidden by default) -->
@@ -140,7 +147,20 @@
             android:layout_height="wrap_content"
             android:layout_weight="1"
             android:text="Refresh"
-            android:layout_marginEnd="4dp"/>
+            android:layout_marginEnd="8dp"/>
+
+        <!-- Version Info - CENTERED -->
+        <TextView
+            android:id="@+id/tv_version"
+            android:layout_width="0dp"
+            android:layout_height="wrap_content"
+            android:layout_weight="1"
+            android:text="v1.0"
+            android:gravity="center"
+            android:textStyle="bold"
+            android:textSize="16sp"
+            android:layout_marginStart="8dp"
+            android:layout_marginEnd="8dp"/>
 
         <!-- Logout Button -->
         <Button
@@ -151,18 +171,6 @@
             android:text="Logout"
             android:backgroundTint="#FF0000"
             android:textColor="#FFFFFF"
-            android:layout_marginStart="4dp"
-            android:layout_marginEnd="4dp"/>
-
-        <!-- Version Info -->
-        <TextView
-            android:id="@+id/tv_version"
-            android:layout_width="0dp"
-            android:layout_height="wrap_content"
-            android:layout_weight="1"
-            android:text="v1.0"
-            android:gravity="center"
-            android:textStyle="bold"
-            android:layout_marginStart="4dp"/>
+            android:layout_marginStart="8dp"/>
     </LinearLayout>
 </LinearLayout>
