@@ -398,7 +398,6 @@ class MainActivity : AppCompatActivity() {
 
     private fun updateCreditDisplay() {
         binding.tvAvailableCredits.text = "Available CV Credits: ${creditManager.getAvailableCredits()}"
-        binding.tvCreditStats.text = "Used: ${creditManager.getUsedCredits()} | Total Earned: ${creditManager.getTotalCredits()}"
         updateGenerateButton()
     }
 
