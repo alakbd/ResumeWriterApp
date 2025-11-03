@@ -533,6 +533,13 @@ class MainActivity : AppCompatActivity() {
             <h3>Education</h3>
             <p><b>B.Sc. in Computer Science</b> — University of Technology (2013-2017)</p>
             <p>Graduated Magna Cum Laude with specialization in Software Engineering</p>
+            <h3>Skills</h3>
+            <ul>
+                <li><b>Programming Languages:</b> JavaScript, Python, Java, SQL</li>
+                <li><b>Frameworks:</b> React, Node.js, Django, Express.js</li>
+                <li><b>Tools:</b> Git, Docker, AWS, Jenkins, MongoDB</li>
+                <li><b>Certifications:</b> AWS Certified Developer, Scrum Master</li>
+            </ul>
         """
 
         private const val SAMPLE_JOB_HTML = """
@@ -615,9 +622,9 @@ class MainActivity : AppCompatActivity() {
             <div class="section">
                 <div class="section-title">SKILLS</div>
                 <ul>
-                    <li><b>Programming Languages:</b> JavaScript, Python, SQL</li>
-                    <li><b>Frameworks:</b> React, Node.js, Django</li>
-                    <li><b>Tools:</b> Git, AWS, MongoDB</li>
+                    <li><b>Programming Languages:</b> JavaScript, Python, Java, SQL</li>
+                    <li><b>Frameworks:</b> React, Node.js, Django, Express.js</li>
+                    <li><b>Tools:</b> Git, Docker, AWS, Jenkins, MongoDB</li>
                     <li><b>Certifications:</b> AWS Certified Developer, Scrum Master</li>
                 </ul>
             </div>
