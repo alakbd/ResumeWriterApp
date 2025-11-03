@@ -216,6 +216,10 @@ class ResumeGenerationActivity : AppCompatActivity() {
         binding.btnDownloadDocx.setOnClickListener { downloadFile("docx") }
         binding.btnDownloadPdf.setOnClickListener { downloadFile("pdf") }
         binding.btnBack.setOnClickListener { finish() }
+
+           binding.btnRetryConnection.setOnClickListener { 
+                testApiConnection() 
+            }
     }
 
     private val textWatcher = object : android.text.TextWatcher {
@@ -226,6 +230,58 @@ class ResumeGenerationActivity : AppCompatActivity() {
         }
     }
 
+    private fun testApiConnection() {
+    binding.layoutConnectionStatus.visibility = View.VISIBLE
+    binding.tvConnectionStatus.text = "Testing connection..."
+    binding.progressConnection.visibility = View.VISIBLE
+    binding.btnRetryConnection.isEnabled = false
+
+    lifecycleScope.launch {
+        try {
+            if (!apiService.isNetworkAvailable()) {
+                updateConnectionStatus("❌ No internet connection", true)
+                binding.progressConnection.visibility = View.GONE
+                binding.btnRetryConnection.isEnabled = true
+                showToast("Please check your internet connection", true)
+                return@launch
+            }
+
+            Log.d("ResumeActivity", "Testing API connection...")
+            
+            val connectionResult = apiService.testConnection()
+            
+            when (connectionResult) {
+                is ApiService.ApiResult.Success -> {
+                    updateConnectionStatus("✅ API Connected", false)
+                    // Add this line to update credits after successful connection
+                    lifecycleScope.launch { updateCreditDisplay() }
+                    showToast("Connection test successful!", false)
+                }
+                is ApiService.ApiResult.Error -> {
+                    updateConnectionStatus("❌ API Connection Failed", true)
+                    showToast("API error: ${connectionResult.message}", true)
+                }
+            }
+        } catch (e: Exception) {
+            updateConnectionStatus("❌ Connection Error", true)
+            Log.e("ResumeActivity", "Connection test failed", e)
+            showToast("Connection failed: ${e.message}", true)
+        } finally {
+            binding.progressConnection.visibility = View.GONE
+            binding.btnRetryConnection.isEnabled = true
+        }
+    }
+}
+
+private fun updateConnectionStatus(message: String, isError: Boolean = false) {
+    binding.tvConnectionStatus.text = message
+    binding.tvConnectionStatus.setTextColor(
+        if (isError) getColor(android.R.color.holo_red_dark)
+        else getColor(android.R.color.holo_green_dark)
+    )
+}
+
+    
     private fun checkGenerateButtonState() {
         val hasFiles = selectedResumeUri != null && selectedJobDescUri != null
         val hasText = binding.etResumeText.text.toString().isNotEmpty() && 
