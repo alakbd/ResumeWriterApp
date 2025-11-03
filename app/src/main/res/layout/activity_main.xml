@@ -17,6 +17,21 @@
             android:padding="24dp"
             android:gravity="center_horizontal">
 
+            <!-- Welcome Message -->
+            <TextView
+                android:layout_width="match_parent"
+                android:layout_height="wrap_content"
+                android:id="@+id/tv_welcome_message"
+                android:text="Welcome user@example.com"
+                android:textColor="#2c3e50"
+                android:textSize="16sp"
+                android:textStyle="bold"
+                android:gravity="center"
+                android:layout_marginBottom="16dp"
+                android:padding="8dp"
+                android:background="#e8f5e8"
+                android:drawablePadding="8dp"/>
+
             <!-- Available Credits -->
             <TextView
                 android:layout_width="match_parent"
@@ -106,26 +121,31 @@
                 android:textColor="#FFFFFF"
                 android:layout_marginBottom="32dp"/>
 
-            <!-- Admin Section (Hidden by default) -->
-            <Button
-                android:layout_width="wrap_content"
-                android:layout_height="wrap_content"
-                android:id="@+id/btn_admin_access"
-                android:text="Admin Access"
-                android:visibility="gone"
-                android:layout_gravity="center_horizontal"
-                android:layout_marginTop="12dp"/>
-
+            <!-- Admin Section - More prominent placement -->
             <TextView
-                android:layout_width="wrap_content"
+                android:layout_width="match_parent"
                 android:layout_height="wrap_content"
                 android:id="@+id/tv_admin_indicator"
-                android:text="ADMIN MODE"
+                android:text="🛡️ ADMIN MODE 🛡️"
                 android:textColor="#FF0000"
+                android:textSize="18sp"
+                android:textStyle="bold"
+                android:gravity="center"
+                android:background="#FFF0F0"
+                android:padding="12dp"
+                android:visibility="gone"
+                android:layout_marginBottom="16dp"/>
+
+            <Button
+                android:layout_width="match_parent"
+                android:layout_height="wrap_content"
+                android:id="@+id/btn_admin_access"
+                android:text="⚙️ Admin Panel Access"
+                android:backgroundTint="#FF6B35"
+                android:textColor="#FFFFFF"
                 android:textStyle="bold"
                 android:visibility="gone"
-                android:layout_gravity="center_horizontal"
-                android:layout_marginTop="8dp"/>
+                android:layout_marginBottom="16dp"/>
 
         </LinearLayout>
     </ScrollView>
