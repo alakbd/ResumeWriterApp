@@ -100,11 +100,20 @@ class MainActivity : AppCompatActivity() {
         setupClickListeners()
         initializeBilling()
         loadUserData()
+        updateWelcomeMessage() // NEW: Add welcome message
         updateAdminIndicator()
         checkEmailVerification()
         
         // NEW: Auto-resync if needed
         userManager.autoResyncIfNeeded()
+    }
+
+    // NEW: Method to update welcome message with user's email
+    private fun updateWelcomeMessage() {
+        val user = userManager.getCurrentFirebaseUser()
+        val email = user?.email ?: "Unknown User"
+        binding.tvWelcomeMessage.text = "Welcome $email"
+        Log.d("MainActivity", "Welcome message updated for: $email")
     }
 
     private fun setupClickListeners() {
@@ -157,10 +166,12 @@ class MainActivity : AppCompatActivity() {
                     
                     if (userSuccess && creditSuccess) {
                         updateCreditDisplay()
+                        updateWelcomeMessage() // NEW: Update welcome message on refresh
                         showMessage("Data refreshed successfully!")
                         Log.d("MainActivity", "Force sync completed successfully")
                     } else {
                         updateCreditDisplay()
+                        updateWelcomeMessage() // NEW: Update welcome message on refresh
                         showMessage("Partial sync. Using available data.")
                         Log.w("MainActivity", "Force sync partially failed - User: $userSuccess, Credits: $creditSuccess")
                     }
@@ -309,9 +320,11 @@ class MainActivity : AppCompatActivity() {
 
             if (credits >= 0) {
                 updateCreditDisplay()
+                updateWelcomeMessage() // NEW: Update welcome message when data loads
                 showMessage("Data loaded successfully")
             } else {
                 updateCreditDisplay()
+                updateWelcomeMessage() // NEW: Update welcome message when data loads
                 showMessage("Using cached data")
             }
         }
@@ -414,6 +427,9 @@ class MainActivity : AppCompatActivity() {
         val isAdmin = creditManager.isAdminMode()
         binding.tvAdminIndicator.visibility = if (isAdmin) android.view.View.VISIBLE else android.view.View.GONE
         binding.btnAdminAccess.visibility = if (isAdmin) android.view.View.VISIBLE else android.view.View.GONE
+        
+        // Debug log to verify admin status
+        Log.d("MainActivity", "Admin Mode: $isAdmin, Admin Indicator Visible: ${if (isAdmin) "YES" else "NO"}")
     }
 
     private fun showMessage(message: String) {
@@ -438,6 +454,7 @@ class MainActivity : AppCompatActivity() {
             // Refresh credit display when returning from other activities
             creditManager.syncWithFirebase { success, _ ->
                 updateCreditDisplay()
+                updateWelcomeMessage() // NEW: Update welcome message on resume
                 updateAdminIndicator()
                 
                 // NEW: Reset resume cooldown when returning from WebView
