@@ -41,14 +41,7 @@
                 android:text="Available CV Credits: 0"
                 android:layout_marginBottom="16dp"/>
 
-            <!-- Credit Stats -->
-            <TextView
-                android:layout_width="match_parent"
-                android:layout_height="wrap_content"
-                android:id="@+id/tv_credit_stats"
-                style="@style/SubTitleText"
-                android:text="Used: 0 | Total Earned: 0"
-                android:layout_marginBottom="32dp"/>
+           
 
             <!-- Generate CV Button -->
             <Button
