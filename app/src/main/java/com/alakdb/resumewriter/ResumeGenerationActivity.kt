@@ -376,28 +376,34 @@ private fun setupScrollableResumeArea() {
     val hasText = binding.etResumeText.text.toString().isNotEmpty() && 
                   binding.etJobDescription.text.toString().isNotEmpty()
     val isLoggedIn = userManager.isUserLoggedIn()
+    val isEmailVerified = isEmailVerified() // ✅ Add this check
 
-    val shouldEnable = (hasFiles || hasText) && isLoggedIn
+    val shouldEnable = (hasFiles || hasText) && isLoggedIn && isEmailVerified // ✅ Include email verification
     
-    Log.d("ButtonState", "Files: $hasFiles, Text: $hasText, LoggedIn: $isLoggedIn, ShouldEnable: $shouldEnable")
+    Log.d("ButtonState", "Files: $hasFiles, Text: $hasText, LoggedIn: $isLoggedIn, EmailVerified: $isEmailVerified, ShouldEnable: $shouldEnable")
     
     binding.btnGenerateResume.isEnabled = shouldEnable
     
     binding.btnGenerateResume.text = when {
         !isLoggedIn -> "Please Log In"
+        !isEmailVerified -> "Verify Email First" // ✅ New state
         hasFiles -> "Generate Resume from Files (1 Credit)"
         hasText -> "Generate Resume from Text (1 Credit)"
         else -> "Generate Resume"
     }
-    
-    // Log the current state for debugging
-    Log.d("ButtonState", "Button enabled: ${binding.btnGenerateResume.isEnabled}")
 }
 
     /** ---------------- Resume Generation ---------------- **/
     private fun generateResumeFromFiles() {
         val resumeUri = selectedResumeUri ?: return showToast("Please select resume file", true)
         val jobDescUri = selectedJobDescUri ?: return showToast("Please select job description file", true)
+
+        // ✅ ADD EMAIL VERIFICATION CHECK HERE
+        if (!isEmailVerified()) {
+            showToast("Please verify your email before generating resumes", true)
+            showEmailVerificationDialog()
+            return
+        }
 
         disableGenerateButton("Processing...")
 
@@ -459,6 +465,13 @@ private fun setupScrollableResumeArea() {
     private fun generateResumeFromText() {
         val resumeText = binding.etResumeText.text.toString().trim()
         val jobDesc = binding.etJobDescription.text.toString().trim()
+
+        // ✅ ADD EMAIL VERIFICATION CHECK HERE
+        if (!isEmailVerified()) {
+            showToast("Please verify your email before generating resumes", true)
+            showEmailVerificationDialog()
+            return
+        }
 
         if (resumeText.isEmpty() || jobDesc.isEmpty()) {
             showToast("Please enter both resume text and job description", true)
@@ -927,6 +940,51 @@ private fun setupScrollableResumeArea() {
         }
     }
 
+    /** ---------------- Email Verification Enforcement ---------------- **/
+private fun isEmailVerified(): Boolean {
+    val user = auth.currentUser
+    return user != null && user.isEmailVerified
+}
+
+private fun showEmailVerificationDialog() {
+    val user = auth.currentUser
+    val builder = AlertDialog.Builder(this)
+        .setTitle("Email Verification Required")
+        .setMessage("You must verify your email address (${user?.email ?: "your email"}) before generating resumes. Please check your inbox for the verification link.")
+        .setPositiveButton("Resend Verification") { _, _ ->
+            resendEmailVerification()
+        }
+        .setNegativeButton("Check Email") { _, _ ->
+            openEmailApp()
+        }
+        .setNeutralButton("Cancel", null)
+
+    builder.show()
+}
+
+private fun resendEmailVerification() {
+    val user = auth.currentUser
+    user?.sendEmailVerification()?.addOnCompleteListener { task ->
+        if (task.isSuccessful) {
+            showToast("Verification email sent to ${user.email}", false)
+        } else {
+            showToast("Failed to send verification email", true)
+        }
+    }
+}
+
+private fun openEmailApp() {
+    val intent = Intent(Intent.ACTION_MAIN)
+    intent.addCategory(Intent.CATEGORY_APP_EMAIL)
+    intent.addFlags(Intent.FLAG_ACTIVITY_NEW_TASK)
+    try {
+        startActivity(intent)
+    } catch (e: Exception) {
+        showToast("No email app found", true)
+    }
+}
+
+    
     private fun testBasicApiCall() {
         lifecycleScope.launch {
             try {
