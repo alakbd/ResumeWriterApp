@@ -132,19 +132,7 @@ class MainActivity : AppCompatActivity() {
         }
 
         binding.btnGenerateSampleResume.setOnClickListener {
-            val combinedHtml = """
-                <html>
-                <head><style>body { font-family: Arial, sans-serif; margin: 20px; } h2 { color: #2c3e50; } hr { margin: 20px 0; }</style></head>
-                <body>
-                <h2>Sample CV</h2>
-                $SAMPLE_CV_HTML
-                <hr>
-                <h2>Sample Job Description</h2>
-                $SAMPLE_JOB_HTML
-                </body>
-                </html>
-            """.trimIndent()
-            showHtmlDialog("Sample Resume & Job Description", combinedHtml)
+            showHtmlDialog("Sample Generated Resume", GENERATED_SAMPLE_RESUME_HTML)
         }
 
         // Admin Access
@@ -266,6 +254,15 @@ class MainActivity : AppCompatActivity() {
                         b { color: #2c3e50; }
                         ul { padding-left: 20px; }
                         li { margin-bottom: 5px; }
+                        .header { text-align: center; margin-bottom: 20px; }
+                        .section { margin-bottom: 15px; }
+                        .section-title { 
+                            background-color: #f8f9fa; 
+                            padding: 8px 12px; 
+                            font-weight: bold; 
+                            border-left: 4px solid #3498db;
+                            margin-bottom: 10px;
+                        }
                     </style>
                 </head>
                 <body>
@@ -577,6 +574,53 @@ class MainActivity : AppCompatActivity() {
                 <li>Previous experience in a tech lead or mentoring role</li>
                 <li>Bachelor's degree in Computer Science or related field</li>
             </ul>
+        """
+
+        private const val GENERATED_SAMPLE_RESUME_HTML = """
+            <div class="header">
+                <h1>John Doe</h1>
+                <p>Email: john.doe@example.com | Phone: (555) 123-4567 | LinkedIn: linkedin.com/in/johndoe</p>
+            </div>
+
+            <div class="section">
+                <div class="section-title">PROFESSIONAL SUMMARY</div>
+                <p>Experienced Senior Full Stack Developer with 5+ years of expertise in JavaScript frameworks, Node.js, and cloud technologies. Proven track record in designing and delivering scalable web applications, optimizing performance, and leading development teams.</p>
+            </div>
+
+            <div class="section">
+                <div class="section-title">EXPERIENCE</div>
+                
+                <p><b>Senior Full Stack Developer, Tech Solutions Inc.</b> (2020-Present)</p>
+                <ul>
+                    <li>Designed and maintained scalable web applications using React.js and Node.js</li>
+                    <li>Led a team of 4 developers to successfully deliver a customer portal, boosting user engagement by 35%</li>
+                    <li>Implemented CI/CD pipelines, reducing deployment time by 40%</li>
+                    <li>Enhanced application performance by 25% through database query optimization</li>
+                </ul>
+
+                <p><b>Software Developer, Innovate Labs</b> (2018-2020)</p>
+                <ul>
+                    <li>Developed RESTful APIs with Python and Django framework</li>
+                    <li>Collaborated with UX designers to create intuitive user interfaces</li>
+                    <li>Achieved a 20% reduction in server costs through code optimization and caching strategies</li>
+                </ul>
+            </div>
+
+            <div class="section">
+                <div class="section-title">EDUCATION</div>
+                <p><b>Bachelor of Science in Computer Science</b><br>
+                University of Technology, Graduated 2018</p>
+            </div>
+
+            <div class="section">
+                <div class="section-title">SKILLS</div>
+                <ul>
+                    <li><b>Programming Languages:</b> JavaScript, Python, SQL</li>
+                    <li><b>Frameworks:</b> React, Node.js, Django</li>
+                    <li><b>Tools:</b> Git, AWS, MongoDB</li>
+                    <li><b>Certifications:</b> AWS Certified Developer, Scrum Master</li>
+                </ul>
+            </div>
         """
     }
 }
