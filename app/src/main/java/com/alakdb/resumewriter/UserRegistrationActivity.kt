@@ -9,6 +9,7 @@ import androidx.appcompat.app.AlertDialog
 import androidx.appcompat.app.AppCompatActivity
 import com.google.firebase.auth.FirebaseAuth
 import com.google.firebase.auth.FirebaseUser
+import com.google.firebase.firestore.FieldValue
 import com.google.firebase.firestore.ktx.firestore
 import com.google.firebase.ktx.Firebase
 import com.alakdb.resumewriter.databinding.ActivityUserRegistrationBinding
@@ -16,6 +17,7 @@ import com.alakdb.resumewriter.databinding.ActivityUserRegistrationBinding
 class UserRegistrationActivity : AppCompatActivity() {
     private lateinit var binding: ActivityUserRegistrationBinding
     private lateinit var userManager: UserManager
+    private val db = Firebase.firestore
 
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
@@ -91,15 +93,20 @@ class UserRegistrationActivity : AppCompatActivity() {
                 return@registerUser
             }
 
+            // ⭐⭐⭐ FIXED: Add verification tracking fields ⭐⭐⭐
             val userMap = hashMapOf(
                 "email" to email,
-                "availableCredits" to 3,   // ✅ give 3 free credits
+                "availableCredits" to 3,
                 "usedCredits" to 0,
-                "totalCreditsEarned" to 3, // ✅ track that 3 were earned
-                "createdAt" to System.currentTimeMillis()
+                "totalCreditsEarned" to 3,
+                "createdAt" to System.currentTimeMillis(),
+                // ⭐⭐⭐ ADD THESE 3 CRITICAL FIELDS ⭐⭐⭐
+                "emailVerified" to false, // Start as not verified
+                "verificationSentAt" to System.currentTimeMillis(), // Track when email was sent
+                "lastUpdated" to System.currentTimeMillis()
             )
 
-            Firebase.firestore.collection("users").document(user.uid)
+            db.collection("users").document(user.uid)
                 .set(userMap)
                 .addOnSuccessListener {
                     // Send verification email after successful Firestore save
@@ -118,13 +125,33 @@ class UserRegistrationActivity : AppCompatActivity() {
             .addOnCompleteListener { task ->
                 if (task.isSuccessful) {
                     Log.d("Registration", "Verification email sent to ${user.email}")
+                    
+                    // ⭐⭐⭐ FIXED: Update verification timestamp in Firestore ⭐⭐⭐
+                    updateVerificationSentTime(user.uid)
+                    
                     showVerificationDialog(user.email)
                 } else {
                     Log.e("Registration", "Failed to send verification email", task.exception)
-                    // Still proceed but show message
                     showMessage("Registration successful but verification email failed to send")
                     proceedToLoginActivity()
                 }
+            }
+    }
+
+    // ⭐⭐⭐ ADD THIS NEW METHOD ⭐⭐⭐
+    private fun updateVerificationSentTime(userId: String) {
+        val updateData = hashMapOf<String, Any>(
+            "verificationSentAt" to System.currentTimeMillis(),
+            "lastUpdated" to System.currentTimeMillis()
+        )
+
+        db.collection("users").document(userId)
+            .update(updateData)
+            .addOnSuccessListener {
+                Log.d("Registration", "Updated verification sent time for user $userId")
+            }
+            .addOnFailureListener { e ->
+                Log.e("Registration", "Failed to update verification sent time", e)
             }
     }
 
