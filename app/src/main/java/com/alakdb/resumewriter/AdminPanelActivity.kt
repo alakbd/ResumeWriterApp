@@ -82,9 +82,9 @@ private fun showTopCVGenerators() {
     showMessage("📊 Loading top CV generators...")
 
     db.collection("users")
-        .whereGreaterThan("cvGenerated", 0) // Only users who generated CVs
-        .orderBy("cvGenerated", com.google.firebase.firestore.Query.Direction.DESCENDING)
-        .limit(10) // Top 10
+        .whereGreaterThan("usedCredits", 0) // Use usedCredits as CV count
+        .orderBy("usedCredits", com.google.firebase.firestore.Query.Direction.DESCENDING)
+        .limit(10)
         .get()
         .addOnSuccessListener { documents ->
             if (documents.isEmpty) {
@@ -93,21 +93,23 @@ private fun showTopCVGenerators() {
             }
 
             val topUsers = StringBuilder()
-            topUsers.append("🏆 TOP 10 CV GENERATORS\n\n")
+            topUsers.append("🏆 TOP 10 CV GENERATORS\n")
+            topUsers.append("(Based on credits used)\n\n")
             
             var rank = 1
             for (doc in documents) {
                 val email = doc.getString("email") ?: "Unknown"
-                val cvsGenerated = doc.getLong("cvGenerated") ?: 0
+                val cvsGenerated = doc.getLong("usedCredits") ?: 0 // Use usedCredits
                 val isVerified = doc.getBoolean("emailVerified") ?: false
                 val isBlocked = doc.getBoolean("isBlocked") ?: false
+                val availableCredits = doc.getLong("availableCredits") ?: 0
                 
                 topUsers.append("$rank. $email\n")
                 topUsers.append("   📊 CVs: $cvsGenerated | ")
-                topUsers.append("${if (isVerified) "✅" else "❌"} | ")
-                topUsers.append("${if (isBlocked) "🚫" else "✅"}\n")
+                topUsers.append("💰 Available: $availableCredits | ")
+                topUsers.append("${if (isVerified) "✅" else "❌"}\n")
                 
-                if (rank == 1 && cvsGenerated > 5) {
+                if (rank == 1) {
                     topUsers.append("   👑 TOP PERFORMER!\n")
                 }
                 
@@ -115,13 +117,10 @@ private fun showTopCVGenerators() {
                 rank++
             }
 
-            topUsers.append("Total users with CVs: ${documents.size()}")
-
             AlertDialog.Builder(this)
                 .setTitle("Top CV Generators")
                 .setMessage(topUsers.toString())
                 .setPositiveButton("OK", null)
-                .setNeutralButton("Refresh") { _, _ -> showTopCVGenerators() }
                 .show()
         }
         .addOnFailureListener { e ->
@@ -139,6 +138,7 @@ private fun showTopCVGenerators() {
         binding.btnAdminLogout.setOnClickListener { logoutAdmin() }
         binding.btnBlockUser.setOnClickListener { toggleUserBlockStatus() }
         binding.btnCheckMultiAccounts.setOnClickListener { checkForMultiAccounts() }
+        binding.btnTopCVGenerators.setOnClickListener { showTopCVGenerators() }
         binding.btnRefreshVerification.setOnClickListener { refreshVerificationStatus() }
 
         binding.btnRefreshUsers.setOnClickListener {
