@@ -169,6 +169,13 @@
             android:textColor="@android:color/white"
             android:layout_margin="4dp" />
 
+        <Button
+            android:id="@+id/btnRefreshVerification"
+            android:layout_width="match_parent"
+            android:layout_height="wrap_content"
+            android:text="Refresh Verification Status"
+            android:layout_margin="4dp" />
+
         <!-- User Stats Button -->
         <Button
             android:id="@+id/btn_admin_stats"
