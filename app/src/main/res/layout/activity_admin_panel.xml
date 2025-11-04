@@ -176,6 +176,16 @@
             android:text="Refresh Verification Status"
             android:layout_margin="4dp" />
 
+        <!-- Top_Ten User buttons -->
+        <Button
+            android:id="@+id/btnTopCVGenerators"
+            android:layout_width="match_parent"
+            android:layout_height="wrap_content"
+            android:text="🏆 Top CV Generators"
+            android:background="@android:color/holo_purple"
+            android:textColor="@android:color/white"
+            android:layout_margin="4dp" />
+
         <!-- User Stats Button -->
         <Button
             android:id="@+id/btn_admin_stats"
