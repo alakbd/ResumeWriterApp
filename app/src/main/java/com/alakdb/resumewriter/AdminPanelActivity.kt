@@ -47,6 +47,36 @@ class AdminPanelActivity : AppCompatActivity() {
         loadAdminStats()
     }
 
+    // ⭐⭐⭐ ADD THIS METHOD TO AdminPanelActivity ⭐⭐⭐
+private fun refreshVerificationStatus() {
+    if (selectedUserId.isEmpty()) {
+        showMessage("Please select a user first")
+        return
+    }
+
+    showMessage("🔄 Checking verification status...")
+    
+    val user = FirebaseAuth.getInstance().currentUser
+    user?.reload()?.addOnCompleteListener { task ->
+        if (task.isSuccessful) {
+            val isVerified = user.isEmailVerified
+            
+            // Update Firestore
+            db.collection("users").document(selectedUserId)
+                .update("emailVerified", isVerified, "lastUpdated", System.currentTimeMillis())
+                .addOnSuccessListener {
+                    showMessage("✅ Verification status updated: ${if (isVerified) "Verified" else "Not Verified"}")
+                    loadUserDataById(selectedUserId) // Refresh display
+                }
+                .addOnFailureListener { e ->
+                    showMessage("❌ Failed to update verification status")
+                }
+        } else {
+            showMessage("❌ Failed to check verification status")
+        }
+    }
+}
+
     private fun setupUI() {
         binding.btnAdminAdd3.setOnClickListener { modifyUserCredits(3, "add") }
         binding.btnAdminAdd5.setOnClickListener { modifyUserCredits(5, "add") }
@@ -57,6 +87,7 @@ class AdminPanelActivity : AppCompatActivity() {
         binding.btnAdminLogout.setOnClickListener { logoutAdmin() }
         binding.btnBlockUser.setOnClickListener { toggleUserBlockStatus() }
         binding.btnCheckMultiAccounts.setOnClickListener { checkForMultiAccounts() }
+        binding.btnRefreshVerification.setOnClickListener { refreshVerificationStatus() }
 
         binding.btnRefreshUsers.setOnClickListener {
             showMessage("Refreshing users from server...")
