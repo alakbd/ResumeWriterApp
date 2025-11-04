@@ -35,11 +35,12 @@ class UserManager(private val context: Context) {
     // STORAGE VALIDATION & DEBUG
     // -----------------------
     // Add this method to your existing UserManager class
-fun cacheCredits(credits: Int) {
-    val prefs = context.getSharedPreferences("user_prefs", Context.MODE_PRIVATE)
-    prefs.edit().putInt("cached_credits", credits).apply()
-    Log.d("UserManager", "Cached credits: $credits")
-}
+    fun cacheCredits(credits: Int) {
+        val prefs = context.getSharedPreferences("user_prefs", Context.MODE_PRIVATE)
+        prefs.edit().putInt("cached_credits", credits).apply()
+        Log.d("UserManager", "Cached credits: $credits")
+    }
+    
     /**
      * 🔍 Validate that user data is properly persisted
      */
@@ -128,7 +129,7 @@ fun cacheCredits(credits: Int) {
     fun forceSyncWithFirebase(onComplete: (Boolean) -> Unit) {
         Log.d("UserManager", "Forcing user data sync")
         prefs.edit().remove(LAST_SYNC_TIME_KEY).apply() // Clear cooldown
-        syncUserCredits { success, credits ->
+        syncUserCredits { success, _ ->
             onComplete(success)
         }
     }
@@ -142,7 +143,7 @@ fun cacheCredits(credits: Int) {
         
         if (needsSync && isUserLoggedIn()) {
             Log.d("UserManager", "Auto-resyncing user data")
-            syncUserCredits { success, credits ->
+            syncUserCredits { success, _ ->
                 if (success) {
                     Log.d("UserManager", "Auto-resync successful")
                 } else {
@@ -263,7 +264,7 @@ fun cacheCredits(credits: Int) {
                         } else {
                             saveUserDataLocally(user.email ?: "", user.uid)
                             // Sync credits after successful login
-                            syncUserCredits { success, credits ->
+                            syncUserCredits { success, _ ->
                                 Log.d("UserManager", "User logged in successfully: $email")
                                 onComplete(true, null)
                             }
@@ -318,7 +319,7 @@ fun cacheCredits(credits: Int) {
                     if (user != null) {
                         saveUserDataLocally(user.email ?: "", user.uid)
                         // Sync credits after successful login
-                        syncUserCredits { success, credits ->
+                        syncUserCredits { success, _ ->
                             Log.d("UserManager", "User logged in successfully: $email")
                             onComplete(true, null)
                         }
@@ -486,7 +487,7 @@ fun cacheCredits(credits: Int) {
                 // Emergency sync to local storage
                 try {
                     if (getCurrentUserId() != firebaseUid) {
-                        saveUserDataLocally(firebaseUser?.email ?: "", firebaseUid)
+                        saveUserDataLocally(firebaseUser.email ?: "", firebaseUid)
                     }
                 } catch (e: Exception) {
                     Log.w("UserManager", "⚠️ Local sync failed but we have Firebase UID")
