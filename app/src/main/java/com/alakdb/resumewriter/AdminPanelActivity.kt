@@ -426,73 +426,127 @@ class AdminPanelActivity : AppCompatActivity() {
     }
 
     private fun showUserStats() {
-        if (selectedUserId.isEmpty()) {
-            showMessage("Please select a user first")
-            return
-        }
-
-        // First get user basic info
-        db.collection("users").document(selectedUserId).get()
-            .addOnSuccessListener { doc ->
-                if (doc.exists()) {
-                    // Then get credit award history
-                    db.collection("creditAwards")
-                        .whereEqualTo("userId", selectedUserId)
-                        .orderBy("timestamp", com.google.firebase.firestore.Query.Direction.DESCENDING)
-                        .limit(10) // Show last 10 awards
-                        .get()
-                        .addOnSuccessListener { awardDocuments ->
-                            val blockedStatus = if (doc.getBoolean("isBlocked") == true) "Yes" else "No"
-                            val emailVerified = if (doc.getBoolean("emailVerified") == true) "Yes" else "No"
-                            
-                            // Build credit history string
-                            val creditHistory = StringBuilder()
-                            if (awardDocuments.isEmpty) {
-                                creditHistory.append("No credit award history found")
-                            } else {
-                                creditHistory.append("Recent Credit Awards:\n")
-                                val dateFormat = java.text.SimpleDateFormat("MMM dd, yyyy HH:mm", java.util.Locale.getDefault())
-                                
-                                for (awardDoc in awardDocuments) {
-                                    val amount = awardDoc.getLong("amount") ?: 0
-                                    val reason = awardDoc.getString("reason") ?: "Unknown"
-                                    val timestamp = awardDoc.getLong("timestamp") ?: 0
-                                    val date = if (timestamp > 0) dateFormat.format(java.util.Date(timestamp)) else "Unknown date"
-                                    
-                                    creditHistory.append("• $date: $amount credits - $reason\n")
-                                }
-                            }
-                            
-                            val stats = """
-                                Email: ${doc.getString("email")}
-                                Email Verified: $emailVerified
-                                Available Credits: ${doc.getLong("availableCredits") ?: 0}
-                                Used Credits: ${doc.getLong("usedCredits") ?: 0}
-                                Total Credits: ${doc.getLong("totalCreditsEarned") ?: 0}
-                                Blocked: $blockedStatus
-                                Created: ${doc.getLong("createdAt")?.let { 
-                                    java.text.SimpleDateFormat("MMM dd, yyyy", java.util.Locale.getDefault()).format(it) } ?: "Unknown"}
-                                
-                                $creditHistory
-                            """.trimIndent()
-                            
-                            AlertDialog.Builder(this)
-                                .setTitle("User Statistics")
-                                .setMessage(stats)
-                                .setPositiveButton("OK", null)
-                                .show()
-                        }
-                        .addOnFailureListener { e ->
-                            showMessage("Failed to load credit history: ${e.message}")
-                        }
-                } else {
-                    showMessage("User document not found")
-                }
-            }
-            .addOnFailureListener { e ->
-                showMessage("Failed to load user stats: ${e.message}")
-            }
+    if (selectedUserId.isEmpty()) {
+        showMessage("Please select a user first")
+        return
     }
+
+    db.collection("users").document(selectedUserId).get()
+        .addOnSuccessListener { doc ->
+            if (!doc.exists()) {
+                showMessage("User document not found")
+                return@addOnSuccessListener
+            }
+
+            // Build basic user stats first
+            val blockedStatus = if (doc.getBoolean("isBlocked") == true) "Yes" else "No"
+            val emailVerified = if (doc.getBoolean("emailVerified") == true) "✅ Yes" else "❌ No"
+            val registrationIP = doc.getString("ipAddress") ?: "Not available"
+            val lastLoginIP = doc.getString("lastLoginIp") ?: "Not available"
+            val deviceId = doc.getString("deviceId") ?: "Not available"
+            
+            // Format dates safely
+            val createdAt = doc.getLong("createdAt") ?: 0
+            val lastUpdated = doc.getLong("lastUpdated") ?: 0
+            
+            val dateFormat = SimpleDateFormat("MMM dd, yyyy HH:mm", Locale.getDefault())
+            val createdDate = if (createdAt > 0) dateFormat.format(Date(createdAt)) else "Unknown"
+            val updatedDate = if (lastUpdated > 0) dateFormat.format(Date(lastUpdated)) else "Unknown"
+
+            // Build the basic stats message
+            val basicStats = """
+                👤 USER INFORMATION:
+                📧 Email: ${doc.getString("email") ?: "N/A"}
+                ✅ Email Verified: $emailVerified
+                🆔 User ID: ${selectedUserId.take(12)}...
+                
+                💰 CREDIT STATUS:
+                Available Credits: ${doc.getLong("availableCredits") ?: 0}
+                Used Credits: ${doc.getLong("usedCredits") ?: 0}
+                Total Credits Earned: ${doc.getLong("totalCreditsEarned") ?: 0}
+                CVs Generated: ${doc.getLong("cvGenerated") ?: 0}
+                
+                🌐 NETWORK INFORMATION:
+                Registration IP: $registrationIP
+                Last Login IP: $lastLoginIP
+                Device ID: ${deviceId.take(8)}...
+                
+                ⚠️ ACCOUNT STATUS:
+                Blocked: $blockedStatus
+                ${if (blockedStatus == "Yes") "Block Reason: ${doc.getString("blockReason") ?: "Not specified"}" else ""}
+                
+                📅 TIMESTAMPS:
+                Account Created: $createdDate
+                Last Updated: $updatedDate
+            """.trimIndent()
+
+            // Now try to load credit awards (but don't fail if it doesn't exist)
+            loadCreditAwards(basicStats)
+        }
+        .addOnFailureListener { e ->
+            showMessage("Failed to load user stats: ${e.message}")
+        }
+}
+
+private fun loadCreditAwards(basicStats: String) {
+    db.collection("creditAwards")
+        .whereEqualTo("userId", selectedUserId)
+        .orderBy("timestamp", com.google.firebase.firestore.Query.Direction.DESCENDING)
+        .limit(5) // Show only last 5 awards
+        .get()
+        .addOnSuccessListener { awardDocuments ->
+            val creditHistory = buildCreditHistoryString(awardDocuments)
+            showStatsDialog(basicStats, creditHistory)
+        }
+        .addOnFailureListener { e ->
+            // If credit awards fail, just show basic stats
+            Log.e("AdminPanel", "Failed to load credit awards: ${e.message}")
+            showStatsDialog(basicStats, "No credit award history available")
+        }
+}
+
+private fun buildCreditHistoryString(awardDocuments: com.google.firebase.firestore.QuerySnapshot): String {
+    if (awardDocuments.isEmpty) {
+        return "No credit award history found"
+    }
+
+    val history = StringBuilder("Recent Credit Awards:\n\n")
+    val dateFormat = SimpleDateFormat("MMM dd, yyyy HH:mm", Locale.getDefault())
+    
+    for (doc in awardDocuments) {
+        try {
+            val amount = doc.getLong("amount") ?: 0
+            val reason = doc.getString("reason") ?: "Unknown reason"
+            val timestamp = doc.getLong("timestamp") ?: 0
+            val date = if (timestamp > 0) dateFormat.format(Date(timestamp)) else "Unknown date"
+            
+            history.append("💰 $amount credits\n")
+            history.append("📝 $reason\n")
+            history.append("📅 $date\n")
+            history.append("${"-".repeat(30)}\n")
+        } catch (e: Exception) {
+            Log.e("AdminPanel", "Error parsing award document: ${e.message}")
+        }
+    }
+    
+    return history.toString()
+}
+
+private fun showStatsDialog(basicStats: String, creditHistory: String) {
+    val fullStats = """
+        $basicStats
+        
+        📊 CREDIT HISTORY:
+        $creditHistory
+    """.trimIndent()
+
+    AlertDialog.Builder(this)
+        .setTitle("User Statistics - $selectedUserEmail")
+        .setMessage(fullStats)
+        .setPositiveButton("OK", null)
+        .setNeutralButton("Refresh") { _, _ -> showUserStats() }
+        .show()
+}
 
     private fun logoutAdmin() {
         creditManager.setAdminMode(false)
