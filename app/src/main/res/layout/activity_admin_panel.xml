@@ -110,28 +110,47 @@
             android:textStyle="bold"
             android:layout_marginBottom="8dp" />
 
-        <!-- Add Credits Buttons -->
-        <Button
-            android:id="@+id/btn_admin_add_10"
+        <!-- New Credit Buttons in Horizontal Layout -->
+        <LinearLayout
             android:layout_width="match_parent"
             android:layout_height="wrap_content"
-            android:text="Add 10 Credits"
-            android:layout_marginBottom="8dp" />
+            android:orientation="horizontal"
+            android:layout_marginBottom="8dp">
 
-        <Button
-            android:id="@+id/btn_admin_add_50"
-            android:layout_width="match_parent"
-            android:layout_height="wrap_content"
-            android:text="Add 50 Credits"
-            android:layout_marginBottom="8dp" />
+            <Button
+                android:id="@+id/btn_admin_add_3"
+                android:layout_width="0dp"
+                android:layout_height="wrap_content"
+                android:layout_weight="1"
+                android:layout_marginEnd="4dp"
+                android:text="+3" />
 
-        <!-- Set Credits Button -->
-        <Button
-            android:id="@+id/btn_admin_set_100"
-            android:layout_width="match_parent"
-            android:layout_height="wrap_content"
-            android:text="Set Credits to 100"
-            android:layout_marginBottom="8dp" />
+            <Button
+                android:id="@+id/btn_admin_add_5"
+                android:layout_width="0dp"
+                android:layout_height="wrap_content"
+                android:layout_weight="1"
+                android:layout_marginStart="4dp"
+                android:layout_marginEnd="4dp"
+                android:text="+5" />
+
+            <Button
+                android:id="@+id/btn_admin_add_8"
+                android:layout_width="0dp"
+                android:layout_height="wrap_content"
+                android:layout_weight="1"
+                android:layout_marginStart="4dp"
+                android:layout_marginEnd="4dp"
+                android:text="+8" />
+
+            <Button
+                android:id="@+id/btn_admin_add_20"
+                android:layout_width="0dp"
+                android:layout_height="wrap_content"
+                android:layout_weight="1"
+                android:layout_marginStart="4dp"
+                android:text="+20" />
+        </LinearLayout>
 
         <!-- Reset Credits Button -->
         <Button
@@ -139,14 +158,6 @@
             android:layout_width="match_parent"
             android:layout_height="wrap_content"
             android:text="Reset Credits to 0"
-            android:layout_marginBottom="8dp" />
-
-        <!-- Generate CV Button -->
-        <Button
-            android:id="@+id/btn_admin_generate_free"
-            android:layout_width="match_parent"
-            android:layout_height="wrap_content"
-            android:text="Generate Free CV"
             android:layout_marginBottom="8dp" />
 
         <!-- User Stats Button -->
@@ -181,7 +192,7 @@
             android:id="@+id/tv_credit_stats"
             android:layout_width="match_parent"
             android:layout_height="wrap_content"
-            android:text="Credits: Loading..."
+            android:text="CV Stats: Loading..."
             android:textSize="14sp"
             android:layout_marginBottom="8dp"
             android:padding="8dp"
@@ -191,11 +202,19 @@
             android:id="@+id/tv_cv_stats"
             android:layout_width="match_parent"
             android:layout_height="wrap_content"
-            android:text="CVs Generated: Loading..."
+            android:text="Total CVs: Loading..."
             android:textSize="14sp"
             android:layout_marginBottom="24dp"
             android:padding="8dp"
             android:background="#f3e5f5" />
+
+        <!-- Refresh Users Button -->
+        <Button
+            android:id="@+id/btn_refresh_users"
+            android:layout_width="match_parent"
+            android:layout_height="wrap_content"
+            android:text="Refresh Users"
+            android:layout_marginBottom="16dp" />
 
         <!-- Logout Button -->
         <Button
@@ -205,13 +224,6 @@
             android:text="Logout Admin"
             android:backgroundTint="#FF0000"
             android:textColor="#FFFFFF" />
-
-        <Button
-            android:id="@+id/btn_refresh_users"
-            android:layout_width="wrap_content"
-            android:layout_height="wrap_content"
-            android:text="Refresh Users"
-            android:layout_margin="8dp" />
 
     </LinearLayout>
 </ScrollView>
