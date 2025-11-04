@@ -59,6 +59,7 @@ class ResumeGenerationActivity : AppCompatActivity() {
     private lateinit var binding: ActivityResumeGenerationBinding
     private lateinit var apiService: ApiService
     private lateinit var userManager: UserManager
+    
     // REMOVED: private lateinit var auth: FirebaseAuth
     // REMOVED: private lateinit var creditManager: CreditManager
 
@@ -68,6 +69,8 @@ class ResumeGenerationActivity : AppCompatActivity() {
 
     private lateinit var resumePicker: ActivityResultLauncher<String>
     private lateinit var jobDescPicker: ActivityResultLauncher<String>
+    private lateinit var spinnerTone: Spinner
+    private var selectedTone: String = "Professional"
     private var lastToastTime: Long = 0
     private val TOAST_COOLDOWN_MS = 3000L
 
@@ -150,6 +153,7 @@ class ResumeGenerationActivity : AppCompatActivity() {
 
         registerFilePickers()
         setupUI()
+        setupToneSpinner()
         checkEmailVerification()
         checkGenerateButtonState()
         
@@ -354,6 +358,34 @@ class ResumeGenerationActivity : AppCompatActivity() {
     }
 }
 
+    private fun setupToneSpinner() {
+    spinnerTone = binding.spinnerTone
+    
+    // Create adapter with tone options
+    val adapter = ArrayAdapter.createFromResource(
+        this,
+        R.array.tone_options,
+        android.R.layout.simple_spinner_item
+    )
+    adapter.setDropDownViewResource(android.R.layout.simple_spinner_dropdown_item)
+    spinnerTone.adapter = adapter
+    
+    // Set default selection
+    spinnerTone.setSelection(0) // Professional
+    
+    // Listen for tone selection changes
+    spinnerTone.onItemSelectedListener = object : AdapterView.OnItemSelectedListener {
+        override fun onItemSelected(parent: AdapterView<*>?, view: View?, position: Int, id: Long) {
+            selectedTone = parent?.getItemAtPosition(position).toString()
+            Log.d("ToneSelection", "Selected tone: $selectedTone")
+        }
+
+        override fun onNothingSelected(parent: AdapterView<*>?) {
+            selectedTone = "Professional"
+        }
+    }
+}
+
     /** ---------------- Simple Scroll Setup ---------------- **/
 private fun setupScrollableResumeArea() {
     binding.tvGeneratedResume.apply {
@@ -431,7 +463,7 @@ private fun setupScrollableResumeArea() {
 
                         Log.d("ResumeActivity", "Generating resume from files")
                         val genResult = safeApiCallWithResult<ApiService.GenerateResumeResponse>("generateResumeFromFiles") { 
-                            apiService.generateResumeFromFiles(resumeUri, jobDescUri) 
+                            apiService.generateResumeFromFiles(resumeUri, jobDescUri, selectedTone) 
                         }
 
                         handleGenerationResult(genResult)
@@ -503,8 +535,8 @@ private fun setupScrollableResumeArea() {
 
                         Log.d("ResumeActivity", "Generating resume from text input")
                         val genResult = safeApiCallWithResult<ApiService.GenerateResumeResponse>("generateResumeFromText") { 
-                            apiService.generateResumeFromText(resumeText, jobDesc) 
-                        }
+                            apiService.generateResumeFromText(resumeText, jobDesc, selectedTone) 
+                         }
 
                         handleGenerationResult(genResult)
                     }
