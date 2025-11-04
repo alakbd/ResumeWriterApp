@@ -56,6 +56,7 @@ class AdminPanelActivity : AppCompatActivity() {
         binding.btnAdminStats.setOnClickListener { showUserStats() }
         binding.btnAdminLogout.setOnClickListener { logoutAdmin() }
         binding.btnBlockUser.setOnClickListener { toggleUserBlockStatus() }
+        binding.btnCheckMultiAccounts.setOnClickListener { checkForMultiAccounts() }
 
         binding.btnRefreshUsers.setOnClickListener {
             showMessage("Refreshing users from server...")
@@ -513,5 +514,87 @@ class AdminPanelActivity : AppCompatActivity() {
     private fun showMessage(message: String) {
         Toast.makeText(this, message, Toast.LENGTH_SHORT).show()
         Log.d("AdminPanel", message)
+    }
+    private fun checkForMultiAccounts() {
+    if (selectedUserId.isEmpty()) {
+        showMessage("Please select a user first")
+        return
+    }
+
+    showMessage("🔍 Checking for related accounts...")
+
+    // Get the selected user's IP address
+    db.collection("users").document(selectedUserId).get()
+        .addOnSuccessListener { doc ->
+            if (!doc.exists()) {
+                showMessage("User not found")
+                return@addOnSuccessListener
+            }
+
+            val userIP = doc.getString("ipAddress")
+            val userEmail = doc.getString("email") ?: "Unknown"
+            
+            if (userIP.isNullOrEmpty()) {
+                showMessage("No IP data available for this user")
+                return@addOnSuccessListener
+            }
+
+            // Find other accounts with same IP
+            db.collection("users")
+                .whereEqualTo("ipAddress", userIP)
+                .get()
+                .addOnSuccessListener { documents ->
+                    showAccountResults(documents, userIP, userEmail)
+                }
+                .addOnFailureListener { e ->
+                    showMessage("Failed to check related accounts: ${e.message}")
+                }
+        }
+        .addOnFailureListener { e ->
+            showMessage("Failed to load user data: ${e.message}")
+        }
+}
+
+private fun showAccountResults(documents: com.google.firebase.firestore.QuerySnapshot, ipAddress: String, currentUserEmail: String) {
+    val message = StringBuilder()
+    message.append("📊 Accounts from IP: $ipAddress\n\n")
+    
+    val dateFormat = SimpleDateFormat("MMM dd, yyyy", Locale.getDefault())
+    
+    var accountCount = 0
+    documents.forEach { doc ->
+        val email = doc.getString("email") ?: "Unknown"
+        val isVerified = doc.getBoolean("emailVerified") ?: false
+        val isBlocked = doc.getBoolean("isBlocked") ?: false
+        val createdAt = doc.getLong("createdAt") ?: 0
+        
+        accountCount++
+        
+        message.append("$accountCount. $email\n")
+        message.append("   ${if (isVerified) "✅ Verified" else "❌ Not Verified"} | ")
+        message.append("${if (isBlocked) "🚫 Blocked" else "✅ Active"}\n")
+        
+        if (email == currentUserEmail) {
+            message.append("   👈 Currently Selected\n")
+        }
+        message.append("   Created: ${dateFormat.format(Date(createdAt))}\n\n")
+    }
+
+    // Add summary
+    message.append("=== SUMMARY ===\n")
+    message.append("Total accounts found: $accountCount\n")
+    
+    when {
+        accountCount >= 4 -> message.append("🚨 High chance of multi-account abuse")
+        accountCount >= 3 -> message.append("⚠️  Suspicious - possible multi-accounts") 
+        accountCount == 2 -> message.append("ℹ️  Could be normal (family/shared WiFi)")
+        else -> message.append("✅ Normal single account")
+    }
+
+    AlertDialog.Builder(this)
+        .setTitle("Related Accounts Report")
+        .setMessage(message.toString())
+        .setPositiveButton("OK", null)
+        .show()
     }
 }
