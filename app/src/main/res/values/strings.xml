@@ -1,3 +1,10 @@
 <resources>
     <string name="app_name">Resume Boost</string>
-</resources>
+    
+    <string-array name="tone_options">
+        <item>Professional</item>
+        <item>Concise</item>
+        <item>Achievement-Oriented</item>
+        <item>Leadership-Focused</item>
+    </string-array>
+</resources
