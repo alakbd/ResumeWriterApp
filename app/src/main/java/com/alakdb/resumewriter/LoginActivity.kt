@@ -245,6 +245,9 @@ class LoginActivity : AppCompatActivity() {
         
         // NEW: Use the enhanced synchronization flow
         synchronizeAndProceed()
+
+     // ⭐⭐⭐ ADD THIS: Check and update verification status ⭐⭐⭐
+        checkAndUpdateEmailVerification(userId)
     }
 
     // NEW: Enhanced synchronization method
