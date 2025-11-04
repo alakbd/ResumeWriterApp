@@ -96,16 +96,21 @@ class LoginActivity : AppCompatActivity() {
         }
     }
 
-    // ⭐⭐⭐ ADD THIS METHOD TO LoginActivity ⭐⭐⭐
-private fun checkAndUpdateEmailVerification(userId: String) {
+// ⭐⭐⭐ ADD THIS METHOD TO LoginActivity ⭐⭐⭐
+private fun checkAndUpdateEmailVerification() {
     val user = FirebaseAuth.getInstance().currentUser
-    user?.reload()?.addOnCompleteListener { task ->
+    val userId = user?.uid ?: return
+    
+    user.reload().addOnCompleteListener { task ->
         if (task.isSuccessful) {
             val isVerified = user.isEmailVerified
             
             // Update Firestore with current verification status
             Firebase.firestore.collection("users").document(userId)
-                .update("emailVerified", isVerified, "lastUpdated", System.currentTimeMillis())
+                .update(
+                    "emailVerified", isVerified, 
+                    "lastUpdated", System.currentTimeMillis()
+                )
                 .addOnSuccessListener {
                     Log.d("Login", "Updated verification status: $isVerified for user $userId")
                     
@@ -127,7 +132,7 @@ private fun awardVerificationBonus(userId: String) {
         .update(
             "availableCredits", FieldValue.increment(2), // +2 bonus credits
             "totalCreditsEarned", FieldValue.increment(2),
-            "lastUpdated" to System.currentTimeMillis()
+            "lastUpdated", System.currentTimeMillis()
         )
         .addOnSuccessListener {
             Log.d("Login", "Awarded 2 bonus credits for email verification")
@@ -290,11 +295,12 @@ private fun awardVerificationBonus(userId: String) {
         
         showMessage("Login successful! Syncing data...")
         
+         // ⭐⭐⭐ ADD THIS: Check and update verification status ⭐⭐⭐
+        checkAndUpdateEmailVerification()
+        
         // NEW: Use the enhanced synchronization flow
         synchronizeAndProceed()
 
-     // ⭐⭐⭐ ADD THIS: Check and update verification status ⭐⭐⭐
-        checkAndUpdateEmailVerification(userId)
     }
 
     // NEW: Enhanced synchronization method
