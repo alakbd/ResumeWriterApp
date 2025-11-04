@@ -160,6 +160,15 @@
             android:text="Reset Credits to 0"
             android:layout_marginBottom="8dp" />
 
+        <Button
+            android:id="@+id/btnCheckMultiAccounts"
+            android:layout_width="match_parent"
+            android:layout_height="wrap_content"
+            android:text="Check Related Accounts"
+            android:background="@color/colorPrimary"
+            android:textColor="@android:color/white"
+            android:layout_margin="4dp" />
+
         <!-- User Stats Button -->
         <Button
             android:id="@+id/btn_admin_stats"
