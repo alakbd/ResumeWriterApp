@@ -45,11 +45,10 @@ class AdminPanelActivity : AppCompatActivity() {
     }
 
     private fun setupUI() {
-        binding.btnAdminAdd10.setOnClickListener { modifyUserCredits(10, "add") }
-        binding.btnAdminAdd50.setOnClickListener { modifyUserCredits(50, "add") }
-        binding.btnAdminSet100.setOnClickListener { modifyUserCredits(100, "set") }
-        binding.btnAdminReset.setOnClickListener { modifyUserCredits(0, "reset") }
-        binding.btnAdminGenerateFree.setOnClickListener { generateFreeCV() }
+        binding.btnAdminAdd3.setOnClickListener { modifyUserCredits(3, "add") }
+        binding.btnAdminAdd5.setOnClickListener { modifyUserCredits(5, "add") }
+        binding.btnAdminAdd8.setOnClickListener { modifyUserCredits(8, "add") }
+        binding.btnAdminAdd20.setOnClickListener { modifyUserCredits(20, "add") }
         binding.btnAdminStats.setOnClickListener { showUserStats() }
         binding.btnAdminLogout.setOnClickListener { logoutAdmin() }
         binding.btnBlockUser.setOnClickListener { toggleUserBlockStatus() }
@@ -133,24 +132,42 @@ class AdminPanelActivity : AppCompatActivity() {
 
     private fun loadAdminStats() {
         binding.tvUserStats.text = "Users: Loading..."
-        binding.tvCreditStats.text = "Credits: Loading..."
-        binding.tvCvStats.text = "CVs Generated: Loading..."
+        binding.tvCreditStats.text = "CV Stats: Loading..."
+        binding.tvCvStats.text = "Total CVs: Loading..."
 
         db.collection("users").get()
             .addOnSuccessListener { documents ->
                 val totalUsers = documents.size()
-                var totalCredits = 0L
                 var totalCVs = 0L
                 var blockedUsers = 0L
+                var activeUsers = 0L
+                
+                // For daily and monthly CV counts
+                var todayCVs = 0L
+                var monthlyCVs = 0L
+                
                 val dailyCount = mutableMapOf<String, Int>()
                 val monthlyCount = mutableMapOf<String, Int>()
+                val cvDailyCount = mutableMapOf<String, Int>()
+                val cvMonthlyCount = mutableMapOf<String, Int>()
+                
                 val dayFormat = java.text.SimpleDateFormat("yyyy-MM-dd", java.util.Locale.getDefault())
                 val monthFormat = java.text.SimpleDateFormat("yyyy-MM", java.util.Locale.getDefault())
+                val today = dayFormat.format(java.util.Date())
+                val thisMonth = monthFormat.format(java.util.Date())
 
                 for (doc in documents) {
-                    totalCredits += doc.getLong("totalCreditsEarned") ?: 0
                     totalCVs += doc.getLong("usedCredits") ?: 0
-                    if (doc.getBoolean("isBlocked") == true) blockedUsers++
+                    
+                    // Check if user is blocked
+                    val isBlocked = doc.getBoolean("isBlocked") == true
+                    if (isBlocked) {
+                        blockedUsers++
+                    } else {
+                        activeUsers++
+                    }
+                    
+                    // User registration date tracking
                     val createdAt = doc.getLong("createdAt")
                     if (createdAt != null) {
                         try {
@@ -161,26 +178,52 @@ class AdminPanelActivity : AppCompatActivity() {
                             Log.e("AdminPanel", "Error parsing date for user ${doc.id}", e)
                         }
                     }
+                    
+                    // CV generation date tracking
+                    val lastUpdated = doc.getLong("lastUpdated")
+                    if (lastUpdated != null) {
+                        try {
+                            val date = java.util.Date(lastUpdated)
+                            val dateDay = dayFormat.format(date)
+                            val dateMonth = monthFormat.format(date)
+                            
+                            cvDailyCount[dateDay] = cvDailyCount.getOrDefault(dateDay, 0) + 1
+                            cvMonthlyCount[dateMonth] = cvMonthlyCount.getOrDefault(dateMonth, 0) + 1
+                            
+                            // Count today's and this month's CVs
+                            if (dateDay == today) {
+                                todayCVs++
+                            }
+                            if (dateMonth == thisMonth) {
+                                monthlyCVs++
+                            }
+                        } catch (e: Exception) {
+                            Log.e("AdminPanel", "Error parsing CV date for user ${doc.id}", e)
+                        }
+                    }
                 }
-
-                val today = dayFormat.format(java.util.Date())
-                val thisMonth = monthFormat.format(java.util.Date())
 
                 binding.tvUserStats.text = """
                     Total Users: $totalUsers
+                    Active Users: $activeUsers
                     Blocked Users: $blockedUsers
                     Joined Today: ${dailyCount.getOrDefault(today, 0)}
                     Joined This Month: ${monthlyCount.getOrDefault(thisMonth, 0)}
                 """.trimIndent()
-                binding.tvCreditStats.text = "Total Credits Earned: $totalCredits"
+                
+                binding.tvCreditStats.text = """
+                    CVs Generated Today: $todayCVs
+                    CVs Generated This Month: $monthlyCVs
+                """.trimIndent()
+                
                 binding.tvCvStats.text = "Total CVs Generated: $totalCVs"
             }
             .addOnFailureListener { e ->
                 Log.e("AdminPanel", "Failed to load admin stats: ${e.message}", e)
                 showMessage("Failed to load admin stats: ${e.message}")
                 binding.tvUserStats.text = "Users: Error loading"
-                binding.tvCreditStats.text = "Credits: Error loading"
-                binding.tvCvStats.text = "CVs Generated: Error loading"
+                binding.tvCreditStats.text = "CV Stats: Error loading"
+                binding.tvCvStats.text = "Total CVs: Error loading"
             }
     }
 
@@ -240,7 +283,6 @@ class AdminPanelActivity : AppCompatActivity() {
         binding.spUserSelector.adapter = adapter
     }
 
-
     private fun selectUser(userId: String, userEmail: String) {
         selectedUserId = userId
         selectedUserEmail = userEmail
@@ -254,7 +296,7 @@ class AdminPanelActivity : AppCompatActivity() {
         selectedUserEmail = ""
         isUserBlocked = false
         binding.etManualEmail.setText("")
-        updateUserDisplay(0, 0, 0)
+        updateUserDisplay(0, 0, 0, false)
         binding.tvUserEmail.text = "User: Not selected"
         updateBlockButtonUI(false)
     }
@@ -271,9 +313,10 @@ class AdminPanelActivity : AppCompatActivity() {
                 val used = doc.getLong("usedCredits")?.toInt() ?: 0
                 val total = doc.getLong("totalCreditsEarned")?.toInt() ?: 0
                 val blocked = doc.getBoolean("isBlocked") ?: false
+                val emailVerified = doc.getBoolean("emailVerified") ?: false
                 
                 isUserBlocked = blocked
-                updateUserDisplay(available, used, total)
+                updateUserDisplay(available, used, total, emailVerified)
                 updateBlockButtonUI(blocked)
             }
             .addOnFailureListener { e ->
@@ -326,25 +369,24 @@ class AdminPanelActivity : AppCompatActivity() {
 
     private fun updateBlockButtonUI(isBlocked: Boolean) {
         if (isBlocked) {
-        binding.btnBlockUser.text = "Unblock User"
-        binding.btnBlockUser.setBackgroundColor(resources.getColor(R.color.colorUnblockGreen, null))
-    } else {
-        binding.btnBlockUser.text = "Block User"
-        binding.btnBlockUser.setBackgroundColor(resources.getColor(R.color.colorBlockRed, null))
-    }
+            binding.btnBlockUser.text = "Unblock User"
+            binding.btnBlockUser.setBackgroundColor(resources.getColor(R.color.colorUnblockGreen, null))
+        } else {
+            binding.btnBlockUser.text = "Block User"
+            binding.btnBlockUser.setBackgroundColor(resources.getColor(R.color.colorBlockRed, null))
+        }
     
-    // Enable/disable other buttons based on block status
+        // Enable/disable other buttons based on block status
         val isEnabled = !isBlocked
-        binding.btnAdminAdd10.isEnabled = isEnabled
-        binding.btnAdminAdd50.isEnabled = isEnabled
-        binding.btnAdminSet100.isEnabled = isEnabled
-        binding.btnAdminReset.isEnabled = isEnabled
-        binding.btnAdminGenerateFree.isEnabled = isEnabled
+        binding.btnAdminAdd3.isEnabled = isEnabled
+        binding.btnAdminAdd5.isEnabled = isEnabled
+        binding.btnAdminAdd8.isEnabled = isEnabled
+        binding.btnAdminAdd20.isEnabled = isEnabled
     
         if (isBlocked) {
-        showMessage("User is blocked - credit operations disabled")
+            showMessage("User is blocked - credit operations disabled")
+        }
     }
-}
 
     private fun modifyUserCredits(amount: Int, operation: String) {
         if (selectedUserId.isEmpty()) {
@@ -363,47 +405,33 @@ class AdminPanelActivity : AppCompatActivity() {
                     showMessage("Added $amount credits to $selectedUserEmail")
                     loadUserDataById(selectedUserId)
                     loadAdminStats()
+                    
+                    // Record credit award history
+                    recordCreditAward(amount, "Admin added credits")
                 } else showMessage("Failed to add credits")
-            }
-            "set" -> creditManager.adminSetUserCredits(selectedUserId, amount) { success ->
-                if (success) {
-                    showMessage("Set credits to $amount for $selectedUserEmail")
-                    loadUserDataById(selectedUserId)
-                    loadAdminStats()
-                } else showMessage("Failed to set credits")
-            }
-            "reset" -> creditManager.adminResetUserCredits(selectedUserId) { success ->
-                if (success) {
-                    showMessage("Reset credits for $selectedUserEmail")
-                    loadUserDataById(selectedUserId)
-                    loadAdminStats()
-                } else showMessage("Failed to reset credits")
             }
         }
     }
 
-    private fun generateFreeCV() {
-        if (selectedUserId.isEmpty()) {
-            showMessage("Please select a user first")
-            return
-        }
-
-        if (isUserBlocked) {
-            showMessage("Cannot generate CV for blocked user")
-            return
-        }
-
-        db.collection("users").document(selectedUserId).update(
-            "usedCredits", com.google.firebase.firestore.FieldValue.increment(1),
-            "cvGenerated", com.google.firebase.firestore.FieldValue.increment(1),
-            "lastUpdated", System.currentTimeMillis()
-        ).addOnSuccessListener {
-            showMessage("Free CV generated for $selectedUserEmail")
-            loadUserDataById(selectedUserId)
-            loadAdminStats()
-        }.addOnFailureListener { e ->
-            showMessage("Failed to generate CV: ${e.message}")
-        }
+    private fun recordCreditAward(amount: Int, reason: String) {
+        if (selectedUserId.isEmpty()) return
+        
+        val awardData = hashMapOf(
+            "userId" to selectedUserId,
+            "amount" to amount,
+            "reason" to reason,
+            "timestamp" to System.currentTimeMillis(),
+            "adminAction" to true
+        )
+        
+        db.collection("creditAwards")
+            .add(awardData)
+            .addOnSuccessListener {
+                Log.d("AdminPanel", "Credit award recorded: $reason - $amount credits")
+            }
+            .addOnFailureListener { e ->
+                Log.e("AdminPanel", "Failed to record credit award", e)
+            }
     }
 
     private fun showUserStats() {
@@ -412,24 +440,60 @@ class AdminPanelActivity : AppCompatActivity() {
             return
         }
 
+        // First get user basic info
         db.collection("users").document(selectedUserId).get()
             .addOnSuccessListener { doc ->
                 if (doc.exists()) {
-                    val blockedStatus = if (doc.getBoolean("isBlocked") == true) "Yes" else "No"
-                    val stats = """
-                        Email: ${doc.getString("email")}
-                        Available Credits: ${doc.getLong("availableCredits") ?: 0}
-                        Used Credits: ${doc.getLong("usedCredits") ?: 0}
-                        Total Credits: ${doc.getLong("totalCreditsEarned") ?: 0}
-                        Blocked: $blockedStatus
-                        Created: ${doc.getLong("createdAt")?.let { 
-                            java.text.SimpleDateFormat("MMM dd, yyyy", java.util.Locale.getDefault()).format(it) } ?: "Unknown"}
-                    """.trimIndent()
-                    AlertDialog.Builder(this)
-                        .setTitle("User Statistics")
-                        .setMessage(stats)
-                        .setPositiveButton("OK", null)
-                        .show()
+                    // Then get credit award history
+                    db.collection("creditAwards")
+                        .whereEqualTo("userId", selectedUserId)
+                        .orderBy("timestamp", com.google.firebase.firestore.Query.Direction.DESCENDING)
+                        .limit(10) // Show last 10 awards
+                        .get()
+                        .addOnSuccessListener { awardDocuments ->
+                            val blockedStatus = if (doc.getBoolean("isBlocked") == true) "Yes" else "No"
+                            val emailVerified = if (doc.getBoolean("emailVerified") == true) "Yes" else "No"
+                            
+                            // Build credit history string
+                            val creditHistory = StringBuilder()
+                            if (awardDocuments.isEmpty) {
+                                creditHistory.append("No credit award history found")
+                            } else {
+                                creditHistory.append("Recent Credit Awards:\n")
+                                val dateFormat = java.text.SimpleDateFormat("MMM dd, yyyy HH:mm", java.util.Locale.getDefault())
+                                
+                                for (awardDoc in awardDocuments) {
+                                    val amount = awardDoc.getLong("amount") ?: 0
+                                    val reason = awardDoc.getString("reason") ?: "Unknown"
+                                    val timestamp = awardDoc.getLong("timestamp") ?: 0
+                                    val date = if (timestamp > 0) dateFormat.format(java.util.Date(timestamp)) else "Unknown date"
+                                    
+                                    creditHistory.append("• $date: $amount credits - $reason\n")
+                                }
+                            }
+                            
+                            val stats = """
+                                Email: ${doc.getString("email")}
+                                Email Verified: $emailVerified
+                                Available Credits: ${doc.getLong("availableCredits") ?: 0}
+                                Used Credits: ${doc.getLong("usedCredits") ?: 0}
+                                Total Credits: ${doc.getLong("totalCreditsEarned") ?: 0}
+                                Blocked: $blockedStatus
+                                Created: ${doc.getLong("createdAt")?.let { 
+                                    java.text.SimpleDateFormat("MMM dd, yyyy", java.util.Locale.getDefault()).format(it) } ?: "Unknown"}
+                                
+                                $creditHistory
+                            """.trimIndent()
+                            
+                            AlertDialog.Builder(this)
+                                .setTitle("User Statistics")
+                                .setMessage(stats)
+                                .setPositiveButton("OK", null)
+                                .show()
+                        }
+                        .addOnFailureListener { e ->
+                            showMessage("Failed to load credit history: ${e.message}")
+                        }
                 } else {
                     showMessage("User document not found")
                 }
@@ -449,8 +513,8 @@ class AdminPanelActivity : AppCompatActivity() {
         finish()
     }
 
-    private fun updateUserDisplay(available: Int, used: Int, total: Int) {
-        binding.tvUserEmail.text = "User: $selectedUserEmail ${if (isUserBlocked) "(BLOCKED)" else ""}"
+    private fun updateUserDisplay(available: Int, used: Int, total: Int, emailVerified: Boolean) {
+        binding.tvUserEmail.text = "User: $selectedUserEmail ${if (isUserBlocked) "(BLOCKED)" else ""} ${if (emailVerified) "(Verified)" else "(Not Verified)"}"
         binding.tvAvailableCredits.text = "Available: $available"
         binding.tvUsedCredits.text = "Used: $used"
         binding.tvTotalCredits.text = "Total: $total"
