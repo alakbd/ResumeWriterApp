@@ -132,101 +132,86 @@ class AdminPanelActivity : AppCompatActivity() {
     }
 
     private fun loadAdminStats() {
-        binding.tvUserStats.text = "Users: Loading..."
-        binding.tvCreditStats.text = "CV Stats: Loading..."
-        binding.tvCvStats.text = "Total CVs: Loading..."
+    binding.tvUserStats.text = "Users: Loading..."
+    binding.tvCreditStats.text = "Credits: Loading..."
+    binding.tvCvStats.text = "CVs Generated: Loading..."
 
-        db.collection("users").get()
-            .addOnSuccessListener { documents ->
+    db.collection("users").get()
+        .addOnSuccessListener { documents ->
+            try {
                 val totalUsers = documents.size()
+                var totalCredits = 0L
                 var totalCVs = 0L
                 var blockedUsers = 0L
-                var activeUsers = 0L
-                
-                // For daily and monthly CV counts
-                var todayCVs = 0L
-                var monthlyCVs = 0L
-                
                 val dailyCount = mutableMapOf<String, Int>()
                 val monthlyCount = mutableMapOf<String, Int>()
-                val cvDailyCount = mutableMapOf<String, Int>()
-                val cvMonthlyCount = mutableMapOf<String, Int>()
-                
-                val dayFormat = java.text.SimpleDateFormat("yyyy-MM-dd", java.util.Locale.getDefault())
-                val monthFormat = java.text.SimpleDateFormat("yyyy-MM", java.util.Locale.getDefault())
-                val today = dayFormat.format(java.util.Date())
-                val thisMonth = monthFormat.format(java.util.Date())
+                val dayFormat = SimpleDateFormat("yyyy-MM-dd", Locale.getDefault())
+                val monthFormat = SimpleDateFormat("yyyy-MM", Locale.getDefault())
 
                 for (doc in documents) {
-                    totalCVs += doc.getLong("usedCredits") ?: 0
-                    
-                    // Check if user is blocked
-                    val isBlocked = doc.getBoolean("isBlocked") == true
-                    if (isBlocked) {
-                        blockedUsers++
-                    } else {
-                        activeUsers++
-                    }
-                    
-                    // User registration date tracking
-                    val createdAt = doc.getLong("createdAt")
-                    if (createdAt != null) {
-                        try {
-                            val date = java.util.Date(createdAt)
-                            dailyCount[dayFormat.format(date)] = dailyCount.getOrDefault(dayFormat.format(date), 0) + 1
-                            monthlyCount[monthFormat.format(date)] = monthlyCount.getOrDefault(monthFormat.format(date), 0) + 1
-                        } catch (e: Exception) {
-                            Log.e("AdminPanel", "Error parsing date for user ${doc.id}", e)
-                        }
-                    }
-                    
-                    // CV generation date tracking
-                    val lastUpdated = doc.getLong("lastUpdated")
-                    if (lastUpdated != null) {
-                        try {
-                            val date = java.util.Date(lastUpdated)
-                            val dateDay = dayFormat.format(date)
-                            val dateMonth = monthFormat.format(date)
-                            
-                            cvDailyCount[dateDay] = cvDailyCount.getOrDefault(dateDay, 0) + 1
-                            cvMonthlyCount[dateMonth] = cvMonthlyCount.getOrDefault(dateMonth, 0) + 1
-                            
-                            // Count today's and this month's CVs
-                            if (dateDay == today) {
-                                todayCVs++
+                    try {
+                        // Safe null handling for all fields
+                        totalCredits += doc.getLong("totalCreditsEarned") ?: 0
+                        totalCVs += doc.getLong("usedCredits") ?: 0
+                        
+                        val isBlocked = doc.getBoolean("isBlocked") 
+                        if (isBlocked == true) blockedUsers++
+                        
+                        val createdAt = doc.getLong("createdAt")
+                        if (createdAt != null && createdAt > 0) {
+                            try {
+                                val date = Date(createdAt)
+                                val dayKey = dayFormat.format(date)
+                                val monthKey = monthFormat.format(date)
+                                
+                                dailyCount[dayKey] = dailyCount.getOrDefault(dayKey, 0) + 1
+                                monthlyCount[monthKey] = monthlyCount.getOrDefault(monthKey, 0) + 1
+                            } catch (e: Exception) {
+                                Log.e("AdminPanel", "Error parsing date for user ${doc.id}", e)
                             }
-                            if (dateMonth == thisMonth) {
-                                monthlyCVs++
-                            }
-                        } catch (e: Exception) {
-                            Log.e("AdminPanel", "Error parsing CV date for user ${doc.id}", e)
                         }
+                    } catch (e: Exception) {
+                        Log.e("AdminPanel", "Error processing user ${doc.id}: ${e.message}")
+                        // Continue with next document instead of crashing
                     }
                 }
 
-                binding.tvUserStats.text = """
-                    Total Users: $totalUsers
-                    Active Users: $activeUsers
-                    Blocked Users: $blockedUsers
-                    Joined Today: ${dailyCount.getOrDefault(today, 0)}
-                    Joined This Month: ${monthlyCount.getOrDefault(thisMonth, 0)}
-                """.trimIndent()
+                val today = dayFormat.format(Date())
+                val thisMonth = monthFormat.format(Date())
+
+                // Safe UI updates on main thread
+                runOnUiThread {
+                    binding.tvUserStats.text = """
+                        Total Users: $totalUsers
+                        Blocked Users: $blockedUsers
+                        Joined Today: ${dailyCount.getOrDefault(today, 0)}
+                        Joined This Month: ${monthlyCount.getOrDefault(thisMonth, 0)}
+                    """.trimIndent()
+                    
+                    binding.tvCreditStats.text = "Total Credits Earned: $totalCredits"
+                    binding.tvCvStats.text = "Total CVs Generated: $totalCVs"
+                }
                 
-                binding.tvCreditStats.text = """
-                    CVs Generated Today: $todayCVs
-                    CVs Generated This Month: $monthlyCVs
-                """.trimIndent()
-                
-                binding.tvCvStats.text = "Total CVs Generated: $totalCVs"
+            } catch (e: Exception) {
+                Log.e("AdminPanel", "Error in loadAdminStats: ${e.message}", e)
+                runOnUiThread {
+                    showMessage("Error loading stats: ${e.message}")
+                    binding.tvUserStats.text = "Users: Error"
+                    binding.tvCreditStats.text = "Credits: Error"
+                    binding.tvCvStats.text = "CVs: Error"
+                }
             }
-            .addOnFailureListener { e ->
-                Log.e("AdminPanel", "Failed to load admin stats: ${e.message}", e)
+        }
+        .addOnFailureListener { e ->
+            Log.e("AdminPanel", "Failed to load admin stats: ${e.message}", e)
+            runOnUiThread {
                 showMessage("Failed to load admin stats: ${e.message}")
-                binding.tvUserStats.text = "Users: Error loading"
-                binding.tvCreditStats.text = "CV Stats: Error loading"
-                binding.tvCvStats.text = "Total CVs: Error loading"
+                binding.tvUserStats.text = "Users: Failed to load"
+                binding.tvCreditStats.text = "Credits: Failed to load"
+                binding.tvCvStats.text = "CVs Generated: Failed to load"
             }
-    }
+        }
+}
 
     private fun setupManualEmailLoad() {
         binding.btnLoadUser.setOnClickListener {
