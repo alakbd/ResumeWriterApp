@@ -359,17 +359,7 @@ class ResumeGenerationActivity : AppCompatActivity() {
 }
 
     private fun setupToneSpinner() {
-    spinnerTone = binding.spinnerTone
-    
-    // Create adapter with tone options
-    val adapter = ArrayAdapter.createFromResource(
-        this,
-        R.array.tone_options,
-        android.R.layout.simple_spinner_item
-    )
-    adapter.setDropDownViewResource(android.R.layout.simple_spinner_dropdown_item)
-    spinnerTone.adapter = adapter
-    
+    spinnerTone = binding.spinnerTone    
     // Set default selection
     spinnerTone.setSelection(0) // Professional
     
