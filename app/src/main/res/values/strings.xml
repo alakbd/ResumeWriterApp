@@ -1,3 +1,4 @@
+<?xml version="1.0" encoding="utf-8"?>
 <resources>
     <string name="app_name">Resume Boost</string>
     
@@ -7,4 +8,4 @@
         <item>Achievement-Oriented</item>
         <item>Leadership-Focused</item>
     </string-array>
-</resources
+</resources>
