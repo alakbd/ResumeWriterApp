@@ -77,6 +77,58 @@ private fun refreshVerificationStatus() {
     }
 }
 
+// ⭐⭐⭐ ADD THIS METHOD FOR TOP CV GENERATORS ⭐⭐⭐
+private fun showTopCVGenerators() {
+    showMessage("📊 Loading top CV generators...")
+
+    db.collection("users")
+        .whereGreaterThan("cvGenerated", 0) // Only users who generated CVs
+        .orderBy("cvGenerated", com.google.firebase.firestore.Query.Direction.DESCENDING)
+        .limit(10) // Top 10
+        .get()
+        .addOnSuccessListener { documents ->
+            if (documents.isEmpty) {
+                showMessage("No CV generation data found")
+                return@addOnSuccessListener
+            }
+
+            val topUsers = StringBuilder()
+            topUsers.append("🏆 TOP 10 CV GENERATORS\n\n")
+            
+            var rank = 1
+            for (doc in documents) {
+                val email = doc.getString("email") ?: "Unknown"
+                val cvsGenerated = doc.getLong("cvGenerated") ?: 0
+                val isVerified = doc.getBoolean("emailVerified") ?: false
+                val isBlocked = doc.getBoolean("isBlocked") ?: false
+                
+                topUsers.append("$rank. $email\n")
+                topUsers.append("   📊 CVs: $cvsGenerated | ")
+                topUsers.append("${if (isVerified) "✅" else "❌"} | ")
+                topUsers.append("${if (isBlocked) "🚫" else "✅"}\n")
+                
+                if (rank == 1 && cvsGenerated > 5) {
+                    topUsers.append("   👑 TOP PERFORMER!\n")
+                }
+                
+                topUsers.append("\n")
+                rank++
+            }
+
+            topUsers.append("Total users with CVs: ${documents.size()}")
+
+            AlertDialog.Builder(this)
+                .setTitle("Top CV Generators")
+                .setMessage(topUsers.toString())
+                .setPositiveButton("OK", null)
+                .setNeutralButton("Refresh") { _, _ -> showTopCVGenerators() }
+                .show()
+        }
+        .addOnFailureListener { e ->
+            showMessage("Failed to load top CV generators: ${e.message}")
+        }
+}
+
     private fun setupUI() {
         binding.btnAdminAdd3.setOnClickListener { modifyUserCredits(3, "add") }
         binding.btnAdminAdd5.setOnClickListener { modifyUserCredits(5, "add") }
@@ -167,70 +219,56 @@ private fun refreshVerificationStatus() {
     }
 
     private fun loadAdminStats() {
-    binding.tvUserStats.text = "Users: Loading..."
-    binding.tvCreditStats.text = "Credits: Loading..."
-    binding.tvCvStats.text = "CVs Generated: Loading..."
+        binding.tvUserStats.text = "Users: Loading..."
+        binding.tvCreditStats.text = "Credits: Loading..."
+        binding.tvCvStats.text = "CVs Generated: Loading..."
 
-    db.collection("users").get()
-        .addOnSuccessListener { documents ->
-            try {
-                val totalUsers = documents.size()
-                var totalCredits = 0L
-                var totalCVs = 0L
-                var blockedUsers = 0L
-                val dailyCount = mutableMapOf<String, Int>()
-                val monthlyCount = mutableMapOf<String, Int>()
-                val dayFormat = SimpleDateFormat("yyyy-MM-dd", Locale.getDefault())
-                val monthFormat = SimpleDateFormat("yyyy-MM", Locale.getDefault())
+        db.collection("users").get()
+            .addOnSuccessListener { documents ->
+                try {
+                    val totalUsers = documents.size()
+                    var totalCredits = 0L
+                    var totalCVs = 0L
+                    var blockedUsers = 0L
+                    var verifiedUsers = 0L
+                    var activeUsers = 0L
 
                 for (doc in documents) {
                     try {
-                        // Safe null handling for all fields
                         totalCredits += doc.getLong("totalCreditsEarned") ?: 0
-                        totalCVs += doc.getLong("usedCredits") ?: 0
+                        totalCVs += doc.getLong("usedCredits") ?: 0 // CVs generated = used credits
                         
-                        val isBlocked = doc.getBoolean("isBlocked") 
-                        if (isBlocked == true) blockedUsers++
-                        
-                        val createdAt = doc.getLong("createdAt")
-                        if (createdAt != null && createdAt > 0) {
-                            try {
-                                val date = Date(createdAt)
-                                val dayKey = dayFormat.format(date)
-                                val monthKey = monthFormat.format(date)
-                                
-                                dailyCount[dayKey] = dailyCount.getOrDefault(dayKey, 0) + 1
-                                monthlyCount[monthKey] = monthlyCount.getOrDefault(monthKey, 0) + 1
-                            } catch (e: Exception) {
-                                Log.e("AdminPanel", "Error parsing date for user ${doc.id}", e)
-                            }
+                        val isBlocked = doc.getBoolean("isBlocked") ?: false
+                        if (isBlocked) {
+                            blockedUsers++
+                        } else {
+                            activeUsers++ // ⭐⭐⭐ COUNT ACTIVE USERS ⭐⭐⭐
                         }
+                        
+                        val isVerified = doc.getBoolean("emailVerified") ?: false
+                        if (isVerified) verifiedUsers++
+                        
                     } catch (e: Exception) {
-                        Log.e("AdminPanel", "Error processing user ${doc.id}: ${e.message}")
-                        // Continue with next document instead of crashing
+                        Log.e("AdminPanel", "Error processing user ${doc.id}", e)
                     }
                 }
 
-                val today = dayFormat.format(Date())
-                val thisMonth = monthFormat.format(Date())
-
-                // Safe UI updates on main thread
                 runOnUiThread {
                     binding.tvUserStats.text = """
                         Total Users: $totalUsers
-                        Blocked Users: $blockedUsers
-                        Joined Today: ${dailyCount.getOrDefault(today, 0)}
-                        Joined This Month: ${monthlyCount.getOrDefault(thisMonth, 0)}
+                        ✅ Verified: $verifiedUsers
+                        ❌ Not Verified: ${totalUsers - verifiedUsers}
+                        🟢 Active: $activeUsers
+                        🚫 Blocked: $blockedUsers
                     """.trimIndent()
                     
-                    binding.tvCreditStats.text = "Total Credits Earned: $totalCredits"
+                    binding.tvCreditStats.text = "Total Credits: $totalCredits"
                     binding.tvCvStats.text = "Total CVs Generated: $totalCVs"
                 }
                 
             } catch (e: Exception) {
-                Log.e("AdminPanel", "Error in loadAdminStats: ${e.message}", e)
+                Log.e("AdminPanel", "Error in loadAdminStats", e)
                 runOnUiThread {
-                    showMessage("Error loading stats: ${e.message}")
                     binding.tvUserStats.text = "Users: Error"
                     binding.tvCreditStats.text = "Credits: Error"
                     binding.tvCvStats.text = "CVs: Error"
@@ -238,12 +276,11 @@ private fun refreshVerificationStatus() {
             }
         }
         .addOnFailureListener { e ->
-            Log.e("AdminPanel", "Failed to load admin stats: ${e.message}", e)
+            Log.e("AdminPanel", "Failed to load stats", e)
             runOnUiThread {
-                showMessage("Failed to load admin stats: ${e.message}")
-                binding.tvUserStats.text = "Users: Failed to load"
-                binding.tvCreditStats.text = "Credits: Failed to load"
-                binding.tvCvStats.text = "CVs Generated: Failed to load"
+                binding.tvUserStats.text = "Users: Failed"
+                binding.tvCreditStats.text = "Credits: Failed"
+                binding.tvCvStats.text = "CVs: Failed"
             }
         }
 }
@@ -469,73 +506,74 @@ private fun refreshVerificationStatus() {
                 return@addOnSuccessListener
             }
 
-            // Build basic user stats first
-            val blockedStatus = if (doc.getBoolean("isBlocked") == true) "Yes" else "No"
-            val emailVerified = if (doc.getBoolean("emailVerified") == true) "✅ Yes" else "❌ No"
-            val registrationIP = doc.getString("ipAddress") ?: "Not available"
-            val lastLoginIP = doc.getString("lastLoginIp") ?: "Not available"
+            // Safe data extraction
+            val email = doc.getString("email") ?: "N/A"
+            val isBlocked = doc.getBoolean("isBlocked") ?: false
+            val isVerified = doc.getBoolean("emailVerified") ?: false
+            val availableCredits = doc.getLong("availableCredits") ?: 0
+            val usedCredits = doc.getLong("usedCredits") ?: 0
+            val totalCredits = doc.getLong("totalCreditsEarned") ?: 0
+            val cvsGenerated = doc.getLong("cvGenerated") ?: 0
+            
+            // ⭐⭐⭐ FIX: Get network information ⭐⭐⭐
+            val ipAddress = doc.getString("ipAddress") ?: "Not available"
             val deviceId = doc.getString("deviceId") ?: "Not available"
+            val lastLoginIp = doc.getString("lastLoginIp") ?: "Not available"
             
-            // Format dates safely
+            // Safe date formatting
             val createdAt = doc.getLong("createdAt") ?: 0
-            val lastUpdated = doc.getLong("lastUpdated") ?: 0
-            
             val dateFormat = SimpleDateFormat("MMM dd, yyyy HH:mm", Locale.getDefault())
             val createdDate = if (createdAt > 0) dateFormat.format(Date(createdAt)) else "Unknown"
-            val updatedDate = if (lastUpdated > 0) dateFormat.format(Date(lastUpdated)) else "Unknown"
 
-            // Build the basic stats message
-            val basicStats = """
+            val stats = """
                 👤 USER INFORMATION:
-                📧 Email: ${doc.getString("email") ?: "N/A"}
-                ✅ Email Verified: $emailVerified
-                🆔 User ID: ${selectedUserId.take(12)}...
+                📧 Email: $email
+                ✅ Email Verified: ${if (isVerified) "✅ YES" else "❌ NO"}
                 
-                💰 CREDIT STATUS:
-                Available Credits: ${doc.getLong("availableCredits") ?: 0}
-                Used Credits: ${doc.getLong("usedCredits") ?: 0}
-                Total Credits Earned: ${doc.getLong("totalCreditsEarned") ?: 0}
-                CVs Generated: ${doc.getLong("cvGenerated") ?: 0}
+                💰 CREDITS:
+                Available: $availableCredits
+                Used: $usedCredits
+                Total Earned: $totalCredits
+                CVs Generated: $cvsGenerated
                 
                 🌐 NETWORK INFORMATION:
-                Registration IP: $registrationIP
-                Last Login IP: $lastLoginIP
+                Registration IP: $ipAddress
+                Last Login IP: $lastLoginIp
                 Device ID: ${deviceId.take(8)}...
                 
                 ⚠️ ACCOUNT STATUS:
-                Blocked: $blockedStatus
-                ${if (blockedStatus == "Yes") "Block Reason: ${doc.getString("blockReason") ?: "Not specified"}" else ""}
+                Blocked: ${if (isBlocked) "🚫 YES" else "✅ NO"}
                 
-                📅 TIMESTAMPS:
-                Account Created: $createdDate
-                Last Updated: $updatedDate
+                📅 ACCOUNT CREATED:
+                $createdDate
             """.trimIndent()
 
-            // Now try to load credit awards (but don't fail if it doesn't exist)
-            loadCreditAwards(basicStats)
+            // Load credit awards history
+            loadCreditAwardsHistory(stats)
         }
         .addOnFailureListener { e ->
             showMessage("Failed to load user stats: ${e.message}")
         }
 }
 
-private fun loadCreditAwards(basicStats: String) {
+// ⭐⭐⭐ ADD THIS METHOD TO LOAD CREDIT AWARDS ⭐⭐⭐
+private fun loadCreditAwardsHistory(basicStats: String) {
     db.collection("creditAwards")
         .whereEqualTo("userId", selectedUserId)
         .orderBy("timestamp", com.google.firebase.firestore.Query.Direction.DESCENDING)
-        .limit(5) // Show only last 5 awards
+        .limit(10)
         .get()
         .addOnSuccessListener { awardDocuments ->
             val creditHistory = buildCreditHistoryString(awardDocuments)
-            showStatsDialog(basicStats, creditHistory)
+            showCompleteStatsDialog(basicStats, creditHistory)
         }
         .addOnFailureListener { e ->
-            // If credit awards fail, just show basic stats
-            Log.e("AdminPanel", "Failed to load credit awards: ${e.message}")
-            showStatsDialog(basicStats, "No credit award history available")
+            // If no credit awards, just show basic stats
+            showCompleteStatsDialog(basicStats, "No credit award history available")
         }
 }
 
+// ⭐⭐⭐ ADD THIS METHOD ⭐⭐⭐
 private fun buildCreditHistoryString(awardDocuments: com.google.firebase.firestore.QuerySnapshot): String {
     if (awardDocuments.isEmpty) {
         return "No credit award history found"
@@ -545,25 +583,22 @@ private fun buildCreditHistoryString(awardDocuments: com.google.firebase.firesto
     val dateFormat = SimpleDateFormat("MMM dd, yyyy HH:mm", Locale.getDefault())
     
     for (doc in awardDocuments) {
-        try {
-            val amount = doc.getLong("amount") ?: 0
-            val reason = doc.getString("reason") ?: "Unknown reason"
-            val timestamp = doc.getLong("timestamp") ?: 0
-            val date = if (timestamp > 0) dateFormat.format(Date(timestamp)) else "Unknown date"
-            
-            history.append("💰 $amount credits\n")
-            history.append("📝 $reason\n")
-            history.append("📅 $date\n")
-            history.append("${"-".repeat(30)}\n")
-        } catch (e: Exception) {
-            Log.e("AdminPanel", "Error parsing award document: ${e.message}")
-        }
+        val amount = doc.getLong("amount") ?: 0
+        val reason = doc.getString("reason") ?: "Unknown reason"
+        val timestamp = doc.getLong("timestamp") ?: 0
+        val date = if (timestamp > 0) dateFormat.format(Date(timestamp)) else "Unknown date"
+        
+        history.append("💰 $amount credits\n")
+        history.append("📝 $reason\n")
+        history.append("📅 $date\n")
+        history.append("${"-".repeat(30)}\n")
     }
     
     return history.toString()
 }
 
-private fun showStatsDialog(basicStats: String, creditHistory: String) {
+// ⭐⭐⭐ ADD THIS METHOD ⭐⭐⭐
+private fun showCompleteStatsDialog(basicStats: String, creditHistory: String) {
     val fullStats = """
         $basicStats
         
