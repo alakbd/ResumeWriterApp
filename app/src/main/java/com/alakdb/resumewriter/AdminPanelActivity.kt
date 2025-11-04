@@ -49,6 +49,7 @@ class AdminPanelActivity : AppCompatActivity() {
         binding.btnAdminAdd5.setOnClickListener { modifyUserCredits(5, "add") }
         binding.btnAdminAdd8.setOnClickListener { modifyUserCredits(8, "add") }
         binding.btnAdminAdd20.setOnClickListener { modifyUserCredits(20, "add") }
+        binding.btnAdminReset.setOnClickListener { modifyUserCredits(0, "reset") } 
         binding.btnAdminStats.setOnClickListener { showUserStats() }
         binding.btnAdminLogout.setOnClickListener { logoutAdmin() }
         binding.btnBlockUser.setOnClickListener { toggleUserBlockStatus() }
@@ -382,6 +383,7 @@ class AdminPanelActivity : AppCompatActivity() {
         binding.btnAdminAdd5.isEnabled = isEnabled
         binding.btnAdminAdd8.isEnabled = isEnabled
         binding.btnAdminAdd20.isEnabled = isEnabled
+        binding.btnAdminReset.isEnabled = isEnabled
     
         if (isBlocked) {
             showMessage("User is blocked - credit operations disabled")
