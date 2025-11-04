@@ -43,7 +43,8 @@ import android.text.method.ScrollingMovementMethod
 import java.io.OutputStream
 import android.view.MotionEvent
 import android.widget.ScrollView
-
+import android.widget.Spinner
+import android.widget.AdapterView
 
 class ResumeGenerationActivity : AppCompatActivity() {
 
