@@ -113,11 +113,6 @@ private fun checkAndUpdateEmailVerification() {
                 )
                 .addOnSuccessListener {
                     Log.d("Login", "Updated verification status: $isVerified for user $userId")
-                    
-                    // Award bonus credits if just verified
-                    if (isVerified) {
-                        awardVerificationBonus(userId)
-                    }
                 }
                 .addOnFailureListener { e ->
                     Log.e("Login", "Failed to update verification status", e)
@@ -126,22 +121,6 @@ private fun checkAndUpdateEmailVerification() {
     }
 }
 
-// ⭐⭐⭐ ADD THIS METHOD TO LoginActivity ⭐⭐⭐
-private fun awardVerificationBonus(userId: String) {
-    Firebase.firestore.collection("users").document(userId)
-        .update(
-            "availableCredits", FieldValue.increment(2), // +2 bonus credits
-            "totalCreditsEarned", FieldValue.increment(2),
-            "lastUpdated", System.currentTimeMillis()
-        )
-        .addOnSuccessListener {
-            Log.d("Login", "Awarded 2 bonus credits for email verification")
-            showMessage("🎉 Email verified! +2 bonus credits awarded!")
-        }
-        .addOnFailureListener { e ->
-            Log.e("Login", "Failed to award verification bonus", e)
-        }
-}
     
 
     
