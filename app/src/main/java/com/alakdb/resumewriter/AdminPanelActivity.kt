@@ -219,30 +219,41 @@ private fun showTopCVGenerators() {
     }
 
     private fun loadAdminStats() {
-        binding.tvUserStats.text = "Users: Loading..."
-        binding.tvCreditStats.text = "Credits: Loading..."
-        binding.tvCvStats.text = "CVs Generated: Loading..."
+    binding.tvUserStats.text = "Users: Loading..."
+    binding.tvCreditStats.text = "Credits: Loading..."
+    binding.tvCvStats.text = "CVs Generated: Loading..."
 
-        db.collection("users").get()
-            .addOnSuccessListener { documents ->
-                try {
-                    val totalUsers = documents.size()
-                    var totalCredits = 0L
-                    var totalCVs = 0L
-                    var blockedUsers = 0L
-                    var verifiedUsers = 0L
-                    var activeUsers = 0L
+    db.collection("users").get()
+        .addOnSuccessListener { documents ->
+            try {
+                // ⭐⭐⭐ ADD NULL CHECK HERE ⭐⭐⭐
+                if (documents == null) {
+                    Log.e("AdminPanel", "Documents is null")
+                    runOnUiThread {
+                        binding.tvUserStats.text = "Users: No data"
+                        binding.tvCreditStats.text = "Credits: No data"
+                        binding.tvCvStats.text = "CVs: No data"
+                    }
+                    return@addOnSuccessListener
+                }
+
+                val totalUsers = documents.size()
+                var totalCredits = 0L
+                var totalCVs = 0L
+                var blockedUsers = 0L
+                var verifiedUsers = 0L
+                var activeUsers = 0L
 
                 for (doc in documents) {
                     try {
                         totalCredits += doc.getLong("totalCreditsEarned") ?: 0
-                        totalCVs += doc.getLong("usedCredits") ?: 0 // CVs generated = used credits
+                        totalCVs += doc.getLong("usedCredits") ?: 0
                         
                         val isBlocked = doc.getBoolean("isBlocked") ?: false
                         if (isBlocked) {
                             blockedUsers++
                         } else {
-                            activeUsers++ // ⭐⭐⭐ COUNT ACTIVE USERS ⭐⭐⭐
+                            activeUsers++
                         }
                         
                         val isVerified = doc.getBoolean("emailVerified") ?: false
