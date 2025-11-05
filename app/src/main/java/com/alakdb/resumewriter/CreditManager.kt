@@ -97,31 +97,44 @@ class CreditManager(private val context: Context) {
     /**
      * 🔒 SECURE: Check if current user is authorized for admin access
      */
-    fun isUserAuthorizedAdmin(): Boolean {
-        val currentUser = auth.currentUser
-        val userEmail = currentUser?.email ?: return false
-        
-        val isAuthorized = ADMIN_EMAILS.contains(userEmail.toLowerCase().trim())
-        Log.d("AdminSecurity", "User $userEmail admin authorized: $isAuthorized")
-        return isAuthorized
+    private fun isUserAuthorizedAdmin(): Boolean {
+    val currentUser = auth.currentUser
+    return when {
+        currentUser == null -> false
+        currentUser.email == "admin@example.com" -> true
+        currentUser.uid == "your_admin_uid_here" -> true
+        // Add other admin checks (from database, etc.)
+        else -> false
     }
+}
 
     /**
      * 🔒 SECURE: Comprehensive admin mode check
      */
     fun isAdminMode(): Boolean {
-        val isAdminFlag = prefs.getBoolean(ADMIN_MODE_KEY, false)
-        
-        // Double-check: if admin flag is set, verify user is still authorized
-        if (isAdminFlag && !isUserAuthorizedAdmin()) {
-            // Auto-revoke admin access if user is no longer authorized
-            setAdminMode(false)
-            Log.w("AdminSecurity", "Auto-revoked admin access for unauthorized user")
-            return false
-        }
-        
-        return isAdminFlag
+    // First, check if current user is authorized to be admin
+    val isUserAdmin = isUserAuthorizedAdmin()
+    
+    // Get the current admin flag state
+    val currentAdminFlag = prefs.getBoolean(ADMIN_MODE_KEY, false)
+    
+    // If user is authorized admin but flag is false, auto-enable admin mode
+    if (isUserAdmin && !currentAdminFlag) {
+        Log.d("AdminSecurity", "Auto-enabling admin mode for authorized user")
+        setAdminMode(true)
+        return true
     }
+    
+    // If user is NOT authorized admin but flag is true, auto-revoke
+    if (!isUserAdmin && currentAdminFlag) {
+        Log.w("AdminSecurity", "Auto-revoking admin access for unauthorized user")
+        setAdminMode(false)
+        return false
+    }
+    
+    // Return the synchronized state
+    return currentAdminFlag && isUserAdmin
+}
 
     // -----------------------
     // NEW METHODS FOR RESUME GENERATION CONTROL
