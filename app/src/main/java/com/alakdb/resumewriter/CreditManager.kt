@@ -101,7 +101,7 @@ class CreditManager(private val context: Context) {
     val currentUser = auth.currentUser
     return when {
         currentUser == null -> false
-        currentUser.email == "admin@example.com" -> true
+        currentUser.email == "alakbd2009@gmail.com" -> true
         currentUser.uid == "your_admin_uid_here" -> true
         // Add other admin checks (from database, etc.)
         else -> false
