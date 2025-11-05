@@ -313,22 +313,24 @@ class MainActivity : AppCompatActivity() {
         binding.btnGenerateCv.isEnabled = false
         binding.btnGenerateCv.text = "Loading..."
 
-        // NEW: Use auto-sync method for credits
-        creditManager.getCreditsWithAutoSync { credits ->
-            binding.btnGenerateCv.isEnabled = true
-            updateGenerateButton()
+    // NEW: Use auto-sync method for credits
+    creditManager.getCreditsWithAutoSync { credits ->
+        binding.btnGenerateCv.isEnabled = true
+        updateGenerateButton()
 
-            if (credits >= 0) {
-                updateCreditDisplay()
-                updateWelcomeMessage() // NEW: Update welcome message when data loads
-                showMessage("Data loaded successfully")
-            } else {
-                updateCreditDisplay()
-                updateWelcomeMessage() // NEW: Update welcome message when data loads
-                showMessage("Using cached data")
-            }
+        if (credits >= 0) {
+            updateCreditDisplay()
+            updateWelcomeMessage()
+            updateAdminIndicator() // ← ADD THIS LINE - after credits are loaded
+            showMessage("Data loaded successfully")
+        } else {
+            updateCreditDisplay()
+            updateWelcomeMessage()
+            updateAdminIndicator() // ← ADD THIS LINE - after credits are loaded
+            showMessage("Using cached data")
         }
     }
+}
 
     private fun generateCV() {
         // NEW: Use the enhanced resume generation check
@@ -423,13 +425,26 @@ class MainActivity : AppCompatActivity() {
     }
 
     private fun updateAdminIndicator() {
-        val isAdmin = creditManager.isAdminMode()
-        binding.tvAdminIndicator.visibility = if (isAdmin) android.view.View.VISIBLE else android.view.View.GONE
-        binding.btnAdminAccess.visibility = if (isAdmin) android.view.View.VISIBLE else android.view.View.GONE
-        
-        // Debug log to verify admin status
-        Log.d("MainActivity", "Admin Mode: $isAdmin, Admin Indicator Visible: ${if (isAdmin) "YES" else "NO"}")
+    val isAdmin = creditManager.isAdminMode()
+    
+    // Debug logging to see what's happening
+    Log.d("ADMIN_DEBUG", "=== ADMIN INDICATOR UPDATE ===")
+    Log.d("ADMIN_DEBUG", "isAdmin: $isAdmin")
+    Log.d("ADMIN_DEBUG", "Admin Indicator View: ${binding.tvAdminIndicator != null}")
+    Log.d("ADMIN_DEBUG", "Admin Button View: ${binding.btnAdminAccess != null}")
+    
+    if (isAdmin) {
+        binding.tvAdminIndicator.visibility = View.VISIBLE
+        binding.btnAdminAccess.visibility = View.VISIBLE
+        Log.d("ADMIN_DEBUG", "✅ Admin views set to VISIBLE")
+    } else {
+        binding.tvAdminIndicator.visibility = View.GONE
+        binding.btnAdminAccess.visibility = View.GONE
+        Log.d("ADMIN_DEBUG", "❌ Admin views set to GONE")
     }
+    
+    Log.d("ADMIN_DEBUG", "Final Visibility - Indicator: ${binding.tvAdminIndicator.visibility}, Button: ${binding.btnAdminAccess.visibility}")
+}
 
     private fun showMessage(message: String) {
         android.widget.Toast.makeText(this, message, android.widget.Toast.LENGTH_SHORT).show()
