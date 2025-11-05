@@ -448,50 +448,89 @@ private fun showTopCVGenerators() {
     }
 
     private fun modifyUserCredits(amount: Int, operation: String) {
-        if (selectedUserId.isEmpty()) {
-            showMessage("Please select a user first")
-            return
-        }
-
-        if (isUserBlocked) {
-            showMessage("Cannot modify credits for blocked user")
-            return
-        }
-
-        when (operation) {
-            "add" -> creditManager.adminAddCreditsToUser(selectedUserId, amount) { success ->
-                if (success) {
-                    showMessage("Added $amount credits to $selectedUserEmail")
-                    loadUserDataById(selectedUserId)
-                    loadAdminStats()
-                    
-                    // Record credit award history
-                    recordCreditAward(amount, "Admin added credits")
-                } else showMessage("Failed to add credits")
-            }
-        }
+    if (selectedUserId.isEmpty()) {
+        showMessage("Please select a user first")
+        return
     }
+
+    if (isUserBlocked) {
+        showMessage("Cannot modify credits for blocked user")
+        return
+    }
+
+    when (operation) {
+        "add" -> creditManager.adminAddCreditsToUser(selectedUserId, amount) { success ->
+            if (success) {
+                showMessage("Added $amount credits to $selectedUserEmail")
+                loadUserDataById(selectedUserId)
+                loadAdminStats()
+                
+                // Record credit award history
+                recordCreditAward(amount, "Admin added credits")
+            } else showMessage("Failed to add credits")
+        }
+        
+        "reset" -> resetUserCreditsToZero() // ← ADD THIS CASE
+    }
+}
+
+// ADD THIS NEW METHOD FOR RESETTING CREDITS
+private fun resetUserCreditsToZero() {
+    AlertDialog.Builder(this)
+        .setTitle("Reset Credits to Zero")
+        .setMessage("Are you sure you want to reset $selectedUserEmail's credits to 0?\n\nThis will set available credits to 0 but preserve used credits history.")
+        .setPositiveButton("Reset to 0") { _, _ ->
+            performCreditReset()
+        }
+        .setNegativeButton("Cancel", null)
+        .show()
+}
+
+// ADD THIS METHOD TO PERFORM THE ACTUAL RESET
+private fun performCreditReset() {
+    val updates = hashMapOf<String, Any>(
+        "availableCredits" to 0,
+        "lastUpdated" to System.currentTimeMillis()
+    )
+
+    db.collection("users").document(selectedUserId)
+        .update(updates)
+        .addOnSuccessListener {
+            showMessage("✅ Credits reset to 0 for $selectedUserEmail")
+            loadUserDataById(selectedUserId) // Refresh the display
+            loadAdminStats() // Refresh overall stats
+            
+            // Record this action in credit awards
+            recordCreditAward(0, "Admin reset credits to zero")
+            
+            Log.d("AdminPanel", "Credits reset to 0 for user: $selectedUserEmail")
+        }
+        .addOnFailureListener { e ->
+            showMessage("❌ Failed to reset credits: ${e.message}")
+            Log.e("AdminPanel", "Error resetting credits", e)
+        }
+}
 
     private fun recordCreditAward(amount: Int, reason: String) {
-        if (selectedUserId.isEmpty()) return
-        
-        val awardData = hashMapOf(
-            "userId" to selectedUserId,
-            "amount" to amount,
-            "reason" to reason,
-            "timestamp" to System.currentTimeMillis(),
-            "adminAction" to true
-        )
-        
-        db.collection("creditAwards")
-            .add(awardData)
-            .addOnSuccessListener {
-                Log.d("AdminPanel", "Credit award recorded: $reason - $amount credits")
-            }
-            .addOnFailureListener { e ->
-                Log.e("AdminPanel", "Failed to record credit award", e)
-            }
-    }
+    if (selectedUserId.isEmpty()) return
+    
+    val awardData = hashMapOf(
+        "userId" to selectedUserId,
+        "amount" to amount,
+        "reason" to reason,
+        "timestamp" to System.currentTimeMillis(),
+        "adminAction" to true
+    )
+    
+    db.collection("creditAwards")
+        .add(awardData)
+        .addOnSuccessListener {
+            Log.d("AdminPanel", "Admin action recorded: $reason")
+        }
+        .addOnFailureListener { e ->
+            Log.e("AdminPanel", "Failed to record admin action", e)
+        }
+}
 
     private fun showUserStats() {
     if (selectedUserId.isEmpty()) {
