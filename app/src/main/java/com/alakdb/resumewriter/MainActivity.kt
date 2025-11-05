@@ -4,6 +4,7 @@ import android.app.Dialog
 import android.content.Intent
 import android.util.Log
 import android.os.Bundle
+import android.view.View
 import android.webkit.WebView
 import androidx.appcompat.app.AlertDialog
 import androidx.appcompat.app.AppCompatActivity
