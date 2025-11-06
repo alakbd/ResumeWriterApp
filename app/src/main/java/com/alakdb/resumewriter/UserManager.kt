@@ -163,9 +163,31 @@ fun registerUser(
     password: String,
     onComplete: (Boolean, String?) -> Unit
 ) {
+    Log.d("RegistrationDebug", "🔍 STARTING REGISTRATION DEBUG")
+    Log.d("RegistrationDebug", "Email: $email")
+    Log.d("RegistrationDebug", "Context is null: ${context == null}")
+
     if (password.length < 6) {
         onComplete(false, "Password must be at least 6 characters")
         return
+    }
+
+    // ⭐⭐⭐ TEST NETWORKUTILS METHODS FIRST
+    try {
+        Log.d("RegistrationDebug", "=== TESTING NETWORKUTILS ===")
+        val testDeviceId = NetworkUtils.getDeviceId(context)
+        val testDeviceInfo = NetworkUtils.getDeviceInfo()
+        val testUserAgent = NetworkUtils.getUserAgent()
+        val testLocalIp = NetworkUtils.getLocalIpAddress()
+        
+        Log.d("RegistrationDebug", "✅ NetworkUtils Test Results:")
+        Log.d("RegistrationDebug", "DeviceId: $testDeviceId")
+        Log.d("RegistrationDebug", "DeviceInfo: $testDeviceInfo")
+        Log.d("RegistrationDebug", "UserAgent: $testUserAgent")
+        Log.d("RegistrationDebug", "LocalIp: $testLocalIp")
+        Log.d("RegistrationDebug", "=== END NETWORKUTILS TEST ===")
+    } catch (e: Exception) {
+        Log.e("RegistrationDebug", "❌ NetworkUtils test failed: ${e.message}", e)
     }
 
     auth.createUserWithEmailAndPassword(email, password)
@@ -178,17 +200,27 @@ fun registerUser(
                     return@addOnCompleteListener
                 }
 
+                Log.d("RegistrationDebug", "✅ Firebase auth successful, UID: $uid")
+
                 // ⭐⭐⭐ CAPTURE DEVICE & NETWORK INFO:
                 val deviceId = NetworkUtils.getDeviceId(context)
                 val deviceInfo = NetworkUtils.getDeviceInfo()
                 val userAgent = NetworkUtils.getUserAgent()
                 val localIp = NetworkUtils.getLocalIpAddress()
 
+                // ⭐⭐⭐ VERIFY CAPTURED DATA:
+                Log.d("RegistrationDebug", "=== CAPTURED REGISTRATION DATA ===")
+                Log.d("RegistrationDebug", "📱 DeviceId: $deviceId")
+                Log.d("RegistrationDebug", "📱 DeviceInfo: $deviceInfo")
+                Log.d("RegistrationDebug", "🌐 UserAgent: $userAgent")
+                Log.d("RegistrationDebug", "🌐 LocalIp: $localIp")
+                Log.d("RegistrationDebug", "=== END CAPTURED DATA ===")
+
                 // Create user document in Firestore
                 val userData = hashMapOf(
                     "email" to email,
                     "uid" to uid,
-                    "availableCredits" to 3, // Start with 3 free credits
+                    "availableCredits" to 3,
                     "usedCredits" to 0,
                     "totalCreditsEarned" to 3,
                     "createdAt" to System.currentTimeMillis(),
@@ -196,7 +228,7 @@ fun registerUser(
                     "isActive" to true,
                     "emailVerified" to false,
                     
-                    // ⭐⭐⭐ NOW THESE METHODS EXIST:
+                    // ⭐⭐⭐ NETWORK FIELDS - VERIFY THEY'RE INCLUDED:
                     "registrationIp" to localIp,
                     "deviceId" to deviceId,
                     "deviceInfo" to deviceInfo,
@@ -205,23 +237,51 @@ fun registerUser(
                     "lastLogin" to System.currentTimeMillis()
                 )
 
+                // ⭐⭐⭐ VERIFY FINAL DATA BEING SENT:
+                Log.d("RegistrationDebug", "=== FINAL DATA BEING SAVED TO FIRESTORE ===")
+                userData.forEach { (key, value) ->
+                    Log.d("RegistrationDebug", "📦 $key: $value")
+                }
+                Log.d("RegistrationDebug", "Total fields: ${userData.size}")
+                Log.d("RegistrationDebug", "=== END FINAL DATA ===")
+
                 db.collection("users").document(uid)
                     .set(userData)
                     .addOnSuccessListener {
-                        // Save registration state locally
+                        Log.d("RegistrationDebug", "✅ Firestore document created successfully")
+                        Log.d("RegistrationDebug", "📁 Collection: users, Document: $uid")
+                        
+                        // ⭐⭐⭐ VERIFY THE DATA WAS ACTUALLY SAVED:
+                        db.collection("users").document(uid).get()
+                            .addOnSuccessListener { savedDoc ->
+                                Log.d("RegistrationDebug", "=== VERIFYING SAVED DATA ===")
+                                if (savedDoc.exists()) {
+                                    savedDoc.data?.forEach { (key, value) ->
+                                        Log.d("RegistrationDebug", "💾 SAVED - $key: $value")
+                                    }
+                                    Log.d("RegistrationDebug", "Total saved fields: ${savedDoc.data?.size}")
+                                } else {
+                                    Log.e("RegistrationDebug", "❌ Saved document doesn't exist!")
+                                }
+                                Log.d("RegistrationDebug", "=== END VERIFICATION ===")
+                            }
+                            .addOnFailureListener { e ->
+                                Log.e("RegistrationDebug", "❌ Failed to verify saved data: ${e.message}")
+                            }
+
                         saveUserDataLocally(email, uid)
-                        Log.d("UserManager", "User registered successfully: $email")
-                        Log.d("UserManager", "Device info saved - ID: ${deviceId.take(8)}..., IP: $localIp")
+                        Log.d("UserManager", "✅ User registration COMPLETE: $email")
                         onComplete(true, null)
                     }
                     .addOnFailureListener { e ->
-                        // Delete the auth user if Firestore fails
+                        Log.e("RegistrationDebug", "❌ Firestore SET operation failed: ${e.message}", e)
                         user.delete()
                         Log.e("UserManager", "Firestore registration failed: ${e.message}")
                         onComplete(false, "Database error: ${e.message}")
                     }
 
             } else {
+                Log.e("RegistrationDebug", "❌ Firebase auth failed: ${task.exception?.message}")
                 val error = when (task.exception) {
                     is FirebaseAuthUserCollisionException -> "This email is already registered"
                     is FirebaseAuthInvalidCredentialsException -> "Invalid email format"
