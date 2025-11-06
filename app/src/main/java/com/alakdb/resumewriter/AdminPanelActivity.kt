@@ -146,6 +146,11 @@ private fun showTopCVGenerators() {
             loadUsers()
         }
 
+        // TEMPORARY: Add this to setupUI() method for debugging
+            binding.btnDebugAwards.setOnClickListener { 
+                debugCheckCreditAwardsCollection()
+                }
+
         binding.spUserSelector.onItemSelectedListener = object : AdapterView.OnItemSelectedListener {
             override fun onItemSelected(parent: AdapterView<*>, view: android.view.View?, position: Int, id: Long) {
                 if (position == 0) {
@@ -369,6 +374,29 @@ private fun showTopCVGenerators() {
         binding.tvUserEmail.text = "User: Not selected"
         updateBlockButtonUI(false)
     }
+
+    // ⭐⭐⭐ TEMPORARY DEBUG METHOD - CALL THIS TO TEST ⭐⭐⭐
+private fun debugCheckCreditAwardsCollection() {
+    showMessage("🔍 Debug: Checking creditAwards collection...")
+    
+    db.collection("creditAwards")
+        .limit(5)
+        .get()
+        .addOnSuccessListener { allDocuments ->
+            Log.d("CreditAwardsDebug", "=== ALL CREDIT AWARDS IN COLLECTION ===")
+            allDocuments.forEach { doc ->
+                Log.d("CreditAwardsDebug", "Doc ID: ${doc.id}")
+                doc.data.forEach { (key, value) ->
+                    Log.d("CreditAwardsDebug", "  $key: $value")
+                }
+                Log.d("CreditAwardsDebug", "---")
+            }
+            showMessage("Check Logcat for credit awards debug info")
+        }
+        .addOnFailureListener { e ->
+            Log.e("CreditAwardsDebug", "Failed to read creditAwards collection: ${e.message}")
+        }
+}
 
     private fun loadUserDataById(userId: String) {
         db.collection("users").document(userId).get()
