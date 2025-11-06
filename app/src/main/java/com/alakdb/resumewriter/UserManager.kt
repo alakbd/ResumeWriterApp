@@ -158,66 +158,81 @@ class UserManager(private val context: Context) {
     // -----------------------
     
     /** Register a new user */
-    fun registerUser(
-        email: String,
-        password: String,
-        onComplete: (Boolean, String?) -> Unit
-    ) {
-        if (password.length < 6) {
-            onComplete(false, "Password must be at least 6 characters")
-            return
-        }
-
-        auth.createUserWithEmailAndPassword(email, password)
-            .addOnCompleteListener { task ->
-                if (task.isSuccessful) {
-                    val user = task.result?.user
-                    val uid = user?.uid
-                    if (uid == null) {
-                        onComplete(false, "Registration failed: No user ID")
-                        return@addOnCompleteListener
-                    }
-
-                    // Create user document in Firestore
-                    val userData = hashMapOf(
-                        "email" to email,
-                        "uid" to uid,
-                        "availableCredits" to 3, // Start with 3 free credits
-                        "usedCredits" to 0,
-                        "totalCreditsEarned" to 3,
-                        "createdAt" to System.currentTimeMillis(),
-                        "lastActive" to System.currentTimeMillis(),
-                        "isActive" to true,
-                        "emailVerified" to false
-                    )
-
-                    db.collection("users").document(uid)
-                        .set(userData)
-                        .addOnSuccessListener {
-                            // Save registration state locally
-                            saveUserDataLocally(email, uid)
-                            Log.d("UserManager", "User registered successfully: $email")
-                            onComplete(true, null)
-                        }
-                        .addOnFailureListener { e ->
-                            // Delete the auth user if Firestore fails
-                            user.delete()
-                            Log.e("UserManager", "Firestore registration failed: ${e.message}")
-                            onComplete(false, "Database error: ${e.message}")
-                        }
-
-                } else {
-                    val error = when (task.exception) {
-                        is FirebaseAuthUserCollisionException -> "This email is already registered"
-                        is FirebaseAuthInvalidCredentialsException -> "Invalid email format"
-                        is FirebaseAuthWeakPasswordException -> "Password is too weak"
-                        else -> "Registration failed: ${task.exception?.message}"
-                    }
-                    Log.e("UserManager", "Registration failed: $error")
-                    onComplete(false, error)
-                }
-            }
+fun registerUser(
+    email: String,
+    password: String,
+    onComplete: (Boolean, String?) -> Unit
+) {
+    if (password.length < 6) {
+        onComplete(false, "Password must be at least 6 characters")
+        return
     }
+
+    auth.createUserWithEmailAndPassword(email, password)
+        .addOnCompleteListener { task ->
+            if (task.isSuccessful) {
+                val user = task.result?.user
+                val uid = user?.uid
+                if (uid == null) {
+                    onComplete(false, "Registration failed: No user ID")
+                    return@addOnCompleteListener
+                }
+
+                // ⭐⭐⭐ CAPTURE DEVICE & NETWORK INFO:
+                val deviceId = NetworkUtils.getDeviceId(context)
+                val deviceInfo = NetworkUtils.getDeviceInfo()
+                val userAgent = NetworkUtils.getUserAgent()
+                val localIp = NetworkUtils.getLocalIpAddress()
+
+                // Create user document in Firestore
+                val userData = hashMapOf(
+                    "email" to email,
+                    "uid" to uid,
+                    "availableCredits" to 3, // Start with 3 free credits
+                    "usedCredits" to 0,
+                    "totalCreditsEarned" to 3,
+                    "createdAt" to System.currentTimeMillis(),
+                    "lastActive" to System.currentTimeMillis(),
+                    "isActive" to true,
+                    "emailVerified" to false,
+                    
+                    // ⭐⭐⭐ NOW THESE METHODS EXIST:
+                    "registrationIp" to localIp,
+                    "deviceId" to deviceId,
+                    "deviceInfo" to deviceInfo,
+                    "userAgent" to userAgent,
+                    "lastLoginIp" to localIp,
+                    "lastLogin" to System.currentTimeMillis()
+                )
+
+                db.collection("users").document(uid)
+                    .set(userData)
+                    .addOnSuccessListener {
+                        // Save registration state locally
+                        saveUserDataLocally(email, uid)
+                        Log.d("UserManager", "User registered successfully: $email")
+                        Log.d("UserManager", "Device info saved - ID: ${deviceId.take(8)}..., IP: $localIp")
+                        onComplete(true, null)
+                    }
+                    .addOnFailureListener { e ->
+                        // Delete the auth user if Firestore fails
+                        user.delete()
+                        Log.e("UserManager", "Firestore registration failed: ${e.message}")
+                        onComplete(false, "Database error: ${e.message}")
+                    }
+
+            } else {
+                val error = when (task.exception) {
+                    is FirebaseAuthUserCollisionException -> "This email is already registered"
+                    is FirebaseAuthInvalidCredentialsException -> "Invalid email format"
+                    is FirebaseAuthWeakPasswordException -> "Password is too weak"
+                    else -> "Registration failed: ${task.exception?.message}"
+                }
+                Log.e("UserManager", "Registration failed: $error")
+                onComplete(false, error)
+            }
+        }
+}
 
     /** Check if current user has verified email */
     fun isEmailVerified(): Boolean {
