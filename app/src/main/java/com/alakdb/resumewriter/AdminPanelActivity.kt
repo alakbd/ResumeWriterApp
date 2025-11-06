@@ -557,25 +557,102 @@ private fun performCreditReset() {
         }
 }
 
-    private fun recordCreditAward(amount: Int, reason: String) {
-    if (selectedUserId.isEmpty() || selectedUserEmail.isEmpty()) return
+private fun fixMissingCreditAwardEmails() {
+    showMessage("🔧 Fixing credit awards missing emails...")
     
+    db.collection("creditAwards")
+        .whereEqualTo("userEmail", null) // Find documents missing userEmail
+        .get()
+        .addOnSuccessListener { documents ->
+            if (documents.isEmpty) {
+                showMessage("✅ No credit awards missing emails")
+                return@addOnSuccessListener
+            }
+            
+            showMessage("📝 Found ${documents.size()} awards missing emails")
+            
+            val batch = db.batch()
+            var fixedCount = 0
+            
+            for (doc in documents) {
+                val userId = doc.getString("userId")
+                if (!userId.isNullOrBlank()) {
+                    // Get user email from users collection
+                    db.collection("users").document(userId).get()
+                        .addOnSuccessListener { userDoc ->
+                            val userEmail = userDoc.getString("email") ?: "Unknown User"
+                            
+                            // Update this credit award document
+                            batch.update(doc.reference, "userEmail", userEmail)
+                            fixedCount++
+                            
+                            Log.d("CreditAwardsFix", "Fixed award for user: $userEmail")
+                            
+                            // Commit after processing all documents
+                            if (fixedCount == documents.size()) {
+                                batch.commit()
+                                    .addOnSuccessListener {
+                                        showMessage("✅ Fixed $fixedCount credit awards")
+                                        // Refresh the display
+                                        if (selectedUserId.isNotEmpty()) {
+                                            showUserStats()
+                                        }
+                                    }
+                                    .addOnFailureListener { e ->
+                                        showMessage("❌ Failed to commit fixes: ${e.message}")
+                                    }
+                            }
+                        }
+                        .addOnFailureListener { e ->
+                            Log.e("CreditAwardsFix", "Failed to get user data for $userId", e)
+                            fixedCount++
+                        }
+                } else {
+                    fixedCount++ // Skip if no userId
+                }
+            }
+        }
+        .addOnFailureListener { e ->
+            showMessage("❌ Failed to scan credit awards: ${e.message}")
+        }
+}
+
+
+
+    private fun recordCreditAward(amount: Int, reason: String) {
+    if (selectedUserId.isEmpty() || selectedUserEmail.isEmpty()) {
+        Log.e("CreditAward", "Cannot record award: missing user data")
+        return
+    }
+    
+    // ⭐⭐⭐ ENSURE ALL REQUIRED FIELDS ARE PRESENT:
     val awardData = hashMapOf(
         "userId" to selectedUserId,
-        "userEmail" to selectedUserEmail, // ⭐⭐⭐ ADD THIS LINE
+        "userEmail" to selectedUserEmail, // ⭐⭐⭐ CRITICAL FIELD
         "amount" to amount,
         "reason" to reason,
         "timestamp" to System.currentTimeMillis(),
-        "adminAction" to true
+        "adminAction" to true,
+        "adminEmail" to "admin@system.com", // Track which admin did it
+        "userEmailLower" to selectedUserEmail.toLowerCase(Locale.ROOT) // For case-insensitive queries
     )
     
     db.collection("creditAwards")
         .add(awardData)
         .addOnSuccessListener {
-            Log.d("AdminPanel", "Admin action recorded for $selectedUserEmail: $reason")
+            Log.d("AdminPanel", "✅ Credit award recorded for $selectedUserEmail: $reason")
         }
         .addOnFailureListener { e ->
-            Log.e("AdminPanel", "Failed to record admin action", e)
+            Log.e("AdminPanel", "❌ Failed to record credit award", e)
+            // ⭐⭐⭐ FALLBACK: Try without userEmail if the above fails
+            val fallbackData = hashMapOf(
+                "userId" to selectedUserId,
+                "amount" to amount,
+                "reason" to reason,
+                "timestamp" to System.currentTimeMillis(),
+                "adminAction" to true
+            )
+            db.collection("creditAwards").add(fallbackData)
         }
 }
 
