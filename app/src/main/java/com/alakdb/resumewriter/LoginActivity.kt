@@ -172,32 +172,55 @@ private fun checkAndUpdateEmailVerification() {
     }
 
     private fun attemptLogin(email: String, password: String) {
-        setLoginInProgress(true)
+    setLoginInProgress(true)
 
-        FirebaseAuth.getInstance().signInWithEmailAndPassword(email, password)
-            .addOnCompleteListener { task ->
-                if (task.isSuccessful) {
-                    val user = task.result?.user
-                    if (user != null) {
-                        if (user.isEmailVerified) {
-                            // ✅ Email verified - proceed with login
-                            onLoginSuccess(user)
-                        } else {
-                            // ❌ Email not verified - show dialog
-                            setLoginInProgress(false)
-                            showUnverifiedEmailDialog(user)
-                        }
+    FirebaseAuth.getInstance().signInWithEmailAndPassword(email, password)
+        .addOnCompleteListener { task ->
+            if (task.isSuccessful) {
+                val user = task.result?.user
+                if (user != null) {
+                    // ⭐⭐⭐ CAPTURE LOGIN NETWORK INFO
+                    try {
+                        val currentIp = NetworkUtils.getLocalIpAddress(this)
+                        val currentTime = System.currentTimeMillis()
+                        
+                        val updates = hashMapOf<String, Any>(
+                            "lastLoginIp" to currentIp,
+                            "lastLogin" to currentTime,
+                            "lastActive" to currentTime
+                        )
+                        
+                        Firebase.firestore.collection("users").document(user.uid)
+                            .update(updates)
+                            .addOnSuccessListener {
+                                Log.d("Login", "Login network info updated - IP: $currentIp")
+                            }
+                            .addOnFailureListener { e ->
+                                Log.e("Login", "Failed to update login network info", e)
+                            }
+                    } catch (e: Exception) {
+                        Log.e("Login", "Error capturing network info", e)
+                    }
+                    
+                    if (user.isEmailVerified) {
+                        // ✅ Email verified - proceed with login
+                        onLoginSuccess(user)
                     } else {
+                        // ❌ Email not verified - show dialog
                         setLoginInProgress(false)
-                        showMessage("Login failed: User not found")
+                        showUnverifiedEmailDialog(user)
                     }
                 } else {
                     setLoginInProgress(false)
-                    val errorMessage = task.exception?.message ?: "Login failed"
-                    onLoginFailure(errorMessage)
+                    showMessage("Login failed: User not found")
                 }
+            } else {
+                setLoginInProgress(false)
+                val errorMessage = task.exception?.message ?: "Login failed"
+                onLoginFailure(errorMessage)
             }
-    }
+        }
+}
 
     private fun showUnverifiedEmailDialog(user: FirebaseUser) {
         AlertDialog.Builder(this)
