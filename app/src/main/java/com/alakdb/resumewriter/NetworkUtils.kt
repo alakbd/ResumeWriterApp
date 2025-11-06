@@ -9,7 +9,7 @@ import java.util.Collections
 object NetworkUtils {
     
     /**
-     * Get device ID (Android ID)
+     * Get device ID (Android ID) - THIS ONE NEEDS Context
      */
     fun getDeviceId(context: Context): String {
         return Settings.Secure.getString(context.contentResolver, Settings.Secure.ANDROID_ID) ?: "unknown_device"
@@ -30,9 +30,9 @@ object NetworkUtils {
     }
     
     /**
-     * Get local IP address
+     * Get local IP address - NO CONTEXT NEEDED
      */
-    fun getLocalIpAddress(): String {
+    fun getLocalIpAddress(): String {  // ⭐⭐⭐ REMOVED Context parameter
         return try {
             val interfaces = Collections.list(NetworkInterface.getNetworkInterfaces())
             for (intf in interfaces) {
