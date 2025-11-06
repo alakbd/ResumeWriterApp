@@ -181,7 +181,7 @@ private fun checkAndUpdateEmailVerification() {
                 if (user != null) {
                     // ⭐⭐⭐ CAPTURE LOGIN NETWORK INFO
                     try {
-                        val currentIp = NetworkUtils.getLocalIpAddress() // ⭐⭐⭐ NO PARAMETER
+                        val currentIp = NetworkUtils.getLocalIpAddress(this) // ⭐⭐⭐ PARAMETER
                         val currentTime = System.currentTimeMillis()
                         
                         val updates = hashMapOf<String, Any>(
