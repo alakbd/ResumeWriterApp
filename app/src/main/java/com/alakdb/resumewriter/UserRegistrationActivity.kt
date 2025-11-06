@@ -188,7 +188,7 @@ private fun testNetworkUtils() {
         val deviceId = NetworkUtils.getDeviceId(this)
         val deviceInfo = NetworkUtils.getDeviceInfo()
         val userAgent = NetworkUtils.getUserAgent()
-        val localIp = NetworkUtils.getLocalIpAddress()
+        val localIp = NetworkUtils.getLocalIpAddress(this)
         
         Log.d("NetworkTest", "✅ DeviceId: $deviceId")
         Log.d("NetworkTest", "✅ DeviceInfo: $deviceInfo")
