@@ -1,25 +1,32 @@
 package com.alakdb.resumewriter
 
 import android.content.Context
+import android.net.ConnectivityManager
+import android.net.NetworkInterface
+import android.net.wifi.WifiManager
 import android.provider.Settings
 import android.util.Log
-import java.net.NetworkInterface
-import java.util.Collections
+import java.net.Inet4Address
+import java.net.URL
+import java.util.*
+import kotlinx.coroutines.*
+import android.annotation.SuppressLint
+import android.os.Build
 
 object NetworkUtils {
     
     // Better IP address detection that works on all networks
-    fun getLocalIpAddress(): String {
+    fun getLocalIpAddress(context: Context): String {
         return try {
             // Method 1: Try WiFi first (most reliable)
-            val wifiIp = getWifiIpAddress()
+            val wifiIp = getWifiIpAddress(context)
             if (wifiIp.isNotBlank()) {
                 Log.d("NetworkUtils", "📶 Found WiFi IP: $wifiIp")
                 return wifiIp
             }
             
             // Method 2: Try mobile data
-            val mobileIp = getMobileIpAddress()
+            val mobileIp = getMobileIpAddress(context)
             if (mobileIp.isNotBlank()) {
                 Log.d("NetworkUtils", "📱 Found Mobile IP: $mobileIp")
                 return mobileIp
@@ -43,9 +50,9 @@ object NetworkUtils {
         }
     }
     
-    private fun getWifiIpAddress(): String {
+    private fun getWifiIpAddress(context: Context): String {
         return try {
-            val wifiManager = context.getSystemService(Context.WIFI_SERVICE) as? WifiManager
+            val wifiManager = context.applicationContext.getSystemService(Context.WIFI_SERVICE) as? WifiManager
             val wifiInfo = wifiManager?.connectionInfo
             val ip = wifiInfo?.ipAddress ?: return ""
             
@@ -63,9 +70,9 @@ object NetworkUtils {
         }
     }
     
-    private fun getMobileIpAddress(): String {
+    private fun getMobileIpAddress(context: Context): String {
         return try {
-            val connectivityManager = context.getSystemService(Context.CONNECTIVITY_SERVICE) as? ConnectivityManager
+            val connectivityManager = context.applicationContext.getSystemService(Context.CONNECTIVITY_SERVICE) as? ConnectivityManager
             val network = connectivityManager?.activeNetwork
             val linkProperties = connectivityManager?.getLinkProperties(network)
             
@@ -150,6 +157,24 @@ object NetworkUtils {
         } catch (e: Exception) {
             Log.e("NetworkUtils", "❌ Device ID failed: ${e.message}")
             "error_device_${System.currentTimeMillis()}"
+        }
+    }
+
+    // Get device information
+    fun getDeviceInfo(): String {
+        return try {
+            "${Build.MANUFACTURER} ${Build.MODEL} (Android ${Build.VERSION.RELEASE})"
+        } catch (e: Exception) {
+            "Unknown Device"
+        }
+    }
+
+    // Get user agent
+    fun getUserAgent(): String {
+        return try {
+            "Android/${Build.VERSION.RELEASE} (${Build.MANUFACTURER} ${Build.MODEL})"
+        } catch (e: Exception) {
+            "Android App"
         }
     }
 }
