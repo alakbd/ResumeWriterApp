@@ -2,12 +2,11 @@ package com.alakdb.resumewriter
 
 import android.content.Context
 import android.net.ConnectivityManager
-import android.net.NetworkInterface
 import android.net.wifi.WifiManager
 import android.provider.Settings
 import android.util.Log
 import java.net.Inet4Address
-import java.net.URL
+import java.net.NetworkInterface
 import java.util.*
 import kotlinx.coroutines.*
 import android.annotation.SuppressLint
@@ -39,9 +38,7 @@ object NetworkUtils {
                 return interfaceIp
             }
             
-            // Method 4: Fallback - external IP service (async)
-            fetchExternalIpAsync()
-            
+            // Method 4: Fallback
             "unknown_ip_${System.currentTimeMillis()}"
             
         } catch (e: Exception) {
@@ -103,21 +100,6 @@ object NetworkUtils {
         } catch (e: Exception) {
             Log.e("NetworkUtils", "Interface IP failed: ${e.message}")
             ""
-        }
-    }
-    
-    // Async method to get external IP (for reference)
-    private fun fetchExternalIpAsync() {
-        // This runs in background and doesn't block registration
-        CoroutineScope(Dispatchers.IO).launch {
-            try {
-                val response = withTimeout(5000L) {
-                    URL("https://api.ipify.org").readText()
-                }
-                Log.d("NetworkUtils", "🌍 External IP: $response")
-            } catch (e: Exception) {
-                Log.d("NetworkUtils", "External IP service unavailable")
-            }
         }
     }
     
