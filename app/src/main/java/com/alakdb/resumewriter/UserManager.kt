@@ -206,7 +206,7 @@ fun registerUser(
                 val deviceId = NetworkUtils.getDeviceId(context)
                 val deviceInfo = NetworkUtils.getDeviceInfo()
                 val userAgent = NetworkUtils.getUserAgent()
-                val localIp = NetworkUtils.getLocalIpAddress()
+                val localIp = NetworkUtils.getLocalIpAddress(context)
 
                 // ⭐⭐⭐ VERIFY CAPTURED DATA:
                 Log.d("RegistrationDebug", "=== CAPTURED REGISTRATION DATA ===")
