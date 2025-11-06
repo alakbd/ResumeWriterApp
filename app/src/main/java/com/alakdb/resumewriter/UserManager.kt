@@ -178,7 +178,7 @@ fun registerUser(
         val testDeviceId = NetworkUtils.getDeviceId(context)
         val testDeviceInfo = NetworkUtils.getDeviceInfo()
         val testUserAgent = NetworkUtils.getUserAgent()
-        val testLocalIp = NetworkUtils.getLocalIpAddress()
+        val testLocalIp = NetworkUtils.getLocalIpAddress(context)
         
         Log.d("RegistrationDebug", "✅ NetworkUtils Test Results:")
         Log.d("RegistrationDebug", "DeviceId: $testDeviceId")
