@@ -523,10 +523,11 @@ private fun performCreditReset() {
 }
 
     private fun recordCreditAward(amount: Int, reason: String) {
-    if (selectedUserId.isEmpty()) return
+    if (selectedUserId.isEmpty() || selectedUserEmail.isEmpty()) return
     
     val awardData = hashMapOf(
         "userId" to selectedUserId,
+        "userEmail" to selectedUserEmail, // ⭐⭐⭐ ADD THIS LINE
         "amount" to amount,
         "reason" to reason,
         "timestamp" to System.currentTimeMillis(),
@@ -536,7 +537,7 @@ private fun performCreditReset() {
     db.collection("creditAwards")
         .add(awardData)
         .addOnSuccessListener {
-            Log.d("AdminPanel", "Admin action recorded: $reason")
+            Log.d("AdminPanel", "Admin action recorded for $selectedUserEmail: $reason")
         }
         .addOnFailureListener { e ->
             Log.e("AdminPanel", "Failed to record admin action", e)
@@ -611,15 +612,26 @@ private fun loadCreditAwardsHistory(basicStats: String) {
     db.collection("creditAwards")
         .whereEqualTo("userId", selectedUserId)
         .orderBy("timestamp", com.google.firebase.firestore.Query.Direction.DESCENDING)
-        .limit(10)
+        .limit(20)
         .get()
         .addOnSuccessListener { awardDocuments ->
+            // Check if documents have email field
+            if (awardDocuments.isEmpty) {
+                showCompleteStatsDialog(basicStats, "No credit award history found")
+                return@addOnSuccessListener
+            }
+            
+            // Optional: Debug to see what fields exist
+            awardDocuments.documents.firstOrNull()?.data?.keys?.forEach { field ->
+                Log.d("CreditAwardsDebug", "Available field: $field")
+            }
+            
             val creditHistory = buildCreditHistoryString(awardDocuments)
             showCompleteStatsDialog(basicStats, creditHistory)
         }
         .addOnFailureListener { e ->
-            // If no credit awards, just show basic stats
-            showCompleteStatsDialog(basicStats, "No credit award history available")
+            Log.e("AdminPanel", "Error loading credit awards: ${e.message}")
+            showCompleteStatsDialog(basicStats, "❌ Error loading credit history")
         }
 }
 
@@ -629,21 +641,28 @@ private fun buildCreditHistoryString(awardDocuments: com.google.firebase.firesto
         return "No credit award history found"
     }
 
-    val history = StringBuilder("Recent Credit Awards:\n\n")
+    val history = StringBuilder("📊 CREDIT AWARD HISTORY:\n\n")
     val dateFormat = SimpleDateFormat("MMM dd, yyyy HH:mm", Locale.getDefault())
     
+    var count = 0
     for (doc in awardDocuments) {
+        count++
         val amount = doc.getLong("amount") ?: 0
         val reason = doc.getString("reason") ?: "Unknown reason"
+        val userEmail = doc.getString("userEmail") ?: "Unknown User" // ⭐⭐⭐ ADD THIS
         val timestamp = doc.getLong("timestamp") ?: 0
+        val adminAction = doc.getBoolean("adminAction") ?: false
         val date = if (timestamp > 0) dateFormat.format(Date(timestamp)) else "Unknown date"
         
-        history.append("💰 $amount credits\n")
-        history.append("📝 $reason\n")
-        history.append("📅 $date\n")
-        history.append("${"-".repeat(30)}\n")
+        history.append("${count}. 💰 $amount credits\n")
+        history.append("   👤 $userEmail\n") // ⭐⭐⭐ DISPLAY EMAIL
+        history.append("   📝 $reason\n")
+        history.append("   ${if (adminAction) "🛡️ Admin Action" else "🤖 System"}\n")
+        history.append("   📅 $date\n")
+        history.append("   ${"-".repeat(40)}\n")
     }
     
+    history.append("\n📈 Total awards found: $count")
     return history.toString()
 }
 
