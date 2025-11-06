@@ -52,4 +52,35 @@ object NetworkUtils {
         }
         return "unknown_ip"
     }
+
+    // Add this method temporarily to MainActivity or RegistrationActivity
+private fun testNetworkUtils() {
+    Log.d("NetworkTest", "=== TESTING NETWORKUTILS DIRECTLY ===")
+    
+    try {
+        val deviceId = NetworkUtils.getDeviceId(this)
+        val deviceInfo = NetworkUtils.getDeviceInfo()
+        val userAgent = NetworkUtils.getUserAgent()
+        val localIp = NetworkUtils.getLocalIpAddress()
+        
+        Log.d("NetworkTest", "✅ DeviceId: $deviceId")
+        Log.d("NetworkTest", "✅ DeviceInfo: $deviceInfo")
+        Log.d("NetworkTest", "✅ UserAgent: $userAgent")
+        Log.d("NetworkTest", "✅ LocalIp: $localIp")
+        
+        // Show in UI for quick verification
+        Toast.makeText(this, 
+            "NetworkTest - IP: $localIp, Device: ${deviceId.take(8)}...", 
+            Toast.LENGTH_LONG
+        ).show()
+        
+    } catch (e: Exception) {
+        Log.e("NetworkTest", "❌ NetworkUtils failed: ${e.message}", e)
+        Toast.makeText(this, "NetworkTest FAILED: ${e.message}", Toast.LENGTH_LONG).show()
+    }
+    
+    Log.d("NetworkTest", "=== END NETWORKUTILS TEST ===")
+    }
+
+    
 }
