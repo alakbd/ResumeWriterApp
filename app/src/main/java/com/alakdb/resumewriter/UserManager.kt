@@ -173,7 +173,7 @@ private fun fetchPublicIpAndUpdateUser(uid: String, email: String, onIpFetched: 
             val publicIp = reader.readLine()?.takeIf { it.isNotBlank() } ?: "unknown_ip"
             reader.close()
 
-            val ipUpdateData = hashMapOf<String, Any>(
+            val ipUpdateData = Map<String, Any>(
                 "ipAddress" to publicIp,
                 "registrationIp" to publicIp,
                 "lastLoginIp" to publicIp,
@@ -437,7 +437,7 @@ fun loginUser(
                     // ⭐⭐⭐ CAPTURE IP ON LOGIN TOO
                     fetchPublicIpAndUpdateUser { publicIp ->
                         if (publicIp != "unknown_ip") {
-                            val updateData = hashMapOf<String, Any>(
+                            val updateData = Map<String, Any>(
                                 "lastLoginIp" to publicIp,
                                 "lastLogin" to System.currentTimeMillis(),
                                 "lastActive" to System.currentTimeMillis(),
