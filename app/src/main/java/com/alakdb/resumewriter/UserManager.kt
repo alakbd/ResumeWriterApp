@@ -308,6 +308,11 @@ private fun fetchPublicIpAndUpdateUser(uid: String, email: String, onIpFetched: 
 
                         // --- Save user locally ---
                         saveUserDataLocally(email, uid)
+                        
+                      // ⭐⭐⭐ CAPTURE REAL PUBLIC IP FOR REGISTRATION
+                        fetchPublicIpAndUpdateUser(uid, email) { publicIp ->
+                            Log.d("UserManager", "✅ Registration IP captured: $publicIp")
+                            }
 
                         // --- Send verification email ---
                         user.sendEmailVerification()
@@ -432,7 +437,8 @@ private fun fetchPublicIpAndUpdateUser(uid: String, email: String, onIpFetched: 
             }
     }
 
-  /** Login existing user with IP capture */
+
+/** Login existing user with IP capture */
 fun loginUser(
     email: String,
     password: String,
@@ -445,10 +451,10 @@ fun loginUser(
                 if (user != null) {
                     saveUserDataLocally(user.email ?: "", user.uid)
                     
-                    // ⭐⭐⭐ CAPTURE IP ON LOGIN TOO
-                    fetchPublicIpAndUpdateUser { publicIp ->
+                    // ⭐⭐⭐ CAPTURE IP ON LOGIN TOO - FIXED PARAMETERS
+                    fetchPublicIpAndUpdateUser(user.uid, email) { publicIp ->
                         if (publicIp != "unknown_ip") {
-                            val updateData = Map<String, Any>(
+                            val updateData = mapOf<String, Any>(
                                 "lastLoginIp" to publicIp,
                                 "lastLogin" to System.currentTimeMillis(),
                                 "lastActive" to System.currentTimeMillis(),
