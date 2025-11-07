@@ -12,6 +12,7 @@ import android.util.Log
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.launch
+import android.provider.Settings
 
 class UserManager(private val context: Context) {
 
@@ -421,8 +422,8 @@ private fun fetchPublicIpAndUpdateUser(uid: String, email: String) {
             }
     }
 
-    /** Login existing user */
-    fun loginUser(
+  /** Login existing user with IP capture */
+fun loginUser(
     email: String,
     password: String,
     onComplete: (Boolean, String?) -> Unit
@@ -432,58 +433,38 @@ private fun fetchPublicIpAndUpdateUser(uid: String, email: String) {
             if (task.isSuccessful) {
                 val user = auth.currentUser
                 if (user != null) {
-                    // ✅ Check email verification status
-                    if (!user.isEmailVerified) {
-                        auth.signOut()
-                        Log.w("UserManager", "Login blocked: Email not verified for $email")
-                        onComplete(false, "Please verify your email before logging in. Check your inbox.")
-                        return@addOnCompleteListener
-                    }
-
-                    // ✅ Save user locally
                     saveUserDataLocally(user.email ?: "", user.uid)
-
-                    // ✅ Ensure Firestore user document exists
-                    checkUserExists(user.uid) { exists ->
-                        if (!exists) {
-                            Log.w("UserManager", "User Firestore doc missing — creating default profile.")
-                            val defaultData = hashMapOf(
-                                "email" to email,
-                                "uid" to user.uid,
-                                "availableCredits" to 3,
-                                "usedCredits" to 0,
-                                "totalCreditsEarned" to 3,
-                                "createdAt" to System.currentTimeMillis(),
+                    
+                    // ⭐⭐⭐ CAPTURE IP ON LOGIN TOO
+                    fetchPublicIp { publicIp ->
+                        if (publicIp != "unknown_ip") {
+                            val updateData = hashMapOf<String, Any>(
+                                "lastLoginIp" to publicIp,
+                                "lastLogin" to System.currentTimeMillis(),
                                 "lastActive" to System.currentTimeMillis(),
-                                "isActive" to true
+                                "lastUpdated" to System.currentTimeMillis()
                             )
+                            
                             db.collection("users").document(user.uid)
-                                .set(defaultData)
+                                .update(updateData)
                                 .addOnSuccessListener {
-                                    Log.d("UserManager", "✅ Default user profile created after login.")
-                                    syncUserCredits { _, _ -> onComplete(true, null) }
+                                    Log.d("UserManager", "✅ Login IP captured: $publicIp")
                                 }
                                 .addOnFailureListener { e ->
-                                    Log.e("UserManager", "❌ Failed to create missing Firestore doc: ${e.message}")
-                                    onComplete(true, null) // Still login even if Firestore creation fails
+                                    Log.e("UserManager", "❌ Failed to update login IP", e)
                                 }
-                        } else {
-                            // ✅ Sync credits immediately if user doc exists
-                            syncUserCredits { success, _ ->
-                                if (success)
-                                    Log.d("UserManager", "✅ User logged in and credits synced: $email")
-                                else
-                                    Log.w("UserManager", "⚠️ User logged in but credit sync failed.")
-                                onComplete(true, null)
-                            }
                         }
                     }
-
+                    
+                    // Sync credits after successful login
+                    syncUserCredits { success, _ ->
+                        Log.d("UserManager", "User logged in successfully: $email")
+                        onComplete(true, null)
+                    }
                 } else {
                     Log.e("UserManager", "Login failed: No user data after successful auth")
                     onComplete(false, "Login failed: No user data")
                 }
-
             } else {
                 val error = when (task.exception) {
                     is FirebaseAuthInvalidUserException -> "No account found with this email"
