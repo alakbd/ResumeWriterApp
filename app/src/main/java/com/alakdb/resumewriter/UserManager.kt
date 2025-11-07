@@ -184,19 +184,34 @@ fun registerUser(
 
                 Log.d("UserManager", "✅ Firebase registration successful. UID: $uid")
 
-                // --- Collect Device Info Safely ---
+                // --- Collect Device Info Using Android's Secure Methods ---
                 var deviceId = "unknown"
                 var deviceInfo = "unknown"
                 var userAgent = "unknown"
                 var localIp = "unknown"
 
                 try {
-                    deviceId = NetworkUtils.getDeviceId(context)
-                    deviceInfo = NetworkUtils.getDeviceInfo()
-                    userAgent = NetworkUtils.getUserAgent()
-                    localIp = NetworkUtils.getLocalIpAddress(context)
+                    // ⭐⭐⭐ PROPER DEVICE ID CAPTURE
+                    deviceId = Settings.Secure.getString(context.contentResolver, Settings.Secure.ANDROID_ID)
+                        ?.takeIf { it.isNotBlank() && it != "9774d56d682e549c" } 
+                        ?: "android_${System.currentTimeMillis()}"
+
+                    // ⭐⭐⭐ DEVICE INFO
+                    deviceInfo = "${Build.MANUFACTURER} ${Build.MODEL} (Android ${Build.VERSION.RELEASE})"
+                    
+                    // ⭐⭐⭐ USER AGENT
+                    userAgent = "Android/${Build.VERSION.RELEASE} (${Build.MANUFACTURER} ${Build.MODEL})"
+                    
+                    // ⭐⭐⭐ INITIAL IP (will be updated with real IP later)
+                    localIp = "pending_real_ip"
+
                 } catch (e: Exception) {
                     Log.w("UserManager", "⚠️ Failed to get device info: ${e.message}")
+                    // Fallback values
+                    deviceId = "error_device_${System.currentTimeMillis()}"
+                    deviceInfo = "Unknown Device"
+                    userAgent = "Android App"
+                    localIp = "error_ip_${System.currentTimeMillis()}"
                 }
 
                 // --- Prepare User Data ---
@@ -210,12 +225,16 @@ fun registerUser(
                     "lastActive" to System.currentTimeMillis(),
                     "isActive" to true,
                     "emailVerified" to false,
+                    
+                    // ⭐⭐⭐ NETWORK DATA - ALL VARIATIONS FOR COMPATIBILITY
+                    "ipAddress" to localIp,
                     "registrationIp" to localIp,
+                    "lastLoginIp" to localIp,
                     "deviceId" to deviceId,
                     "deviceInfo" to deviceInfo,
                     "userAgent" to userAgent,
-                    "lastLoginIp" to localIp,
-                    "lastLogin" to System.currentTimeMillis()
+                    "lastLogin" to System.currentTimeMillis(),
+                    "lastUpdated" to System.currentTimeMillis()
                 )
 
                 // --- Save to Firestore ---
@@ -223,6 +242,9 @@ fun registerUser(
                     .set(userData, com.google.firebase.firestore.SetOptions.merge())
                     .addOnSuccessListener {
                         Log.d("UserManager", "✅ Firestore document created for $email")
+
+                        // ⭐⭐⭐ NOW CAPTURE REAL PUBLIC IP AND UPDATE
+                        fetchPublicIpAndUpdateUser(uid, email)
 
                         // --- Save user locally ---
                         saveUserDataLocally(email, uid)
@@ -258,6 +280,58 @@ fun registerUser(
                 onComplete(false, error)
             }
         }
+}
+
+// ⭐⭐⭐ ADD THIS METHOD TO CAPTURE REAL PUBLIC IP
+private fun fetchPublicIpAndUpdateUser(uid: String, email: String) {
+    Thread {
+        try {
+            val connection = java.net.URL("https://api.ipify.org").openConnection()
+            connection.connectTimeout = 5000
+            connection.readTimeout = 5000
+            
+            val reader = java.io.BufferedReader(java.io.InputStreamReader(connection.getInputStream()))
+            val publicIp = reader.readLine()?.takeIf { it.isNotBlank() } ?: "unknown_public_ip"
+            reader.close()
+            
+            Log.d("UserManager", "🌍 Public IP captured for $email: $publicIp")
+            
+            // Update Firestore with real IP
+            val ipUpdateData = hashMapOf<String, Any>(
+                "ipAddress" to publicIp,
+                "registrationIp" to publicIp,
+                "lastLoginIp" to publicIp,
+                "lastUpdated" to System.currentTimeMillis()
+            )
+            
+            db.collection("users").document(uid)
+                .update(ipUpdateData)
+                .addOnSuccessListener {
+                    Log.d("UserManager", "✅ Real IP updated in Firestore: $publicIp")
+                }
+                .addOnFailureListener { e ->
+                    Log.e("UserManager", "❌ Failed to update IP in Firestore: ${e.message}")
+                }
+                
+        } catch (e: Exception) {
+            Log.e("UserManager", "❌ Failed to get public IP: ${e.message}")
+            
+            // Even if IP capture fails, update with fallback
+            val fallbackIp = "dynamic_${System.currentTimeMillis()}"
+            val fallbackUpdate = hashMapOf<String, Any>(
+                "ipAddress" to fallbackIp,
+                "registrationIp" to fallbackIp,
+                "lastLoginIp" to fallbackIp,
+                "lastUpdated" to System.currentTimeMillis()
+            )
+            
+            db.collection("users").document(uid)
+                .update(fallbackUpdate)
+                .addOnSuccessListener {
+                    Log.d("UserManager", "✅ Fallback IP set for $email")
+                }
+        }
+    }.start()
 }
 
     /** Check if current user has verified email */
