@@ -165,22 +165,36 @@ class UserManager(private val context: Context) {
 private fun fetchPublicIpAndUpdateUser(uid: String, email: String, onIpFetched: (String) -> Unit = {}) {
     Thread {
         try {
-            val connection = URL("https://api.ipify.org").openConnection()
-            val publicIp = BufferedReader(InputStreamReader(connection.getInputStream())).readLine() ?: "unknown"
-            
-            val ipUpdateData = mapOf<String, Any>(
+            val connection = java.net.URL("https://api.ipify.org").openConnection()
+            connection.connectTimeout = 5000
+            connection.readTimeout = 5000
+
+            val reader = java.io.BufferedReader(java.io.InputStreamReader(connection.getInputStream()))
+            val publicIp = reader.readLine()?.takeIf { it.isNotBlank() } ?: "unknown_ip"
+            reader.close()
+
+            val ipUpdateData = hashMapOf<String, Any>(
                 "ipAddress" to publicIp,
                 "registrationIp" to publicIp,
                 "lastLoginIp" to publicIp,
                 "lastUpdated" to System.currentTimeMillis()
             )
-            
-            db.collection("users").document(uid).update(ipUpdateData)
-            onIpFetched(publicIp)
+
+            db.collection("users").document(uid)
+                .update(ipUpdateData)
+                .addOnSuccessListener {
+                    Log.d("UserManager", "✅ IP updated: $publicIp")
+                    onIpFetched(publicIp)
+                }
+                .addOnFailureListener {
+                    Log.e("UserManager", "❌ Failed to update IP")
+                    onIpFetched(publicIp)
+                }
+
         } catch (e: Exception) {
             val fallbackIp = "dynamic_${System.currentTimeMillis()}"
             db.collection("users").document(uid)
-                .update(mapOf(
+                .update(hashMapOf(
                     "ipAddress" to fallbackIp,
                     "registrationIp" to fallbackIp,
                     "lastLoginIp" to fallbackIp,
