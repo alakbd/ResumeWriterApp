@@ -157,136 +157,11 @@ class UserManager(private val context: Context) {
         }
     }
 
-    // -----------------------
-    // AUTHENTICATION METHODS
-    // -----------------------
-    
-    /** Register a new user */
-fun registerUser(
-    email: String,
-    password: String,
-    onComplete: (Boolean, String?) -> Unit
-) {
-    Log.d("UserManager", "🔹 Starting registration for $email")
-
-    if (password.length < 6) {
-        onComplete(false, "Password must be at least 6 characters")
-        return
-    }
-
-    auth.createUserWithEmailAndPassword(email, password)
-        .addOnCompleteListener { task ->
-            if (task.isSuccessful) {
-                val user = task.result?.user
-                val uid = user?.uid
-
-                if (uid == null) {
-                    Log.e("UserManager", "❌ Registration failed: UID null")
-                    onComplete(false, "Registration failed: No user ID")
-                    return@addOnCompleteListener
-                }
-
-                Log.d("UserManager", "✅ Firebase registration successful. UID: $uid")
-
-                // --- Collect Device Info Using Android's Secure Methods ---
-                var deviceId = "unknown"
-                var deviceInfo = "unknown"
-                var userAgent = "unknown"
-                var localIp = "unknown"
-
-                try {
-                    // ⭐⭐⭐ PROPER DEVICE ID CAPTURE
-                    deviceId = Settings.Secure.getString(context.contentResolver, Settings.Secure.ANDROID_ID)
-                        ?.takeIf { it.isNotBlank() && it != "9774d56d682e549c" } 
-                        ?: "android_${System.currentTimeMillis()}"
-
-                    // ⭐⭐⭐ DEVICE INFO
-                    deviceInfo = "${Build.MANUFACTURER} ${Build.MODEL} (Android ${Build.VERSION.RELEASE})"
-                    
-                    // ⭐⭐⭐ USER AGENT
-                    userAgent = "Android/${Build.VERSION.RELEASE} (${Build.MANUFACTURER} ${Build.MODEL})"
-                    
-                    // ⭐⭐⭐ INITIAL IP (will be updated with real IP later)
-                    localIp = "pending_real_ip"
-
-                } catch (e: Exception) {
-                    Log.w("UserManager", "⚠️ Failed to get device info: ${e.message}")
-                    // Fallback values
-                    deviceId = "error_device_${System.currentTimeMillis()}"
-                    deviceInfo = "Unknown Device"
-                    userAgent = "Android App"
-                    localIp = "error_ip_${System.currentTimeMillis()}"
-                }
-
-                // --- Prepare User Data ---
-                val userData = hashMapOf(
-                    "email" to email,
-                    "uid" to uid,
-                    "availableCredits" to 3,
-                    "usedCredits" to 0,
-                    "totalCreditsEarned" to 3,
-                    "createdAt" to System.currentTimeMillis(),
-                    "lastActive" to System.currentTimeMillis(),
-                    "isActive" to true,
-                    "emailVerified" to false,
-                    
-                    // ⭐⭐⭐ NETWORK DATA - ALL VARIATIONS FOR COMPATIBILITY
-                    "ipAddress" to localIp,
-                    "registrationIp" to localIp,
-                    "lastLoginIp" to localIp,
-                    "deviceId" to deviceId,
-                    "deviceInfo" to deviceInfo,
-                    "userAgent" to userAgent,
-                    "lastLogin" to System.currentTimeMillis(),
-                    "lastUpdated" to System.currentTimeMillis()
-                )
-
-                // --- Save to Firestore ---
-                db.collection("users").document(uid)
-                    .set(userData, com.google.firebase.firestore.SetOptions.merge())
-                    .addOnSuccessListener {
-                        Log.d("UserManager", "✅ Firestore document created for $email")
-
-                        // ⭐⭐⭐ NOW CAPTURE REAL PUBLIC IP AND UPDATE
-                        fetchPublicIpAndUpdateUser(uid, email)
-
-                        // --- Save user locally ---
-                        saveUserDataLocally(email, uid)
-
-                        // --- Send verification email ---
-                        user.sendEmailVerification()
-                            .addOnCompleteListener { emailTask ->
-                                if (emailTask.isSuccessful) {
-                                    Log.d("UserManager", "📩 Verification email sent to $email")
-                                    onComplete(true, "Registration successful! Please verify your email before logging in.")
-                                } else {
-                                    Log.w("UserManager", "⚠️ Verification email failed: ${emailTask.exception?.message}")
-                                    onComplete(true, "Registration successful, but verification email could not be sent. You can resend it later.")
-                                }
-                            }
-                    }
-                    .addOnFailureListener { e ->
-                        Log.e("UserManager", "❌ Firestore user save failed: ${e.message}")
-                        user.delete().addOnCompleteListener {
-                            Log.e("UserManager", "Deleted Firebase user after Firestore failure.")
-                            onComplete(false, "Database error during registration: ${e.message}")
-                        }
-                    }
-
-            } else {
-                val error = when (task.exception) {
-                    is FirebaseAuthUserCollisionException -> "This email is already registered"
-                    is FirebaseAuthInvalidCredentialsException -> "Invalid email format"
-                    is FirebaseAuthWeakPasswordException -> "Password is too weak"
-                    else -> "Registration failed: ${task.exception?.message}"
-                }
-                Log.e("UserManager", "❌ Firebase registration failed: $error")
-                onComplete(false, error)
-            }
-        }
-}
-
 // ⭐⭐⭐ ADD THIS METHOD TO CAPTURE REAL PUBLIC IP
+    
+    /**
+ * Capture real public IP and update user document
+ */
 private fun fetchPublicIpAndUpdateUser(uid: String, email: String) {
     Thread {
         try {
@@ -337,6 +212,138 @@ private fun fetchPublicIpAndUpdateUser(uid: String, email: String) {
         }
     }.start()
 }
+
+    
+    // -----------------------
+    // AUTHENTICATION METHODS
+    // -----------------------
+    
+    /** Register a new user */
+    fun registerUser(
+        email: String,
+        password: String,
+        onComplete: (Boolean, String?) -> Unit
+        )  {
+        Log.d("UserManager", "🔹 Starting registration for $email")
+
+        if (password.length < 6) {
+            onComplete(false, "Password must be at least 6 characters")
+            return
+        }
+
+    auth.createUserWithEmailAndPassword(email, password)
+        .addOnCompleteListener { task ->
+            if (task.isSuccessful) {
+                val user = task.result?.user
+                val uid = user?.uid
+
+                if (uid == null) {
+                    Log.e("UserManager", "❌ Registration failed: UID null")
+                    onComplete(false, "Registration failed: No user ID")
+                    return@addOnCompleteListener
+                }
+
+                Log.d("UserManager", "✅ Firebase registration successful. UID: $uid")
+
+                // --- Collect Device Info Using Android's Secure Methods ---
+                var deviceId = "unknown"
+                var deviceInfo = "unknown"
+                var userAgent = "unknown"
+                var localIp = "unknown"
+
+                try {
+                    // PROPER DEVICE ID CAPTURE
+                    deviceId = Settings.Secure.getString(context.contentResolver, Settings.Secure.ANDROID_ID)
+                        ?.takeIf { it.isNotBlank() && it != "9774d56d682e549c" } 
+                        ?: "android_${System.currentTimeMillis()}"
+
+                    // DEVICE INFO
+                    deviceInfo = "${Build.MANUFACTURER} ${Build.MODEL} (Android ${Build.VERSION.RELEASE})"
+                    
+                    // USER AGENT
+                    userAgent = "Android/${Build.VERSION.RELEASE} (${Build.MANUFACTURER} ${Build.MODEL})"
+                    
+                    // INITIAL IP (will be updated with real IP later)
+                    localIp = "pending_real_ip"
+
+                } catch (e: Exception) {
+                    Log.w("UserManager", "⚠️ Failed to get device info: ${e.message}")
+                    deviceId = "error_device_${System.currentTimeMillis()}"
+                    deviceInfo = "Unknown Device"
+                    userAgent = "Android App"
+                    localIp = "error_ip_${System.currentTimeMillis()}"
+                }
+
+                // --- Prepare User Data ---
+                val userData = hashMapOf(
+                    "email" to email,
+                    "uid" to uid,
+                    "availableCredits" to 3,
+                    "usedCredits" to 0,
+                    "totalCreditsEarned" to 3,
+                    "createdAt" to System.currentTimeMillis(),
+                    "lastActive" to System.currentTimeMillis(),
+                    "isActive" to true,
+                    "emailVerified" to false,
+                    
+                    // NETWORK DATA
+                    "ipAddress" to localIp,
+                    "registrationIp" to localIp,
+                    "lastLoginIp" to localIp,
+                    "deviceId" to deviceId,
+                    "deviceInfo" to deviceInfo,
+                    "userAgent" to userAgent,
+                    "lastLogin" to System.currentTimeMillis(),
+                    "lastUpdated" to System.currentTimeMillis()
+                )
+
+                // --- Save to Firestore ---
+                db.collection("users").document(uid)
+                    .set(userData, com.google.firebase.firestore.SetOptions.merge())
+                    .addOnSuccessListener {
+                        Log.d("UserManager", "✅ Firestore document created for $email")
+
+                        // ⭐⭐⭐ CAPTURE REAL PUBLIC IP AND UPDATE USER
+                        fetchPublicIpAndUpdateUser(uid, email)
+
+                        // --- Save user locally ---
+                        saveUserDataLocally(email, uid)
+
+                        // --- Send verification email ---
+                        user.sendEmailVerification()
+                            .addOnCompleteListener { emailTask ->
+                                if (emailTask.isSuccessful) {
+                                    Log.d("UserManager", "📩 Verification email sent to $email")
+                                    onComplete(true, "Registration successful! Please verify your email before logging in.")
+                                } else {
+                                    Log.w("UserManager", "⚠️ Verification email failed: ${emailTask.exception?.message}")
+                                    onComplete(true, "Registration successful, but verification email could not be sent. You can resend it later.")
+                                }
+                            }
+                    }
+                    .addOnFailureListener { e ->
+                        Log.e("UserManager", "❌ Firestore user save failed: ${e.message}")
+                        user.delete().addOnCompleteListener {
+                            Log.e("UserManager", "Deleted Firebase user after Firestore failure.")
+                            onComplete(false, "Database error during registration: ${e.message}")
+                        }
+                    }
+
+            } else {
+                val error = when (task.exception) {
+                    is FirebaseAuthUserCollisionException -> "This email is already registered"
+                    is FirebaseAuthInvalidCredentialsException -> "Invalid email format"
+                    is FirebaseAuthWeakPasswordException -> "Password is too weak"
+                    else -> "Registration failed: ${task.exception?.message}"
+                }
+                Log.e("UserManager", "❌ Firebase registration failed: $error")
+                onComplete(false, error)
+            }
+        }
+}
+
+
+
 
     /** Check if current user has verified email */
     fun isEmailVerified(): Boolean {
