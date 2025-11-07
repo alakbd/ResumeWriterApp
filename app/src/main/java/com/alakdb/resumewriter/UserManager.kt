@@ -446,7 +446,7 @@ fun loginUser(
                     saveUserDataLocally(user.email ?: "", user.uid)
                     
                     // ⭐⭐⭐ CAPTURE IP ON LOGIN TOO
-                    fetchPublicIp { publicIp ->
+                    fetchPublicIpAndUpdateUser { publicIp ->
                         if (publicIp != "unknown_ip") {
                             val updateData = hashMapOf<String, Any>(
                                 "lastLoginIp" to publicIp,
