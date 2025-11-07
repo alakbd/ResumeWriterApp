@@ -162,53 +162,31 @@ class UserManager(private val context: Context) {
     /**
  * Capture real public IP and update user document
  */
-private fun fetchPublicIpAndUpdateUser(uid: String, email: String) {
+private fun fetchPublicIpAndUpdateUser(uid: String, email: String, onIpFetched: (String) -> Unit = {}) {
     Thread {
         try {
-            val connection = java.net.URL("https://api.ipify.org").openConnection()
-            connection.connectTimeout = 5000
-            connection.readTimeout = 5000
+            val connection = URL("https://api.ipify.org").openConnection()
+            val publicIp = BufferedReader(InputStreamReader(connection.getInputStream())).readLine() ?: "unknown"
             
-            val reader = java.io.BufferedReader(java.io.InputStreamReader(connection.getInputStream()))
-            val publicIp = reader.readLine()?.takeIf { it.isNotBlank() } ?: "unknown_public_ip"
-            reader.close()
-            
-            Log.d("UserManager", "🌍 Public IP captured for $email: $publicIp")
-            
-            // Update Firestore with real IP
-            val ipUpdateData = hashMapOf<String, Any>(
+            val ipUpdateData = mapOf<String, Any>(
                 "ipAddress" to publicIp,
                 "registrationIp" to publicIp,
                 "lastLoginIp" to publicIp,
                 "lastUpdated" to System.currentTimeMillis()
             )
             
-            db.collection("users").document(uid)
-                .update(ipUpdateData)
-                .addOnSuccessListener {
-                    Log.d("UserManager", "✅ Real IP updated in Firestore: $publicIp")
-                }
-                .addOnFailureListener { e ->
-                    Log.e("UserManager", "❌ Failed to update IP in Firestore: ${e.message}")
-                }
-                
+            db.collection("users").document(uid).update(ipUpdateData)
+            onIpFetched(publicIp)
         } catch (e: Exception) {
-            Log.e("UserManager", "❌ Failed to get public IP: ${e.message}")
-            
-            // Even if IP capture fails, update with fallback
             val fallbackIp = "dynamic_${System.currentTimeMillis()}"
-            val fallbackUpdate = hashMapOf<String, Any>(
-                "ipAddress" to fallbackIp,
-                "registrationIp" to fallbackIp,
-                "lastLoginIp" to fallbackIp,
-                "lastUpdated" to System.currentTimeMillis()
-            )
-            
             db.collection("users").document(uid)
-                .update(fallbackUpdate)
-                .addOnSuccessListener {
-                    Log.d("UserManager", "✅ Fallback IP set for $email")
-                }
+                .update(mapOf(
+                    "ipAddress" to fallbackIp,
+                    "registrationIp" to fallbackIp,
+                    "lastLoginIp" to fallbackIp,
+                    "lastUpdated" to System.currentTimeMillis()
+                ))
+            onIpFetched(fallbackIp)
         }
     }.start()
 }
