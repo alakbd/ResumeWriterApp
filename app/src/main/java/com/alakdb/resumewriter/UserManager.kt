@@ -275,7 +275,7 @@ private fun fetchPublicIpAndUpdateUser(uid: String, email: String) {
                 }
 
                 // --- Prepare User Data ---
-                val userData = hashMapOf(
+                val userData: Map<String, Any> = mapOf(
                     "email" to email,
                     "uid" to uid,
                     "availableCredits" to 3,
