@@ -17,11 +17,10 @@ import com.alakdb.resumewriter.databinding.ActivityUserRegistrationBinding
 class UserRegistrationActivity : AppCompatActivity() {
     private lateinit var binding: ActivityUserRegistrationBinding
     private lateinit var userManager: UserManager
-    private val db = Firebase.firestore
 
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
-        binding = ActivityUserRegistrationBinding.inflate(layoutInflater)
+        binding = ActivityUserRegistrationBinding.inflate(layout.layoutInflater)
         setContentView(binding.root)
 
         userManager = UserManager(this)
@@ -75,84 +74,21 @@ class UserRegistrationActivity : AppCompatActivity() {
         binding.btnRegister.isEnabled = false
         binding.btnRegister.text = "Registering..."
 
+        // Use UserManager's registerUser method - it handles everything including Firestore
         userManager.registerUser(email, password) { success: Boolean, error: String? ->
-            if (!success) {
-                // Restore button state on error
+            if (success) {
+                Log.d("Registration", "✅ Registration successful for: $email")
+                
+                // Show verification dialog - UserManager already sent the verification email
+                showVerificationDialog(email)
+            } else {
+                // Registration failed
                 binding.btnRegister.isEnabled = true
                 binding.btnRegister.text = "Register"
                 showMessage(error ?: "Registration failed")
-                return@registerUser
+                Log.e("Registration", "❌ Registration failed: $error")
             }
-
-            // At this point, registration succeeded
-            val user = FirebaseAuth.getInstance().currentUser
-            if (user == null) {
-                binding.btnRegister.isEnabled = true
-                binding.btnRegister.text = "Register"
-                showMessage("Registration succeeded but user data not ready. Try login.")
-                return@registerUser
-            }
-
-            // ⭐⭐⭐ FIXED: Add verification tracking fields ⭐⭐⭐
-            val userMap = hashMapOf(
-                "email" to email,
-                "availableCredits" to 3,
-                "usedCredits" to 0,
-                "totalCreditsEarned" to 3,
-                "createdAt" to System.currentTimeMillis(),
-                // ⭐⭐⭐ ADD THESE 3 CRITICAL FIELDS ⭐⭐⭐
-                "emailVerified" to false, // Start as not verified
-                "verificationSentAt" to System.currentTimeMillis(), // Track when email was sent
-                "lastUpdated" to System.currentTimeMillis()
-            )
-
-            db.collection("users").document(user.uid)
-                .set(userMap)
-                .addOnSuccessListener {
-                    // Send verification email after successful Firestore save
-                    sendVerificationEmail(user)
-                }
-                .addOnFailureListener { e ->
-                    binding.btnRegister.isEnabled = true
-                    binding.btnRegister.text = "Register"
-                    showMessage("Failed to save user profile: ${e.message}")
-                }
         }
-    }
-
-    private fun sendVerificationEmail(user: FirebaseUser) {
-        user.sendEmailVerification()
-            .addOnCompleteListener { task ->
-                if (task.isSuccessful) {
-                    Log.d("Registration", "Verification email sent to ${user.email}")
-                    
-                    // ⭐⭐⭐ FIXED: Update verification timestamp in Firestore ⭐⭐⭐
-                    updateVerificationSentTime(user.uid)
-                    
-                    showVerificationDialog(user.email)
-                } else {
-                    Log.e("Registration", "Failed to send verification email", task.exception)
-                    showMessage("Registration successful but verification email failed to send")
-                    proceedToLoginActivity()
-                }
-            }
-    }
-
-    // ⭐⭐⭐ ADD THIS NEW METHOD ⭐⭐⭐
-    private fun updateVerificationSentTime(userId: String) {
-        val updateData = hashMapOf<String, Any>(
-            "verificationSentAt" to System.currentTimeMillis(),
-            "lastUpdated" to System.currentTimeMillis()
-        )
-
-        db.collection("users").document(userId)
-            .update(updateData)
-            .addOnSuccessListener {
-                Log.d("Registration", "Updated verification sent time for user $userId")
-            }
-            .addOnFailureListener { e ->
-                Log.e("Registration", "Failed to update verification sent time", e)
-            }
     }
 
     private fun showVerificationDialog(email: String?) {
@@ -180,35 +116,6 @@ class UserRegistrationActivity : AppCompatActivity() {
             showMessage("No email app found. Please check your email manually.")
         }
     }
-// Add this method temporarily to MainActivity or RegistrationActivity
-private fun testNetworkUtils() {
-    Log.d("NetworkTest", "=== TESTING NETWORKUTILS DIRECTLY ===")
-    
-    try {
-        val deviceId = NetworkUtils.getDeviceId(this)
-        val deviceInfo = NetworkUtils.getDeviceInfo()
-        val userAgent = NetworkUtils.getUserAgent()
-        val localIp = NetworkUtils.getLocalIpAddress(this)
-        
-        Log.d("NetworkTest", "✅ DeviceId: $deviceId")
-        Log.d("NetworkTest", "✅ DeviceInfo: $deviceInfo")
-        Log.d("NetworkTest", "✅ UserAgent: $userAgent")
-        Log.d("NetworkTest", "✅ LocalIp: $localIp")
-        
-        // Show in UI for quick verification
-        Toast.makeText(this, 
-            "NetworkTest - IP: $localIp, Device: ${deviceId.take(8)}...", 
-            Toast.LENGTH_LONG
-        ).show()
-        
-    } catch (e: Exception) {
-        Log.e("NetworkTest", "❌ NetworkUtils failed: ${e.message}", e)
-        Toast.makeText(this, "NetworkTest FAILED: ${e.message}", Toast.LENGTH_LONG).show()
-    }
-    
-    Log.d("NetworkTest", "=== END NETWORKUTILS TEST ===")
-}
-
     
     private fun proceedToLoginActivity() {
         binding.btnRegister.isEnabled = true
