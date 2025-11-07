@@ -295,9 +295,6 @@ private fun fetchPublicIpAndUpdateUser(uid: String, email: String, onIpFetched: 
                     .addOnSuccessListener {
                         Log.d("UserManager", "✅ Firestore document created for $email")
 
-                        // ⭐⭐⭐ CAPTURE REAL PUBLIC IP AND UPDATE USER
-                        fetchPublicIpAndUpdateUser(uid, email)
-
                         // --- Save user locally ---
                         saveUserDataLocally(email, uid)
 
