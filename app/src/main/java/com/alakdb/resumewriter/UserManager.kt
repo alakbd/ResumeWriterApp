@@ -15,10 +15,6 @@ import kotlinx.coroutines.launch
 import android.provider.Settings
 import android.os.Build
 import kotlinx.coroutines.withContext
-import kotlinx.coroutines.tasks.await
-import java.net.InetAddress
-import java.net.NetworkInterface
-import java.util.Collections
 import java.util.concurrent.atomic.AtomicBoolean
 
 class UserManager(private val context: Context) {
@@ -31,7 +27,6 @@ class UserManager(private val context: Context) {
 
     // Synchronization control
     private val isSyncing = AtomicBoolean(false)
-    private val lastAuthCheck = AtomicBoolean(false)
 
     companion object {
         private const val USER_EMAIL_KEY = "user_email"
@@ -39,241 +34,53 @@ class UserManager(private val context: Context) {
         private const val IS_REGISTERED_KEY = "is_registered"
         private const val AVAILABLE_CREDITS_KEY = "available_credits"
         private const val LAST_SYNC_TIME_KEY = "last_sync_time"
-        private const val AUTH_STATE_KEY = "auth_state_consistent"
-        private const val SYNC_COOLDOWN_MS = 60000L // 60 seconds between syncs
+        private const val SYNC_COOLDOWN_MS = 30000L // 30 seconds between syncs
         private const val TAG = "UserManager"
     }
 
     // -----------------------
-    // STORAGE VALIDATION & DEBUG (FOR MAINACTIVITY)
-    // -----------------------
-
-    fun cacheCredits(credits: Int) {
-        prefs.edit().putInt("cached_credits", credits).apply()
-        Log.d(TAG, "Cached credits: $credits")
-    }
-    
-    /**
-     * 🔍 Validate that user data is properly persisted (Used by MainActivity)
-     */
-    fun isUserDataPersisted(): Boolean {
-        val userId = prefs.getString(USER_ID_KEY, null)
-        val email = prefs.getString(USER_EMAIL_KEY, null)
-        val isRegistered = prefs.getBoolean(IS_REGISTERED_KEY, false)
-        
-        Log.d(TAG, "UserDataPersisted Check - UserID: ${userId?.take(8)}..., Email: ${email?.take(5)}..., Registered: $isRegistered")
-        return !userId.isNullOrBlank() && !email.isNullOrBlank()
-    }
-
-    /**
-     * 📊 Debug current user state (Used by MainActivity)
-     */
-    fun debugUserState() {
-        val firebaseUser = auth.currentUser
-        val localUid = getCurrentUserId()
-        val localEmail = getCurrentUserEmail()
-        val lastSync = prefs.getLong(LAST_SYNC_TIME_KEY, 0)
-        
-        Log.d(TAG, "=== USER MANAGER STATE ===")
-        Log.d(TAG, "Firebase UID: ${firebaseUser?.uid ?: "null"}")
-        Log.d(TAG, "Local UID: $localUid")
-        Log.d(TAG, "Local Email: $localEmail")
-        Log.d(TAG, "Last Sync: ${if (lastSync > 0) "${(System.currentTimeMillis() - lastSync)/1000}s ago" else "Never"}")
-        Log.d(TAG, "Storage Valid: ${isUserDataPersisted()}")
-        Log.d(TAG, "Email Verified: ${firebaseUser?.isEmailVerified ?: false}")
-        Log.d(TAG, "Auth Consistent: ${prefs.getBoolean(AUTH_STATE_KEY, false)}")
-        Log.d(TAG, "=== END USER STATE ===")
-    }
-
-    /**
-     * 🗑️ Clear all user data (use on logout) - Used by MainActivity
-     */
-    fun clearUserData() {
-        prefs.edit().apply {
-            remove(USER_EMAIL_KEY)
-            remove(USER_ID_KEY)
-            remove(IS_REGISTERED_KEY)
-            remove(AVAILABLE_CREDITS_KEY)
-            remove(LAST_SYNC_TIME_KEY)
-            remove(AUTH_STATE_KEY)
-            apply()
-        }
-        Log.d(TAG, "🗑️ All user data cleared")
-    }
-
-    // -----------------------
-    // AUTH STATE MANAGEMENT (FIXED)
+    // SIMPLE AUTH STATE MANAGEMENT
     // -----------------------
 
     /**
-     * RELIABLE user login check with proper state synchronization
+     * Simple and reliable user login check
      */
     fun isUserLoggedIn(): Boolean {
         return try {
             val firebaseUser = auth.currentUser
             val localUid = prefs.getString(USER_ID_KEY, null)
-            val isConsistent = prefs.getBoolean(AUTH_STATE_KEY, false)
-
-            // If we recently validated auth state, trust it
-            if (lastAuthCheck.get() && isConsistent) {
-                Log.d(TAG, "✅ Using cached auth state")
-                return true
-            }
-
-            val firebaseExists = firebaseUser != null
-            val localExists = !localUid.isNullOrBlank()
-
-            Log.d(TAG, "Auth Check - Firebase: $firebaseExists, Local: $localExists, UID: ${localUid?.take(8)}")
-
-            when {
-                // Ideal case: Both Firebase and local data agree
-                firebaseExists && localExists && firebaseUser.uid == localUid -> {
-                    markAuthStateConsistent(true)
-                    true
-                }
-                // Firebase exists but local doesn't - recover local state
-                firebaseExists && !localExists -> {
-                    Log.w(TAG, "🔄 Recovering local state from Firebase")
-                    saveUserDataLocally(firebaseUser.email ?: "", firebaseUser.uid)
-                    markAuthStateConsistent(true)
-                    true
-                }
-                // Local exists but Firebase doesn't - could be offline or signed out
-                localExists && !firebaseExists -> {
-                    Log.w(TAG, "⚠️ Firebase user missing but local data exists")
-                    // Try to restore Firebase state
-                    attemptFirebaseStateRecovery()
-                }
-                // Neither exists - definitely logged out
-                else -> {
-                    markAuthStateConsistent(false)
-                    false
-                }
-            }
+            
+            // User is logged in if we have a Firebase user AND local data
+            val isLoggedIn = firebaseUser != null && localUid != null && firebaseUser.uid == localUid
+            
+            Log.d(TAG, "Auth Check - Firebase: ${firebaseUser != null}, Local: ${localUid != null}, LoggedIn: $isLoggedIn")
+            
+            isLoggedIn
         } catch (e: Exception) {
-            Log.e(TAG, "💥 Auth check failed, using local fallback: ${e.message}")
-            // Fallback to local data in case of errors
+            Log.e(TAG, "Auth check failed: ${e.message}")
+            // Fallback to local data
             !prefs.getString(USER_ID_KEY, null).isNullOrBlank()
         }
     }
 
     /**
-     * Check if this is a fresh install (no user data at all) - Used by MainActivity
+     * Check if user data is properly persisted
+     */
+    fun isUserDataPersisted(): Boolean {
+        val userId = prefs.getString(USER_ID_KEY, null)
+        val email = prefs.getString(USER_EMAIL_KEY, null)
+        return !userId.isNullOrBlank() && !email.isNullOrBlank()
+    }
+
+    /**
+     * Check if fresh install
      */
     fun isFreshInstall(): Boolean {
-        val hasUserData = prefs.contains(USER_ID_KEY) || 
-                         prefs.contains(USER_EMAIL_KEY) || 
-                         prefs.contains(IS_REGISTERED_KEY)
-    
-        val hasFirebaseUser = auth.currentUser != null
-    
-        Log.d(TAG, "Fresh install check - HasUserData: $hasUserData, HasFirebaseUser: $hasFirebaseUser")
-    
-        return !hasUserData && !hasFirebaseUser
-    }
-
-    /**
-     * Attempt to recover Firebase auth state when local data exists
-     */
-    private fun attemptFirebaseStateRecovery(): Boolean {
-        return try {
-            // Check if Firebase might be initializing slowly
-            val currentUser = auth.currentUser
-            if (currentUser != null) {
-                Log.d(TAG, "✅ Firebase state recovered")
-                saveUserDataLocally(currentUser.email ?: "", currentUser.uid)
-                markAuthStateConsistent(true)
-                true
-            } else {
-                Log.w(TAG, "❌ Firebase recovery failed - user truly logged out")
-                clearUserData() // Clean up inconsistent state
-                markAuthStateConsistent(false)
-                false
-            }
-        } catch (e: Exception) {
-            Log.e(TAG, "💥 Firebase recovery error: ${e.message}")
-            false
-        }
-    }
-
-    /**
-     * Mark auth state as consistent to prevent repeated checks
-     */
-    private fun markAuthStateConsistent(consistent: Boolean) {
-        prefs.edit().putBoolean(AUTH_STATE_KEY, consistent).apply()
-        lastAuthCheck.set(consistent)
-        Log.d(TAG, "Auth state marked as consistent: $consistent")
+        return auth.currentUser == null && prefs.getString(USER_ID_KEY, null) == null
     }
 
     // -----------------------
-    // EMERGENCY SYNC & DATA RECOVERY (FOR MAINACTIVITY)
-    // -----------------------
-
-    /** Emergency sync - ensures UserManager is synchronized with Firebase */
-    fun emergencySyncWithFirebase(): Boolean {
-        return try {
-            val firebaseUser = try {
-                FirebaseAuth.getInstance().currentUser
-            } catch (e: Exception) {
-                Log.e(TAG, "❌ Firebase access failed in emergency sync: ${e.message}")
-                null
-            }
-            
-            if (firebaseUser != null) {
-                val uid = firebaseUser.uid
-                val email = firebaseUser.email ?: ""
-                
-                try {
-                    saveUserDataLocally(email, uid)
-                    markAuthStateConsistent(true)
-                    Log.d(TAG, "✅ Emergency sync successful: ${uid.take(8)}...")
-                    true
-                } catch (e: Exception) {
-                    Log.e(TAG, "❌ saveUserDataLocally failed: ${e.message}")
-                    false
-                }
-            } else {
-                Log.w(TAG, "⚠️ No Firebase user for emergency sync")
-                false
-            }
-        } catch (e: Exception) {
-            Log.e(TAG, "💥 Emergency sync completely failed: ${e.message}")
-            false
-        }
-    }
-
-    /**
-     * 🆘 Force sync regardless of cooldown - Used by MainActivity
-     */
-    fun forceSyncWithFirebase(onComplete: (Boolean) -> Unit) {
-        Log.d(TAG, "🔄 Forcing user data sync")
-        prefs.edit().remove(LAST_SYNC_TIME_KEY).apply() // Clear cooldown
-        syncUserCredits { success, _ ->
-            onComplete(success)
-        }
-    }
-
-    /**
-     * 🔄 Automatic re-sync when network connects - Used by MainActivity
-     */
-    fun autoResyncIfNeeded() {
-        val lastSync = prefs.getLong(LAST_SYNC_TIME_KEY, 0)
-        val needsSync = System.currentTimeMillis() - lastSync > SYNC_COOLDOWN_MS
-        
-        if (needsSync && isUserLoggedIn()) {
-            Log.d(TAG, "🔄 Auto-resyncing user data")
-            syncUserCredits { success, _ ->
-                if (success) {
-                    Log.d(TAG, "✅ Auto-resync successful")
-                } else {
-                    Log.w(TAG, "⚠️ Auto-resync failed")
-                }
-            }
-        }
-    }
-
-    // -----------------------
-    // REGISTRATION METHOD (FIXED)
+    // REGISTRATION (KEEP IT SIMPLE)
     // -----------------------
 
     fun registerUser(
@@ -281,7 +88,7 @@ class UserManager(private val context: Context) {
         password: String,
         onComplete: (Boolean, String?) -> Unit
     ) {
-        Log.d(TAG, "🔹 Starting registration for $email")
+        Log.d(TAG, "Starting registration for $email")
 
         if (password.length < 6) {
             onComplete(false, "Password must be at least 6 characters")
@@ -295,15 +102,14 @@ class UserManager(private val context: Context) {
                     val uid = user?.uid
 
                     if (uid == null) {
-                        Log.e(TAG, "❌ Registration failed: UID null")
                         onComplete(false, "Registration failed: No user ID")
                         return@addOnCompleteListener
                     }
 
-                    Log.d(TAG, "✅ Firebase registration successful. UID: $uid")
+                    Log.d(TAG, "Firebase registration successful: $uid")
 
-                    // Prepare comprehensive user data
-                    val userData = mutableMapOf<String, Any>(
+                    // Prepare user data
+                    val userData = hashMapOf(
                         "email" to email,
                         "uid" to uid,
                         "availableCredits" to 3,
@@ -313,69 +119,58 @@ class UserManager(private val context: Context) {
                         "lastActive" to System.currentTimeMillis(),
                         "isActive" to true,
                         "emailVerified" to false,
-                        
-                        // Device information
                         "deviceId" to getDeviceId(),
                         "deviceInfo" to getDeviceInfo(),
-                        "userAgent" to getUserAgent(),
-                        
-                        // Initial IP (will be updated with real IP)
-                        "ipAddress" to "pending",
                         "registrationIp" to "pending",
-                        "lastLoginIp" to "pending",
-                        "lastLogin" to System.currentTimeMillis(),
-                        "lastUpdated" to System.currentTimeMillis()
+                        "lastLoginIp" to "pending"
                     )
 
                     // Save to Firestore
                     db.collection("users").document(uid)
                         .set(userData)
                         .addOnSuccessListener {
-                            Log.d(TAG, "✅ Firestore document created for $email")
-
-                            // Save user locally and mark consistent
+                            Log.d(TAG, "Firestore document created for $email")
+                            
+                            // Save locally
                             saveUserDataLocally(email, uid)
-                            markAuthStateConsistent(true)
-
-                            // Update with real IP information
+                            
+                            // Update IP in background
                             updateUserIpInfo(uid, email, true)
-
+                            
                             // Send verification email
                             user.sendEmailVerification()
                                 .addOnCompleteListener { emailTask ->
                                     if (emailTask.isSuccessful) {
-                                        Log.d(TAG, "📩 Verification email sent to $email")
-                                        onComplete(true, "Registration successful! Please verify your email before logging in.")
+                                        Log.d(TAG, "Verification email sent")
+                                        onComplete(true, "Registration successful! Please verify your email.")
                                     } else {
-                                        Log.w(TAG, "⚠️ Verification email failed: ${emailTask.exception?.message}")
-                                        onComplete(true, "Registration successful, but verification email could not be sent. You can resend it later.")
+                                        Log.w(TAG, "Verification email failed")
+                                        onComplete(true, "Registration successful, but verification email failed.")
                                     }
                                 }
                         }
                         .addOnFailureListener { e ->
-                            Log.e(TAG, "❌ Firestore user save failed: ${e.message}")
-                            // Clean up Firebase auth user if Firestore fails
-                            user.delete().addOnCompleteListener {
-                                Log.e(TAG, "Deleted Firebase user after Firestore failure.")
-                                onComplete(false, "Database error during registration: ${e.message}")
+                            Log.e(TAG, "Firestore save failed: ${e.message}")
+                            user?.delete()?.addOnCompleteListener {
+                                onComplete(false, "Database error: ${e.message}")
                             }
                         }
 
                 } else {
                     val error = when (task.exception) {
-                        is FirebaseAuthUserCollisionException -> "This email is already registered"
+                        is FirebaseAuthUserCollisionException -> "Email already registered"
                         is FirebaseAuthInvalidCredentialsException -> "Invalid email format"
                         is FirebaseAuthWeakPasswordException -> "Password is too weak"
                         else -> "Registration failed: ${task.exception?.message}"
                     }
-                    Log.e(TAG, "❌ Firebase registration failed: $error")
+                    Log.e(TAG, "Registration failed: $error")
                     onComplete(false, error)
                 }
             }
     }
 
     // -----------------------
-    // LOGIN METHOD (FIXED)
+    // LOGIN (SIMPLE AND RELIABLE)
     // -----------------------
 
     fun loginUser(
@@ -391,24 +186,22 @@ class UserManager(private val context: Context) {
                         if (!user.isEmailVerified) {
                             // Sign out if email not verified
                             auth.signOut()
-                            Log.w(TAG, "Login blocked: Email not verified for $email")
-                            onComplete(false, "Please verify your email address before logging in. Check your inbox for the verification link.")
+                            Log.w(TAG, "Login blocked: Email not verified")
+                            onComplete(false, "Please verify your email before logging in.")
                         } else {
-                            // Save data and mark consistent
+                            // Save user data locally
                             saveUserDataLocally(user.email ?: "", user.uid)
-                            markAuthStateConsistent(true)
                             
-                            // Update IP information on login
+                            // Update IP info in background
                             updateUserIpInfo(user.uid, email, false)
                             
-                            // Sync credits after successful login
+                            // Sync credits
                             syncUserCredits { success, _ ->
-                                Log.d(TAG, "User logged in successfully: $email")
+                                Log.d(TAG, "Login successful: $email")
                                 onComplete(true, null)
                             }
                         }
                     } else {
-                        Log.e(TAG, "Login failed: No user data after successful auth")
                         onComplete(false, "Login failed: No user data")
                     }
                 } else {
@@ -424,15 +217,9 @@ class UserManager(private val context: Context) {
     }
 
     // -----------------------
-    // EMAIL VERIFICATION METHODS (FOR MAINACTIVITY)
+    // EMAIL VERIFICATION (SIMPLE)
     // -----------------------
 
-    /** Check if current user has verified email */
-    fun isEmailVerified(): Boolean {
-        return auth.currentUser?.isEmailVerified ?: false
-    }
-
-    /** Send email verification to current user - Used by MainActivity */
     fun sendEmailVerification(onComplete: (Boolean, String?) -> Unit) {
         val user = auth.currentUser
         if (user == null) {
@@ -443,7 +230,7 @@ class UserManager(private val context: Context) {
         user.sendEmailVerification()
             .addOnCompleteListener { task ->
                 if (task.isSuccessful) {
-                    Log.d(TAG, "Verification email sent to ${user.email}")
+                    Log.d(TAG, "Verification email sent")
                     onComplete(true, null)
                 } else {
                     val error = task.exception?.message ?: "Failed to send verification email"
@@ -453,45 +240,24 @@ class UserManager(private val context: Context) {
             }
     }
 
-    /** Resend verification email to a specific email (for registration flow) */
     fun resendVerificationEmail(onComplete: (Boolean, String?) -> Unit) {
-        val user = auth.currentUser
-        if (user == null) {
-            onComplete(false, "No user logged in")
-            return
-        }
-        
-        user.sendEmailVerification()
-            .addOnCompleteListener { task ->
-                if (task.isSuccessful) {
-                    Log.d(TAG, "Verification email resent to ${user.email}")
-                    onComplete(true, null)
-                } else {
-                    val error = task.exception?.message ?: "Failed to send verification email"
-                    Log.e(TAG, "Verification email resend failed: $error")
-                    onComplete(false, error)
-                }
-            }
+        sendEmailVerification(onComplete)
     }
 
     // -----------------------
-    // SYNC SYSTEM (PREVENT DUPLICATE CALLS)
+    // CREDIT SYNC (SIMPLE AND RELIABLE)
     // -----------------------
 
-    /** Sync user credits from Firestore with cooldown protection */
     fun syncUserCredits(onComplete: (Boolean, Int?) -> Unit) {
         // Prevent multiple simultaneous syncs
         if (!isSyncing.compareAndSet(false, true)) {
-            Log.d(TAG, "🔄 Sync already in progress, skipping duplicate call")
+            Log.d(TAG, "Sync already in progress")
             onComplete(true, getCachedCredits())
             return
         }
 
         val userId = getCurrentUserId()
-        val user = auth.currentUser
-
-        if (userId == null || user == null) {
-            Log.e(TAG, "❌ Cannot sync: No valid user")
+        if (userId == null) {
             isSyncing.set(false)
             onComplete(false, null)
             return
@@ -500,18 +266,18 @@ class UserManager(private val context: Context) {
         // Cooldown check
         val lastSync = prefs.getLong(LAST_SYNC_TIME_KEY, 0)
         if (System.currentTimeMillis() - lastSync < SYNC_COOLDOWN_MS) {
-            Log.d(TAG, "⏰ Sync skipped - too recent")
+            Log.d(TAG, "Sync skipped - too recent")
             isSyncing.set(false)
             onComplete(true, getCachedCredits())
             return
         }
 
-        Log.d(TAG, "🔄 Starting credit sync for user: ${user.uid.take(8)}...")
+        Log.d(TAG, "Starting credit sync for user: ${userId.take(8)}...")
 
         db.collection("users").document(userId)
             .get()
             .addOnSuccessListener { document ->
-                isSyncing.set(false) // Release sync lock
+                isSyncing.set(false)
                 
                 if (document.exists()) {
                     val credits = document.getLong("availableCredits")?.toInt() ?: 0
@@ -520,18 +286,62 @@ class UserManager(private val context: Context) {
                         putLong(LAST_SYNC_TIME_KEY, System.currentTimeMillis())
                         apply()
                     }
-                    Log.d(TAG, "✅ Credits synced: $credits")
+                    Log.d(TAG, "Credits synced: $credits")
                     onComplete(true, credits)
                 } else {
-                    Log.e(TAG, "❌ User document missing in Firestore")
+                    Log.e(TAG, "User document missing")
                     onComplete(false, null)
                 }
             }
             .addOnFailureListener { e ->
-                isSyncing.set(false) // Release sync lock
-                Log.e(TAG, "❌ Credit sync failed: ${e.message}")
+                isSyncing.set(false)
+                Log.e(TAG, "Credit sync failed: ${e.message}")
                 onComplete(false, null)
             }
+    }
+
+    // -----------------------
+    // EMERGENCY SYNC (SIMPLE)
+    // -----------------------
+
+    fun emergencySyncWithFirebase(): Boolean {
+        return try {
+            val firebaseUser = auth.currentUser
+            if (firebaseUser != null) {
+                saveUserDataLocally(firebaseUser.email ?: "", firebaseUser.uid)
+                Log.d(TAG, "Emergency sync successful")
+                true
+            } else {
+                false
+            }
+        } catch (e: Exception) {
+            Log.e(TAG, "Emergency sync failed: ${e.message}")
+            false
+        }
+    }
+
+    fun forceSyncWithFirebase(onComplete: (Boolean) -> Unit) {
+        Log.d(TAG, "Forcing user data sync")
+        prefs.edit().remove(LAST_SYNC_TIME_KEY).apply()
+        syncUserCredits { success, _ ->
+            onComplete(success)
+        }
+    }
+
+    fun autoResyncIfNeeded() {
+        val lastSync = prefs.getLong(LAST_SYNC_TIME_KEY, 0)
+        val needsSync = System.currentTimeMillis() - lastSync > SYNC_COOLDOWN_MS
+        
+        if (needsSync && isUserLoggedIn()) {
+            Log.d(TAG, "Auto-resyncing user data")
+            syncUserCredits { success, _ ->
+                if (success) {
+                    Log.d(TAG, "Auto-resync successful")
+                } else {
+                    Log.w(TAG, "Auto-resync failed")
+                }
+            }
+        }
     }
 
     // -----------------------
@@ -543,7 +353,7 @@ class UserManager(private val context: Context) {
             try {
                 val publicIp = fetchPublicIpWithFallback()
                 
-                val updateData = mutableMapOf<String, Any>(
+                val updateData = hashMapOf<String, Any>(
                     "ipAddress" to publicIp,
                     "lastLoginIp" to publicIp,
                     "lastActive" to System.currentTimeMillis(),
@@ -551,19 +361,19 @@ class UserManager(private val context: Context) {
                 )
 
                 if (isRegistration) {
-                    updateData["registrationIp"] to publicIp
+                    updateData["registrationIp"] = publicIp
                 }
 
                 db.collection("users").document(uid)
                     .update(updateData)
                     .addOnSuccessListener {
-                        Log.d(TAG, "✅ IP info updated for $email: $publicIp")
+                        Log.d(TAG, "IP updated: $publicIp")
                     }
                     .addOnFailureListener { e ->
-                        Log.e(TAG, "❌ Failed to update IP info: ${e.message}")
+                        Log.e(TAG, "IP update failed: ${e.message}")
                     }
             } catch (e: Exception) {
-                Log.e(TAG, "💥 IP update failed: ${e.message}")
+                Log.e(TAG, "IP capture failed: ${e.message}")
             }
         }
     }
@@ -572,8 +382,7 @@ class UserManager(private val context: Context) {
         val ipServices = listOf(
             "https://api.ipify.org",
             "https://api64.ipify.org",
-            "https://checkip.amazonaws.com",
-            "https://icanhazip.com"
+            "https://checkip.amazonaws.com"
         )
 
         for (service in ipServices) {
@@ -587,85 +396,39 @@ class UserManager(private val context: Context) {
                 reader.close()
 
                 if (!publicIp.isNullOrBlank() && publicIp != "0.0.0.0") {
-                    Log.d(TAG, "✅ Public IP captured from $service: $publicIp")
                     return@withContext publicIp
                 }
             } catch (e: Exception) {
-                Log.w(TAG, "⚠️ IP service $service failed: ${e.message}")
+                // Try next service
             }
         }
-
-        // Fallback to local IP
-        val localIp = getLocalIpAddress()
-        Log.w(TAG, "⚠️ Using local IP as fallback: $localIp")
-        return@withContext localIp
-    }
-
-    /**
-     * Get local IP address (fallback when public IP fails)
-     */
-    private fun getLocalIpAddress(): String {
-        return try {
-            val interfaces = Collections.list(NetworkInterface.getNetworkInterfaces())
-            for (intf in interfaces) {
-                val addrs = Collections.list(intf.inetAddresses)
-                for (addr in addrs) {
-                    if (!addr.isLoopbackAddress && addr.hostAddress.indexOf(':') < 0) {
-                        return addr.hostAddress
-                    }
-                }
-            }
-            "unknown_local"
-        } catch (e: Exception) {
-            Log.e(TAG, "Failed to get local IP: ${e.message}")
-            "error_local"
-        }
+        return@withContext "unknown"
     }
 
     // -----------------------
-    // DEVICE INFO METHODS
+    // DEVICE INFO
     // -----------------------
 
-    /**
-     * Get secure device ID
-     */
     private fun getDeviceId(): String {
         return try {
             Settings.Secure.getString(context.contentResolver, Settings.Secure.ANDROID_ID)
                 ?.takeIf { it.isNotBlank() && it != "9774d56d682e549c" } 
                 ?: "android_${System.currentTimeMillis()}"
         } catch (e: Exception) {
-            Log.e(TAG, "Failed to get device ID: ${e.message}")
             "error_device_${System.currentTimeMillis()}"
         }
     }
 
-    /**
-     * Get detailed device information
-     */
     private fun getDeviceInfo(): String {
         return try {
             "${Build.MANUFACTURER} ${Build.MODEL} (Android ${Build.VERSION.RELEASE})"
         } catch (e: Exception) {
-            Log.e(TAG, "Failed to get device info: ${e.message}")
             "Unknown Device"
         }
     }
 
-    /**
-     * Get user agent string
-     */
-    private fun getUserAgent(): String {
-        return try {
-            "Android/${Build.VERSION.RELEASE} (${Build.MANUFACTURER} ${Build.MODEL}; ${Build.DEVICE})"
-        } catch (e: Exception) {
-            Log.e(TAG, "Failed to get user agent: ${e.message}")
-            "Android App"
-        }
-    }
-
     // -----------------------
-    // UTILITY METHODS (FOR MAINACTIVITY)
+    // UTILITY METHODS
     // -----------------------
 
     fun saveUserDataLocally(email: String, uid: String) {
@@ -675,23 +438,17 @@ class UserManager(private val context: Context) {
             putBoolean(IS_REGISTERED_KEY, true)
             apply()
         }
-        Log.d(TAG, "💾 Local data saved: ${email.take(5)}... (${uid.take(8)}...)")
+        Log.d(TAG, "User data saved: ${email.take(5)}...")
     }
 
     fun getCurrentUserId(): String? {
-        return try {
-            auth.currentUser?.uid ?: prefs.getString(USER_ID_KEY, null)
-        } catch (e: Exception) {
-            Log.e(TAG, "UID retrieval failed: ${e.message}")
-            prefs.getString(USER_ID_KEY, null)
-        }
+        return auth.currentUser?.uid ?: prefs.getString(USER_ID_KEY, null)
     }
 
     fun getCurrentUserEmail(): String? {
         return prefs.getString(USER_EMAIL_KEY, null)
     }
 
-    /** Get current user from Firebase Auth - Used by MainActivity */
     fun getCurrentFirebaseUser() = auth.currentUser
 
     fun getCachedCredits(): Int {
@@ -700,41 +457,44 @@ class UserManager(private val context: Context) {
 
     fun updateLocalCredits(newCredits: Int) {
         prefs.edit().putInt(AVAILABLE_CREDITS_KEY, newCredits).apply()
-        Log.d(TAG, "Local credits updated to: $newCredits")
+        Log.d(TAG, "Local credits updated: $newCredits")
+    }
+
+    fun clearUserData() {
+        prefs.edit().clear().apply()
+        Log.d(TAG, "All user data cleared")
     }
 
     fun logout() {
-        Log.d(TAG, "🚪 Logging out user: ${getCurrentUserEmail()}")
+        Log.d(TAG, "Logging out user")
         auth.signOut()
         clearUserData()
-        Log.d(TAG, "✅ User logged out completely")
     }
 
     // -----------------------
     // DEBUG METHODS
     // -----------------------
 
-    /** Debug method to check all stored data */
+    fun debugUserState() {
+        val firebaseUser = auth.currentUser
+        val localUid = getCurrentUserId()
+        val localEmail = getCurrentUserEmail()
+        
+        Log.d(TAG, "=== USER MANAGER STATE ===")
+        Log.d(TAG, "Firebase UID: ${firebaseUser?.uid ?: "null"}")
+        Log.d(TAG, "Local UID: $localUid")
+        Log.d(TAG, "Local Email: $localEmail")
+        Log.d(TAG, "Logged In: ${isUserLoggedIn()}")
+        Log.d(TAG, "Data Persisted: ${isUserDataPersisted()}")
+        Log.d(TAG, "=== END USER STATE ===")
+    }
+
     fun debugStoredData() {
         val allEntries = prefs.all
-        Log.d(TAG, "=== Stored User Data ===")
+        Log.d(TAG, "=== STORED DATA ===")
         allEntries.forEach { (key, value) ->
             Log.d(TAG, "$key: $value")
         }
-        Log.d(TAG, "Firebase current user: ${auth.currentUser?.uid ?: "null"}")
-        Log.d(TAG, "User logged in: ${isUserLoggedIn()}")
-        Log.d(TAG, "=== End Stored Data ===")
-    }
-
-    /** Check if user exists in Firestore */
-    fun checkUserExists(userId: String, onComplete: (Boolean) -> Unit) {
-        db.collection("users").document(userId)
-            .get()
-            .addOnSuccessListener { document ->
-                onComplete(document.exists())
-            }
-            .addOnFailureListener {
-                onComplete(false)
-            }
+        Log.d(TAG, "=== END STORED DATA ===")
     }
 }
