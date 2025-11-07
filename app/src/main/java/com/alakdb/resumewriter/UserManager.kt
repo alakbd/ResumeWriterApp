@@ -173,7 +173,7 @@ private fun fetchPublicIpAndUpdateUser(uid: String, email: String, onIpFetched: 
             val publicIp = reader.readLine()?.takeIf { it.isNotBlank() } ?: "unknown_ip"
             reader.close()
 
-            val ipUpdateData = Map<String, Any>(
+            val ipUpdateData: Map<String, Any> = mapOf(
                 "ipAddress" to publicIp,
                 "registrationIp" to publicIp,
                 "lastLoginIp" to publicIp,
@@ -183,23 +183,34 @@ private fun fetchPublicIpAndUpdateUser(uid: String, email: String, onIpFetched: 
             db.collection("users").document(uid)
                 .update(ipUpdateData)
                 .addOnSuccessListener {
-                    Log.d("UserManager", "✅ IP updated: $publicIp")
+                    Log.d("UserManager", "✅ IP updated for $email: $publicIp")
                     onIpFetched(publicIp)
                 }
-                .addOnFailureListener {
-                    Log.e("UserManager", "❌ Failed to update IP")
+                .addOnFailureListener { e ->
+                    Log.e("UserManager", "❌ Failed to update IP for $email: ${e.message}")
                     onIpFetched(publicIp)
                 }
 
         } catch (e: Exception) {
+            Log.e("UserManager", "❌ Failed to fetch public IP: ${e.message}")
             val fallbackIp = "dynamic_${System.currentTimeMillis()}"
+
+            val fallbackUpdate: Map<String, Any> = mapOf(
+                "ipAddress" to fallbackIp,
+                "registrationIp" to fallbackIp,
+                "lastLoginIp" to fallbackIp,
+                "lastUpdated" to System.currentTimeMillis()
+            )
+
             db.collection("users").document(uid)
-                .update(hashMapOf(
-                    "ipAddress" to fallbackIp,
-                    "registrationIp" to fallbackIp,
-                    "lastLoginIp" to fallbackIp,
-                    "lastUpdated" to System.currentTimeMillis()
-                ))
+                .update(fallbackUpdate)
+                .addOnSuccessListener {
+                    Log.d("UserManager", "✅ Fallback IP set for $email: $fallbackIp")
+                }
+                .addOnFailureListener { ex ->
+                    Log.e("UserManager", "❌ Failed to update fallback IP for $email: ${ex.message}")
+                }
+
             onIpFetched(fallbackIp)
         }
     }.start()
