@@ -3,12 +3,16 @@ package com.alakdb.resumewriter
 import android.content.Context
 import android.content.Intent
 import android.os.Bundle
+import android.os.Handler
+import android.os.Looper
 import android.util.Log
 import android.widget.Toast
 import androidx.appcompat.app.AlertDialog
 import androidx.appcompat.app.AppCompatActivity
 import com.google.firebase.auth.FirebaseAuth
 import com.google.firebase.auth.FirebaseUser
+import com.google.firebase.auth.FirebaseAuthInvalidCredentialsException
+import com.google.firebase.auth.FirebaseAuthInvalidUserException
 import com.alakdb.resumewriter.databinding.ActivityLoginBinding
 import com.google.firebase.firestore.FieldValue
 import com.google.firebase.firestore.ktx.firestore
@@ -335,13 +339,14 @@ class LoginActivity : AppCompatActivity() {
         userManager.syncUserCredits { success, credits ->
             if (success) {
                 Log.d("LoginActivity", "✅ Sync successful - credits: $credits")
-                creditManager.updateLocalCredits(credits ?: 0)
+                // Use the public method to update credits in CreditManager
+                creditManager.updateCredits(credits ?: 0, creditManager.getUsedCredits(), creditManager.getTotalCredits())
             } else {
                 Log.w("LoginActivity", "⚠️ Sync failed but proceeding with cached data")
             }
             
             // Always proceed to main activity
-            Handler().postDelayed({
+            Handler(Looper.getMainLooper()).postDelayed({
                 proceedToMainActivity()
             }, 500) // Small delay to ensure data persistence
         }
