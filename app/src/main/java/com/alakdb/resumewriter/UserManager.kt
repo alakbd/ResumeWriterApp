@@ -508,6 +508,31 @@ fun registerUser(
         Log.d("UserManager", "User logged out and all data cleared")
     }
 
+private var hasSyncedOnce = false
+
+fun autoSyncUser() {
+    if (hasSyncedOnce) {
+        Log.d("UserManager", "🟡 Skipping duplicate auto-sync call.")
+        return
+    }
+    hasSyncedOnce = true
+
+    val firebaseUser = auth.currentUser
+    if (firebaseUser != null) {
+        Log.d("UserManager", "Auto-resyncing user data")
+        syncUserCredits { success, message ->
+            if (success) {
+                Log.d("UserManager", "✅ Auto-sync completed for ${firebaseUser.uid}")
+            } else {
+                Log.w("UserManager", "⚠️ Auto-sync failed: $message")
+            }
+        }
+    } else {
+        Log.w("UserManager", "⚠️ No Firebase user found for auto-sync.")
+    }
+}
+
+    
     // -----------------------
     // CREDIT SYNC IMPROVEMENTS
     // -----------------------
