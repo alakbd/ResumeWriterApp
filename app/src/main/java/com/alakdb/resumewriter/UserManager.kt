@@ -13,6 +13,9 @@ import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.launch
 import android.provider.Settings
+import android.os.Build
+import kotlinx.coroutines.withContext
+import java.net.URL
 
 class UserManager(private val context: Context) {
 
