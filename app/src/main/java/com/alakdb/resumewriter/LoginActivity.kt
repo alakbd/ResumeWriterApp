@@ -339,8 +339,8 @@ class LoginActivity : AppCompatActivity() {
         userManager.syncUserCredits { success, credits ->
             if (success) {
                 Log.d("LoginActivity", "✅ Sync successful - credits: $credits")
-                // Use the public method to update credits in CreditManager
-                creditManager.updateCredits(credits ?: 0, creditManager.getUsedCredits(), creditManager.getTotalCredits())
+                // Use UserManager to update local credits - CreditManager will sync separately
+                userManager.updateLocalCredits(credits ?: 0)
             } else {
                 Log.w("LoginActivity", "⚠️ Sync failed but proceeding with cached data")
             }
