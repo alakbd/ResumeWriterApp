@@ -363,6 +363,53 @@
 
         </LinearLayout>
 
+        <!-- Instructions/Announcements Placeholder -->
+        <LinearLayout
+            android:id="@+id/instructions_section"
+            android:layout_width="match_parent"
+            android:layout_height="wrap_content"
+            android:orientation="vertical"
+            android:background="@drawable/bg_instructions_placeholder"
+            android:padding="16dp"
+            android:layout_marginBottom="16dp"
+            android:visibility="gone">
+
+        <LinearLayout
+                android:layout_width="match_parent"
+                android:layout_height="wrap_content"
+                android:orientation="horizontal"
+                android:gravity="center_vertical"
+                android:layout_marginBottom="8dp">
+
+            <TextView
+            android:layout_width="wrap_content"
+            android:layout_height="wrap_content"
+            android:text="📢"
+            android:textSize="18sp"
+            android:layout_marginEnd="8dp" />
+
+            <TextView
+            android:layout_width="0dp"
+            android:layout_height="wrap_content"
+            android:layout_weight="1"
+            android:text="Announcements amp&; Tips"
+            android:textColor="@color/text_primary"
+            android:textSize="16sp"
+            android:textStyle="bold" />
+
+        </LinearLayout>
+
+        <TextView
+        android:id="@+id/tv_instructions"
+        android:layout_width="match_parent"
+        android:layout_height="wrap_content"
+        android:text="Your instructions will appear here..."
+        android:textColor="@color/text_secondary"
+        android:textSize="14sp"
+        android:lineSpacingExtra="4dp" />
+
+    </LinearLayout>
+
         <!-- User Management - IMPROVED BUTTONS -->
         <LinearLayout
             android:layout_width="match_parent"
