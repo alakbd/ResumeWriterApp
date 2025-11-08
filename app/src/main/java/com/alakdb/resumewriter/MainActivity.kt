@@ -32,7 +32,9 @@ class MainActivity : AppCompatActivity() {
 
         // Initialize managers first
         initializeManagers()
-
+        
+        setupInstructions() // This will control when instructions appear
+        
         // DEBUG: Check current state with new validation methods
         Log.d("MAIN_ACTIVITY_DEBUG", "=== MAIN ACTIVITY START ===")
         Log.d("MAIN_ACTIVITY_DEBUG", "Firebase User: ${auth.currentUser?.uid ?: "NULL"}")
@@ -245,10 +247,39 @@ class MainActivity : AppCompatActivity() {
         //binding.instructionsSection.visibility = View.GONE
     //}
 
+    private fun setupInstructions() {
+        // You can add logic here to decide when to show instructions
+        // For example, show tips to new users, or announcements to all users
+        
+        // Example 1: Always show a welcome tip
+        // showInstructions("🎯 Welcome! Each credit generates one professional CV. Use samples to see the format.")
+        
+        // Example 2: Show only to users with low credits
+        // if (availableCredits < 3) {
+        //     showInstructions("💡 Low on credits? Buy the 8-credit package for best value!")
+        // }
+
+        // For new features
+           // showInstructions("🎉 New: Export your CV as PDF!")
+
+        // For system announcements  
+           // showInstructions("⚠️ Scheduled maintenance tonight 2-4 AM")
+
+        // For usage tips
+           // showInstructions("💡 Pro tip: Tailor each CV to the specific job description!")
+
+            // To hide it later
+            //hideInstructions()
+        
+        // Example 3: Show announcements (remove after some time)
+        showInstructions("🚀 New Feature: ATS-friendly templates now available!")
+    }
+
     // Examples of usage:
     // showInstructions("🎯 Pro Tip: Always tailor your CV to the specific job description!")
     // showInstructions("⚠️ Maintenance: System update scheduled for Sunday 2-4 AM")
     // showInstructions("📢 New Feature: Now supporting ATS-friendly templates!")
+    
 
     // FIXED: Proper implementation of showHtmlDialog
     private fun showHtmlDialog(title: String, htmlContent: String) {
