@@ -43,6 +43,10 @@
         android:layout_height="wrap_content"
         android:hint="Type to search users..."
         android:completionThreshold="2"
+        android:dropDownVerticalOffset="2dp"
+        android:dropDownHeight="wrap_content"
+        android:dropDownWidth="match_parent"
+        android:padding="8dp"
         android:layout_marginBottom="16dp" />
 
         <!-- User Info Display -->
