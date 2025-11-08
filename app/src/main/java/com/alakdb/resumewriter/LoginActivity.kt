@@ -3,8 +3,6 @@ package com.alakdb.resumewriter
 import android.content.Context
 import android.content.Intent
 import android.os.Bundle
-import android.os.Handler
-import android.os.Looper
 import android.util.Log
 import android.widget.Toast
 import androidx.appcompat.app.AlertDialog
@@ -14,9 +12,6 @@ import com.google.firebase.auth.FirebaseUser
 import com.google.firebase.auth.FirebaseAuthInvalidCredentialsException
 import com.google.firebase.auth.FirebaseAuthInvalidUserException
 import com.alakdb.resumewriter.databinding.ActivityLoginBinding
-import com.google.firebase.firestore.FieldValue
-import com.google.firebase.firestore.ktx.firestore
-import com.google.firebase.ktx.Firebase
 
 class LoginActivity : AppCompatActivity() {
     private lateinit var binding: ActivityLoginBinding
@@ -58,25 +53,31 @@ class LoginActivity : AppCompatActivity() {
         Log.d("LoginActivity", "UserManager isUserLoggedIn(): ${userManager.isUserLoggedIn()}")
 
         when {
-            // Case 1: Both Firebase and local data agree - user is logged in
+            // Case 1: Both Firebase and local data agree - user is logged in AND VERIFIED
             firebaseUser != null && localUid != null && firebaseUser.uid == localUid -> {
-                Log.d("LoginActivity", "✅ Valid existing session found")
                 if (firebaseUser.isEmailVerified) {
+                    Log.d("LoginActivity", "✅ Valid verified session found")
                     proceedToMainActivity()
                 } else {
-                    Log.w("LoginActivity", "⚠️ User exists but email not verified")
-                    showUnverifiedEmailDialog(firebaseUser)
+                    Log.w("LoginActivity", "🚫 User exists but email not verified - blocking access")
+                    // Sign out and clear data to enforce verification
+                    firebaseAuth.signOut()
+                    userManager.clearUserData()
+                    creditManager.clearCreditData()
+                    showVerificationRequiredDialog(firebaseUser.email)
                 }
             }
             
-            // Case 2: Firebase user exists but no local data - recover state
+            // Case 2: Firebase user exists but no local data - recover state ONLY IF VERIFIED
             firebaseUser != null && localUid == null -> {
-                Log.w("LoginActivity", "🔄 Recovering local state from Firebase")
-                userManager.saveUserDataLocally(firebaseUser.email ?: "", firebaseUser.uid)
                 if (firebaseUser.isEmailVerified) {
+                    Log.w("LoginActivity", "🔄 Recovering local state from verified Firebase user")
+                    userManager.saveUserDataLocally(firebaseUser.email ?: "", firebaseUser.uid)
                     proceedToMainActivity()
                 } else {
-                    showUnverifiedEmailDialog(firebaseUser)
+                    Log.w("LoginActivity", "🚫 Firebase user not verified - blocking access")
+                    firebaseAuth.signOut()
+                    showVerificationRequiredDialog(firebaseUser.email)
                 }
             }
             
@@ -132,30 +133,6 @@ class LoginActivity : AppCompatActivity() {
         }
     }
 
-    private fun checkAndUpdateEmailVerification(user: FirebaseUser) {
-        val userId = user.uid
-        
-        user.reload().addOnCompleteListener { task ->
-            if (task.isSuccessful) {
-                val isVerified = user.isEmailVerified
-                
-                Firebase.firestore.collection("users").document(userId)
-                    .update(
-                        "emailVerified", isVerified, 
-                        "lastUpdated", System.currentTimeMillis()
-                    )
-                    .addOnSuccessListener {
-                        Log.d("Login", "✅ Updated verification status: $isVerified")
-                    }
-                    .addOnFailureListener { e ->
-                        Log.e("Login", "❌ Failed to update verification status", e)
-                    }
-            } else {
-                Log.e("Login", "❌ Failed to reload user for verification check", task.exception)
-            }
-        }
-    }
-    
     private fun validateInput(email: String, password: String): Boolean {
         var isValid = true
 
@@ -212,113 +189,35 @@ class LoginActivity : AppCompatActivity() {
         setLoginInProgress(true)
         isLoginInProgress = true
 
-        Log.d("LoginActivity", "🔐 Attempting login for: ${email.take(5)}...")
+        Log.d("LoginActivity", "🔐 Attempting STRICT login for: ${email.take(5)}...")
 
-        FirebaseAuth.getInstance().signInWithEmailAndPassword(email, password)
-            .addOnCompleteListener { task ->
-                isLoginInProgress = false
-                
-                if (task.isSuccessful) {
-                    val user = task.result?.user
-                    if (user != null) {
-                        Log.d("LoginActivity", "✅ Firebase authentication successful: ${user.uid}")
-                        handleSuccessfulAuth(user, email)
-                    } else {
-                        setLoginInProgress(false)
-                        Log.e("LoginActivity", "❌ Firebase auth succeeded but user is null")
-                        showMessage("Login failed: User data missing")
-                    }
-                } else {
-                    setLoginInProgress(false)
-                    handleLoginFailure(task.exception)
-                }
-            }
-    }
-
-    private fun handleSuccessfulAuth(user: FirebaseUser, email: String) {
-        // Capture login network info
-        captureLoginNetworkInfo(user.uid)
-        
-        if (user.isEmailVerified) {
-            Log.d("LoginActivity", "✅ Email verified - proceeding with login")
-            completeLoginProcess(user)
-        } else {
-            Log.w("LoginActivity", "⚠️ Email not verified - showing dialog")
+        // ⭐⭐⭐ USE USERMANAGER'S STRICT LOGIN (WILL BLOCK UNVERIFIED USERS)
+        userManager.loginUser(email, password) { success, message ->
+            isLoginInProgress = false
             setLoginInProgress(false)
-            showUnverifiedEmailDialog(user)
-        }
-    }
-
-    private fun captureLoginNetworkInfo(userId: String) {
-        try {
-            Thread {
-                try {
-                    val publicIp = fetchPublicIpWithFallback()
-                    val currentTime = System.currentTimeMillis()
-                    
-                    val updates = hashMapOf<String, Any>(
-                        "lastLoginIp" to publicIp,
-                        "lastLogin" to currentTime,
-                        "lastActive" to currentTime,
-                        "lastUpdated" to currentTime
-                    )
-                    
-                    Firebase.firestore.collection("users").document(userId)
-                        .update(updates)
-                        .addOnSuccessListener {
-                            Log.d("Login", "✅ Login network info updated - IP: $publicIp")
-                        }
-                        .addOnFailureListener { e ->
-                            Log.e("Login", "❌ Failed to update login network info", e)
-                        }
-                } catch (e: Exception) {
-                    Log.e("Login", "❌ Error capturing network info", e)
-                }
-            }.start()
-        } catch (e: Exception) {
-            Log.e("Login", "❌ Error starting network info thread", e)
-        }
-    }
-
-    private fun fetchPublicIpWithFallback(): String {
-        return try {
-            val ipServices = listOf(
-                "https://api.ipify.org",
-                "https://api64.ipify.org", 
-                "https://checkip.amazonaws.com"
-            )
             
-            for (service in ipServices) {
-                try {
-                    val connection = java.net.URL(service).openConnection()
-                    connection.connectTimeout = 3000
-                    connection.readTimeout = 3000
-                    
-                    val reader = java.io.BufferedReader(java.io.InputStreamReader(connection.getInputStream()))
-                    val publicIp = reader.readLine()?.trim()
-                    reader.close()
-                    
-                    if (!publicIp.isNullOrBlank() && publicIp != "0.0.0.0") {
-                        return publicIp
-                    }
-                } catch (e: Exception) {
-                    // Try next service
+            if (success) {
+                // User is verified and properly logged in
+                val user = FirebaseAuth.getInstance().currentUser
+                if (user != null) {
+                    Log.d("LoginActivity", "✅ STRICT login successful for verified user: ${user.uid}")
+                    completeLoginProcess(user)
+                } else {
+                    Log.e("LoginActivity", "❌ Login succeeded but user is null")
+                    showMessage("Login successful but user data missing")
                 }
+            } else {
+                // Login failed or user not verified
+                handleLoginFailure(message)
             }
-            "unknown"
-        } catch (e: Exception) {
-            "error"
         }
     }
 
     private fun completeLoginProcess(user: FirebaseUser) {
-        Log.d("LoginActivity", "🎯 Completing login process for: ${user.uid}")
+        Log.d("LoginActivity", "🎯 Completing login process for verified user: ${user.uid}")
         
-        // CRITICAL: Save user data FIRST
+        // CRITICAL: Save user data (should already be done by UserManager)
         userManager.saveUserDataLocally(user.email ?: "", user.uid)
-        
-        // Update verification status
-        checkAndUpdateEmailVerification(user)
         
         // Ensure admin mode is disabled
         creditManager.setAdminMode(false)
@@ -339,47 +238,38 @@ class LoginActivity : AppCompatActivity() {
         userManager.syncUserCredits { success, credits ->
             if (success) {
                 Log.d("LoginActivity", "✅ Sync successful - credits: $credits")
-                // Use UserManager to update local credits - CreditManager will sync separately
                 userManager.updateLocalCredits(credits ?: 0)
             } else {
                 Log.w("LoginActivity", "⚠️ Sync failed but proceeding with cached data")
             }
             
             // Always proceed to main activity
-            Handler(Looper.getMainLooper()).postDelayed({
+            android.os.Handler(android.os.Looper.getMainLooper()).postDelayed({
                 proceedToMainActivity()
-            }, 500) // Small delay to ensure data persistence
+            }, 500)
         }
     }
 
-    private fun handleLoginFailure(exception: Exception?) {
-        val errorMessage = when (exception) {
-            is FirebaseAuthInvalidUserException -> "No account found with this email"
-            is FirebaseAuthInvalidCredentialsException -> "Invalid password"
-            else -> exception?.message ?: "Login failed. Please check your credentials."
-        }
-        
-        showMessage(errorMessage)
-        Log.e("LoginActivity", "❌ Login failed: $errorMessage")
+    private fun handleLoginFailure(errorMessage: String?) {
+        val message = errorMessage ?: "Login failed. Please check your credentials."
+        showMessage(message)
+        Log.e("LoginActivity", "❌ Login failed: $message")
         
         // Clear password field on failure
         binding.etLoginPassword.text?.clear()
         binding.etLoginPassword.requestFocus()
     }
 
-    private fun showUnverifiedEmailDialog(user: FirebaseUser) {
+    private fun showVerificationRequiredDialog(email: String?) {
         AlertDialog.Builder(this)
-            .setTitle("Email Not Verified")
-            .setMessage("Please verify your email address (${user.email}) before logging in. Check your inbox for the verification link.")
+            .setTitle("Email Verification Required")
+            .setMessage("Please verify your email address ($email) before logging in. Check your inbox for the verification link.")
             .setPositiveButton("Resend Verification") { dialog, _ ->
-                resendVerificationEmail(user)
+                resendVerificationEmail()
                 dialog.dismiss()
             }
             .setNegativeButton("OK") { dialog, _ ->
                 dialog.dismiss()
-                // Sign out since email isn't verified
-                FirebaseAuth.getInstance().signOut()
-                userManager.clearUserData()
             }
             .setNeutralButton("Open Email App") { dialog, _ ->
                 openEmailApp()
@@ -389,17 +279,22 @@ class LoginActivity : AppCompatActivity() {
             .show()
     }
 
-    private fun resendVerificationEmail(user: FirebaseUser) {
-        user.sendEmailVerification()
-            .addOnCompleteListener { task ->
-                if (task.isSuccessful) {
-                    showMessage("Verification email sent to ${user.email}")
-                    Log.d("LoginActivity", "✅ Verification email resent to: ${user.email}")
-                } else {
-                    showMessage("Failed to send verification email")
-                    Log.e("LoginActivity", "❌ Failed to resend verification email")
+    private fun resendVerificationEmail() {
+        val user = FirebaseAuth.getInstance().currentUser
+        if (user != null) {
+            user.sendEmailVerification()
+                .addOnCompleteListener { task ->
+                    if (task.isSuccessful) {
+                        showMessage("Verification email sent to ${user.email}")
+                        Log.d("LoginActivity", "✅ Verification email resent to: ${user.email}")
+                    } else {
+                        showMessage("Failed to send verification email")
+                        Log.e("LoginActivity", "❌ Failed to resend verification email")
+                    }
                 }
-            }
+        } else {
+            showMessage("No user found. Please register first.")
+        }
     }
     
     private fun openEmailApp() {
@@ -432,7 +327,7 @@ class LoginActivity : AppCompatActivity() {
         
         Log.d("LoginActivity", "Final Check - Firebase: ${firebaseUser?.uid ?: "NULL"}")
         Log.d("LoginActivity", "Final Check - UserManager: $userManagerUid")
-        Log.d("LoginActivity", "Final Check - Consistent: ${firebaseUser?.uid == userManagerUid}")
+        Log.d("LoginActivity", "Final Check - Verified: ${firebaseUser?.isEmailVerified ?: false}")
 
         val intent = Intent(this, MainActivity::class.java).apply {
             flags = Intent.FLAG_ACTIVITY_NEW_TASK or Intent.FLAG_ACTIVITY_CLEAR_TASK
@@ -459,6 +354,5 @@ class LoginActivity : AppCompatActivity() {
     override fun onDestroy() {
         super.onDestroy()
         Log.d("LoginActivity", "💀 LoginActivity destroyed")
-        // Clean up any pending operations if needed
     }
 }
