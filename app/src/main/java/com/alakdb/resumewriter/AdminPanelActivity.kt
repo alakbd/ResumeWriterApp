@@ -44,7 +44,7 @@ class AdminPanelActivity : AppCompatActivity() {
         setupUI()
         loadUsers()
         setupManualEmailLoad()
-        loadAdminStats()
+        
     }
 
     // ⭐⭐⭐ ADD THIS METHOD TO AdminPanelActivity ⭐⭐⭐
@@ -184,30 +184,41 @@ private fun showTopCVGenerators() {
     }
 
     private fun loadUsers() {
-        binding.tvUserStats.text = "Users: Loading..."
-        db.collection("users").get(Source.SERVER)
-            .addOnSuccessListener { documents ->
-                usersList.clear()
-                val defaultOption = "" to "Select a user..."
-                for (doc in documents) {
-                    val email = doc.getString("email") ?: "Unknown Email"
-                    usersList.add(doc.id to email)
-                }
-                val displayList = mutableListOf<String>()
-                displayList.add(defaultOption.second)
-                displayList.addAll(usersList.map { it.second })
-                val adapter = ArrayAdapter(this, android.R.layout.simple_spinner_item, displayList)
-                adapter.setDropDownViewResource(android.R.layout.simple_spinner_dropdown_item)
-                binding.spUserSelector.adapter = adapter
+    binding.tvUserStats.text = "Users: Loading..."
+    
+    // ⭐⭐⭐ USE THE SAME QUERY FOR BOTH USERS AND STATS ⭐⭐⭐
+    db.collection("users").get(Source.SERVER)
+        .addOnSuccessListener { documents ->
+            // Process users list
+            usersList.clear()
+            for (doc in documents) {
+                val email = doc.getString("email") ?: "Unknown Email"
+                usersList.add(doc.id to email)
+            }
+            
+            val displayList = mutableListOf<String>()
+            displayList.add("Select a user...")
+            displayList.addAll(usersList.map { it.second })
+            
+            val adapter = ArrayAdapter(this, android.R.layout.simple_spinner_item, displayList)
+            adapter.setDropDownViewResource(android.R.layout.simple_spinner_dropdown_item)
+            binding.spUserSelector.adapter = adapter
 
-                if (usersList.isEmpty()) showMessage("No users found in database")
+            if (usersList.isEmpty()) {
+                showMessage("No users found in database")
+            } else {
+                showMessage("✅ Loaded ${usersList.size} users")
             }
-            .addOnFailureListener { e ->
-                Log.e("AdminPanel", "Firestore error: ${e.message}", e)
-                showMessage("Failed to load users: ${e.message}")
-                binding.tvUserStats.text = "Users: Failed to load"
-            }
-    }
+            
+            // ⭐⭐⭐ NOW PROCESS STATS FROM THE SAME QUERY ⭐⭐⭐
+            processStatsData(documents, "server")
+        }
+        .addOnFailureListener { e ->
+            Log.e("AdminPanel", "Firestore error: ${e.message}", e)
+            showMessage("Failed to load users: ${e.message}")
+            binding.tvUserStats.text = "Users: Failed to load"
+        }
+}
 
     private fun validateUserExists(userId: String, callback: (Boolean) -> Unit) {
         if (userId.isEmpty()) {
@@ -225,77 +236,103 @@ private fun showTopCVGenerators() {
     binding.tvCreditStats.text = "Credits: Loading..."
     binding.tvCvStats.text = "CVs Generated: Loading..."
 
-    db.collection("users").get()
-        .addOnSuccessListener { documents ->
-            try {
-                // ⭐⭐⭐ ADD NULL CHECK HERE ⭐⭐⭐
-                if (documents == null) {
-                    Log.e("AdminPanel", "Documents is null")
-                    runOnUiThread {
-                        binding.tvUserStats.text = "Users: No data"
-                        binding.tvCreditStats.text = "Credits: No data"
-                        binding.tvCvStats.text = "CVs: No data"
-                    }
-                    return@addOnSuccessListener
-                }
-
-                val totalUsers = documents.size()
-                var totalCredits = 0L
-                var totalCVs = 0L
-                var blockedUsers = 0L
-                var verifiedUsers = 0L
-                var activeUsers = 0L
-
-                for (doc in documents) {
-                    try {
-                        totalCredits += doc.getLong("totalCreditsEarned") ?: 0
-                        totalCVs += doc.getLong("usedCredits") ?: 0
-                        
-                        val isBlocked = doc.getBoolean("isBlocked") ?: false
-                        if (isBlocked) {
-                            blockedUsers++
-                        } else {
-                            activeUsers++
-                        }
-                        
-                        val isVerified = doc.getBoolean("emailVerified") ?: false
-                        if (isVerified) verifiedUsers++
-                        
-                    } catch (e: Exception) {
-                        Log.e("AdminPanel", "Error processing user ${doc.id}", e)
-                    }
-                }
-
-                runOnUiThread {
-                    binding.tvUserStats.text = """
-                        Total Users: $totalUsers
-                        ✅ Verified: $verifiedUsers
-                        ❌ Not Verified: ${totalUsers - verifiedUsers}
-                        🟢 Active: $activeUsers
-                        🚫 Blocked: $blockedUsers
-                    """.trimIndent()
-                    
-                    binding.tvCreditStats.text = "Total Credits: $totalCredits"
-                    binding.tvCvStats.text = "Total CVs Generated: $totalCVs"
-                }
-                
-            } catch (e: Exception) {
-                Log.e("AdminPanel", "Error in loadAdminStats", e)
-                runOnUiThread {
-                    binding.tvUserStats.text = "Users: Error"
-                    binding.tvCreditStats.text = "Credits: Error"
-                    binding.tvCvStats.text = "CVs: Error"
-                }
+    // ⭐⭐⭐ USE CACHE FIRST FOR FASTER LOADING ⭐⭐⭐
+    db.collection("users").get(Source.CACHE)
+        .addOnSuccessListener { cachedDocuments ->
+            // Immediately show cached data if available
+            if (!cachedDocuments.isEmpty) {
+                processStatsData(cachedDocuments, "cached")
             }
+            
+            // Then get fresh data from server
+            loadFreshStatsData()
         }
         .addOnFailureListener { e ->
-            Log.e("AdminPanel", "Failed to load stats", e)
+            // If cache fails, go directly to server
+            Log.d("AdminPanel", "Cache not available, loading from server")
+            loadFreshStatsData()
+        }
+}
+
+private fun loadFreshStatsData() {
+    db.collection("users").get(Source.SERVER)
+        .addOnSuccessListener { serverDocuments ->
+            processStatsData(serverDocuments, "server")
+        }
+        .addOnFailureListener { e ->
+            Log.e("AdminPanel", "Failed to load fresh stats", e)
             runOnUiThread {
                 binding.tvUserStats.text = "Users: Failed"
                 binding.tvCreditStats.text = "Credits: Failed"
                 binding.tvCvStats.text = "CVs: Failed"
             }
         }
+}
+
+private fun processStatsData(documents: com.google.firebase.firestore.QuerySnapshot, source: String) {
+    try {
+        Log.d("AdminPanel", "Processing stats from $source: ${documents.size()} users")
+        
+        if (documents.isEmpty) {
+            runOnUiThread {
+                binding.tvUserStats.text = "Users: No data"
+                binding.tvCreditStats.text = "Credits: No data"
+                binding.tvCvStats.text = "CVs: No data"
+            }
+            return
+        }
+
+        val totalUsers = documents.size()
+        var totalCredits = 0L
+        var totalCVs = 0L
+        var blockedUsers = 0L
+        var verifiedUsers = 0L
+        var activeUsers = 0L
+
+        // ⭐⭐⭐ OPTIMIZED PROCESSING - NO TRY/CATCH IN LOOP ⭐⭐⭐
+        for (doc in documents) {
+            totalCredits += doc.getLong("totalCreditsEarned") ?: 0
+            totalCVs += doc.getLong("usedCredits") ?: 0
+            
+            val isBlocked = doc.getBoolean("isBlocked") ?: false
+            if (isBlocked) {
+                blockedUsers++
+            } else {
+                activeUsers++
+            }
+            
+            val isVerified = doc.getBoolean("emailVerified") ?: false
+            if (isVerified) verifiedUsers++
+        }
+
+        runOnUiThread {
+            binding.tvUserStats.text = """
+                Total Users: $totalUsers
+                ✅ Verified: $verifiedUsers
+                ❌ Not Verified: ${totalUsers - verifiedUsers}
+                🟢 Active: $activeUsers
+                🚫 Blocked: $blockedUsers
+            """.trimIndent()
+            
+            binding.tvCreditStats.text = "Total Credits: $totalCredits"
+            binding.tvCvStats.text = "Total CVs Generated: $totalCVs"
+            
+            // Show source indicator for debugging
+            if (source == "cached") {
+                Log.d("AdminPanel", "✅ Stats loaded from cache")
+            } else {
+                Log.d("AdminPanel", "✅ Stats loaded from server")
+            }
+        }
+        
+    } catch (e: Exception) {
+        Log.e("AdminPanel", "Error in processStatsData", e)
+        runOnUiThread {
+            binding.tvUserStats.text = "Users: Error"
+            binding.tvCreditStats.text = "Credits: Error"
+            binding.tvCvStats.text = "CVs: Error"
+        }
+    }
 }
 
     private fun setupManualEmailLoad() {
