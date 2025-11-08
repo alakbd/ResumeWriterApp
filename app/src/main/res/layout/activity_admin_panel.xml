@@ -141,7 +141,7 @@
                 android:id="@+id/spUserSelector"
                 android:layout_width="match_parent"
                 android:layout_height="48dp"
-                android:background="@drawable/bg_spinner"
+                android:background="@drawable/spinner_background"
                 android:paddingStart="12dp"
                 android:paddingEnd="12dp"
                 android:layout_marginBottom="12dp" />
