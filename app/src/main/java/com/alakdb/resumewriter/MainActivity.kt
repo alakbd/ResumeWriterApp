@@ -233,6 +233,23 @@ class MainActivity : AppCompatActivity() {
         }, 2000)
     }
 
+    //Show Instruction in Main Activity
+    // To show the section with your text:
+    fun showInstructions(message: String) {
+        binding.instructionsSection.visibility = View.VISIBLE
+        binding.tvInstructions.text = message
+    }
+
+// To hide it when not needed:
+    //fun hideInstructions() {
+        //binding.instructionsSection.visibility = View.GONE
+    //}
+
+    // Examples of usage:
+    // showInstructions("🎯 Pro Tip: Always tailor your CV to the specific job description!")
+    // showInstructions("⚠️ Maintenance: System update scheduled for Sunday 2-4 AM")
+    // showInstructions("📢 New Feature: Now supporting ATS-friendly templates!")
+
     // FIXED: Proper implementation of showHtmlDialog
     private fun showHtmlDialog(title: String, htmlContent: String) {
         try {
