@@ -8,10 +8,6 @@ import android.widget.Toast
 import androidx.appcompat.app.AlertDialog
 import androidx.appcompat.app.AppCompatActivity
 import com.google.firebase.auth.FirebaseAuth
-import com.google.firebase.auth.FirebaseUser
-import com.google.firebase.firestore.FieldValue
-import com.google.firebase.firestore.ktx.firestore
-import com.google.firebase.ktx.Firebase
 import com.alakdb.resumewriter.databinding.ActivityUserRegistrationBinding
 
 class UserRegistrationActivity : AppCompatActivity() {
@@ -20,7 +16,7 @@ class UserRegistrationActivity : AppCompatActivity() {
 
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
-        binding = ActivityUserRegistrationBinding.inflate(layout.layoutInflater)
+        binding = ActivityUserRegistrationBinding.inflate(layoutInflater) // FIXED: removed .layout
         setContentView(binding.root)
 
         userManager = UserManager(this)
