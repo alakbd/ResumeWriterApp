@@ -118,7 +118,7 @@
                 android:background="@drawable/bg_instructions_placeholder"
                 android:padding="16dp"
                 android:layout_marginBottom="16dp"
-                android:visibility="visible"    
+                android:visibility="visible">    
                 //android:visibility="gone">
 
         <LinearLayout
