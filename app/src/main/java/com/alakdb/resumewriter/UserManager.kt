@@ -39,6 +39,53 @@ class UserManager(private val context: Context) {
     }
 
     // -----------------------
+    // VERIFICATION ENFORCEMENT METHODS
+    // -----------------------
+
+    /**
+     * ⭐⭐⭐ STRICT CHECK for resume generation
+     * Use this before allowing any CV generation
+     */
+    fun canGenerateResume(): Boolean {
+        val user = auth.currentUser
+        val isLoggedIn = isUserLoggedIn()
+        
+        val canGenerate = user != null && isLoggedIn && user.isEmailVerified
+        
+        Log.d(TAG, "🔥 Resume Access Check - " +
+              "User: ${user?.uid?.take(8)}..., " +
+              "LoggedIn: $isLoggedIn, " +
+              "Verified: ${user?.isEmailVerified}, " +
+              "CanGenerate: $canGenerate")
+        
+        return canGenerate
+    }
+
+    /**
+     * ⭐⭐⭐ Get verification status for UI
+     */
+    fun getVerificationStatus(): VerificationStatus {
+        val user = auth.currentUser
+        return when {
+            user == null -> VerificationStatus.NOT_LOGGED_IN
+            !user.isEmailVerified -> VerificationStatus.NOT_VERIFIED  
+            else -> VerificationStatus.VERIFIED
+        }
+    }
+
+    enum class VerificationStatus {
+        NOT_LOGGED_IN, NOT_VERIFIED, VERIFIED
+    }
+
+    /**
+     * ⭐⭐⭐ Check if user needs verification redirect
+     */
+    fun requiresVerification(): Boolean {
+        val user = auth.currentUser
+        return user != null && !user.isEmailVerified && isUserLoggedIn()
+    }
+
+    // -----------------------
     // SIMPLE AUTH STATE MANAGEMENT
     // -----------------------
 
@@ -80,7 +127,7 @@ class UserManager(private val context: Context) {
     }
 
     // -----------------------
-    // REGISTRATION (KEEP IT SIMPLE)
+    // REGISTRATION (WITH AUTO-SIGNOUT)
     // -----------------------
 
     fun registerUser(
@@ -108,6 +155,10 @@ class UserManager(private val context: Context) {
 
                     Log.d(TAG, "Firebase registration successful: $uid")
 
+                    // ⭐⭐⭐ COLLECT DEVICE INFO (KEEP THIS - IT'S WORKING!)
+                    val deviceId = getDeviceId()
+                    val deviceInfo = getDeviceInfo()
+
                     // Prepare user data
                     val userData = hashMapOf(
                         "email" to email,
@@ -119,9 +170,9 @@ class UserManager(private val context: Context) {
                         "lastActive" to System.currentTimeMillis(),
                         "isActive" to true,
                         "emailVerified" to false,
-                        "deviceId" to getDeviceId(),
-                        "deviceInfo" to getDeviceInfo(),
-                        "registrationIp" to "pending",
+                        "deviceId" to deviceId, // ⭐⭐⭐ DEVICE ID PRESERVED
+                        "deviceInfo" to deviceInfo, // ⭐⭐⭐ DEVICE INFO PRESERVED
+                        "registrationIp" to "pending", // ⭐⭐⭐ WILL BE UPDATED
                         "lastLoginIp" to "pending"
                     )
 
@@ -134,7 +185,7 @@ class UserManager(private val context: Context) {
                             // Save locally
                             saveUserDataLocally(email, uid)
                             
-                            // Update IP in background
+                            // ⭐⭐⭐ UPDATE IP INFO (KEEP THIS - IT'S WORKING!)
                             updateUserIpInfo(uid, email, true)
                             
                             // Send verification email
@@ -142,10 +193,23 @@ class UserManager(private val context: Context) {
                                 .addOnCompleteListener { emailTask ->
                                     if (emailTask.isSuccessful) {
                                         Log.d(TAG, "Verification email sent")
-                                        onComplete(true, "Registration successful! Please verify your email.")
+                                        
+                                        // ⭐⭐⭐ CRITICAL: AUTO-SIGNOUT AFTER REGISTRATION
+                                        lifecycleScope.launch {
+                                            kotlinx.coroutines.delay(2000) // Let IP capture complete
+                                            auth.signOut()
+                                            clearUserData()
+                                            Log.d(TAG, "🚪 Auto-signed out after registration")
+                                        }
+                                        
+                                        onComplete(true, "Registration successful! Please verify your email before logging in.")
                                     } else {
                                         Log.w(TAG, "Verification email failed")
-                                        onComplete(true, "Registration successful, but verification email failed.")
+                                        
+                                        // Still enforce signout even if email failed
+                                        auth.signOut()
+                                        clearUserData()
+                                        onComplete(true, "Account created but verification email failed. Please use 'Resend Verification' from login.")
                                     }
                                 }
                         }
@@ -170,7 +234,7 @@ class UserManager(private val context: Context) {
     }
 
     // -----------------------
-    // LOGIN (SIMPLE AND RELIABLE)
+    // ⭐⭐⭐ STRICT LOGIN (BLOCKS UNVERIFIED USERS)
     // -----------------------
 
     fun loginUser(
@@ -178,28 +242,41 @@ class UserManager(private val context: Context) {
         password: String,
         onComplete: (Boolean, String?) -> Unit
     ) {
+        Log.d(TAG, "🔐 STRICT LOGIN ATTEMPT for: $email")
+        
         auth.signInWithEmailAndPassword(email, password)
             .addOnCompleteListener { task ->
                 if (task.isSuccessful) {
                     val user = auth.currentUser
                     if (user != null) {
+                        Log.d(TAG, "✅ Firebase auth success - checking verification...")
+                        
+                        // ⭐⭐⭐ CRITICAL: STRICT VERIFICATION BLOCK
                         if (!user.isEmailVerified) {
-                            // Sign out if email not verified
+                            Log.w(TAG, "🚫 BLOCKED: Email not verified for ${user.email}")
+                            
+                            // IMMEDIATE SIGN OUT - User cannot proceed
                             auth.signOut()
-                            Log.w(TAG, "Login blocked: Email not verified")
-                            onComplete(false, "Please verify your email before logging in.")
-                        } else {
-                            // Save user data locally
-                            saveUserDataLocally(user.email ?: "", user.uid)
+                            clearUserData()
                             
-                            // Update IP info in background
-                            updateUserIpInfo(user.uid, email, false)
-                            
-                            // Sync credits
-                            syncUserCredits { success, _ ->
-                                Log.d(TAG, "Login successful: $email")
-                                onComplete(true, null)
-                            }
+                            val errorMsg = "Please verify your email address before logging in. Check your inbox for the verification link."
+                            onComplete(false, errorMsg)
+                            return@addOnCompleteListener
+                        }
+
+                        // ✅ ONLY verified users reach here
+                        Log.d(TAG, "✅ Email verified - proceeding with login")
+                        
+                        // Save user data locally
+                        saveUserDataLocally(user.email ?: "", user.uid)
+                        
+                        // ⭐⭐⭐ UPDATE IP INFO ON LOGIN (KEEP THIS!)
+                        updateUserIpInfo(user.uid, email, false)
+                        
+                        // Sync credits
+                        syncUserCredits { success, _ ->
+                            Log.d(TAG, "🎉 Verified user login completed: $email")
+                            onComplete(true, null)
                         }
                     } else {
                         onComplete(false, "Login failed: No user data")
@@ -345,7 +422,7 @@ class UserManager(private val context: Context) {
     }
 
     // -----------------------
-    // IP CAPTURE (BACKGROUND)
+    // ⭐⭐⭐ IP CAPTURE (KEEP THIS - IT'S WORKING!)
     // -----------------------
 
     private fun updateUserIpInfo(uid: String, email: String, isRegistration: Boolean = false) {
@@ -360,20 +437,24 @@ class UserManager(private val context: Context) {
                     "lastUpdated" to System.currentTimeMillis()
                 )
 
+                // ⭐⭐⭐ PRESERVE REGISTRATION IP FOR NEW USERS
                 if (isRegistration) {
                     updateData["registrationIp"] = publicIp
+                    Log.d(TAG, "📍 Registration IP captured: $publicIp")
+                } else {
+                    Log.d(TAG, "📍 Login IP captured: $publicIp")
                 }
 
                 db.collection("users").document(uid)
                     .update(updateData)
                     .addOnSuccessListener {
-                        Log.d(TAG, "IP updated: $publicIp")
+                        Log.d(TAG, "✅ IP info updated successfully")
                     }
                     .addOnFailureListener { e ->
-                        Log.e(TAG, "IP update failed: ${e.message}")
+                        Log.e(TAG, "❌ IP update failed: ${e.message}")
                     }
             } catch (e: Exception) {
-                Log.e(TAG, "IP capture failed: ${e.message}")
+                Log.e(TAG, "❌ IP capture failed: ${e.message}")
             }
         }
     }
@@ -406,7 +487,7 @@ class UserManager(private val context: Context) {
     }
 
     // -----------------------
-    // DEVICE INFO
+    // ⭐⭐⭐ DEVICE INFO (KEEP THIS - IT'S WORKING!)
     // -----------------------
 
     private fun getDeviceId(): String {
@@ -485,7 +566,8 @@ class UserManager(private val context: Context) {
         Log.d(TAG, "Local UID: $localUid")
         Log.d(TAG, "Local Email: $localEmail")
         Log.d(TAG, "Logged In: ${isUserLoggedIn()}")
-        Log.d(TAG, "Data Persisted: ${isUserDataPersisted()}")
+        Log.d(TAG, "Email Verified: ${firebaseUser?.isEmailVerified ?: false}")
+        Log.d(TAG, "Can Generate Resume: ${canGenerateResume()}")
         Log.d(TAG, "=== END USER STATE ===")
     }
 
