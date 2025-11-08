@@ -212,7 +212,10 @@ private fun showTopCVGenerators() {
             
             // ⭐⭐⭐ NOW PROCESS STATS FROM THE SAME QUERY ⭐⭐⭐
             processStatsData(documents, "server")
-                setupAutoCompleteSearch()
+            
+            // ⭐⭐⭐ SETUP AUTOCOMPLETE AFTER USERS ARE LOADED ⭐⭐⭐
+            setupAutoCompleteSearch()
+               
         }
         .addOnFailureListener { e ->
             Log.e("AdminPanel", "Firestore error: ${e.message}", e)
