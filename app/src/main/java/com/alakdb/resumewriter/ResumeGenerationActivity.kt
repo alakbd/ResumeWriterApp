@@ -978,4 +978,238 @@ private fun showEmailVerificationDialog() {
     val builder = AlertDialog.Builder(this)
         .setTitle("Email Verification Required")
         .setMessage("You must verify your email address (${user?.email ?: "your email"}) before generating resumes. Please check your inbox for the verification link.")
-       
+        .setPositiveButton("Resend Verification") { _, _ ->
+            resendEmailVerification()
+        }
+        .setNegativeButton("Check Email") { _, _ ->
+            openEmailApp()
+        }
+        .setNeutralButton("Cancel", null)
+
+    builder.show()
+}
+
+private fun resendEmailVerification() {
+    val user = auth.currentUser
+    user?.sendEmailVerification()?.addOnCompleteListener { task ->
+        if (task.isSuccessful) {
+            showToast("Verification email sent to ${user.email}", false)
+        } else {
+            showToast("Failed to send verification email", true)
+        }
+    }
+}
+
+private fun openEmailApp() {
+    val intent = Intent(Intent.ACTION_MAIN)
+    intent.addCategory(Intent.CATEGORY_APP_EMAIL)
+    intent.addFlags(Intent.FLAG_ACTIVITY_NEW_TASK)
+    try {
+        startActivity(intent)
+    } catch (e: Exception) {
+        showToast("No email app found", true)
+    }
+}
+
+    // ⭐⭐⭐ ADD THIS NEW METHOD FOR VERIFICATION DIALOG
+    private fun showVerificationRequiredDialog() {
+        val user = auth.currentUser
+        AlertDialog.Builder(this)
+            .setTitle("Email Verification Required")
+            .setMessage("Please verify your email address (${user?.email ?: "your email"}) before generating resumes. Check your inbox for the verification link.")
+            .setPositiveButton("Resend Verification") { _, _ ->
+                userManager.sendEmailVerification { success, message ->
+                    if (success) {
+                        Toast.makeText(this, "Verification email sent!", Toast.LENGTH_LONG).show()
+                    } else {
+                        Toast.makeText(this, "Failed to send: $message", Toast.LENGTH_SHORT).show()
+                    }
+                }
+            }
+            .setNegativeButton("OK", null)
+            .show()
+    }
+    
+    private fun testBasicApiCall() {
+        lifecycleScope.launch {
+            try {
+                binding.tvConnectionStatus.text = "Testing basic API call..."
+                binding.progressConnection.visibility = View.VISIBLE
+                
+                Log.d("BasicTest", "🔄 Testing basic API call without authentication...")
+                
+                val result = apiService.testConnection()
+                
+                when (result) {
+                    is ApiService.ApiResult.Success -> {
+                        binding.tvConnectionStatus.text = "✅ Basic API works!"
+                        Log.d("BasicTest", "✅ Basic API call SUCCESS: ${result.data}")
+                        showToast("Basic connectivity: ✅ WORKING", false)
+                    }
+                    is ApiService.ApiResult.Error -> {
+                        binding.tvConnectionStatus.text = "❌ Basic API failed: ${result.message}"
+                        Log.e("BasicTest", "❌ Basic API call FAILED: ${result.message}")
+                        showToast("Basic connectivity: ❌ FAILED - ${result.message}", true)
+                    }
+                }
+            } catch (e: Exception) {
+                binding.tvConnectionStatus.text = "💥 Test crashed: ${e.message}"
+                Log.e("BasicTest", "💥 Test crashed", e)
+                showToast("Test crashed: ${e.message}", true)
+            } finally {
+                binding.progressConnection.visibility = View.GONE
+            }
+        }
+    }
+
+    // Clear memory when needed
+    private fun clearMemoryCache() {
+        selectedResumeUri = null
+        selectedJobDescUri = null
+        currentGeneratedResume = null
+        binding.etResumeText.text?.clear()
+        binding.etJobDescription.text?.clear()
+        System.gc()
+    }
+
+    // Optimize onDestroy
+    override fun onDestroy() {
+        super.onDestroy()
+        clearMemoryCache()
+        try {
+            connectivityManager.unregisterNetworkCallback(networkCallback)
+        } catch (e: Exception) {
+            // Ignore
+        }
+    }
+
+    private fun testApiConnection() {
+        binding.layoutConnectionStatus.visibility = View.VISIBLE
+        binding.tvConnectionStatus.text = "Testing connection..."
+        binding.progressConnection.visibility = View.VISIBLE
+        binding.btnRetryConnection.isEnabled = false
+
+        lifecycleScope.launch {
+            try {
+                if (!apiService.isNetworkAvailable()) {
+                    updateConnectionStatus("❌ No internet connection", true)
+                    binding.progressConnection.visibility = View.GONE
+                    binding.btnRetryConnection.isEnabled = true
+                    showToast("Please check your internet connection", true)
+                    return@launch
+                }
+
+                Log.d("ResumeActivity", "Testing API connection...")
+                
+                val connectionResult = apiService.testConnection()
+                
+                when (connectionResult) {
+                    is ApiService.ApiResult.Success -> {
+                        updateConnectionStatus("✅ API Connected", false)
+                        // Don't auto-update credits after connection test to avoid rate limits
+                    }
+                    is ApiService.ApiResult.Error -> {
+                        if (connectionResult.code in 500..599 || connectionResult.code == 0) {
+                            updateConnectionStatus("🔄 Server is waking up...", true)
+                            showServerWakeupMessage()
+                            
+                            val serverAwake = apiService.waitForServerWakeUp(maxAttempts = 6, delayBetweenAttempts = 15000L) // Reduced attempts
+                            
+                            if (serverAwake) {
+                                updateConnectionStatus("✅ Server is ready!", false)
+                            } else {
+                                updateConnectionStatus("⏰ Server taking too long", true)
+                                showToast("Server is taking longer than expected. Please try again in a minute.", true)
+                            }
+                        } else {
+                            updateConnectionStatus("❌ API Connection Failed", true)
+                            showToast("API error: ${connectionResult.message}", true)
+                        }
+                    }
+                }
+            } catch (e: Exception) {
+                updateConnectionStatus("❌ Connection Error", true)
+                Log.e("ResumeActivity", "Connection test failed", e)
+                showToast("Connection failed: ${e.message}", true)
+            } finally {
+                binding.progressConnection.visibility = View.GONE
+                binding.btnRetryConnection.isEnabled = true
+            }
+        }
+    }
+
+    private fun updateConnectionStatus(message: String, isError: Boolean = false) {
+        binding.tvConnectionStatus.text = message
+        binding.tvConnectionStatus.setTextColor(
+            if (isError) getColor(android.R.color.holo_red_dark)
+            else getColor(android.R.color.holo_green_dark)
+        )
+        Log.d("ResumeActivity", "Connection status updated: $message")
+    }
+
+    private fun showServerWakeupMessage() {
+        Toast.makeText(
+            this, 
+            "🔄 Server is waking up... This may take 30-60 seconds on first launch.", 
+            Toast.LENGTH_LONG
+        ).show()
+    }
+
+    private fun debugAuthFlow() {
+        lifecycleScope.launch {
+            try {
+                binding.tvGeneratedResume.text = "🔐 Debugging Authentication Flow..."
+                
+                val debugInfo = StringBuilder()
+                debugInfo.appendLine("🔐 AUTHENTICATION DEBUG")
+                debugInfo.appendLine("=".repeat(50))
+                
+                debugInfo.appendLine("1. USER MANAGER STATE:")
+                debugInfo.appendLine("   • isUserLoggedIn(): ${userManager.isUserLoggedIn()}")
+                debugInfo.appendLine("   • getCurrentUserId(): ${userManager.getCurrentUserId()}")
+                debugInfo.appendLine("   • getCurrentUserEmail(): ${userManager.getCurrentUserEmail()}")
+                
+                val firebaseUser = auth.currentUser // Use the lazy auth instance
+                debugInfo.appendLine("\n2. FIREBASE AUTH STATE:")
+                debugInfo.appendLine("   • Current User: ${firebaseUser?.uid ?: "NULL"}")
+                debugInfo.appendLine("   • Email: ${firebaseUser?.email ?: "NULL"}")
+                debugInfo.appendLine("   • Verified: ${firebaseUser?.isEmailVerified ?: false}")
+                
+                debugInfo.appendLine("\n3. BASIC API TEST (no auth):")
+                val healthResult = apiService.testConnection()
+                when (healthResult) {
+                    is ApiService.ApiResult.Success -> {
+                        debugInfo.appendLine("   • Health Endpoint: ✅ SUCCESS")
+                    }
+                    is ApiService.ApiResult.Error -> {
+                        debugInfo.appendLine("   • Health Endpoint: ❌ FAILED - ${healthResult.message}")
+                    }
+                }
+                
+                debugInfo.appendLine("\n4. AUTHENTICATED API TEST:")
+                if (userManager.isUserLoggedIn()) {
+                    val creditsResult = apiService.getUserCredits()
+                    when (creditsResult) {
+                        is ApiService.ApiResult.Success -> {
+                            debugInfo.appendLine("   • Credits Endpoint: ✅ SUCCESS")
+                            debugInfo.appendLine("   • Credits: ${creditsResult.data.available_credits}")
+                        }
+                        is ApiService.ApiResult.Error -> {
+                            debugInfo.appendLine("   • Credits Endpoint: ❌ FAILED")
+                            debugInfo.appendLine("   • Error: ${creditsResult.message}")
+                            debugInfo.appendLine("   • Code: ${creditsResult.code}")
+                        }
+                    }
+                } else {
+                    debugInfo.appendLine("   • Credits Endpoint: ❌ SKIPPED (not logged in)")
+                }
+                
+                debugInfo.appendLine("=".repeat(50))
+                binding.tvGeneratedResume.text = debugInfo.toString()
+                
+            } catch (e: Exception) {
+                binding.tvGeneratedResume.text = "💥 Auth debug failed: ${e.message}"
+            }
+        }
+    }
+}
