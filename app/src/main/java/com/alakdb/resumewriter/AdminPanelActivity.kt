@@ -131,7 +131,7 @@ private fun showTopCVGenerators() {
     private fun setupUI() {
         binding.btnAdminAdd3.setOnClickListener { modifyUserCredits(3, "add") }
         binding.btnAdminAdd5.setOnClickListener { modifyUserCredits(5, "add") }
-        //binding.btnAdminAdd8.setOnClickListener { modifyUserCredits(8, "add") }
+        binding.btnAdminAdd8.setOnClickListener { modifyUserCredits(8, "add") }
         binding.btnAdminAdd20.setOnClickListener { modifyUserCredits(20, "add") }
         binding.btnAdminReset.setOnClickListener { modifyUserCredits(0, "reset") } 
         binding.btnAdminStats.setOnClickListener { showUserStats() }
@@ -146,17 +146,7 @@ private fun showTopCVGenerators() {
             loadUsers()
         }
 
-        // TEMPORARY: Add this to setupUI() method for debugging
-            // ⭐⭐⭐ TEMPORARY: Use an existing button for debugging
-            binding.btnAdminAdd8.setOnClickListener { 
-        //     Long press for debug, normal click for original function
-        }
-    
-    // Or add long press to an existing button:
-        binding.btnAdminAdd8.setOnLongClickListener {
-            debugCheckCreditAwardsCollection()
-                true
-            }
+        
 
         binding.spUserSelector.onItemSelectedListener = object : AdapterView.OnItemSelectedListener {
             override fun onItemSelected(parent: AdapterView<*>, view: android.view.View?, position: Int, id: Long) {
