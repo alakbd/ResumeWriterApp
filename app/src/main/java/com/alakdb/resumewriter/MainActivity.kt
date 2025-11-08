@@ -238,13 +238,13 @@ class MainActivity : AppCompatActivity() {
     //Show Instruction in Main Activity
     // To show the section with your text:
     fun showInstructions(message: String) {
-        binding.instructionsSection.visibility = View.VISIBLE
+        binding.instructionsSection.visibility = View.VISIBLE // Make it visible
         binding.tvInstructions.text = message
     }
 
 // To hide it when not needed:
     //fun hideInstructions() {
-        //binding.instructionsSection.visibility = View.GONE
+        //binding.instructionsSection.visibility = View.GONE // Make it completely gone
     //}
 
     private fun setupInstructions() {
