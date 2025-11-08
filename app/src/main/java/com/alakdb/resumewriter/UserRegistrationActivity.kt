@@ -16,7 +16,7 @@ class UserRegistrationActivity : AppCompatActivity() {
 
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
-        binding = ActivityUserRegistrationBinding.inflate(layoutInflater) // FIXED: removed .layout
+        binding = ActivityUserRegistrationBinding.inflate(layoutInflater)
         setContentView(binding.root)
 
         userManager = UserManager(this)
@@ -70,12 +70,22 @@ class UserRegistrationActivity : AppCompatActivity() {
         binding.btnRegister.isEnabled = false
         binding.btnRegister.text = "Registering..."
 
-        // Use UserManager's registerUser method - it handles everything including Firestore
+        Log.d("Registration", "🔄 Starting registration for: $email")
+
+        // Use UserManager's registerUser method - it handles everything including Firestore, IP capture, and device ID
         userManager.registerUser(email, password) { success: Boolean, error: String? ->
             if (success) {
                 Log.d("Registration", "✅ Registration successful for: $email")
                 
-                // Show verification dialog - UserManager already sent the verification email
+                // ⭐⭐⭐ UserManager now handles:
+                // - Firebase Auth registration
+                // - Firestore user document creation  
+                // - Device ID capture
+                // - IP address capture (registrationIp)
+                // - Sending verification email
+                // - Auto-signout after registration
+                
+                // Show verification dialog
                 showVerificationDialog(email)
             } else {
                 // Registration failed
@@ -90,12 +100,14 @@ class UserRegistrationActivity : AppCompatActivity() {
     private fun showVerificationDialog(email: String?) {
         AlertDialog.Builder(this)
             .setTitle("Verify Your Email")
-            .setMessage("We've sent a verification link to $email. Please check your inbox and verify your email address before logging in.")
+            .setMessage("We've sent a verification link to $email. Please check your inbox (and spam folder) and verify your email address before logging in.\n\nYou will be automatically signed out after registration - this is for security.")
             .setPositiveButton("Open Email") { _: DialogInterface, _: Int ->
                 openEmailApp()
+                // ⭐⭐⭐ UserManager will auto-signout, so just proceed to login
                 proceedToLoginActivity()
             }
-            .setNegativeButton("Continue") { _: DialogInterface, _: Int ->
+            .setNegativeButton("Continue to Login") { _: DialogInterface, _: Int ->
+                // ⭐⭐⭐ UserManager auto-signout ensures user must verify before logging in
                 proceedToLoginActivity()
             }
             .setCancelable(false)
@@ -117,6 +129,8 @@ class UserRegistrationActivity : AppCompatActivity() {
         binding.btnRegister.isEnabled = true
         binding.btnRegister.text = "Register"
         
+        Log.d("Registration", "➡️ Navigating to LoginActivity")
+        
         val intent = Intent(this, LoginActivity::class.java)
         intent.flags = Intent.FLAG_ACTIVITY_CLEAR_TOP or Intent.FLAG_ACTIVITY_NEW_TASK
         startActivity(intent)
@@ -125,5 +139,11 @@ class UserRegistrationActivity : AppCompatActivity() {
 
     private fun showMessage(message: String) {
         Toast.makeText(this, message, Toast.LENGTH_SHORT).show()
+    }
+
+    override fun onBackPressed() {
+        // Allow back navigation to login
+        startActivity(Intent(this, LoginActivity::class.java))
+        finish()
     }
 }
