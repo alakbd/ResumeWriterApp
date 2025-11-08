@@ -43,7 +43,7 @@ class AdminPanelActivity : AppCompatActivity() {
 
         setupUI()
         loadUsers()
-        setupManualEmailLoad()
+        setupAutoCompleteSearch()
         
     }
 
@@ -212,6 +212,7 @@ private fun showTopCVGenerators() {
             
             // ⭐⭐⭐ NOW PROCESS STATS FROM THE SAME QUERY ⭐⭐⭐
             processStatsData(documents, "server")
+                setupAutoCompleteSearch()
         }
         .addOnFailureListener { e ->
             Log.e("AdminPanel", "Firestore error: ${e.message}", e)
@@ -335,54 +336,24 @@ private fun processStatsData(documents: com.google.firebase.firestore.QuerySnaps
     }
 }
 
-    private fun setupManualEmailLoad() {
-        binding.btnLoadUser.setOnClickListener {
-            val emailInput = binding.etManualEmail.text.toString().trim()
-            if (emailInput.isEmpty()) {
-                showMessage("Enter an email first")
-                return@setOnClickListener
-            }
-
-            val match = usersList.find { it.second.equals(emailInput, ignoreCase = true) }
-            if (match != null) {
-                validateUserExists(match.first) { isValid ->
-                    if (isValid) {
-                        selectUser(match.first, match.second)
-                        val index = usersList.indexOf(match) + 1
-                        if (index < binding.spUserSelector.count) binding.spUserSelector.setSelection(index)
-                    } else {
-                        showMessage("User was deleted - refreshing list")
-                        loadUsers()
-                    }
-                }
-            } else {
-                db.collection("users").whereEqualTo("email", emailInput).get(Source.SERVER)
-                    .addOnSuccessListener { documents ->
-                        when {
-                            documents.isEmpty -> showMessage("User not found with email: $emailInput")
-                            documents.size() > 1 -> handleManualUserLoad(documents.documents[0], emailInput)
-                            else -> handleManualUserLoad(documents.documents[0], emailInput)
-                        }
-                    }
-                    .addOnFailureListener { e -> showMessage("Failed to load user: ${e.message}") }
-            }
-        }
+    private fun setupAutoCompleteSearch() {
+    val adapter = ArrayAdapter<String>(this, android.R.layout.simple_dropdown_item_1line)
+    binding.etManualEmail.setAdapter(adapter)
+    
+    // Use existing EditText as AutoComplete
+    binding.etManualEmail.setOnItemClickListener { parent, view, position, id ->
+        val selectedEmail = adapter.getItem(position) ?: return@setOnItemClickListener
+        val user = usersList.find { it.second == selectedEmail }
+        user?.let { (userId, email) -> selectUser(userId, email) }
     }
+    
+    // Update adapter when users load
+    val emails = usersList.map { it.second }
+    adapter.clear()
+    adapter.addAll(emails)
+}
 
-    private fun handleManualUserLoad(document: DocumentSnapshot, emailInput: String) {
-        val userId = document.id
-        val userEmail = document.getString("email") ?: emailInput
 
-        if (usersList.none { it.first == userId }) {
-            usersList.add(userId to userEmail)
-            refreshSpinnerAdapter()
-        }
-
-        selectUser(userId, userEmail)
-
-        val spinnerIndex = usersList.indexOfFirst { it.first == userId } + 1
-        if (spinnerIndex > 0 && spinnerIndex < binding.spUserSelector.count) binding.spUserSelector.setSelection(spinnerIndex)
-    }
 
     private fun refreshSpinnerAdapter() {
         val displayList = mutableListOf("Select a user...") + usersList.map { it.second }
