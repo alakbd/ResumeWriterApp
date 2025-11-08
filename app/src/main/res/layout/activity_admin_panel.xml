@@ -35,28 +35,15 @@
             android:layout_height="wrap_content"
             android:layout_marginBottom="16dp" />
 
-        <!-- Manual Email Input -->
-        <LinearLayout
-            android:layout_width="match_parent"
-            android:layout_height="wrap_content"
-            android:orientation="horizontal"
-            android:layout_marginBottom="16dp">
-
-            <EditText
-                android:id="@+id/et_manual_email"
-                android:layout_width="0dp"
-                android:layout_height="wrap_content"
-                android:layout_weight="1"
-                android:hint="Or enter email manually"
-                android:inputType="textEmailAddress"
-                android:layout_marginEnd="8dp" />
-
-            <Button
-                android:id="@+id/btn_load_user"
-                android:layout_width="wrap_content"
-                android:layout_height="wrap_content"
-                android:text="Load" />
-        </LinearLayout>
+        
+        <!-- Search Users -->
+        <AutoCompleteTextView
+        android:id="@+id/et_manual_email"
+        android:layout_width="match_parent"
+        android:layout_height="wrap_content"
+        android:hint="Type to search users..."
+        android:completionThreshold="2"
+        android:layout_marginBottom="16dp" />
 
         <!-- User Info Display -->
         <TextView
