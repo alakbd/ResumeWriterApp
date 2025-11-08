@@ -1,246 +1,473 @@
 <?xml version="1.0" encoding="utf-8"?>
 <ScrollView xmlns:android="http://schemas.android.com/apk/res/android"
+    xmlns:app="http://schemas.android.com/apk/res-auto"
     android:layout_width="match_parent"
     android:layout_height="match_parent"
-    android:fillViewport="true"
-    android:padding="16dp">
+    android:scrollbars="none"
+    android:fadeScrollbars="true"
+    android:background="@color/background"
+    android:padding="12dp">
 
     <LinearLayout
         android:layout_width="match_parent"
         android:layout_height="wrap_content"
         android:orientation="vertical">
 
-        <!-- Admin Header -->
+        <!-- Header Title -->
         <TextView
             android:layout_width="match_parent"
             android:layout_height="wrap_content"
-            android:text="Admin Panel"
+            android:text="👑 Admin Dashboard"
             android:textSize="24sp"
             android:textStyle="bold"
             android:gravity="center"
-            android:layout_marginBottom="24dp" />
-
-        <!-- User Selection Section -->
-        <TextView
-            android:layout_width="match_parent"
-            android:layout_height="wrap_content"
-            android:text="Select User:"
-            android:textSize="16sp"
-            android:textStyle="bold"
-            android:layout_marginBottom="8dp" />
-
-        <Spinner
-            android:id="@+id/sp_user_selector"
-            android:layout_width="match_parent"
-            android:layout_height="wrap_content"
-            android:layout_marginBottom="16dp" />
-
-        
-        <!-- Search Users -->
-        <AutoCompleteTextView
-        android:id="@+id/et_manual_email"
-        android:layout_width="match_parent"
-        android:layout_height="wrap_content"
-        android:hint="Type to search users..."
-        android:completionThreshold="2"
-        android:dropDownVerticalOffset="2dp"
-        android:dropDownHeight="wrap_content"
-        android:dropDownWidth="match_parent"
-        android:padding="8dp"
-        android:layout_marginBottom="16dp" />
-
-        <!-- User Info Display -->
-        <TextView
-            android:id="@+id/tv_user_email"
-            android:layout_width="match_parent"
-            android:layout_height="wrap_content"
-            android:text="User: Not selected"
-            android:textSize="14sp"
-            android:layout_marginBottom="8dp" />
-
-        <TextView
-            android:id="@+id/tv_available_credits"
-            android:layout_width="match_parent"
-            android:layout_height="wrap_content"
-            android:text="Available: 0"
-            android:textSize="14sp"
-            android:layout_marginBottom="4dp" />
-
-        <TextView
-            android:id="@+id/tv_used_credits"
-            android:layout_width="match_parent"
-            android:layout_height="wrap_content"
-            android:text="Used: 0"
-            android:textSize="14sp"
-            android:layout_marginBottom="4dp" />
-
-        <TextView
-            android:id="@+id/tv_total_credits"
-            android:layout_width="match_parent"
-            android:layout_height="wrap_content"
-            android:text="Total Earned: 0"
-            android:textSize="14sp"
-            android:layout_marginBottom="16dp" />
-
-        <!-- Block / Unblock User -->
-        <Button
-            android:id="@+id/btn_block_user"
-            android:layout_width="match_parent"
-            android:layout_height="wrap_content"
-            android:text="Block User"
+            android:textColor="@color/colorPrimary"
             android:layout_marginBottom="16dp"
-            android:backgroundTint="#FF5722"
-            android:textColor="#FFFFFF" />
+            android:padding="8dp" />
 
-        <!-- Admin Controls Section -->
-        <TextView
-            android:layout_width="match_parent"
-            android:layout_height="wrap_content"
-            android:text="Credit Management:"
-            android:textSize="16sp"
-            android:textStyle="bold"
-            android:layout_marginBottom="8dp" />
-
-        <!-- New Credit Buttons in Horizontal Layout -->
+        <!-- Stats Section - Improved Layout -->
         <LinearLayout
             android:layout_width="match_parent"
             android:layout_height="wrap_content"
             android:orientation="horizontal"
-            android:layout_marginBottom="8dp">
+            android:weightSum="3"
+            android:layout_marginBottom="16dp">
 
-            <Button
-                android:id="@+id/btn_admin_add_3"
+            <!-- Users Stats -->
+            <LinearLayout
                 android:layout_width="0dp"
-                android:layout_height="wrap_content"
+                android:layout_height="100dp"
                 android:layout_weight="1"
                 android:layout_marginEnd="4dp"
-                android:text="+3" />
+                android:background="@drawable/bg_stats_card"
+                android:gravity="center"
+                android:orientation="vertical"
+                android:padding="12dp">
 
-            <Button
-                android:id="@+id/btn_admin_add_5"
+                <TextView
+                    android:layout_width="wrap_content"
+                    android:layout_height="wrap_content"
+                    android:text="👥"
+                    android:textSize="20sp" />
+
+                <TextView
+                    android:id="@+id/tvUserStats"
+                    android:layout_width="wrap_content"
+                    android:layout_height="wrap_content"
+                    android:text="Users: Loading..."
+                    android:textColor="@color/text_primary"
+                    android:textSize="12sp"
+                    android:gravity="center"
+                    android:maxLines="2" />
+
+            </LinearLayout>
+
+            <!-- Credits Stats -->
+            <LinearLayout
                 android:layout_width="0dp"
-                android:layout_height="wrap_content"
+                android:layout_height="100dp"
                 android:layout_weight="1"
-                android:layout_marginStart="4dp"
                 android:layout_marginEnd="4dp"
-                android:text="+5" />
+                android:background="@drawable/bg_stats_card"
+                android:gravity="center"
+                android:orientation="vertical"
+                android:padding="12dp">
 
-            <Button
-                android:id="@+id/btn_admin_add_8"
-                android:layout_width="0dp"
-                android:layout_height="wrap_content"
-                android:layout_weight="1"
-                android:layout_marginStart="4dp"
-                android:layout_marginEnd="4dp"
-                android:text="+8" />
+                <TextView
+                    android:layout_width="wrap_content"
+                    android:layout_height="wrap_content"
+                    android:text="💰"
+                    android:textSize="20sp" />
 
-            <Button
-                android:id="@+id/btn_admin_add_20"
+                <TextView
+                    android:id="@+id/tvCreditStats"
+                    android:layout_width="wrap_content"
+                    android:layout_height="wrap_content"
+                    android:text="Credits: Loading..."
+                    android:textColor="@color/text_primary"
+                    android:textSize="12sp"
+                    android:gravity="center" />
+
+            </LinearLayout>
+
+            <!-- CV Stats -->
+            <LinearLayout
                 android:layout_width="0dp"
-                android:layout_height="wrap_content"
+                android:layout_height="100dp"
                 android:layout_weight="1"
-                android:layout_marginStart="4dp"
-                android:text="+20" />
+                android:background="@drawable/bg_stats_card"
+                android:gravity="center"
+                android:orientation="vertical"
+                android:padding="12dp">
+
+                <TextView
+                    android:layout_width="wrap_content"
+                    android:layout_height="wrap_content"
+                    android:text="📊"
+                    android:textSize="20sp" />
+
+                <TextView
+                    android:id="@+id/tvCvStats"
+                    android:layout_width="wrap_content"
+                    android:layout_height="wrap_content"
+                    android:text="CVs: Loading..."
+                    android:textColor="@color/text_primary"
+                    android:textSize="12sp"
+                    android:gravity="center" />
+
+            </LinearLayout>
+
         </LinearLayout>
 
-        <!-- Reset Credits Button -->
-        <Button
-            android:id="@+id/btn_admin_reset"
+        <!-- User Selection - Improved -->
+        <LinearLayout
             android:layout_width="match_parent"
             android:layout_height="wrap_content"
-            android:text="Reset Credits to 0"
-            android:layout_marginBottom="8dp" />
+            android:orientation="vertical"
+            android:background="@drawable/bg_section_card"
+            android:padding="16dp"
+            android:layout_marginBottom="16dp">
 
-        <Button
-            android:id="@+id/btnCheckMultiAccounts"
-            android:layout_width="match_parent"
-            android:layout_height="wrap_content"
-            android:text="Check Related Accounts"
-            android:background="@color/colorPrimary"
-            android:textColor="@android:color/white"
-            android:layout_margin="4dp" />
+            <TextView
+                android:layout_width="match_parent"
+                android:layout_height="wrap_content"
+                android:text="👤 Select User"
+                android:textSize="16sp"
+                android:textStyle="bold"
+                android:textColor="@color/text_primary"
+                android:layout_marginBottom="12dp" />
 
-        <Button
-            android:id="@+id/btnRefreshVerification"
-            android:layout_width="match_parent"
-            android:layout_height="wrap_content"
-            android:text="Refresh Verification Status"
-            android:layout_margin="4dp" />
+            <Spinner
+                android:id="@+id/spUserSelector"
+                android:layout_width="match_parent"
+                android:layout_height="48dp"
+                android:background="@drawable/bg_spinner"
+                android:paddingStart="12dp"
+                android:paddingEnd="12dp"
+                android:layout_marginBottom="12dp" />
 
-        <!-- Top_Ten User buttons -->
-        <Button
-            android:id="@+id/btnTopCVGenerators"
-            android:layout_width="match_parent"
-            android:layout_height="wrap_content"
-            android:text="🏆 Top CV Generators"
-            android:background="@android:color/holo_purple"
-            android:textColor="@android:color/white"
-            android:layout_margin="4dp" />
+            <com.google.android.material.textfield.TextInputLayout
+                android:layout_width="match_parent"
+                android:layout_height="wrap_content"
+                android:layout_marginBottom="12dp"
+                app:boxBackgroundMode="outline"
+                app:boxCornerRadiusBottomEnd="8dp"
+                app:boxCornerRadiusBottomStart="8dp"
+                app:boxCornerRadiusTopEnd="8dp"
+                app:boxCornerRadiusTopStart="8dp">
 
-        <!-- User Stats Button -->
-        <Button
-            android:id="@+id/btn_admin_stats"
-            android:layout_width="match_parent"
-            android:layout_height="wrap_content"
-            android:text="Show User Statistics"
-            android:layout_marginBottom="8dp" />
+                <AutoCompleteTextView
+                    android:id="@+id/etManualEmail"
+                    android:layout_width="match_parent"
+                    android:layout_height="48dp"
+                    android:hint="Search by email..."
+                    android:inputType="textEmailAddress"
+                    android:paddingStart="12dp"
+                    android:paddingEnd="12dp" />
 
-        <!-- Admin Statistics Section -->
-        <TextView
-            android:layout_width="match_parent"
-            android:layout_height="wrap_content"
-            android:text="Admin Statistics"
-            android:textSize="16sp"
-            android:textStyle="bold"
-            android:layout_marginTop="24dp"
-            android:layout_marginBottom="8dp" />
+            </com.google.android.material.textfield.TextInputLayout>
 
-        <TextView
-            android:id="@+id/tv_user_stats"
-            android:layout_width="match_parent"
-            android:layout_height="wrap_content"
-            android:text="Users: Loading..."
-            android:textSize="14sp"
-            android:layout_marginBottom="8dp"
-            android:padding="8dp"
-            android:background="#e0f7fa" />
+            <Button
+                android:id="@+id/btnRefreshUsers"
+                android:layout_width="match_parent"
+                android:layout_height="48dp"
+                android:text="🔄 Refresh Users"
+                android:textColor="@color/btn_text_light"
+                android:backgroundTint="@color/modern_info"
+                android:layout_marginTop="4dp" />
 
-        <TextView
-            android:id="@+id/tv_credit_stats"
-            android:layout_width="match_parent"
-            android:layout_height="wrap_content"
-            android:text="CV Stats: Loading..."
-            android:textSize="14sp"
-            android:layout_marginBottom="8dp"
-            android:padding="8dp"
-            android:background="#fff3e0" />
+        </LinearLayout>
 
-        <TextView
-            android:id="@+id/tv_cv_stats"
+        <!-- Selected User Info - Improved -->
+        <LinearLayout
+            android:id="@+id/selectedUserSection"
             android:layout_width="match_parent"
             android:layout_height="wrap_content"
-            android:text="Total CVs: Loading..."
-            android:textSize="14sp"
-            android:layout_marginBottom="24dp"
-            android:padding="8dp"
-            android:background="#f3e5f5" />
+            android:orientation="vertical"
+            android:background="@drawable/bg_section_card"
+            android:padding="16dp"
+            android:layout_marginBottom="16dp"
+            android:visibility="visible">
 
-        <!-- Refresh Users Button -->
-        <Button
-            android:id="@+id/btn_refresh_users"
+            <TextView
+                android:id="@+id/tvUserEmail"
+                android:layout_width="match_parent"
+                android:layout_height="wrap_content"
+                android:text="User: Not selected"
+                android:textSize="16sp"
+                android:textStyle="bold"
+                android:textColor="@color/text_primary"
+                android:layout_marginBottom="12dp" />
+
+            <LinearLayout
+                android:layout_width="match_parent"
+                android:layout_height="wrap_content"
+                android:orientation="horizontal"
+                android:weightSum="3"
+                android:layout_marginBottom="16dp">
+
+                <LinearLayout
+                    android:layout_width="0dp"
+                    android:layout_height="wrap_content"
+                    android:layout_weight="1"
+                    android:orientation="vertical"
+                    android:gravity="center">
+
+                    <TextView
+                        android:id="@+id/tvAvailableCredits"
+                        android:layout_width="wrap_content"
+                        android:layout_height="wrap_content"
+                        android:text="Available: 0"
+                        android:textColor="@color/modern_success"
+                        android:textSize="14sp"
+                        android:textStyle="bold" />
+
+                </LinearLayout>
+
+                <LinearLayout
+                    android:layout_width="0dp"
+                    android:layout_height="wrap_content"
+                    android:layout_weight="1"
+                    android:orientation="vertical"
+                    android:gravity="center">
+
+                    <TextView
+                        android:id="@+id/tvUsedCredits"
+                        android:layout_width="wrap_content"
+                        android:layout_height="wrap_content"
+                        android:text="Used: 0"
+                        android:textColor="@color/modern_warning"
+                        android:textSize="14sp"
+                        android:textStyle="bold" />
+
+                </LinearLayout>
+
+                <LinearLayout
+                    android:layout_width="0dp"
+                    android:layout_height="wrap_content"
+                    android:layout_weight="1"
+                    android:orientation="vertical"
+                    android:gravity="center">
+
+                    <TextView
+                        android:id="@+id/tvTotalCredits"
+                        android:layout_width="wrap_content"
+                        android:layout_height="wrap_content"
+                        android:text="Total: 0"
+                        android:textColor="@color/modern_info"
+                        android:textSize="14sp"
+                        android:textStyle="bold" />
+
+                </LinearLayout>
+
+            </LinearLayout>
+
+        </LinearLayout>
+
+        <!-- Credit Operations - IMPROVED BUTTONS -->
+        <LinearLayout
             android:layout_width="match_parent"
             android:layout_height="wrap_content"
-            android:text="Refresh Users"
-            android:layout_marginBottom="16dp" />
+            android:orientation="vertical"
+            android:background="@drawable/bg_section_card"
+            android:padding="16dp"
+            android:layout_marginBottom="16dp">
+
+            <TextView
+                android:layout_width="match_parent"
+                android:layout_height="wrap_content"
+                android:text="💰 Credit Operations"
+                android:textSize="16sp"
+                android:textStyle="bold"
+                android:textColor="@color/text_primary"
+                android:layout_marginBottom="12dp" />
+
+            <!-- First Row of Credit Buttons -->
+            <LinearLayout
+                android:layout_width="match_parent"
+                android:layout_height="wrap_content"
+                android:orientation="horizontal"
+                android:weightSum="2">
+
+                <Button
+                    android:id="@+id/btnAdminAdd3"
+                    android:layout_width="0dp"
+                    android:layout_height="52dp"
+                    android:layout_weight="1"
+                    android:layout_marginEnd="4dp"
+                    android:text="+3 Credits"
+                    android:textColor="@color/btn_text_light"
+                    android:textSize="14sp"
+                    android:backgroundTint="@color/modern_success"
+                    app:cornerRadius="12dp" />
+
+                <Button
+                    android:id="@+id/btnAdminAdd5"
+                    android:layout_width="0dp"
+                    android:layout_height="52dp"
+                    android:layout_weight="1"
+                    android:layout_marginStart="4dp"
+                    android:text="+5 Credits"
+                    android:textColor="@color/btn_text_light"
+                    android:textSize="14sp"
+                    android:backgroundTint="@color/modern_success"
+                    app:cornerRadius="12dp" />
+
+            </LinearLayout>
+
+            <!-- Second Row of Credit Buttons -->
+            <LinearLayout
+                android:layout_width="match_parent"
+                android:layout_height="wrap_content"
+                android:orientation="horizontal"
+                android:weightSum="2"
+                android:layout_marginTop="8dp">
+
+                <Button
+                    android:id="@+id/btnAdminAdd8"
+                    android:layout_width="0dp"
+                    android:layout_height="52dp"
+                    android:layout_weight="1"
+                    android:layout_marginEnd="4dp"
+                    android:text="+8 Credits"
+                    android:textColor="@color/btn_text_light"
+                    android:textSize="14sp"
+                    android:backgroundTint="@color/modern_success"
+                    app:cornerRadius="12dp" />
+
+                <Button
+                    android:id="@+id/btnAdminAdd20"
+                    android:layout_width="0dp"
+                    android:layout_height="52dp"
+                    android:layout_weight="1"
+                    android:layout_marginStart="4dp"
+                    android:text="+20 Credits"
+                    android:textColor="@color/btn_text_light"
+                    android:textSize="14sp"
+                    android:backgroundTint="@color/modern_success"
+                    app:cornerRadius="12dp" />
+
+            </LinearLayout>
+
+            <!-- Reset Button -->
+            <Button
+                android:id="@+id/btnAdminReset"
+                android:layout_width="match_parent"
+                android:layout_height="52dp"
+                android:text="🔄 Reset to Zero"
+                android:textColor="@color/btn_text_light"
+                android:textSize="14sp"
+                android:backgroundTint="@color/modern_warning"
+                app:cornerRadius="12dp"
+                android:layout_marginTop="8dp" />
+
+        </LinearLayout>
+
+        <!-- User Management - IMPROVED BUTTONS -->
+        <LinearLayout
+            android:layout_width="match_parent"
+            android:layout_height="wrap_content"
+            android:orientation="vertical"
+            android:background="@drawable/bg_section_card"
+            android:padding="16dp"
+            android:layout_marginBottom="16dp">
+
+            <TextView
+                android:layout_width="match_parent"
+                android:layout_height="wrap_content"
+                android:text="⚙️ User Management"
+                android:textSize="16sp"
+                android:textStyle="bold"
+                android:textColor="@color/text_primary"
+                android:layout_marginBottom="12dp" />
+
+            <Button
+                android:id="@+id/btnBlockUser"
+                android:layout_width="match_parent"
+                android:layout_height="52dp"
+                android:text="🚫 Block User"
+                android:textColor="@color/btn_text_light"
+                android:textSize="14sp"
+                android:backgroundTint="@color/modern_danger"
+                app:cornerRadius="12dp"
+                android:layout_marginBottom="8dp" />
+
+            <Button
+                android:id="@+id/btnRefreshVerification"
+                android:layout_width="match_parent"
+                android:layout_height="52dp"
+                android:text="✅ Refresh Verification"
+                android:textColor="@color/btn_text_light"
+                android:textSize="14sp"
+                android:backgroundTint="@color/modern_info"
+                app:cornerRadius="12dp"
+                android:layout_marginBottom="8dp" />
+
+            <Button
+                android:id="@+id/btnCheckMultiAccounts"
+                android:layout_width="match_parent"
+                android:layout_height="52dp"
+                android:text="🔍 Check Multi-Accounts"
+                android:textColor="@color/btn_text_light"
+                android:textSize="14sp"
+                android:backgroundTint="@color/modern_warning"
+                app:cornerRadius="12dp"
+                android:layout_marginBottom="8dp" />
+
+        </LinearLayout>
+
+        <!-- Analytics Section -->
+        <LinearLayout
+            android:layout_width="match_parent"
+            android:layout_height="wrap_content"
+            android:orientation="vertical"
+            android:background="@drawable/bg_section_card"
+            android:padding="16dp"
+            android:layout_marginBottom="16dp">
+
+            <TextView
+                android:layout_width="match_parent"
+                android:layout_height="wrap_content"
+                android:text="📈 Analytics"
+                android:textSize="16sp"
+                android:textStyle="bold"
+                android:textColor="@color/text_primary"
+                android:layout_marginBottom="12dp" />
+
+            <Button
+                android:id="@+id/btnAdminStats"
+                android:layout_width="match_parent"
+                android:layout_height="52dp"
+                android:text="📊 User Statistics"
+                android:textColor="@color/btn_text_light"
+                android:textSize="14sp"
+                android:backgroundTint="@color/modern_primary"
+                app:cornerRadius="12dp"
+                android:layout_marginBottom="8dp" />
+
+            <Button
+                android:id="@+id/btnTopCVGenerators"
+                android:layout_width="match_parent"
+                android:layout_height="52dp"
+                android:text="🏆 Top CV Generators"
+                android:textColor="@color/btn_text_light"
+                android:textSize="14sp"
+                android:backgroundTint="@color/modern_info"
+                app:cornerRadius="12dp" />
+
+        </LinearLayout>
 
         <!-- Logout Button -->
         <Button
-            android:id="@+id/btn_admin_logout"
+            android:id="@+id/btnAdminLogout"
             android:layout_width="match_parent"
-            android:layout_height="wrap_content"
-            android:text="Logout Admin"
-            android:backgroundTint="#FF0000"
-            android:textColor="#FFFFFF" />
+            android:layout_height="52dp"
+            android:text="🚪 Logout Admin"
+            android:textColor="@color/btn_text_light"
+            android:textSize="14sp"
+            android:backgroundTint="@color/modern_danger"
+            app:cornerRadius="12dp" />
 
     </LinearLayout>
+
 </ScrollView>
