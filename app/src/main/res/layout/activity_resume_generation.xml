@@ -82,7 +82,7 @@
                 android:id="@+id/btnRetryConnection"
                 android:layout_width="wrap_content"
                 android:layout_height="36dp"
-                android:text="Update"
+                android:text="Update Connection"
                 android:textSize="12sp"
                 android:textColor="@color/modern_info"
                 android:background="@drawable/bg_outline_button"
