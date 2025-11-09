@@ -1,0 +1,110 @@
+<!DOCTYPE html>
+<html>
+<head>
+    <title>Resume API Admin Panel</title>
+    <meta name="viewport" content="width=device-width, initial-scale=1">
+    <style>
+        body { font-family: Arial, sans-serif; margin: 40px; background: #f5f5f5; }
+        .container { max-width: 800px; margin: 0 auto; background: white; padding: 20px; border-radius: 10px; box-shadow: 0 2px 10px rgba(0,0,0,0.1); }
+        h1 { color: #333; border-bottom: 2px solid #007bff; padding-bottom: 10px; }
+        .card { background: #f8f9fa; padding: 15px; margin: 15px 0; border-radius: 5px; border-left: 4px solid #007bff; }
+        .stats { font-size: 1.2em; margin: 10px 0; }
+        .cost { color: #28a745; font-weight: bold; }
+        .tokens { color: #007bff; }
+        .btn { background: #007bff; color: white; padding: 10px 20px; border: none; border-radius: 5px; cursor: pointer; margin: 5px; }
+        .btn:hover { background: #0056b3; }
+        .btn-reset { background: #dc3545; }
+        .btn-reset:hover { background: #c82333; }
+        .loading { color: #6c757d; }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <h1>📊 Resume API Admin Panel</h1>
+        
+        <div class="card">
+            <h3>💰 Cost Statistics</h3>
+            <div id="costStats" class="loading">Enter API URL and click Load</div>
+            <input type="text" id="apiUrl" placeholder="https://yourapi.com" style="width: 300px; padding: 8px; margin: 5px;">
+            <input type="text" id="adminKey" placeholder="Admin Key" style="width: 150px; padding: 8px; margin: 5px;">
+            <button class="btn" onclick="loadCostStats()">🔄 Load Stats</button>
+            <button class="btn btn-reset" onclick="resetStats()">🔄 Reset Daily Stats</button>
+        </div>
+        
+        <div class="card">
+            <h3>🚀 API Health</h3>
+            <div id="healthStatus" class="loading">Click Check Health</div>
+            <button class="btn" onclick="checkHealth()">🔍 Check Health</button>
+        </div>
+    </div>
+
+    <script>
+        function getApiUrl() {
+            return document.getElementById('apiUrl').value || 'https://your-resume-api.onrender.com';
+        }
+
+        function getAdminKey() {
+            return document.getElementById('adminKey').value || 'admin123';
+        }
+
+        async function loadCostStats() {
+            document.getElementById('costStats').innerHTML = '<div class="loading">Loading...</div>';
+            try {
+                const response = await fetch(getApiUrl() + '/cost-stats');
+                const data = await response.json();
+                if (data.success) {
+                    const stats = data.cost_stats;
+                    document.getElementById('costStats').innerHTML = `
+                        <div class="stats">
+                            📅 Date: <strong>${stats.date}</strong><br>
+                            🪙 Tokens Used: <span class="tokens">${stats.total_tokens.toLocaleString()}</span><br>
+                            💰 Estimated Cost: <span class="cost">$${stats.total_cost.toFixed(6)}</span><br>
+                            📊 Avg Cost per Token: $${(stats.total_cost / stats.total_tokens * 1000).toFixed(6)} per 1K tokens
+                        </div>
+                    `;
+                } else {
+                    document.getElementById('costStats').innerHTML = 'Error loading stats';
+                }
+            } catch (error) {
+                document.getElementById('costStats').innerHTML = 'Failed to load: ' + error;
+            }
+        }
+
+        async function resetStats() {
+            if (!confirm('Are you sure you want to reset daily statistics?')) return;
+            
+            try {
+                const response = await fetch(getApiUrl() + '/reset-cost-stats', {
+                    method: 'POST',
+                    headers: {
+                        'Admin-Key': getAdminKey()
+                    }
+                });
+                const data = await response.json();
+                alert(data.message);
+                loadCostStats();
+            } catch (error) {
+                alert('Reset failed: ' + error);
+            }
+        }
+
+        async function checkHealth() {
+            document.getElementById('healthStatus').innerHTML = '<div class="loading">Checking...</div>';
+            try {
+                const response = await fetch(getApiUrl() + '/health');
+                const data = await response.json();
+                document.getElementById('healthStatus').innerHTML = `
+                    ✅ Status: <strong>${data.status}</strong><br>
+                    🔥 Firebase: ${data.firebase}<br>
+                    🤖 OpenAI: ${data.openai}<br>
+                    💾 Redis: ${data.redis}<br>
+                    📁 Temp Dir: ${data.temp_directory}<br>
+                    ⏰ Last Check: ${new Date().toLocaleTimeString()}
+                `;
+            } catch (error) {
+                document.getElementById('healthStatus').innerHTML = 'Health check failed: ' + error;
+            }
+        }
+    </script>
+</body>
+</html>
