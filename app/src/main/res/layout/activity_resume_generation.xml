@@ -1,43 +1,73 @@
 <?xml version="1.0" encoding="utf-8"?>
 <ScrollView xmlns:android="http://schemas.android.com/apk/res/android"
-    xmlns:tools="http://schemas.android.com/tools"
+    xmlns:app="http://schemas.android.com/apk/res-auto"
     android:layout_width="match_parent"
     android:layout_height="match_parent"
-    android:padding="16dp"
-    android:background="#f5f5f5">
+    android:scrollbars="none"
+    android:fadeScrollbars="true"
+    android:background="@color/background"
+    android:padding="16dp">
 
     <LinearLayout
         android:layout_width="match_parent"
         android:layout_height="wrap_content"
         android:orientation="vertical">
-         
-        <TextView
+
+        <!-- Header Section -->
+        <LinearLayout
             android:layout_width="match_parent"
             android:layout_height="wrap_content"
-            android:text="Resume Generator"
-            android:textSize="24sp"
-            android:textStyle="bold"
-            android:gravity="center"
-            android:layout_marginBottom="16dp"
-            android:textColor="#333333" />
+            android:orientation="vertical"
+            android:background="@drawable/bg_header_card"
+            android:padding="24dp"
+            android:layout_marginBottom="20dp"
+            android:gravity="center">
 
-        <!-- Connection Status -->
+            <TextView
+                android:layout_width="wrap_content"
+                android:layout_height="wrap_content"
+                android:text="🚀"
+                android:textSize="32sp"
+                android:layout_marginBottom="8dp" />
+
+            <TextView
+                android:layout_width="match_parent"
+                android:layout_height="wrap_content"
+                android:text="Professional CV Generator"
+                android:textColor="@color/on_primary"
+                android:textSize="20sp"
+                android:textStyle="bold"
+                android:gravity="center" />
+
+            <TextView
+                android:layout_width="match_parent"
+                android:layout_height="wrap_content"
+                android:text="Create tailored resumes for your dream job"
+                android:textColor="@color/admin_primary_light"
+                android:textSize="14sp"
+                android:gravity="center"
+                android:layout_marginTop="4dp" />
+
+        </LinearLayout>
+
+        <!-- Connection Status Card -->
         <LinearLayout
             android:id="@+id/layoutConnectionStatus"
             android:layout_width="match_parent"
             android:layout_height="wrap_content"
             android:orientation="horizontal"
-            android:padding="12dp"
-            android:background="#e3f2fd"
-            android:visibility="visible"
+            android:background="@drawable/bg_status_card"
+            android:padding="16dp"
             android:layout_marginBottom="16dp"
-            android:gravity="center_vertical">
+            android:gravity="center_vertical"
+            android:visibility="visible">
 
             <ProgressBar
                 android:id="@+id/progressConnection"
                 android:layout_width="20dp"
                 android:layout_height="20dp"
-                android:layout_marginEnd="12dp" />
+                android:layout_marginEnd="12dp"
+                android:indeterminateTint="@color/modern_info" />
 
             <TextView
                 android:id="@+id/tvConnectionStatus"
@@ -46,304 +76,414 @@
                 android:layout_weight="1"
                 android:text="Testing connection to API..."
                 android:textSize="14sp"
-                android:textColor="#1976d2" />
+                android:textColor="@color/text_primary" />
 
             <Button
                 android:id="@+id/btnRetryConnection"
                 android:layout_width="wrap_content"
-                android:layout_height="32dp"
+                android:layout_height="36dp"
                 android:text="Update"
                 android:textSize="12sp"
-                android:background="@color/secondary"
-                android:textColor="#1976d2"
+                android:textColor="@color/modern_info"
+                android:background="@drawable/bg_outline_button"
+                app:cornerRadius="8dp"
                 android:paddingStart="12dp"
                 android:paddingEnd="12dp" />
 
         </LinearLayout>
 
-        <!-- Credit Info -->
-        <TextView
-            android:id="@+id/creditText"
+        <!-- Credits Info Card -->
+        <LinearLayout
             android:layout_width="match_parent"
             android:layout_height="wrap_content"
-            android:text="Credits: Loading..."
-            android:textStyle="bold"
-            android:gravity="center"
-            android:padding="12dp"
-            android:background="#e8f5e8"
-            android:textColor="#2e7d32"
-            android:layout_marginBottom="16dp" />
+            android:orientation="horizontal"
+            android:background="@drawable/bg_credits_info"
+            android:padding="16dp"
+            android:layout_marginBottom="20dp"
+            android:gravity="center_vertical">
+
+            <TextView
+                android:layout_width="wrap_content"
+                android:layout_height="wrap_content"
+                android:text="💰"
+                android:textSize="20sp"
+                android:layout_marginEnd="12dp" />
+
+            <TextView
+                android:id="@+id/creditText"
+                android:layout_width="0dp"
+                android:layout_height="wrap_content"
+                android:layout_weight="1"
+                android:text="Credits: Loading..."
+                android:textStyle="bold"
+                android:textColor="@color/text_primary"
+                android:textSize="16sp" />
+
+            <TextView
+                android:layout_width="wrap_content"
+                android:layout_height="wrap_content"
+                android:text="1 credit per CV"
+                android:textSize="12sp"
+                android:textColor="@color/text_secondary"
+                android:background="@drawable/bg_credit_badge"
+                android:paddingHorizontal="8dp"
+                android:paddingVertical="4dp" />
+
+        </LinearLayout>
 
         <!-- File Upload Section -->
-        <TextView
-            android:layout_width="match_parent"
-            android:layout_height="wrap_content"
-            android:text="Upload Files (CV &amp; Job Des)"
-            android:textSize="18sp"
-            android:textStyle="bold"
-            android:textColor="#333333"
-            android:layout_marginBottom="8dp" />
-
-        <!-- Resume File Selection -->
         <LinearLayout
             android:layout_width="match_parent"
             android:layout_height="wrap_content"
             android:orientation="vertical"
-            android:background="@android:color/white"
-            android:padding="12dp"
-            android:layout_marginBottom="12dp">
+            android:background="@drawable/bg_section_card"
+            android:padding="20dp"
+            android:layout_marginBottom="20dp">
 
             <TextView
                 android:layout_width="match_parent"
                 android:layout_height="wrap_content"
-                android:text="Resume File"
+                android:text="📎 Upload Files"
+                android:textSize="18sp"
                 android:textStyle="bold"
-                android:textColor="#333333"
-                android:layout_marginBottom="8dp" />
+                android:textColor="@color/text_primary"
+                android:layout_marginBottom="16dp" />
 
+            <!-- Resume File Upload -->
             <LinearLayout
                 android:layout_width="match_parent"
                 android:layout_height="wrap_content"
-                android:orientation="horizontal"
-                android:gravity="center_vertical">
+                android:orientation="vertical"
+                android:background="@drawable/bg_upload_item"
+                android:padding="16dp"
+                android:layout_marginBottom="12dp">
 
-                <Button
-                    android:id="@+id/btnSelectResume"
-                    android:layout_width="0dp"
+                <TextView
+                    android:layout_width="match_parent"
                     android:layout_height="wrap_content"
-                    android:layout_weight="1"
-                    android:text="Select Resume File"
-                    android:background="@color/secondary"
-                    android:textColor="#333333"
-                    android:layout_marginEnd="8dp" />
+                    android:text="📄 Resume File"
+                    android:textStyle="bold"
+                    android:textColor="@color/text_primary"
+                    android:layout_marginBottom="8dp" />
 
-                <Button
-                    android:id="@+id/btnClearResume"
-                    android:layout_width="wrap_content"
+                <LinearLayout
+                    android:layout_width="match_parent"
                     android:layout_height="wrap_content"
-                    android:text="Clear"
-                    android:background="@color/button_clear"
-                    android:textColor="@color/button_clear_text" />
+                    android:orientation="horizontal"
+                    android:gravity="center_vertical">
+
+                    <Button
+                        android:id="@+id/btnSelectResume"
+                        android:layout_width="0dp"
+                        android:layout_height="48dp"
+                        android:layout_weight="1"
+                        android:text="Select Resume"
+                        android:textColor="@color/on_primary"
+                        android:backgroundTint="@color/modern_primary"
+                        app:cornerRadius="12dp"
+                        android:layout_marginEnd="8dp" />
+
+                    <Button
+                        android:id="@+id/btnClearResume"
+                        android:layout_width="wrap_content"
+                        android:layout_height="36dp"
+                        android:text="Clear"
+                        android:textColor="@color/modern_danger"
+                        android:background="@drawable/bg_outline_button"
+                        app:cornerRadius="8dp" />
+
+                </LinearLayout>
+
+                <TextView
+                    android:id="@+id/tvResumeFile"
+                    android:layout_width="match_parent"
+                    android:layout_height="wrap_content"
+                    android:text="No file selected"
+                    android:textSize="12sp"
+                    android:textColor="@color/text_secondary"
+                    android:layout_marginTop="8dp" />
 
             </LinearLayout>
 
-            <TextView
-                android:id="@+id/tvResumeFile"
+            <!-- Job Description File Upload -->
+            <LinearLayout
                 android:layout_width="match_parent"
                 android:layout_height="wrap_content"
-                android:text="No file selected"
-                android:textSize="12sp"
-                android:textColor="#757575"
-                android:layout_marginTop="4dp" />
+                android:orientation="vertical"
+                android:background="@drawable/bg_upload_item"
+                android:padding="16px">
+
+                <TextView
+                    android:layout_width="match_parent"
+                    android:layout_height="wrap_content"
+                    android:text="💼 Job Description File"
+                    android:textStyle="bold"
+                    android:textColor="@color/text_primary"
+                    android:layout_marginBottom="8dp" />
+
+                <LinearLayout
+                    android:layout_width="match_parent"
+                    android:layout_height="wrap_content"
+                    android:orientation="horizontal"
+                    android:gravity="center_vertical">
+
+                    <Button
+                        android:id="@+id/btnSelectJobDesc"
+                        android:layout_width="0dp"
+                        android:layout_height="48dp"
+                        android:layout_weight="1"
+                        android:text="Select Job Description"
+                        android:textColor="@color/on_primary"
+                        android:backgroundTint="@color/modern_primary"
+                        app:cornerRadius="12dp"
+                        android:layout_marginEnd="8dp" />
+
+                    <Button
+                        android:id="@+id/btnClearJobDesc"
+                        android:layout_width="wrap_content"
+                        android:layout_height="36dp"
+                        android:text="Clear"
+                        android:textColor="@color/modern_danger"
+                        android:background="@drawable/bg_outline_button"
+                        app:cornerRadius="8dp" />
+
+                </LinearLayout>
+
+                <TextView
+                    android:id="@+id/tvJobDescFile"
+                    android:layout_width="match_parent"
+                    android:layout_height="wrap_content"
+                    android:text="No file selected"
+                    android:textSize="12sp"
+                    android:textColor="@color/text_secondary"
+                    android:layout_marginTop="8dp" />
+
+            </LinearLayout>
 
         </LinearLayout>
 
-        <!-- Job Description File Selection -->
+        <!-- Tone Selection Card -->
         <LinearLayout
             android:layout_width="match_parent"
             android:layout_height="wrap_content"
             android:orientation="vertical"
-            android:background="@android:color/white"
-            android:padding="12dp"
-            android:layout_marginBottom="16dp">
+            android:background="@drawable/bg_section_card"
+            android:padding="20dp"
+            android:layout_marginBottom="20dp">
 
             <TextView
                 android:layout_width="match_parent"
                 android:layout_height="wrap_content"
-                android:text="Job Description File"
+                android:text="🎭 Select Tone"
+                android:textSize="18sp"
                 android:textStyle="bold"
-                android:textColor="#333333"
-                android:layout_marginBottom="8dp" />
+                android:textColor="@color/text_primary"
+                android:layout_marginBottom="12dp" />
 
-            <LinearLayout
+            <com.google.android.material.textfield.TextInputLayout
+                style="@style/Widget.Material3.TextInputLayout.OutlinedBox.ExposedDropdownMenu"
                 android:layout_width="match_parent"
                 android:layout_height="wrap_content"
-                android:orientation="horizontal"
-                android:gravity="center_vertical">
+                app:boxCornerRadiusBottomEnd="12dp"
+                app:boxCornerRadiusBottomStart="12dp"
+                app:boxCornerRadiusTopEnd="12dp"
+                app:boxCornerRadiusTopStart="12dp">
 
-                <Button
-                    android:id="@+id/btnSelectJobDesc"
-                    android:layout_width="0dp"
+                <AutoCompleteTextView
+                    android:id="@+id/spinnerTone"
+                    android:layout_width="match_parent"
                     android:layout_height="wrap_content"
-                    android:layout_weight="1"
-                    android:text="Select Job Description"
-                    android:background="@color/secondary"
-                    android:textColor="#333333"
-                    android:layout_marginEnd="8dp" />
+                    android:inputType="none"
+                    android:text="Professional"
+                    android:textSize="14sp" />
 
-                <Button
-                    android:id="@+id/btnClearJobDesc"
-                    android:layout_width="wrap_content"
-                    android:layout_height="wrap_content"
-                    android:text="Clear"
-                    android:background="@color/button_clear"
-                    android:textColor="@color/button_clear_text" />
-
-            </LinearLayout>
-
-            <TextView
-                android:id="@+id/tvJobDescFile"
-                android:layout_width="match_parent"
-                android:layout_height="wrap_content"
-                android:text="No file selected"
-                android:textSize="12sp"
-                android:textColor="#757575"
-                android:layout_marginTop="4dp" />
+            </com.google.android.material.textfield.TextInputLayout>
 
         </LinearLayout>
-        
-        <!-- Tone Selection Section -->
-<LinearLayout
-        android:layout_width="match_parent"
-        android:layout_height="wrap_content"
-        android:orientation="vertical"
-        android:background="@android:color/white"
-        android:padding="16dp"
-        android:layout_margin="16dp"
-        android:elevation="4dp">
-
-    <TextView
-        android:layout_width="match_parent"
-        android:layout_height="wrap_content"
-        android:text="Select Tone"
-        android:textStyle="bold"
-        android:textSize="16sp"
-        android:layout_marginBottom="8dp" />
-
-    <Spinner
-        android:id="@+id/spinnerTone"
-        android:layout_width="match_parent"
-        android:layout_height="wrap_content"
-        android:entries="@array/tone_options"
-        android:padding="12dp"
-        android:background="@drawable/spinner_background" />
-
-</LinearLayout>
-
-        <!-- Divider -->
-        <View
-            android:layout_width="match_parent"
-            android:layout_height="1dp"
-            android:background="#e0e0e0"
-            android:layout_marginBottom="16dp" />
 
         <!-- Text Input Section -->
-        <TextView
-            android:layout_width="match_parent"
-            android:layout_height="wrap_content"
-            android:text="Or Enter Text"
-            android:textSize="18sp"
-            android:textStyle="bold"
-            android:textColor="#333333"
-            android:layout_marginBottom="8dp" />
-
-        <!-- Resume Text Input -->
-        <TextView
-            android:layout_width="match_parent"
-            android:layout_height="wrap_content"
-            android:text="Your Resume Text"
-            android:textStyle="bold"
-            android:textColor="#333333"
-            android:layout_marginBottom="8dp" />
-
-        <EditText
-            android:id="@+id/etResumeText"
-            android:layout_width="match_parent"
-            android:layout_height="120dp"
-            android:hint="Paste your current resume text here...\n\nOr use file upload above"
-            android:gravity="top"
-            android:inputType="textMultiLine"
-            android:background="@android:color/white"
-            android:padding="12dp"
-            android:textColor="#333333"
-            android:textSize="14sp" />
-
-        <!-- Job Description Input -->
-        <TextView
-            android:layout_width="match_parent"
-            android:layout_height="wrap_content"
-            android:text="Job Description"
-            android:textStyle="bold"
-            android:textColor="#333333"
-            android:layout_marginTop="16dp"
-            android:layout_marginBottom="8dp" />
-
-        <EditText
-            android:id="@+id/etJobDescription"
-            android:layout_width="match_parent"
-            android:layout_height="120dp"
-            android:hint="Paste the job description here...\n\nOr use file upload above"
-            android:gravity="top"
-            android:inputType="textMultiLine"
-            android:background="@android:color/white"
-            android:padding="12dp"
-            android:textColor="#333333"
-            android:textSize="14sp" />
-
-        <!-- Generate Button with Progress -->
         <LinearLayout
             android:layout_width="match_parent"
             android:layout_height="wrap_content"
             android:orientation="vertical"
-            android:layout_marginTop="16dp"
-            android:layout_marginBottom="8dp">
+            android:background="@drawable/bg_section_card"
+            android:padding="20dp"
+            android:layout_marginBottom="20px">
+
+            <TextView
+                android:layout_width="match_parent"
+                android:layout_height="wrap_content"
+                android:text="📝 Or Enter Text"
+                android:textSize="18sp"
+                android:textStyle="bold"
+                android:textColor="@color/text_primary"
+                android:layout_marginBottom="16dp" />
+
+            <!-- Resume Text Input -->
+            <com.google.android.material.textfield.TextInputLayout
+                android:layout_width="match_parent"
+                android:layout_height="wrap_content"
+                android:layout_marginBottom="16dp"
+                app:boxBackgroundMode="outline"
+                app:boxCornerRadiusBottomEnd="12dp"
+                app:boxCornerRadiusBottomStart="12dp"
+                app:boxCornerRadiusTopEnd="12dp"
+                app:boxCornerRadiusTopStart="12dp"
+                app:hint="Your Resume Text">
+
+                <EditText
+                    android:id="@+id/etResumeText"
+                    android:layout_width="match_parent"
+                    android:layout_height="120dp"
+                    android:gravity="top"
+                    android:inputType="textMultiLine"
+                    android:padding="12dp"
+                    android:textSize="14sp"
+                    android:lineSpacingExtra="4dp" />
+
+            </com.google.android.material.textfield.TextInputLayout>
+
+            <!-- Job Description Input -->
+            <com.google.android.material.textfield.TextInputLayout
+                android:layout_width="match_parent"
+                android:layout_height="wrap_content"
+                app:boxBackgroundMode="outline"
+                app:boxCornerRadiusBottomEnd="12dp"
+                app:boxCornerRadiusBottomStart="12dp"
+                app:boxCornerRadiusTopEnd="12dp"
+                app:boxCornerRadiusTopStart="12dp"
+                app:hint="Job Description">
+
+                <EditText
+                    android:id="@+id/etJobDescription"
+                    android:layout_width="match_parent"
+                    android:layout_height="120dp"
+                    android:gravity="top"
+                    android:inputType="textMultiLine"
+                    android:padding="12dp"
+                    android:textSize="14sp"
+                    android:lineSpacingExtra="4dp" />
+
+            </com.google.android.material.textfield.TextInputLayout>
+
+        </LinearLayout>
+
+        <!-- Generate Button Section -->
+        <LinearLayout
+            android:layout_width="match_parent"
+            android:layout_height="wrap_content"
+            android:orientation="vertical"
+            android:background="@drawable/bg_generate_section"
+            android:padding="24dp"
+            android:layout_marginBottom="20dp"
+            android:gravity="center">
 
             <ProgressBar
                 android:id="@+id/progressGenerate"
-                android:layout_width="wrap_content"
-                android:layout_height="wrap_content"
+                android:layout_width="32dp"
+                android:layout_height="32dp"
                 android:layout_gravity="center"
                 android:visibility="gone"
-                android:layout_marginBottom="8dp" />
+                android:layout_marginBottom="12dp"
+                android:indeterminateTint="@color/on_primary" />
 
             <Button
                 android:id="@+id/btnGenerateResume"
                 android:layout_width="match_parent"
-                android:layout_height="wrap_content"
-                android:text="Generate Resume (1 Credit)"
-                android:background="@color/primary"
-                android:textColor="@android:color/white"
+                android:layout_height="56dp"
+                android:text="✨ Generate Professional CV (1 Credit)"
+                android:textColor="@color/on_primary"
                 android:textSize="16sp"
                 android:textStyle="bold"
+                android:backgroundTint="@color/modern_success"
+                app:cornerRadius="16dp"
                 android:padding="14dp" />
+
+            <TextView
+                android:layout_width="match_parent"
+                android:layout_height="wrap_content"
+                android:text="AI-powered resume tailoring"
+                android:textSize="12sp"
+                android:textColor="@color/text_secondary"
+                android:gravity="center"
+                android:layout_marginTop="8dp" />
 
         </LinearLayout>
 
         <!-- Generated Resume Section -->
-        <TextView
-            android:layout_width="match_parent"
-            android:layout_height="wrap_content"
-            android:text="Generated Resume"
-            android:textSize="18sp"
-            android:textStyle="bold"
-            android:textColor="#333333"
-            android:layout_marginTop="24dp"
-            android:layout_marginBottom="8dp" />
-        
-        <!-- Simplified Resume Area -->
         <LinearLayout
             android:layout_width="match_parent"
-            android:layout_height="200dp"
-            android:background="@android:color/white"
+            android:layout_height="wrap_content"
             android:orientation="vertical"
-            android:padding="8dp">
+            android:background="@drawable/bg_section_card"
+            android:padding="20dp"
+            android:layout_marginBottom="20dp">
 
             <TextView
-                android:id="@+id/tvGeneratedResume"
                 android:layout_width="match_parent"
-                android:layout_height="match_parent"
-                android:padding="16dp"
-                android:text="Your generated resume will appear here...\n\nUpload files or enter text above and click Generate Resume."
-                android:textIsSelectable="true"
-                android:textColor="#333333"
-                android:textSize="14sp"
-                android:lineSpacingExtra="4dp"
-                android:scrollbars="vertical"
-                android:isScrollContainer="true" />
+                android:layout_height="wrap_content"
+                android:text="📋 Generated Resume"
+                android:textSize="18sp"
+                android:textStyle="bold"
+                android:textColor="@color/text_primary"
+                android:layout_marginBottom="16dp" />
+
+            <LinearLayout
+                android:layout_width="match_parent"
+                android:layout_height="200dp"
+                android:background="@drawable/bg_resume_preview"
+                android:orientation="vertical"
+                android:padding="16dp">
+
+                <TextView
+                    android:id="@+id/tvGeneratedResume"
+                    android:layout_width="match_parent"
+                    android:layout_height="match_parent"
+                    android:text="Your AI-generated resume will appear here...\n\nUpload files or enter text above and click Generate Resume."
+                    android:textIsSelectable="true"
+                    android:textColor="@color/text_primary"
+                    android:textSize="14sp"
+                    android:lineSpacingExtra="4dp"
+                    android:scrollbars="vertical" />
+
+            </LinearLayout>
+
+            <!-- Download Buttons -->
+            <LinearLayout
+                android:id="@+id/layoutDownloadButtons"
+                android:layout_width="match_parent"
+                android:layout_height="wrap_content"
+                android:orientation="horizontal"
+                android:visibility="gone"
+                android:layout_marginTop="16dp">
+
+                <Button
+                    android:id="@+id/btnDownloadDocx"
+                    android:layout_width="0dp"
+                    android:layout_height="48dp"
+                    android:layout_weight="1"
+                    android:text="📝 DOCX"
+                    android:textColor="@color/on_primary"
+                    android:backgroundTint="@color/modern_info"
+                    app:cornerRadius="12dp"
+                    android:layout_marginEnd="8dp" />
+
+                <Button
+                    android:id="@+id/btnDownloadPdf"
+                    android:layout_width="0dp"
+                    android:layout_height="48dp"
+                    android:layout_weight="1"
+                    android:text="📄 PDF"
+                    android:textColor="@color/on_primary"
+                    android:backgroundTint="@color/modern_primary"
+                    app:cornerRadius="12dp"
+                    android:layout_marginStart="8dp" />
+
+            </LinearLayout>
 
         </LinearLayout>
 
-        <!-- Additional Credit Info (for generation results) -->
+        <!-- Success Message -->
         <TextView
             android:id="@+id/tvCreditInfo"
             android:layout_width="match_parent"
@@ -351,56 +491,21 @@
             android:text=""
             android:textStyle="bold"
             android:gravity="center"
-            android:padding="8dp"
-            android:background="#e8f5e8"
-            android:textColor="#2e7d32"
-            android:layout_marginTop="8dp"
+            android:padding="16dp"
+            android:background="@drawable/bg_success_message"
+            android:textColor="@color/modern_success"
+            android:layout_marginBottom="16dp"
             android:visibility="gone" />
-
-        <!-- Download Buttons -->
-        <LinearLayout
-            android:id="@+id/layoutDownloadButtons"
-            android:layout_width="match_parent"
-            android:layout_height="wrap_content"
-            android:orientation="horizontal"
-            android:visibility="gone"
-            android:layout_marginTop="16dp"
-            android:layout_marginBottom="8dp">
-
-            <Button
-                android:id="@+id/btnDownloadDocx"
-                android:layout_width="0dp"
-                android:layout_height="wrap_content"
-                android:layout_weight="1"
-                android:text="📝 Download DOCX"
-                android:background="@color/success"
-                android:textColor="@android:color/white"
-                android:layout_marginEnd="8dp"
-                android:padding="12dp" />
-
-            <Button
-                android:id="@+id/btnDownloadPdf"
-                android:layout_width="0dp"
-                android:layout_height="wrap_content"
-                android:layout_weight="1"
-                android:text="📄 Download PDF"
-                android:background="@color/success"
-                android:textColor="@android:color/white"
-                android:layout_marginStart="8dp"
-                android:padding="12dp" />
-
-        </LinearLayout>
 
         <!-- Back Button -->
         <Button
             android:id="@+id/btnBack"
             android:layout_width="match_parent"
-            android:layout_height="wrap_content"
-            android:text="← Back to Main Menu"
-            android:background="@color/secondary"
-            android:textColor="#666666"
-            android:layout_marginTop="8dp"
-            android:padding="12dp" />
+            android:layout_height="52dp"
+            android:text="← Back to Dashboard"
+            android:textColor="@color/modern_primary"
+            android:background="@drawable/bg_outline_button"
+            app:cornerRadius="12dp" />
 
     </LinearLayout>
 
