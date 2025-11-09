@@ -6,12 +6,12 @@ plugins {
 
 android {
     namespace "com.alakdb.resumewriter"
-    compileSdk 34
+    compileSdk 35
 
     defaultConfig {
         applicationId "com.alakdb.resumewriter"
         minSdk 21
-        targetSdk 34
+        targetSdk 35
         versionCode 6
         versionName "1.5"
 
@@ -30,9 +30,10 @@ android {
 
     buildTypes {
         release {
-            minifyEnabled false
+            minifyEnabled true
+            shrinkResources true
             proguardFiles getDefaultProguardFile('proguard-android-optimize.txt'), 'proguard-rules.pro'
-        }
+         }
         debug {
             buildConfigField "String", "APP_SECRET_KEY", "\"${System.getenv("APP_SECRET_KEY") ?: "dev-secret"}\""
         }
