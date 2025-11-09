@@ -320,53 +320,63 @@
                 android:layout_marginBottom="16dp" />
 
             <!-- Resume Text Input -->
-            <com.google.android.material.textfield.TextInputLayout
+            <LinearLayout
+            android:layout_width="match_parent"
+            android:layout_height="wrap_content"
+            android:orientation="vertical"
+            android:layout_marginBottom="16dp">
+
+            <TextView
                 android:layout_width="match_parent"
                 android:layout_height="wrap_content"
-                android:layout_marginBottom="16dp"
-                app:boxBackgroundMode="outline"
-                app:boxCornerRadiusBottomEnd="12dp"
-                app:boxCornerRadiusBottomStart="12dp"
-                app:boxCornerRadiusTopEnd="12dp"
-                app:boxCornerRadiusTopStart="12dp"
-                app:hint="Your Resume Text">
+                android:text="Your Resume Text"
+                android:textStyle="bold"
+                android:textColor="@color/text_primary"
+                android:layout_marginBottom="8dp" />
 
-                <EditText
-                    android:id="@+id/etResumeText"
-                    android:layout_width="match_parent"
-                    android:layout_height="120dp"
-                    android:gravity="top"
-                    android:inputType="textMultiLine"
-                    android:padding="12dp"
-                    android:textSize="14sp"
-                    android:lineSpacingExtra="4dp" />
+            <EditText
+                android:id="@+id/etResumeText"
+                android:layout_width="match_parent"
+                android:layout_height="120dp"
+                android:hint="Paste your current resume text here..."
+                android:gravity="top"
+                android:inputType="textMultiLine"
+                android:background="@drawable/bg_edittext"
+                android:padding="16dp"
+                android:textSize="14sp"
+                android:lineSpacingExtra="4dp" />
 
-            </com.google.android.material.textfield.TextInputLayout>
+            </LinearLayout>
 
             <!-- Job Description Input -->
-            <com.google.android.material.textfield.TextInputLayout
+            <LinearLayout
+            android:layout_width="match_parent"
+            android:layout_height="wrap_content"
+            android:orientation="vertical">
+
+            <TextView
                 android:layout_width="match_parent"
                 android:layout_height="wrap_content"
-                app:boxBackgroundMode="outline"
-                app:boxCornerRadiusBottomEnd="12dp"
-                app:boxCornerRadiusBottomStart="12dp"
-                app:boxCornerRadiusTopEnd="12dp"
-                app:boxCornerRadiusTopStart="12dp"
-                app:hint="Job Description">
+                android:text="Job Description"
+                android:textStyle="bold"
+                android:textColor="@color/text_primary"
+                android:layout_marginBottom="8dp" />
 
-                <EditText
-                    android:id="@+id/etJobDescription"
-                    android:layout_width="match_parent"
-                    android:layout_height="120dp"
-                    android:gravity="top"
-                    android:inputType="textMultiLine"
-                    android:padding="12dp"
-                    android:textSize="14sp"
-                    android:lineSpacingExtra="4dp" />
+            <EditText
+                android:id="@+id/etJobDescription"
+                android:layout_width="match_parent"
+                android:layout_height="120dp"
+                android:hint="Paste the job description here..."
+                android:gravity="top"
+                android:inputType="textMultiLine"
+                android:background="@drawable/bg_edittext"
+                android:padding="16dp"
+                android:textSize="14sp"
+                android:lineSpacingExtra="4dp" />
 
-            </com.google.android.material.textfield.TextInputLayout>
+            </LinearLayout>
 
-        </LinearLayout>
+       
 
         <!-- Generate Button Section -->
         <LinearLayout
