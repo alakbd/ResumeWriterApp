@@ -1,110 +1,509 @@
 <!DOCTYPE html>
-<html>
+<html lang="en">
 <head>
-    <title>Resume API Admin Panel</title>
-    <meta name="viewport" content="width=device-width, initial-scale=1">
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Resume Writer API Configuration</title>
     <style>
-        body { font-family: Arial, sans-serif; margin: 40px; background: #f5f5f5; }
-        .container { max-width: 800px; margin: 0 auto; background: white; padding: 20px; border-radius: 10px; box-shadow: 0 2px 10px rgba(0,0,0,0.1); }
-        h1 { color: #333; border-bottom: 2px solid #007bff; padding-bottom: 10px; }
-        .card { background: #f8f9fa; padding: 15px; margin: 15px 0; border-radius: 5px; border-left: 4px solid #007bff; }
-        .stats { font-size: 1.2em; margin: 10px 0; }
-        .cost { color: #28a745; font-weight: bold; }
-        .tokens { color: #007bff; }
-        .btn { background: #007bff; color: white; padding: 10px 20px; border: none; border-radius: 5px; cursor: pointer; margin: 5px; }
-        .btn:hover { background: #0056b3; }
-        .btn-reset { background: #dc3545; }
-        .btn-reset:hover { background: #c82333; }
-        .loading { color: #6c757d; }
+        * {
+            margin: 0;
+            padding: 0;
+            box-sizing: border-box;
+        }
+
+        body {
+            font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
+            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+            min-height: 100vh;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            padding: 20px;
+        }
+
+        .container {
+            background: white;
+            border-radius: 15px;
+            box-shadow: 0 20px 40px rgba(0, 0, 0, 0.1);
+            padding: 40px;
+            max-width: 500px;
+            width: 100%;
+        }
+
+        .logo {
+            text-align: center;
+            margin-bottom: 30px;
+        }
+
+        .logo h1 {
+            color: #333;
+            font-size: 2.5rem;
+            margin-bottom: 10px;
+        }
+
+        .logo p {
+            color: #666;
+            font-size: 1.1rem;
+        }
+
+        .form-group {
+            margin-bottom: 25px;
+        }
+
+        label {
+            display: block;
+            margin-bottom: 8px;
+            font-weight: 600;
+            color: #333;
+        }
+
+        input[type="text"],
+        input[type="password"] {
+            width: 100%;
+            padding: 15px;
+            border: 2px solid #e1e5e9;
+            border-radius: 10px;
+            font-size: 16px;
+            transition: all 0.3s ease;
+            background: #f8f9fa;
+        }
+
+        input[type="text"]:focus,
+        input[type="password"]:focus {
+            outline: none;
+            border-color: #667eea;
+            background: white;
+            box-shadow: 0 0 0 3px rgba(102, 126, 234, 0.1);
+        }
+
+        .btn {
+            width: 100%;
+            padding: 15px;
+            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+            color: white;
+            border: none;
+            border-radius: 10px;
+            font-size: 16px;
+            font-weight: 600;
+            cursor: pointer;
+            transition: all 0.3s ease;
+        }
+
+        .btn:hover {
+            transform: translateY(-2px);
+            box-shadow: 0 10px 20px rgba(102, 126, 234, 0.3);
+        }
+
+        .btn:active {
+            transform: translateY(0);
+        }
+
+        .btn:disabled {
+            background: #ccc;
+            cursor: not-allowed;
+            transform: none;
+            box-shadow: none;
+        }
+
+        .features {
+            margin-top: 30px;
+            padding-top: 20px;
+            border-top: 1px solid #e1e5e9;
+        }
+
+        .features h3 {
+            color: #333;
+            margin-bottom: 15px;
+            text-align: center;
+        }
+
+        .feature-list {
+            list-style: none;
+        }
+
+        .feature-list li {
+            padding: 8px 0;
+            color: #666;
+            display: flex;
+            align-items: center;
+        }
+
+        .feature-list li::before {
+            content: "✓";
+            color: #667eea;
+            font-weight: bold;
+            margin-right: 10px;
+        }
+
+        .security-note {
+            background: #e3f2fd;
+            border: 1px solid #bbdefb;
+            border-radius: 8px;
+            padding: 15px;
+            margin-top: 20px;
+            text-align: center;
+            color: #1565c0;
+            font-size: 14px;
+        }
+
+        .hidden {
+            display: none;
+        }
+
+        .api-status {
+            margin-top: 20px;
+            padding: 15px;
+            border-radius: 8px;
+            text-align: center;
+            font-weight: 600;
+        }
+
+        .status-success {
+            background: #e8f5e8;
+            color: #2e7d32;
+            border: 1px solid #c8e6c9;
+        }
+
+        .status-error {
+            background: #ffebee;
+            color: #c62828;
+            border: 1px solid #ffcdd2;
+        }
+
+        .status-warning {
+            background: #fff3e0;
+            color: #ef6c00;
+            border: 1px solid #ffcc80;
+        }
+
+        .toggle-password {
+            position: absolute;
+            right: 15px;
+            top: 50%;
+            transform: translateY(-50%);
+            background: none;
+            border: none;
+            cursor: pointer;
+            color: #666;
+        }
+
+        .password-container {
+            position: relative;
+        }
+
+        .loading {
+            display: inline-block;
+            width: 20px;
+            height: 20px;
+            border: 3px solid #f3f3f3;
+            border-top: 3px solid #667eea;
+            border-radius: 50%;
+            animation: spin 1s linear infinite;
+            margin-right: 10px;
+        }
+
+        @keyframes spin {
+            0% { transform: rotate(0deg); }
+            100% { transform: rotate(360deg); }
+        }
+
+        .debug-info {
+            background: #f5f5f5;
+            border: 1px solid #ddd;
+            border-radius: 5px;
+            padding: 10px;
+            margin-top: 10px;
+            font-size: 12px;
+            color: #666;
+            display: none;
+        }
     </style>
 </head>
 <body>
     <div class="container">
-        <h1>📊 Resume API Admin Panel</h1>
-        
-        <div class="card">
-            <h3>💰 Cost Statistics</h3>
-            <div id="costStats" class="loading">Enter API URL and click Load</div>
-            <input type="text" id="apiUrl" placeholder="https://yourapi.com" style="width: 300px; padding: 8px; margin: 5px;">
-            <input type="text" id="adminKey" placeholder="Admin Key" style="width: 150px; padding: 8px; margin: 5px;">
-            <button class="btn" onclick="loadCostStats()">🔄 Load Stats</button>
-            <button class="btn btn-reset" onclick="resetStats()">🔄 Reset Daily Stats</button>
+        <div class="logo">
+            <h1>🚀 Resume Writer</h1>
+            <p>AI-Powered Resume Optimization</p>
         </div>
+
+        <form id="configForm">
+            <div class="form-group">
+                <label for="apiAddress">API Server Address</label>
+                <input 
+                    type="text" 
+                    id="apiAddress" 
+                    placeholder="https://your-api-server.com"
+                    required
+                >
+                <small style="color: #666; font-size: 12px;">
+                    Enter your Render API server URL (e.g., https://your-app.onrender.com)
+                </small>
+            </div>
+
+            <div class="form-group">
+                <label for="securityKey">Security Key (X-User-ID)</label>
+                <div class="password-container">
+                    <input 
+                        type="password" 
+                        id="securityKey" 
+                        placeholder="Enter your Firebase User ID"
+                        required
+                    >
+                    <button type="button" class="toggle-password" onclick="togglePassword()">👁️</button>
+                </div>
+                <small style="color: #666; font-size: 12px;">
+                    Your Firebase Authentication User ID
+                </small>
+            </div>
+
+            <button type="submit" class="btn" id="connectBtn">
+                Connect to API
+            </button>
+        </form>
+
+        <div id="apiStatus" class="api-status hidden"></div>
         
-        <div class="card">
-            <h3>🚀 API Health</h3>
-            <div id="healthStatus" class="loading">Click Check Health</div>
-            <button class="btn" onclick="checkHealth()">🔍 Check Health</button>
+        <div id="debugInfo" class="debug-info"></div>
+
+        <div class="security-note">
+            🔒 Your security key is stored locally and never sent to third parties
+        </div>
+
+        <div class="features">
+            <h3>API Features</h3>
+            <ul class="feature-list">
+                <li>AI-Powered Resume Generation</li>
+                <li>Job Description Alignment</li>
+                <li>PDF & DOCX Export</li>
+                <li>Smart Caching</li>
+                <li>Rate Limiting</li>
+                <li>Cost Tracking</li>
+            </ul>
         </div>
     </div>
 
     <script>
-        function getApiUrl() {
-            return document.getElementById('apiUrl').value || 'https://your-resume-api.onrender.com';
-        }
-
-        function getAdminKey() {
-            return document.getElementById('adminKey').value || 'admin123';
-        }
-
-        async function loadCostStats() {
-            document.getElementById('costStats').innerHTML = '<div class="loading">Loading...</div>';
-            try {
-                const response = await fetch(getApiUrl() + '/cost-stats');
-                const data = await response.json();
-                if (data.success) {
-                    const stats = data.cost_stats;
-                    document.getElementById('costStats').innerHTML = `
-                        <div class="stats">
-                            📅 Date: <strong>${stats.date}</strong><br>
-                            🪙 Tokens Used: <span class="tokens">${stats.total_tokens.toLocaleString()}</span><br>
-                            💰 Estimated Cost: <span class="cost">$${stats.total_cost.toFixed(6)}</span><br>
-                            📊 Avg Cost per Token: $${(stats.total_cost / stats.total_tokens * 1000).toFixed(6)} per 1K tokens
-                        </div>
-                    `;
-                } else {
-                    document.getElementById('costStats').innerHTML = 'Error loading stats';
-                }
-            } catch (error) {
-                document.getElementById('costStats').innerHTML = 'Failed to load: ' + error;
+        // Toggle password visibility
+        function togglePassword() {
+            const passwordInput = document.getElementById('securityKey');
+            const toggleButton = document.querySelector('.toggle-password');
+            
+            if (passwordInput.type === 'password') {
+                passwordInput.type = 'text';
+                toggleButton.textContent = '🔒';
+            } else {
+                passwordInput.type = 'password';
+                toggleButton.textContent = '👁️';
             }
         }
 
-        async function resetStats() {
-            if (!confirm('Are you sure you want to reset daily statistics?')) return;
+        // Load saved configuration
+        function loadSavedConfig() {
+            const savedAddress = localStorage.getItem('apiAddress');
+            const savedKey = localStorage.getItem('securityKey');
+            
+            if (savedAddress) {
+                document.getElementById('apiAddress').value = savedAddress;
+            }
+            if (savedKey) {
+                document.getElementById('securityKey').value = savedKey;
+            }
+        }
+
+        // Test API connection with better error handling
+        async function testAPIConnection(apiAddress) {
+            const healthEndpoint = `${apiAddress}/health`;
+            const testEndpoint = `${apiAddress}/test`;
+            
+            console.log(`Testing connection to: ${healthEndpoint}`);
             
             try {
-                const response = await fetch(getApiUrl() + '/reset-cost-stats', {
-                    method: 'POST',
+                // Try health endpoint first
+                const response = await fetch(healthEndpoint, {
+                    method: 'GET',
                     headers: {
-                        'Admin-Key': getAdminKey()
-                    }
+                        'Accept': 'application/json',
+                        'Content-Type': 'application/json',
+                    },
+                    mode: 'cors'
                 });
-                const data = await response.json();
-                alert(data.message);
-                loadCostStats();
+                
+                console.log('Health endpoint response status:', response.status);
+                
+                if (response.ok) {
+                    const data = await response.json();
+                    return { 
+                        success: true, 
+                        data,
+                        endpoint: 'health'
+                    };
+                } else {
+                    // If health fails, try test endpoint
+                    console.log('Health endpoint failed, trying test endpoint...');
+                    const testResponse = await fetch(testEndpoint, {
+                        method: 'GET',
+                        headers: {
+                            'Accept': 'application/json',
+                        },
+                        mode: 'cors'
+                    });
+                    
+                    if (testResponse.ok) {
+                        const testData = await testResponse.json();
+                        return { 
+                            success: true, 
+                            data: testData,
+                            endpoint: 'test'
+                        };
+                    } else {
+                        return { 
+                            success: false, 
+                            error: `Health: HTTP ${response.status}, Test: HTTP ${testResponse.status}` 
+                        };
+                    }
+                }
             } catch (error) {
-                alert('Reset failed: ' + error);
+                console.error('Connection test error:', error);
+                return { 
+                    success: false, 
+                    error: error.message,
+                    details: getErrorDetails(error)
+                };
             }
         }
 
-        async function checkHealth() {
-            document.getElementById('healthStatus').innerHTML = '<div class="loading">Checking...</div>';
+        // Get detailed error information
+        function getErrorDetails(error) {
+            if (error.name === 'TypeError') {
+                if (error.message.includes('Failed to fetch')) {
+                    return 'CORS issue or network error. Check if: 1) Server is running, 2) CORS is enabled, 3) URL is correct';
+                }
+                if (error.message.includes('NetworkError')) {
+                    return 'Network error - check internet connection';
+                }
+            }
+            return error.toString();
+        }
+
+        // Show debug information
+        function showDebugInfo(apiAddress, result) {
+            const debugDiv = document.getElementById('debugInfo');
+            debugDiv.innerHTML = `
+                <strong>Debug Info:</strong><br>
+                URL Tested: ${apiAddress}/health<br>
+                Result: ${result.success ? 'SUCCESS' : 'FAILED'}<br>
+                ${!result.success ? `Error: ${result.error}<br>Details: ${result.details || 'None'}` : ''}
+                ${result.success ? `Endpoint: ${result.endpoint}<br>Status: ${result.data.status || 'Unknown'}` : ''}
+            `;
+            debugDiv.style.display = 'block';
+        }
+
+        // Handle form submission
+        document.getElementById('configForm').addEventListener('submit', async function(e) {
+            e.preventDefault();
+            
+            const apiAddress = document.getElementById('apiAddress').value.trim();
+            const securityKey = document.getElementById('securityKey').value.trim();
+            const statusDiv = document.getElementById('apiStatus');
+            const connectBtn = document.getElementById('connectBtn');
+            
+            // Basic validation
+            if (!apiAddress || !securityKey) {
+                statusDiv.className = 'api-status status-error';
+                statusDiv.textContent = '❌ Please fill in all fields';
+                statusDiv.classList.remove('hidden');
+                return;
+            }
+
+            // Validate URL format
+            if (!apiAddress.startsWith('http://') && !apiAddress.startsWith('https://')) {
+                statusDiv.className = 'api-status status-error';
+                statusDiv.textContent = '❌ URL must start with http:// or https://';
+                statusDiv.classList.remove('hidden');
+                return;
+            }
+
+            // Disable button during testing
+            connectBtn.disabled = true;
+            connectBtn.innerHTML = '<div class="loading"></div> Testing Connection...';
+
+            // Clear previous status
+            statusDiv.className = 'api-status';
+            statusDiv.innerHTML = '🔄 Testing API connection...';
+            statusDiv.classList.remove('hidden');
+
             try {
-                const response = await fetch(getApiUrl() + '/health');
-                const data = await response.json();
-                document.getElementById('healthStatus').innerHTML = `
-                    ✅ Status: <strong>${data.status}</strong><br>
-                    🔥 Firebase: ${data.firebase}<br>
-                    🤖 OpenAI: ${data.openai}<br>
-                    💾 Redis: ${data.redis}<br>
-                    📁 Temp Dir: ${data.temp_directory}<br>
-                    ⏰ Last Check: ${new Date().toLocaleTimeString()}
-                `;
+                // Test the connection
+                const result = await testAPIConnection(apiAddress);
+                
+                // Show debug info
+                showDebugInfo(apiAddress, result);
+                
+                if (result.success) {
+                    // Save to localStorage
+                    localStorage.setItem('apiAddress', apiAddress);
+                    localStorage.setItem('securityKey', securityKey);
+                    
+                    statusDiv.className = 'api-status status-success';
+                    statusDiv.innerHTML = `
+                        ✅ API Connection Successful!<br>
+                        <small>
+                            Endpoint: ${result.endpoint} | 
+                            Status: ${result.data.status || 'OK'} |
+                            Firebase: ${result.data.firebase || 'N/A'}
+                        </small>
+                    `;
+                    
+                    // Success message
+                    setTimeout(() => {
+                        alert('Configuration saved successfully! You can now use the Resume Writer app.');
+                    }, 1000);
+                    
+                } else {
+                    statusDiv.className = 'api-status status-error';
+                    statusDiv.innerHTML = `
+                        ❌ API Connection Failed<br>
+                        <small>${result.error}</small>
+                    `;
+                    
+                    // Show warning for common issues
+                    if (result.details && result.details.includes('CORS')) {
+                        statusDiv.innerHTML += `<br><small>💡 Make sure CORS is enabled on your server</small>`;
+                    }
+                }
             } catch (error) {
-                document.getElementById('healthStatus').innerHTML = 'Health check failed: ' + error;
+                statusDiv.className = 'api-status status-error';
+                statusDiv.textContent = `❌ Unexpected Error: ${error.message}`;
+                showDebugInfo(apiAddress, { success: false, error: error.message });
+            } finally {
+                // Re-enable button
+                connectBtn.disabled = false;
+                connectBtn.textContent = 'Connect to API';
+            }
+        });
+
+        // Auto-fill with common Render URL pattern if empty
+        function suggestRenderURL() {
+            const addressInput = document.getElementById('apiAddress');
+            if (!addressInput.value) {
+                addressInput.placeholder = 'https://your-app-name.onrender.com';
             }
         }
+
+        // Initialize
+        document.addEventListener('DOMContentLoaded', function() {
+            loadSavedConfig();
+            suggestRenderURL();
+            
+            // Focus on API address field
+            document.getElementById('apiAddress').focus();
+            
+            // Auto-test if API address is already filled
+            const savedAddress = localStorage.getItem('apiAddress');
+            if (savedAddress) {
+                console.log('Found saved API address:', savedAddress);
+            }
+        });
     </script>
 </body>
 </html>
