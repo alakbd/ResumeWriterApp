@@ -29,6 +29,9 @@
     <color name="card_background">#F8FAFC</color>
     <color name="border_light">#E2E8F0</color>
     <color name="btn_text_light">#FFFFFF</color>
+    <color name="admin_primary_light">#A5B4FC</color>
+
+
     
     <!-- Admin colors -->
     <color name="admin_red">#F44336</color>
