@@ -137,7 +137,7 @@
             <TextView
                 android:layout_width="match_parent"
                 android:layout_height="wrap_content"
-                android:text="4. Click 'Generate Tailored Résumé'"
+                android:text="4. Click 'Generate Aligned, ATS-friendly Tailored Résumé'"
                 android:textColor="#333333"
                 android:textSize="14sp"
                 android:layout_marginBottom="8dp"/>
