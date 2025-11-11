@@ -45,6 +45,8 @@ import android.view.MotionEvent
 import android.widget.ScrollView
 import android.widget.Spinner
 import android.widget.AdapterView
+import android.text.TextWatcher
+import android.text.Editable
 
 class ResumeGenerationActivity : AppCompatActivity() {
 
