@@ -250,10 +250,10 @@ private fun getFileNameFromUri(uri: Uri): String? {
     // ==================== API METHODS ====================
 
     suspend fun generateResumeFromFiles(
-        resumeUri: Uri,
-        jobDescUri: Uri,
-        tone: String = "Professional"
-    ): ApiResult<GenerateResumeResponse> = withContext(Dispatchers.IO) {
+    resumeUri: Uri,
+    jobDescUri: Uri,
+    tone: String = "Professional"
+): ApiResult<GenerateResumeResponse> = withContext(Dispatchers.IO) {
     try {
         Log.d("ApiService", "📄 Generating resume from files...")
 
@@ -268,6 +268,7 @@ private fun getFileNameFromUri(uri: Uri): String? {
             return when {
                 file.name.endsWith(".pdf", true) -> "application/pdf".toMediaType()
                 file.name.endsWith(".docx", true) -> "application/vnd.openxmlformats-officedocument.wordprocessingml.document".toMediaType()
+                file.name.endsWith(".txt", true) -> "text/plain".toMediaType()
                 else -> "application/octet-stream".toMediaType()
             }
         }
@@ -290,7 +291,7 @@ private fun getFileNameFromUri(uri: Uri): String? {
             )
             .build()
 
-        // CREATE THE REQUEST VARIABLE - This was missing
+        // ✅ FIXED: Create and execute the request
         val request = Request.Builder()
             .url("$baseUrl/generate-resume-from-files")
             .addHeader("Accept", "application/json")
@@ -299,7 +300,7 @@ private fun getFileNameFromUri(uri: Uri): String? {
 
         Log.d("ApiService", "➡️ Sending file-based resume generation request to: $baseUrl/generate-resume-from-files")
 
-        // EXECUTE THE REQUEST - This part was probably missing
+        // ✅ FIXED: Execute the request
         client.newCall(request).execute().use { response ->
             val respBody = response.body?.string() ?: "{}"
             Log.d("ApiService", "📬 File-based resume generation response: ${response.code}")
