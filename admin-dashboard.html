@@ -67,11 +67,14 @@
             border-radius: 5px; 
             cursor: pointer; 
             margin: 5px; 
+            font-size: 14px;
         }
         
         .btn:hover { background: #5a6fd8; }
         .btn-danger { background: #e74c3c; }
         .btn-danger:hover { background: #c0392b; }
+        .btn-warning { background: #f39c12; }
+        .btn-warning:hover { background: #e67e22; }
         
         .admin-login { 
             background: white; 
@@ -88,25 +91,96 @@
             margin: 10px 0; 
             border: 1px solid #ddd; 
             border-radius: 5px; 
+            font-size: 14px;
         }
+        
+        .loading { 
+            opacity: 0.6; 
+            pointer-events: none; 
+        }
+        
+        .error-message { 
+            background: #fee; 
+            border: 1px solid #e74c3c; 
+            color: #e74c3c; 
+            padding: 10px; 
+            border-radius: 5px; 
+            margin: 10px 0; 
+        }
+        
+        .success-message { 
+            background: #efe; 
+            border: 1px solid #27ae60; 
+            color: #27ae60; 
+            padding: 10px; 
+            border-radius: 5px; 
+            margin: 10px 0; 
+        }
+        
+        table { 
+            width: 100%; 
+            border-collapse: collapse; 
+            margin: 10px 0; 
+        }
+        
+        th, td { 
+            padding: 12px; 
+            text-align: left; 
+            border-bottom: 1px solid #eee; 
+        }
+        
+        th { 
+            background: #f8f9fa; 
+            font-weight: 600; 
+        }
+        
+        .user-list { 
+            max-height: 300px; 
+            overflow-y: auto; 
+            border: 1px solid #ddd; 
+            border-radius: 5px; 
+        }
+        
+        .user-item { 
+            padding: 12px; 
+            border-bottom: 1px solid #eee; 
+            font-family: monospace; 
+        }
+        
+        .user-item:last-child { 
+            border-bottom: none; 
+        }
+        
+        .status-online { color: #27ae60; }
+        .status-offline { color: #e74c3c; }
+        .status-degraded { color: #f39c12; }
     </style>
 </head>
 <body>
     <div id="app">
         <!-- Login Screen -->
         <div id="loginScreen" class="admin-login">
-            <h2>🔐 Admin Login</h2>
-            <p style="color: #666; margin-bottom: 20px; font-size: 14px;">
+            <h2 style="text-align: center; margin-bottom: 10px;">🔐 Admin Login</h2>
+            <p style="color: #666; margin-bottom: 20px; text-align: center; font-size: 14px;">
                 Use your APP_SECRET_KEY from environment variables
             </p>
-            <input type="password" id="adminKey" class="login-input" placeholder="Enter APP_SECRET_KEY">
+            
+            <div id="loginMessage" style="display: none;"></div>
+            
+            <input type="password" id="adminKey" class="login-input" placeholder="Enter APP_SECRET_KEY" autocomplete="off">
             <input type="text" id="apiUrl" class="login-input" placeholder="API URL (e.g., https://yourapp.onrender.com)">
-            <button class="btn" onclick="login()">Login</button>
-            <div id="loginError" style="color: red; margin-top: 10px; display: none;"></div>
+            
+            <button class="btn" onclick="login()" style="width: 100%; margin-top: 10px;">Login</button>
             
             <div style="margin-top: 20px; padding: 15px; background: #f8f9fa; border-radius: 5px;">
                 <small style="color: #666;">
                     <strong>Note:</strong> This uses the same APP_SECRET_KEY that's already configured in your environment variables. No new keys needed.
+                </small>
+            </div>
+            
+            <div style="margin-top: 15px; text-align: center;">
+                <small style="color: #999;">
+                    Auto-logout after 30 minutes of inactivity
                 </small>
             </div>
         </div>
@@ -120,47 +194,56 @@
             </div>
 
             <div class="container">
-                <div style="text-align: right; margin-bottom: 20px;">
-                    <button class="btn" onclick="refreshStats()">🔄 Refresh</button>
-                    <button class="btn btn-danger" onclick="resetStats()">🔄 Reset Daily Stats</button>
-                    <button class="btn" onclick="logout()">🚪 Logout</button>
+                <!-- Control Bar -->
+                <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 20px; flex-wrap: wrap; gap: 10px;">
+                    <div>
+                        <button class="btn" onclick="refreshStats()" id="refreshBtn">🔄 Refresh</button>
+                        <button class="btn btn-warning" onclick="resetStats()">📊 Reset Daily Stats</button>
+                        <button class="btn btn-danger" onclick="logout()">🚪 Logout</button>
+                    </div>
+                    <div style="color: #666; font-size: 14px;">
+                        Auto-refresh: <span id="autoRefreshStatus">On (30s)</span>
+                    </div>
                 </div>
+
+                <!-- Messages -->
+                <div id="messageContainer" style="display: none;"></div>
 
                 <!-- Live Stats -->
                 <div class="stats-grid">
                     <div class="stat-card">
                         <div class="stat-label">Daily Cost</div>
-                        <div class="stat-value" id="dailyCost">$0.00</div>
+                        <div class="stat-value cost-good" id="dailyCost">...</div>
                         <div class="stat-label">OpenAI API Usage</div>
                     </div>
                     
                     <div class="stat-card">
                         <div class="stat-label">Total Tokens</div>
-                        <div class="stat-value" id="totalTokens">0</div>
+                        <div class="stat-value" id="totalTokens">...</div>
                         <div class="stat-label">Today</div>
                     </div>
                     
                     <div class="stat-card">
                         <div class="stat-label">API Requests</div>
-                        <div class="stat-value" id="apiRequests">0</div>
+                        <div class="stat-value" id="apiRequests">...</div>
                         <div class="stat-label">Today</div>
                     </div>
                     
                     <div class="stat-card">
-                        <div class="stat-label">Cache Hits</div>
-                        <div class="stat-value" id="cacheHits">0</div>
-                        <div class="stat-label" id="cacheRatio">Ratio: 0%</div>
+                        <div class="stat-label">Cache Performance</div>
+                        <div class="stat-value" id="cacheHits">...</div>
+                        <div class="stat-label" id="cacheRatio">Ratio: ...</div>
                     </div>
                     
                     <div class="stat-card">
                         <div class="stat-label">Total Users</div>
-                        <div class="stat-value" id="userCount">0</div>
+                        <div class="stat-value" id="userCount">...</div>
                         <div class="stat-label">Registered</div>
                     </div>
                     
                     <div class="stat-card">
                         <div class="stat-label">Server Status</div>
-                        <div class="stat-value" id="serverStatus">❓</div>
+                        <div class="stat-value" id="serverStatus">⏳ Loading...</div>
                         <div class="stat-label" id="lastUpdate">Last update: Never</div>
                     </div>
                 </div>
@@ -168,7 +251,7 @@
                 <!-- Cost History -->
                 <div class="chart-container">
                     <h3>📈 Cost History (Last 7 Days)</h3>
-                    <div id="costHistory" style="min-height: 200px; background: #f9f9f9; border: 1px solid #ddd; padding: 20px; border-radius: 5px;">
+                    <div id="costHistory" style="min-height: 200px;">
                         <p>Loading cost history...</p>
                     </div>
                 </div>
@@ -180,46 +263,166 @@
                         Loading user data...
                     </div>
                 </div>
+
+                <!-- System Info -->
+                <div class="chart-container">
+                    <h3>⚙️ System Information</h3>
+                    <div style="display: grid; grid-template-columns: repeat(auto-fit, minmax(200px, 1fr)); gap: 15px;">
+                        <div>
+                            <strong>API Base URL:</strong><br>
+                            <code id="apiBaseUrl">-</code>
+                        </div>
+                        <div>
+                            <strong>Session Started:</strong><br>
+                            <span id="sessionStart">-</span>
+                        </div>
+                        <div>
+                            <strong>Auto-refresh:</strong><br>
+                            <label>
+                                <input type="checkbox" id="autoRefreshToggle" checked onchange="toggleAutoRefresh()">
+                                Every 30 seconds
+                            </label>
+                        </div>
+                    </div>
+                </div>
             </div>
         </div>
     </div>
 
     <script>
+        // Global variables
         let adminKey = '';
         let apiUrl = '';
+        let refreshInterval;
+        let inactivityTimer;
+        let sessionStartTime;
+        let autoRefreshEnabled = true;
 
-        function login() {
-            adminKey = document.getElementById('adminKey').value;
-            apiUrl = document.getElementById('apiUrl').value;
-            
-            if (!adminKey || !apiUrl) {
-                showLoginError('Please enter both APP_SECRET_KEY and API URL');
-                return;
+        // Initialize on page load
+        document.addEventListener('DOMContentLoaded', function() {
+            // Load saved API URL
+            const savedApiUrl = localStorage.getItem('adminApiUrl');
+            if (savedApiUrl) {
+                document.getElementById('apiUrl').value = savedApiUrl;
             }
+            
+            // Auto-detect current domain if possible
+            if (!savedApiUrl && window.location.origin !== 'file://') {
+                document.getElementById('apiUrl').value = window.location.origin;
+            }
+            
+            document.getElementById('adminKey').focus();
+            
+            // Set up inactivity monitoring
+            setupInactivityTimer();
+        });
 
-            // Test connection
-            fetch(`${apiUrl}/admin/stats`, {
-                headers: { 'X-Admin-Key': adminKey }
-            })
-            .then(response => {
-                if (response.ok) {
-                    document.getElementById('loginScreen').style.display = 'none';
-                    document.getElementById('dashboard').style.display = 'block';
-                    refreshStats();
-                    startAutoRefresh();
-                } else {
-                    showLoginError('Invalid APP_SECRET_KEY or server error');
-                }
-            })
-            .catch(error => {
-                showLoginError('Connection failed: ' + error.message);
+        function setupInactivityTimer() {
+            // Reset timer on user activity
+            const events = ['mousemove', 'keypress', 'click', 'scroll'];
+            events.forEach(event => {
+                document.addEventListener(event, resetInactivityTimer);
             });
         }
 
-        function showLoginError(message) {
-            const errorDiv = document.getElementById('loginError');
-            errorDiv.textContent = message;
-            errorDiv.style.display = 'block';
+        function resetInactivityTimer() {
+            clearTimeout(inactivityTimer);
+            inactivityTimer = setTimeout(logout, 30 * 60 * 1000); // 30 minutes
+        }
+
+        function login() {
+            adminKey = document.getElementById('adminKey').value.trim();
+            apiUrl = document.getElementById('apiUrl').value.trim();
+            
+            if (!adminKey) {
+                showLoginMessage('Please enter your APP_SECRET_KEY', 'error');
+                return;
+            }
+
+            if (!apiUrl) {
+                showLoginMessage('Please enter the API URL', 'error');
+                return;
+            }
+
+            // Validate URL format
+            if (!apiUrl.startsWith('http://') && !apiUrl.startsWith('https://')) {
+                showLoginMessage('Please enter a valid URL starting with http:// or https://', 'error');
+                return;
+            }
+
+            // Save API URL for future use
+            localStorage.setItem('adminApiUrl', apiUrl);
+
+            // Show loading state
+            document.getElementById('loginScreen').classList.add('loading');
+
+            // Test connection with timeout
+            const controller = new AbortController();
+            const timeoutId = setTimeout(() => controller.abort(), 10000);
+
+            fetch(`${apiUrl}/admin/stats`, {
+                headers: { 'X-Admin-Key': adminKey },
+                signal: controller.signal
+            })
+            .then(response => {
+                clearTimeout(timeoutId);
+                if (response.ok) {
+                    return response.json();
+                } else {
+                    throw new Error(`Server returned ${response.status}: ${response.statusText}`);
+                }
+            })
+            .then(data => {
+                if (data.success) {
+                    // Login successful
+                    document.getElementById('loginScreen').style.display = 'none';
+                    document.getElementById('dashboard').style.display = 'block';
+                    sessionStartTime = new Date();
+                    document.getElementById('sessionStart').textContent = sessionStartTime.toLocaleString();
+                    document.getElementById('apiBaseUrl').textContent = apiUrl;
+                    
+                    showMessage('Login successful!', 'success');
+                    refreshStats();
+                    startAutoRefresh();
+                    resetInactivityTimer();
+                } else {
+                    throw new Error(data.detail || 'Authentication failed');
+                }
+            })
+            .catch(error => {
+                clearTimeout(timeoutId);
+                document.getElementById('loginScreen').classList.remove('loading');
+                
+                if (error.name === 'AbortError') {
+                    showLoginMessage('Connection timeout - server may be offline or URL incorrect', 'error');
+                } else {
+                    showLoginMessage('Login failed: ' + error.message, 'error');
+                }
+            });
+        }
+
+        function showLoginMessage(message, type) {
+            const messageDiv = document.getElementById('loginMessage');
+            messageDiv.textContent = message;
+            messageDiv.className = type === 'error' ? 'error-message' : 'success-message';
+            messageDiv.style.display = 'block';
+            
+            // Auto-hide success messages
+            if (type === 'success') {
+                setTimeout(() => {
+                    messageDiv.style.display = 'none';
+                }, 3000);
+            }
+        }
+
+        function showMessage(message, type) {
+            const container = document.getElementById('messageContainer');
+            container.innerHTML = `<div class="${type === 'error' ? 'error-message' : 'success-message'}">${message}</div>`;
+            container.style.display = 'block';
+            
+            setTimeout(() => {
+                container.style.display = 'none';
+            }, 5000);
         }
 
         function logout() {
@@ -227,17 +430,34 @@
             apiUrl = '';
             document.getElementById('loginScreen').style.display = 'block';
             document.getElementById('dashboard').style.display = 'none';
+            document.getElementById('loginScreen').classList.remove('loading');
             stopAutoRefresh();
+            clearTimeout(inactivityTimer);
+            
+            // Clear password field for security
+            document.getElementById('adminKey').value = '';
         }
 
         function refreshStats() {
             if (!adminKey || !apiUrl) return;
 
+            // Show loading states
+            document.querySelectorAll('.stat-value').forEach(el => {
+                if (el.id !== 'serverStatus') {
+                    el.textContent = '...';
+                }
+            });
+            document.getElementById('refreshBtn').classList.add('loading');
+            document.getElementById('serverStatus').textContent = '⏳ Loading...';
+
             // Get main stats
             fetch(`${apiUrl}/admin/stats`, {
                 headers: { 'X-Admin-Key': adminKey }
             })
-            .then(response => response.json())
+            .then(response => {
+                if (!response.ok) throw new Error(`HTTP ${response.status}`);
+                return response.json();
+            })
             .then(data => {
                 if (data.success) {
                     updateDashboard(data);
@@ -245,6 +465,12 @@
             })
             .catch(error => {
                 console.error('Stats error:', error);
+                document.getElementById('serverStatus').textContent = '❌ Error';
+                document.getElementById('serverStatus').className = 'stat-value status-offline';
+                showMessage('Failed to fetch stats: ' + error.message, 'error');
+            })
+            .finally(() => {
+                document.getElementById('refreshBtn').classList.remove('loading');
             });
 
             // Get cost history
@@ -254,6 +480,9 @@
             .then(response => response.json())
             .then(data => {
                 updateCostHistory(data);
+            })
+            .catch(error => {
+                console.error('Cost history error:', error);
             });
 
             // Get user stats
@@ -265,7 +494,13 @@
                 if (data.success) {
                     updateUserStats(data);
                 }
+            })
+            .catch(error => {
+                console.error('User stats error:', error);
             });
+
+            // Check server health
+            checkServerHealth();
         }
 
         function updateDashboard(stats) {
@@ -275,40 +510,47 @@
             document.getElementById('cacheHits').textContent = stats.cache_hits.toLocaleString();
             document.getElementById('userCount').textContent = stats.user_count.toLocaleString();
             
+            // Calculate cache ratio
             const totalCache = stats.cache_hits + stats.cache_misses;
             const cacheRatio = totalCache > 0 ? (stats.cache_hits / totalCache * 100).toFixed(1) : 0;
-            document.getElementById('cacheRatio').textContent = `Ratio: ${cacheRatio}%`;
+            document.getElementById('cacheRatio').textContent = `Ratio: ${cacheRatio}% (${stats.cache_hits}/${totalCache})`;
             
-            document.getElementById('serverStatus').textContent = '✅ Online';
             document.getElementById('lastUpdate').textContent = `Last update: ${new Date().toLocaleTimeString()}`;
             
             // Color code based on cost
             const costElement = document.getElementById('dailyCost');
-            costElement.className = stats.daily_cost > 1.0 ? 'stat-value cost-warning' : 'stat-value cost-good';
+            if (stats.daily_cost > 1.0) {
+                costElement.className = 'stat-value cost-warning';
+            } else if (stats.daily_cost > 0.1) {
+                costElement.className = 'stat-value';
+            } else {
+                costElement.className = 'stat-value cost-good';
+            }
         }
 
         function updateCostHistory(history) {
             const historyDiv = document.getElementById('costHistory');
             
-            if (history.length === 0) {
+            if (!history || history.length === 0) {
                 historyDiv.innerHTML = '<p>No cost history available yet. Stats will appear after daily reset.</p>';
                 return;
             }
 
-            let html = '<table style="width: 100%; border-collapse: collapse;">';
-            html += '<tr style="background: #667eea; color: white;">';
-            html += '<th style="padding: 10px; text-align: left;">Date</th>';
-            html += '<th style="padding: 10px; text-align: right;">Cost</th>';
-            html += '<th style="padding: 10px; text-align: right;">Tokens</th>';
-            html += '<th style="padding: 10px; text-align: right;">Requests</th>';
+            let html = '<table>';
+            html += '<tr>';
+            html += '<th>Date</th>';
+            html += '<th style="text-align: right;">Cost</th>';
+            html += '<th style="text-align: right;">Tokens</th>';
+            html += '<th style="text-align: right;">Requests</th>';
             html += '</tr>';
             
             history.forEach(day => {
-                html += `<tr style="border-bottom: 1px solid #eee;">`;
-                html += `<td style="padding: 10px;">${day.date}</td>`;
-                html += `<td style="padding: 10px; text-align: right; color: ${day.cost > 1.0 ? '#e74c3c' : '#27ae60'}">$${day.cost.toFixed(6)}</td>`;
-                html += `<td style="padding: 10px; text-align: right;">${day.tokens.toLocaleString()}</td>`;
-                html += `<td style="padding: 10px; text-align: right;">${day.requests.toLocaleString()}</td>`;
+                const costColor = day.cost > 1.0 ? 'cost-warning' : (day.cost > 0.1 ? '' : 'cost-good');
+                html += `<tr>`;
+                html += `<td>${day.date}</td>`;
+                html += `<td style="text-align: right;" class="${costColor}">$${day.cost.toFixed(6)}</td>`;
+                html += `<td style="text-align: right;">${day.tokens.toLocaleString()}</td>`;
+                html += `<td style="text-align: right;">${day.requests.toLocaleString()}</td>`;
                 html += `</tr>`;
             });
             
@@ -318,40 +560,90 @@
 
         function updateUserStats(userData) {
             const userStatsDiv = document.getElementById('userStats');
-            userStatsDiv.innerHTML = `
+            
+            if (!userData || !userData.users) {
+                userStatsDiv.innerHTML = '<p>Error loading user data</p>';
+                return;
+            }
+
+            let html = `
                 <div style="display: grid; grid-template-columns: repeat(auto-fit, minmax(200px, 1fr)); gap: 15px; margin-bottom: 20px;">
                     <div style="background: #f8f9fa; padding: 15px; border-radius: 5px;">
                         <strong>Total Users</strong><br>
-                        <span style="font-size: 1.5rem; color: #667eea;">${userData.total_users}</span>
+                        <span style="font-size: 1.5rem; color: #667eea;">${userData.total_users || 0}</span>
                     </div>
                     <div style="background: #f8f9fa; padding: 15px; border-radius: 5px;">
                         <strong>Credits Used</strong><br>
-                        <span style="font-size: 1.5rem; color: #e74c3c;">${userData.total_credits_used}</span>
+                        <span style="font-size: 1.5rem; color: #e74c3c;">${userData.total_credits_used || 0}</span>
                     </div>
                     <div style="background: #f8f9fa; padding: 15px; border-radius: 5px;">
                         <strong>Credits Available</strong><br>
-                        <span style="font-size: 1.5rem; color: #27ae60;">${userData.total_credits_available}</span>
-                    </div>
-                </div>
-                
-                <div style="margin-top: 15px;">
-                    <strong>Recent Users (max 10):</strong>
-                    <div style="max-height: 200px; overflow-y: auto; margin-top: 10px; border: 1px solid #ddd; border-radius: 5px;">
-                        ${userData.users.slice(0, 10).map(user => `
-                            <div style="padding: 10px; border-bottom: 1px solid #eee; font-family: monospace;">
-                                <div>User: ${user.user_id.substring(0, 12)}...</div>
-                                <div style="font-size: 0.9rem; color: #666;">
-                                    Credits: ${user.available_credits} available • ${user.used_credits} used
-                                </div>
-                            </div>
-                        `).join('')}
+                        <span style="font-size: 1.5rem; color: #27ae60;">${userData.total_credits_available || 0}</span>
                     </div>
                 </div>
             `;
+            
+            if (userData.users && userData.users.length > 0) {
+                html += `
+                    <div style="margin-top: 15px;">
+                        <strong>Recent Users (max 10):</strong>
+                        <div class="user-list">
+                `;
+                
+                userData.users.slice(0, 10).forEach(user => {
+                    const userId = user.user_id || 'unknown';
+                    const shortId = userId.length > 12 ? userId.substring(0, 12) + '...' : userId;
+                    
+                    html += `
+                        <div class="user-item">
+                            <div><strong>${shortId}</strong></div>
+                            <div style="font-size: 0.9rem; color: #666;">
+                                Credits: ${user.available_credits || 0} available • ${user.used_credits || 0} used
+                            </div>
+                            ${user.last_updated ? `<div style="font-size: 0.8rem; color: #999;">Last active: ${formatDate(user.last_updated)}</div>` : ''}
+                        </div>
+                    `;
+                });
+                
+                html += `</div></div>`;
+            } else {
+                html += '<p>No users found</p>';
+            }
+            
+            userStatsDiv.innerHTML = html;
+        }
+
+        function formatDate(dateString) {
+            if (!dateString) return 'Unknown';
+            try {
+                const date = new Date(dateString);
+                return date.toLocaleDateString() + ' ' + date.toLocaleTimeString();
+            } catch {
+                return 'Invalid date';
+            }
+        }
+
+        function checkServerHealth() {
+            fetch(`${apiUrl}/health`)
+            .then(response => response.json())
+            .then(health => {
+                const statusEl = document.getElementById('serverStatus');
+                if (health.status === 'healthy') {
+                    statusEl.textContent = '✅ Online';
+                    statusEl.className = 'stat-value status-online';
+                } else {
+                    statusEl.textContent = '⚠️ Degraded';
+                    statusEl.className = 'stat-value status-degraded';
+                }
+            })
+            .catch(() => {
+                document.getElementById('serverStatus').textContent = '❌ Offline';
+                document.getElementById('serverStatus').className = 'stat-value status-offline';
+            });
         }
 
         function resetStats() {
-            if (confirm('Are you sure you want to reset daily statistics?')) {
+            if (confirm('Are you sure you want to reset daily statistics? This will save current stats to history and reset counters to zero.')) {
                 fetch(`${apiUrl}/admin/reset-stats`, {
                     method: 'POST',
                     headers: { 'X-Admin-Key': adminKey }
@@ -359,31 +651,64 @@
                 .then(response => response.json())
                 .then(data => {
                     if (data.success) {
-                        alert('Statistics reset successfully!');
+                        showMessage('Statistics reset successfully!', 'success');
                         refreshStats();
+                    } else {
+                        throw new Error(data.detail || 'Reset failed');
                     }
                 })
                 .catch(error => {
-                    alert('Reset failed: ' + error.message);
+                    showMessage('Reset failed: ' + error.message, 'error');
                 });
             }
         }
 
-        // Auto-refresh every 30 seconds
-        let refreshInterval;
+        // Auto-refresh management
         function startAutoRefresh() {
-            refreshInterval = setInterval(refreshStats, 30000);
+            if (autoRefreshEnabled) {
+                refreshInterval = setInterval(refreshStats, 30000);
+                document.getElementById('autoRefreshStatus').textContent = 'On (30s)';
+            }
         }
         
         function stopAutoRefresh() {
             if (refreshInterval) {
                 clearInterval(refreshInterval);
+                refreshInterval = null;
+            }
+            document.getElementById('autoRefreshStatus').textContent = 'Off';
+        }
+        
+        function toggleAutoRefresh() {
+            autoRefreshEnabled = document.getElementById('autoRefreshToggle').checked;
+            if (autoRefreshEnabled) {
+                startAutoRefresh();
+            } else {
+                stopAutoRefresh();
             }
         }
 
-        // Initialize
-        document.getElementById('apiUrl').value = localStorage.getItem('apiUrl') || '';
-        document.getElementById('adminKey').focus();
+        // Keyboard shortcuts
+        document.addEventListener('keydown', function(event) {
+            // Ctrl/Cmd + R to refresh
+            if ((event.ctrlKey || event.metaKey) && event.key === 'r') {
+                event.preventDefault();
+                refreshStats();
+            }
+            
+            // Escape to logout
+            if (event.key === 'Escape') {
+                logout();
+            }
+        });
+
+        // Prevent leaving page accidentally
+        window.addEventListener('beforeunload', function(event) {
+            if (adminKey) {
+                event.preventDefault();
+                event.returnValue = 'You have an active admin session. Are you sure you want to leave?';
+            }
+        });
     </script>
 </body>
 </html>
