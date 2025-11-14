@@ -1,12 +1,389 @@
 <!DOCTYPE html>
-<html>
+<html lang="en">
 <head>
-    <title>Admin Dashboard - ResumeWriterApp</title>
-    <script src="https://www.gstatic.com/firebasejs/9.22.0/firebase-app-compat.js"></script>
-    <script src="https://www.gstatic.com/firebasejs/9.22.0/firebase-firestore-compat.js"></script>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Resume Writer - Admin Dashboard</title>
+    <style>
+        * { margin: 0; padding: 0; box-sizing: border-box; }
+        body { font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif; background: #f5f5f5; }
+        
+        .header { 
+            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%); 
+            color: white; 
+            padding: 20px; 
+            text-align: center; 
+        }
+        
+        .container { 
+            max-width: 1200px; 
+            margin: 0 auto; 
+            padding: 20px; 
+        }
+        
+        .stats-grid { 
+            display: grid; 
+            grid-template-columns: repeat(auto-fit, minmax(250px, 1fr)); 
+            gap: 20px; 
+            margin-bottom: 30px; 
+        }
+        
+        .stat-card { 
+            background: white; 
+            padding: 20px; 
+            border-radius: 10px; 
+            box-shadow: 0 2px 10px rgba(0,0,0,0.1); 
+            text-align: center; 
+        }
+        
+        .stat-value { 
+            font-size: 2rem; 
+            font-weight: bold; 
+            color: #667eea; 
+            margin: 10px 0; 
+        }
+        
+        .stat-label { 
+            color: #666; 
+            font-size: 0.9rem; 
+        }
+        
+        .cost-warning { color: #e74c3c; }
+        .cost-good { color: #27ae60; }
+        
+        .chart-container { 
+            background: white; 
+            padding: 20px; 
+            border-radius: 10px; 
+            box-shadow: 0 2px 10px rgba(0,0,0,0.1); 
+            margin-bottom: 20px; 
+        }
+        
+        .btn { 
+            background: #667eea; 
+            color: white; 
+            border: none; 
+            padding: 10px 20px; 
+            border-radius: 5px; 
+            cursor: pointer; 
+            margin: 5px; 
+        }
+        
+        .btn:hover { background: #5a6fd8; }
+        .btn-danger { background: #e74c3c; }
+        .btn-danger:hover { background: #c0392b; }
+        
+        .admin-login { 
+            background: white; 
+            padding: 40px; 
+            border-radius: 10px; 
+            box-shadow: 0 2px 10px rgba(0,0,0,0.1); 
+            max-width: 400px; 
+            margin: 100px auto; 
+        }
+        
+        .login-input { 
+            width: 100%; 
+            padding: 15px; 
+            margin: 10px 0; 
+            border: 1px solid #ddd; 
+            border-radius: 5px; 
+        }
+    </style>
 </head>
 <body>
-    <h1>Admin Dashboard - User Management</h1>
-    <!-- Your admin interface code here -->
+    <div id="app">
+        <!-- Login Screen -->
+        <div id="loginScreen" class="admin-login">
+            <h2>🔐 Admin Login</h2>
+            <p style="color: #666; margin-bottom: 20px; font-size: 14px;">
+                Use your APP_SECRET_KEY from environment variables
+            </p>
+            <input type="password" id="adminKey" class="login-input" placeholder="Enter APP_SECRET_KEY">
+            <input type="text" id="apiUrl" class="login-input" placeholder="API URL (e.g., https://yourapp.onrender.com)">
+            <button class="btn" onclick="login()">Login</button>
+            <div id="loginError" style="color: red; margin-top: 10px; display: none;"></div>
+            
+            <div style="margin-top: 20px; padding: 15px; background: #f8f9fa; border-radius: 5px;">
+                <small style="color: #666;">
+                    <strong>Note:</strong> This uses the same APP_SECRET_KEY that's already configured in your environment variables. No new keys needed.
+                </small>
+            </div>
+        </div>
+
+        <!-- Dashboard -->
+        <div id="dashboard" style="display: none;">
+            <div class="header">
+                <h1>📊 Resume Writer - Admin Dashboard</h1>
+                <p>Real-time API Monitoring & Cost Tracking</p>
+                <small>Using APP_SECRET_KEY for authentication</small>
+            </div>
+
+            <div class="container">
+                <div style="text-align: right; margin-bottom: 20px;">
+                    <button class="btn" onclick="refreshStats()">🔄 Refresh</button>
+                    <button class="btn btn-danger" onclick="resetStats()">🔄 Reset Daily Stats</button>
+                    <button class="btn" onclick="logout()">🚪 Logout</button>
+                </div>
+
+                <!-- Live Stats -->
+                <div class="stats-grid">
+                    <div class="stat-card">
+                        <div class="stat-label">Daily Cost</div>
+                        <div class="stat-value" id="dailyCost">$0.00</div>
+                        <div class="stat-label">OpenAI API Usage</div>
+                    </div>
+                    
+                    <div class="stat-card">
+                        <div class="stat-label">Total Tokens</div>
+                        <div class="stat-value" id="totalTokens">0</div>
+                        <div class="stat-label">Today</div>
+                    </div>
+                    
+                    <div class="stat-card">
+                        <div class="stat-label">API Requests</div>
+                        <div class="stat-value" id="apiRequests">0</div>
+                        <div class="stat-label">Today</div>
+                    </div>
+                    
+                    <div class="stat-card">
+                        <div class="stat-label">Cache Hits</div>
+                        <div class="stat-value" id="cacheHits">0</div>
+                        <div class="stat-label" id="cacheRatio">Ratio: 0%</div>
+                    </div>
+                    
+                    <div class="stat-card">
+                        <div class="stat-label">Total Users</div>
+                        <div class="stat-value" id="userCount">0</div>
+                        <div class="stat-label">Registered</div>
+                    </div>
+                    
+                    <div class="stat-card">
+                        <div class="stat-label">Server Status</div>
+                        <div class="stat-value" id="serverStatus">❓</div>
+                        <div class="stat-label" id="lastUpdate">Last update: Never</div>
+                    </div>
+                </div>
+
+                <!-- Cost History -->
+                <div class="chart-container">
+                    <h3>📈 Cost History (Last 7 Days)</h3>
+                    <div id="costHistory" style="min-height: 200px; background: #f9f9f9; border: 1px solid #ddd; padding: 20px; border-radius: 5px;">
+                        <p>Loading cost history...</p>
+                    </div>
+                </div>
+
+                <!-- User Statistics -->
+                <div class="chart-container">
+                    <h3>👥 User Statistics</h3>
+                    <div id="userStats">
+                        Loading user data...
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <script>
+        let adminKey = '';
+        let apiUrl = '';
+
+        function login() {
+            adminKey = document.getElementById('adminKey').value;
+            apiUrl = document.getElementById('apiUrl').value;
+            
+            if (!adminKey || !apiUrl) {
+                showLoginError('Please enter both APP_SECRET_KEY and API URL');
+                return;
+            }
+
+            // Test connection
+            fetch(`${apiUrl}/admin/stats`, {
+                headers: { 'X-Admin-Key': adminKey }
+            })
+            .then(response => {
+                if (response.ok) {
+                    document.getElementById('loginScreen').style.display = 'none';
+                    document.getElementById('dashboard').style.display = 'block';
+                    refreshStats();
+                    startAutoRefresh();
+                } else {
+                    showLoginError('Invalid APP_SECRET_KEY or server error');
+                }
+            })
+            .catch(error => {
+                showLoginError('Connection failed: ' + error.message);
+            });
+        }
+
+        function showLoginError(message) {
+            const errorDiv = document.getElementById('loginError');
+            errorDiv.textContent = message;
+            errorDiv.style.display = 'block';
+        }
+
+        function logout() {
+            adminKey = '';
+            apiUrl = '';
+            document.getElementById('loginScreen').style.display = 'block';
+            document.getElementById('dashboard').style.display = 'none';
+            stopAutoRefresh();
+        }
+
+        function refreshStats() {
+            if (!adminKey || !apiUrl) return;
+
+            // Get main stats
+            fetch(`${apiUrl}/admin/stats`, {
+                headers: { 'X-Admin-Key': adminKey }
+            })
+            .then(response => response.json())
+            .then(data => {
+                if (data.success) {
+                    updateDashboard(data);
+                }
+            })
+            .catch(error => {
+                console.error('Stats error:', error);
+            });
+
+            // Get cost history
+            fetch(`${apiUrl}/admin/cost-history?days=7`, {
+                headers: { 'X-Admin-Key': adminKey }
+            })
+            .then(response => response.json())
+            .then(data => {
+                updateCostHistory(data);
+            });
+
+            // Get user stats
+            fetch(`${apiUrl}/admin/users`, {
+                headers: { 'X-Admin-Key': adminKey }
+            })
+            .then(response => response.json())
+            .then(data => {
+                if (data.success) {
+                    updateUserStats(data);
+                }
+            });
+        }
+
+        function updateDashboard(stats) {
+            document.getElementById('dailyCost').textContent = `$${stats.daily_cost.toFixed(6)}`;
+            document.getElementById('totalTokens').textContent = stats.total_tokens.toLocaleString();
+            document.getElementById('apiRequests').textContent = stats.api_requests.toLocaleString();
+            document.getElementById('cacheHits').textContent = stats.cache_hits.toLocaleString();
+            document.getElementById('userCount').textContent = stats.user_count.toLocaleString();
+            
+            const totalCache = stats.cache_hits + stats.cache_misses;
+            const cacheRatio = totalCache > 0 ? (stats.cache_hits / totalCache * 100).toFixed(1) : 0;
+            document.getElementById('cacheRatio').textContent = `Ratio: ${cacheRatio}%`;
+            
+            document.getElementById('serverStatus').textContent = '✅ Online';
+            document.getElementById('lastUpdate').textContent = `Last update: ${new Date().toLocaleTimeString()}`;
+            
+            // Color code based on cost
+            const costElement = document.getElementById('dailyCost');
+            costElement.className = stats.daily_cost > 1.0 ? 'stat-value cost-warning' : 'stat-value cost-good';
+        }
+
+        function updateCostHistory(history) {
+            const historyDiv = document.getElementById('costHistory');
+            
+            if (history.length === 0) {
+                historyDiv.innerHTML = '<p>No cost history available yet. Stats will appear after daily reset.</p>';
+                return;
+            }
+
+            let html = '<table style="width: 100%; border-collapse: collapse;">';
+            html += '<tr style="background: #667eea; color: white;">';
+            html += '<th style="padding: 10px; text-align: left;">Date</th>';
+            html += '<th style="padding: 10px; text-align: right;">Cost</th>';
+            html += '<th style="padding: 10px; text-align: right;">Tokens</th>';
+            html += '<th style="padding: 10px; text-align: right;">Requests</th>';
+            html += '</tr>';
+            
+            history.forEach(day => {
+                html += `<tr style="border-bottom: 1px solid #eee;">`;
+                html += `<td style="padding: 10px;">${day.date}</td>`;
+                html += `<td style="padding: 10px; text-align: right; color: ${day.cost > 1.0 ? '#e74c3c' : '#27ae60'}">$${day.cost.toFixed(6)}</td>`;
+                html += `<td style="padding: 10px; text-align: right;">${day.tokens.toLocaleString()}</td>`;
+                html += `<td style="padding: 10px; text-align: right;">${day.requests.toLocaleString()}</td>`;
+                html += `</tr>`;
+            });
+            
+            html += '</table>';
+            historyDiv.innerHTML = html;
+        }
+
+        function updateUserStats(userData) {
+            const userStatsDiv = document.getElementById('userStats');
+            userStatsDiv.innerHTML = `
+                <div style="display: grid; grid-template-columns: repeat(auto-fit, minmax(200px, 1fr)); gap: 15px; margin-bottom: 20px;">
+                    <div style="background: #f8f9fa; padding: 15px; border-radius: 5px;">
+                        <strong>Total Users</strong><br>
+                        <span style="font-size: 1.5rem; color: #667eea;">${userData.total_users}</span>
+                    </div>
+                    <div style="background: #f8f9fa; padding: 15px; border-radius: 5px;">
+                        <strong>Credits Used</strong><br>
+                        <span style="font-size: 1.5rem; color: #e74c3c;">${userData.total_credits_used}</span>
+                    </div>
+                    <div style="background: #f8f9fa; padding: 15px; border-radius: 5px;">
+                        <strong>Credits Available</strong><br>
+                        <span style="font-size: 1.5rem; color: #27ae60;">${userData.total_credits_available}</span>
+                    </div>
+                </div>
+                
+                <div style="margin-top: 15px;">
+                    <strong>Recent Users (max 10):</strong>
+                    <div style="max-height: 200px; overflow-y: auto; margin-top: 10px; border: 1px solid #ddd; border-radius: 5px;">
+                        ${userData.users.slice(0, 10).map(user => `
+                            <div style="padding: 10px; border-bottom: 1px solid #eee; font-family: monospace;">
+                                <div>User: ${user.user_id.substring(0, 12)}...</div>
+                                <div style="font-size: 0.9rem; color: #666;">
+                                    Credits: ${user.available_credits} available • ${user.used_credits} used
+                                </div>
+                            </div>
+                        `).join('')}
+                    </div>
+                </div>
+            `;
+        }
+
+        function resetStats() {
+            if (confirm('Are you sure you want to reset daily statistics?')) {
+                fetch(`${apiUrl}/admin/reset-stats`, {
+                    method: 'POST',
+                    headers: { 'X-Admin-Key': adminKey }
+                })
+                .then(response => response.json())
+                .then(data => {
+                    if (data.success) {
+                        alert('Statistics reset successfully!');
+                        refreshStats();
+                    }
+                })
+                .catch(error => {
+                    alert('Reset failed: ' + error.message);
+                });
+            }
+        }
+
+        // Auto-refresh every 30 seconds
+        let refreshInterval;
+        function startAutoRefresh() {
+            refreshInterval = setInterval(refreshStats, 30000);
+        }
+        
+        function stopAutoRefresh() {
+            if (refreshInterval) {
+                clearInterval(refreshInterval);
+            }
+        }
+
+        // Initialize
+        document.getElementById('apiUrl').value = localStorage.getItem('apiUrl') || '';
+        document.getElementById('adminKey').focus();
+    </script>
 </body>
 </html>
