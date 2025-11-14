@@ -76,24 +76,6 @@
         .btn-warning { background: #f39c12; }
         .btn-warning:hover { background: #e67e22; }
         
-        .admin-login { 
-            background: white; 
-            padding: 40px; 
-            border-radius: 10px; 
-            box-shadow: 0 2px 10px rgba(0,0,0,0.1); 
-            max-width: 400px; 
-            margin: 100px auto; 
-        }
-        
-        .login-input { 
-            width: 100%; 
-            padding: 15px; 
-            margin: 10px 0; 
-            border: 1px solid #ddd; 
-            border-radius: 5px; 
-            font-size: 14px;
-        }
-        
         .loading { 
             opacity: 0.6; 
             pointer-events: none; 
@@ -112,6 +94,15 @@
             background: #efe; 
             border: 1px solid #27ae60; 
             color: #27ae60; 
+            padding: 10px; 
+            border-radius: 5px; 
+            margin: 10px 0; 
+        }
+        
+        .info-message { 
+            background: #e8f4fd; 
+            border: 1px solid #b6d7f7; 
+            color: #1a5a9a; 
             padding: 10px; 
             border-radius: 5px; 
             margin: 10px 0; 
@@ -147,40 +138,48 @@
             font-family: monospace; 
         }
         
-        .user-item:last-child { 
-            border-bottom: none; 
-        }
-        
         .status-online { color: #27ae60; }
         .status-offline { color: #e74c3c; }
         .status-degraded { color: #f39c12; }
+        
+        .login-container { 
+            background: white; 
+            padding: 40px; 
+            border-radius: 10px; 
+            box-shadow: 0 2px 10px rgba(0,0,0,0.1); 
+            max-width: 400px; 
+            margin: 100px auto; 
+            text-align: center;
+        }
+        
+        .login-input { 
+            width: 100%; 
+            padding: 15px; 
+            margin: 10px 0; 
+            border: 1px solid #ddd; 
+            border-radius: 5px; 
+            font-size: 14px;
+        }
     </style>
 </head>
 <body>
     <div id="app">
         <!-- Login Screen -->
-        <div id="loginScreen" class="admin-login">
-            <h2 style="text-align: center; margin-bottom: 10px;">🔐 Admin Login</h2>
-            <p style="color: #666; margin-bottom: 20px; text-align: center; font-size: 14px;">
-                Use your APP_SECRET_KEY from environment variables
+        <div id="loginScreen" class="login-container">
+            <h2 style="margin-bottom: 10px;">🔐 Admin Dashboard</h2>
+            <p style="color: #666; margin-bottom: 20px;">
+                Enter your Admin Secret Key to continue
             </p>
             
             <div id="loginMessage" style="display: none;"></div>
             
-            <input type="password" id="adminKey" class="login-input" placeholder="Enter APP_SECRET_KEY" autocomplete="off">
-            <input type="text" id="apiUrl" class="login-input" placeholder="API URL (e.g., https://yourapp.onrender.com)">
+            <input type="password" id="adminKey" class="login-input" placeholder="Enter Admin Secret Key" autocomplete="off">
             
             <button class="btn" onclick="login()" style="width: 100%; margin-top: 10px;">Login</button>
             
-            <div style="margin-top: 20px; padding: 15px; background: #f8f9fa; border-radius: 5px;">
-                <small style="color: #666;">
-                    <strong>Note:</strong> This uses the same APP_SECRET_KEY that's already configured in your environment variables. No new keys needed.
-                </small>
-            </div>
-            
-            <div style="margin-top: 15px; text-align: center;">
-                <small style="color: #999;">
-                    Auto-logout after 30 minutes of inactivity
+            <div class="info-message" style="margin-top: 20px;">
+                <small>
+                    <strong>Note:</strong> This key is stored in your GitHub secrets as APP_SECRET_KEY
                 </small>
             </div>
         </div>
@@ -190,7 +189,7 @@
             <div class="header">
                 <h1>📊 Resume Writer - Admin Dashboard</h1>
                 <p>Real-time API Monitoring & Cost Tracking</p>
-                <small>Using APP_SECRET_KEY for authentication</small>
+                <small>Protected by GitHub Secrets • Auto-refresh every 30s</small>
             </div>
 
             <div class="container">
@@ -202,7 +201,8 @@
                         <button class="btn btn-danger" onclick="logout()">🚪 Logout</button>
                     </div>
                     <div style="color: #666; font-size: 14px;">
-                        Auto-refresh: <span id="autoRefreshStatus">On (30s)</span>
+                        Auto-refresh: <span id="autoRefreshStatus">On (30s)</span> • 
+                        Session: <span id="sessionTimer">0:00</span>
                     </div>
                 </div>
 
@@ -251,7 +251,7 @@
                 <!-- Cost History -->
                 <div class="chart-container">
                     <h3>📈 Cost History (Last 7 Days)</h3>
-                    <div id="costHistory" style="min-height: 200px;">
+                    <div id="costHistory">
                         <p>Loading cost history...</p>
                     </div>
                 </div>
@@ -277,6 +277,10 @@
                             <span id="sessionStart">-</span>
                         </div>
                         <div>
+                            <strong>Authentication:</strong><br>
+                            <span style="color: #27ae60;">GitHub Secrets</span>
+                        </div>
+                        <div>
                             <strong>Auto-refresh:</strong><br>
                             <label>
                                 <input type="checkbox" id="autoRefreshToggle" checked onchange="toggleAutoRefresh()">
@@ -290,115 +294,78 @@
     </div>
 
     <script>
-        // Global variables
         let adminKey = '';
-        let apiUrl = '';
+        let apiBaseUrl = window.location.origin;
         let refreshInterval;
-        let inactivityTimer;
+        let sessionTimerInterval;
         let sessionStartTime;
         let autoRefreshEnabled = true;
 
-        // Initialize on page load
         document.addEventListener('DOMContentLoaded', function() {
-            // Load saved API URL
-            const savedApiUrl = localStorage.getItem('adminApiUrl');
-            if (savedApiUrl) {
-                document.getElementById('apiUrl').value = savedApiUrl;
-            }
-            
-            // Auto-detect current domain if possible
-            if (!savedApiUrl && window.location.origin !== 'file://') {
-                document.getElementById('apiUrl').value = window.location.origin;
-            }
-            
             document.getElementById('adminKey').focus();
             
-            // Set up inactivity monitoring
-            setupInactivityTimer();
+            // Try to load admin key from localStorage
+            const savedKey = localStorage.getItem('adminKey');
+            if (savedKey) {
+                document.getElementById('adminKey').value = savedKey;
+                // Auto-login after a short delay
+                setTimeout(login, 1000);
+            }
         });
-
-        function setupInactivityTimer() {
-            // Reset timer on user activity
-            const events = ['mousemove', 'keypress', 'click', 'scroll'];
-            events.forEach(event => {
-                document.addEventListener(event, resetInactivityTimer);
-            });
-        }
-
-        function resetInactivityTimer() {
-            clearTimeout(inactivityTimer);
-            inactivityTimer = setTimeout(logout, 30 * 60 * 1000); // 30 minutes
-        }
 
         function login() {
             adminKey = document.getElementById('adminKey').value.trim();
-            apiUrl = document.getElementById('apiUrl').value.trim();
             
             if (!adminKey) {
-                showLoginMessage('Please enter your APP_SECRET_KEY', 'error');
+                showLoginMessage('Please enter your Admin Secret Key', 'error');
                 return;
             }
 
-            if (!apiUrl) {
-                showLoginMessage('Please enter the API URL', 'error');
-                return;
-            }
+            // Save key to localStorage for convenience
+            localStorage.setItem('adminKey', adminKey);
 
-            // Validate URL format
-            if (!apiUrl.startsWith('http://') && !apiUrl.startsWith('https://')) {
-                showLoginMessage('Please enter a valid URL starting with http:// or https://', 'error');
-                return;
-            }
-
-            // Save API URL for future use
-            localStorage.setItem('adminApiUrl', apiUrl);
-
-            // Show loading state
             document.getElementById('loginScreen').classList.add('loading');
+            document.getElementById('loginMessage').style.display = 'none';
 
-            // Test connection with timeout
-            const controller = new AbortController();
-            const timeoutId = setTimeout(() => controller.abort(), 10000);
-
-            fetch(`${apiUrl}/admin/stats`, {
-                headers: { 'X-Admin-Key': adminKey },
-                signal: controller.signal
+            // Test admin connection
+            fetch(`${apiBaseUrl}/admin/stats`, {
+                headers: { 'X-Admin-Key': adminKey }
             })
             .then(response => {
-                clearTimeout(timeoutId);
                 if (response.ok) {
                     return response.json();
+                } else if (response.status === 403) {
+                    throw new Error('Invalid Admin Secret Key');
                 } else {
-                    throw new Error(`Server returned ${response.status}: ${response.statusText}`);
+                    throw new Error(`Server error: ${response.status}`);
                 }
             })
             .then(data => {
                 if (data.success) {
-                    // Login successful
-                    document.getElementById('loginScreen').style.display = 'none';
-                    document.getElementById('dashboard').style.display = 'block';
-                    sessionStartTime = new Date();
-                    document.getElementById('sessionStart').textContent = sessionStartTime.toLocaleString();
-                    document.getElementById('apiBaseUrl').textContent = apiUrl;
-                    
-                    showMessage('Login successful!', 'success');
-                    refreshStats();
-                    startAutoRefresh();
-                    resetInactivityTimer();
+                    handleSuccessfulLogin();
                 } else {
-                    throw new Error(data.detail || 'Authentication failed');
+                    throw new Error('Invalid response from server');
                 }
             })
             .catch(error => {
-                clearTimeout(timeoutId);
                 document.getElementById('loginScreen').classList.remove('loading');
-                
-                if (error.name === 'AbortError') {
-                    showLoginMessage('Connection timeout - server may be offline or URL incorrect', 'error');
-                } else {
-                    showLoginMessage('Login failed: ' + error.message, 'error');
-                }
+                showLoginMessage('Login failed: ' + error.message, 'error');
+                // Clear invalid key
+                localStorage.removeItem('adminKey');
             });
+        }
+
+        function handleSuccessfulLogin() {
+            document.getElementById('loginScreen').style.display = 'none';
+            document.getElementById('dashboard').style.display = 'block';
+            sessionStartTime = new Date();
+            document.getElementById('sessionStart').textContent = sessionStartTime.toLocaleString();
+            document.getElementById('apiBaseUrl').textContent = apiBaseUrl;
+            
+            showMessage('Admin authentication successful!', 'success');
+            refreshStats();
+            startAutoRefresh();
+            startSessionTimer();
         }
 
         function showLoginMessage(message, type) {
@@ -406,13 +373,6 @@
             messageDiv.textContent = message;
             messageDiv.className = type === 'error' ? 'error-message' : 'success-message';
             messageDiv.style.display = 'block';
-            
-            // Auto-hide success messages
-            if (type === 'success') {
-                setTimeout(() => {
-                    messageDiv.style.display = 'none';
-                }, 3000);
-            }
         }
 
         function showMessage(message, type) {
@@ -427,19 +387,34 @@
 
         function logout() {
             adminKey = '';
-            apiUrl = '';
+            localStorage.removeItem('adminKey');
             document.getElementById('loginScreen').style.display = 'block';
             document.getElementById('dashboard').style.display = 'none';
             document.getElementById('loginScreen').classList.remove('loading');
-            stopAutoRefresh();
-            clearTimeout(inactivityTimer);
-            
-            // Clear password field for security
             document.getElementById('adminKey').value = '';
+            stopAutoRefresh();
+            stopSessionTimer();
+        }
+
+        function startSessionTimer() {
+            sessionTimerInterval = setInterval(() => {
+                const now = new Date();
+                const diff = Math.floor((now - sessionStartTime) / 1000);
+                const minutes = Math.floor(diff / 60);
+                const seconds = diff % 60;
+                document.getElementById('sessionTimer').textContent = 
+                    `${minutes}:${seconds.toString().padStart(2, '0')}`;
+            }, 1000);
+        }
+
+        function stopSessionTimer() {
+            if (sessionTimerInterval) {
+                clearInterval(sessionTimerInterval);
+            }
         }
 
         function refreshStats() {
-            if (!adminKey || !apiUrl) return;
+            if (!adminKey) return;
 
             // Show loading states
             document.querySelectorAll('.stat-value').forEach(el => {
@@ -451,7 +426,7 @@
             document.getElementById('serverStatus').textContent = '⏳ Loading...';
 
             // Get main stats
-            fetch(`${apiUrl}/admin/stats`, {
+            fetch(`${apiBaseUrl}/admin/stats`, {
                 headers: { 'X-Admin-Key': adminKey }
             })
             .then(response => {
@@ -474,7 +449,7 @@
             });
 
             // Get cost history
-            fetch(`${apiUrl}/admin/cost-history?days=7`, {
+            fetch(`${apiBaseUrl}/admin/cost-history?days=7`, {
                 headers: { 'X-Admin-Key': adminKey }
             })
             .then(response => response.json())
@@ -486,7 +461,7 @@
             });
 
             // Get user stats
-            fetch(`${apiUrl}/admin/users`, {
+            fetch(`${apiBaseUrl}/admin/users`, {
                 headers: { 'X-Admin-Key': adminKey }
             })
             .then(response => response.json())
@@ -510,10 +485,9 @@
             document.getElementById('cacheHits').textContent = stats.cache_hits.toLocaleString();
             document.getElementById('userCount').textContent = stats.user_count.toLocaleString();
             
-            // Calculate cache ratio
             const totalCache = stats.cache_hits + stats.cache_misses;
             const cacheRatio = totalCache > 0 ? (stats.cache_hits / totalCache * 100).toFixed(1) : 0;
-            document.getElementById('cacheRatio').textContent = `Ratio: ${cacheRatio}% (${stats.cache_hits}/${totalCache})`;
+            document.getElementById('cacheRatio').textContent = `Ratio: ${cacheRatio}%`;
             
             document.getElementById('lastUpdate').textContent = `Last update: ${new Date().toLocaleTimeString()}`;
             
@@ -600,7 +574,6 @@
                             <div style="font-size: 0.9rem; color: #666;">
                                 Credits: ${user.available_credits || 0} available • ${user.used_credits || 0} used
                             </div>
-                            ${user.last_updated ? `<div style="font-size: 0.8rem; color: #999;">Last active: ${formatDate(user.last_updated)}</div>` : ''}
                         </div>
                     `;
                 });
@@ -613,18 +586,8 @@
             userStatsDiv.innerHTML = html;
         }
 
-        function formatDate(dateString) {
-            if (!dateString) return 'Unknown';
-            try {
-                const date = new Date(dateString);
-                return date.toLocaleDateString() + ' ' + date.toLocaleTimeString();
-            } catch {
-                return 'Invalid date';
-            }
-        }
-
         function checkServerHealth() {
-            fetch(`${apiUrl}/health`)
+            fetch(`${apiBaseUrl}/health`)
             .then(response => response.json())
             .then(health => {
                 const statusEl = document.getElementById('serverStatus');
@@ -644,7 +607,7 @@
 
         function resetStats() {
             if (confirm('Are you sure you want to reset daily statistics? This will save current stats to history and reset counters to zero.')) {
-                fetch(`${apiUrl}/admin/reset-stats`, {
+                fetch(`${apiBaseUrl}/admin/reset-stats`, {
                     method: 'POST',
                     headers: { 'X-Admin-Key': adminKey }
                 })
@@ -663,7 +626,6 @@
             }
         }
 
-        // Auto-refresh management
         function startAutoRefresh() {
             if (autoRefreshEnabled) {
                 refreshInterval = setInterval(refreshStats, 30000);
@@ -674,7 +636,6 @@
         function stopAutoRefresh() {
             if (refreshInterval) {
                 clearInterval(refreshInterval);
-                refreshInterval = null;
             }
             document.getElementById('autoRefreshStatus').textContent = 'Off';
         }
@@ -688,27 +649,13 @@
             }
         }
 
-        // Keyboard shortcuts
-        document.addEventListener('keydown', function(event) {
-            // Ctrl/Cmd + R to refresh
-            if ((event.ctrlKey || event.metaKey) && event.key === 'r') {
-                event.preventDefault();
-                refreshStats();
-            }
-            
-            // Escape to logout
-            if (event.key === 'Escape') {
+        // Auto-logout after 1 hour
+        setTimeout(() => {
+            if (adminKey) {
+                showMessage('Session expired. Please login again.', 'error');
                 logout();
             }
-        });
-
-        // Prevent leaving page accidentally
-        window.addEventListener('beforeunload', function(event) {
-            if (adminKey) {
-                event.preventDefault();
-                event.returnValue = 'You have an active admin session. Are you sure you want to leave?';
-            }
-        });
+        }, 60 * 60 * 1000);
     </script>
 </body>
 </html>
