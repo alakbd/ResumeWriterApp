@@ -79,17 +79,29 @@
     <div id="app">
         <!-- Login Screen -->
         <div id="loginScreen" class="login-container">
-            <h2 style="margin-bottom: 10px;">🔐 Admin Dashboard - Authentication Debugger</h2>
-            <p style="color: #666; margin-bottom: 20px;">We need to discover how your backend expects authentication</p>
+            <h2 style="margin-bottom: 10px;">🔐 Admin Dashboard - Mobile App Reverse Engineering</h2>
+            <p style="color: #666; margin-bottom: 20px;">Since mobile app works, let's discover what it's doing differently</p>
             
             <form id="loginForm" onsubmit="login(event)">
                 <input type="text" id="username" class="login-input" placeholder="Admin Username" required value="alakbd2009@gmail.com">
                 <input type="password" id="password" class="login-input" placeholder="Admin Password" required>
                 
                 <button type="submit" class="btn" style="width: 100%; margin-top: 10px; background: #27ae60;">
-                    Sign In & Discover Auth Method
+                    Sign In & Analyze
                 </button>
             </form>
+            
+            <div class="test-section" style="margin-top: 20px;">
+                <h4>🚨 Important: Mobile App Analysis Required</h4>
+                <p>To make this work, we need to see how your mobile app authenticates.</p>
+                <p><strong>Please check one of these:</strong></p>
+                <ul style="text-align: left; margin: 10px 0;">
+                    <li>Check your mobile app code for API calls</li>
+                    <li>Use a proxy tool like Charles Proxy to inspect mobile app traffic</li>
+                    <li>Check your backend FastAPI code for the expected authentication</li>
+                    <li>Add console logs to your backend to see what headers are received</li>
+                </ul>
+            </div>
             
             <div id="loginDebug" class="debug-info" style="display: none; margin-top: 20px;"></div>
         </div>
@@ -97,25 +109,46 @@
         <!-- Dashboard -->
         <div id="dashboard" style="display: none;">
             <div class="header">
-                <h1>🔍 Authentication Discovery Tool</h1>
-                <p>Testing different authentication methods to find what your backend expects</p>
+                <h1>🔍 Mobile App Authentication Discovery</h1>
+                <p>Let's figure out what the mobile app is doing differently</p>
             </div>
 
             <div class="container">
                 <div class="test-section">
-                    <h3>📋 Test Results</h3>
-                    <div id="authTestResults" class="debug-info"></div>
+                    <h3>🔧 Most Likely Scenarios (Try These)</h3>
+                    <p>Based on the mobile app working, here are the most likely authentication methods:</p>
+                    
+                    <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 10px; margin: 15px 0;">
+                        <button class="btn" onclick="testMobileAppMethod('session_cookie')">🔄 Session Cookie</button>
+                        <button class="btn" onclick="testMobileAppMethod('firebase_uid')">🔥 Firebase UID</button>
+                        <button class="btn" onclick="testMobileAppMethod('different_endpoint')">📡 Different Endpoint</button>
+                        <button class="btn" onclick="testMobileAppMethod('token_auth')">🔑 Token Auth</button>
+                    </div>
+                    
+                    <div id="mobileTestResults" class="debug-info"></div>
                 </div>
 
                 <div class="test-section">
-                    <h3>🔧 Manual Test</h3>
-                    <p>Try a custom header/value combination:</p>
-                    <div style="display: flex; gap: 10px; margin-bottom: 10px;">
-                        <input type="text" id="customHeader" placeholder="Header name (e.g., X-User-ID)" style="flex: 1; padding: 8px; border: 1px solid #ddd; border-radius: 4px;">
-                        <input type="text" id="customValue" placeholder="Header value" style="flex: 1; padding: 8px; border: 1px solid #ddd; border-radius: 4px;" value="admin-user">
+                    <h3>🎯 Quick Debug Your Backend</h3>
+                    <p>Add this to your FastAPI backend to see what's happening:</p>
+                    <div class="debug-info">
+                        <pre>@app.get("/admin/stats")
+async def get_admin_stats(request: Request):
+    # Log all headers
+    print("=== HEADERS ===")
+    for header, value in request.headers.items():
+        print(f"{header}: {value}")
+    
+    # Check specific headers
+    user_id = request.headers.get("x-user-id")
+    authorization = request.headers.get("authorization")
+    print(f"X-User-ID: {user_id}")
+    print(f"Authorization: {authorization}")
+    
+    # Your existing auth logic here
+    ...</pre>
                     </div>
-                    <button class="btn" onclick="testCustomAuth()">Test Custom Header</button>
-                    <div id="customTestResult" class="debug-info" style="margin-top: 10px; display: none;"></div>
+                    <button class="btn" onclick="testWithBackendLogs()">Test After Adding Backend Logs</button>
                 </div>
 
                 <div style="text-align: center; margin-top: 20px;">
@@ -135,9 +168,7 @@
             const username = document.getElementById('username').value.trim();
             const password = document.getElementById('password').value.trim();
             
-            if (!username || !password) {
-                return;
-            }
+            if (!username || !password) return;
 
             const loginBtn = document.querySelector('#loginForm button');
             loginBtn.disabled = true;
@@ -170,15 +201,13 @@
                     currentSession = {
                         user_id: data.user_id,
                         username: data.username || username,
-                        full_response: data // Store everything
+                        full_response: data
                     };
                     
                     localStorage.setItem('adminSession', JSON.stringify(currentSession));
                     
                     document.getElementById('loginScreen').style.display = 'none';
                     document.getElementById('dashboard').style.display = 'block';
-                    
-                    await runComprehensiveAuthTests();
                     
                 } else {
                     throw new Error(data.detail || data.message || 'Login failed');
@@ -187,135 +216,97 @@
                 debugElement.innerHTML += `<div class="error">Login error: ${error.message}</div>`;
             } finally {
                 loginBtn.disabled = false;
-                loginBtn.textContent = 'Sign In & Discover Auth Method';
+                loginBtn.textContent = 'Sign In & Analyze';
             }
         }
 
-        async function runComprehensiveAuthTests() {
-            const testResults = document.getElementById('authTestResults');
-            testResults.innerHTML = '<div>Running comprehensive authentication tests...</div>';
+        async function testMobileAppMethod(method) {
+            const resultsDiv = document.getElementById('mobileTestResults');
+            resultsDiv.innerHTML = `<div>Testing ${method} method...</div>`;
             
-            const testCases = [
-                // Basic headers with user_id
-                { name: 'X-User-ID', headers: { 'X-User-ID': currentSession.user_id } },
-                { name: 'X-User-Id', headers: { 'X-User-Id': currentSession.user_id } },
-                { name: 'User-ID', headers: { 'User-ID': currentSession.user_id } },
-                { name: 'User-Id', headers: { 'User-Id': currentSession.user_id } },
-                
-                // Admin specific headers
-                { name: 'X-Admin-ID', headers: { 'X-Admin-ID': currentSession.user_id } },
-                { name: 'X-Admin-User-ID', headers: { 'X-Admin-User-ID': currentSession.user_id } },
-                { name: 'Admin-User-ID', headers: { 'Admin-User-ID': currentSession.user_id } },
-                
-                // Authorization headers
-                { name: 'Authorization: User', headers: { 'Authorization': `User ${currentSession.user_id}` } },
-                { name: 'Authorization: Admin', headers: { 'Authorization': `Admin ${currentSession.user_id}` } },
-                { name: 'Authorization: Basic (base64 user:pass)', headers: { 'Authorization': `Basic ${btoa('admin:password')}` } },
-                
-                // API Key styles
-                { name: 'X-API-Key', headers: { 'X-API-Key': currentSession.user_id } },
-                { name: 'X-API-Token', headers: { 'X-API-Token': currentSession.user_id } },
-                { name: 'API-Key', headers: { 'API-Key': currentSession.user_id } },
-                
-                // Session/token based (if we had a token)
-                { name: 'X-Session-ID', headers: { 'X-Session-ID': currentSession.user_id } },
-                { name: 'X-Auth-Token', headers: { 'X-Auth-Token': currentSession.user_id } },
-                
-                // Custom headers that might be used
-                { name: 'X-Client-ID', headers: { 'X-Client-ID': currentSession.user_id } },
-                { name: 'X-Client-Id', headers: { 'X-Client-Id': currentSession.user_id } },
-                
-                // No authentication
-                { name: 'No headers', headers: {} }
-            ];
-
-            let successCount = 0;
+            let headers = {};
+            let endpoint = `${API_BASE_URL}/admin/stats`;
             
-            for (const testCase of testCases) {
-                testResults.innerHTML += `<div>Testing <strong>${testCase.name}</strong>...</div>`;
-                
-                try {
-                    const response = await fetch(`${API_BASE_URL}/admin/stats`, {
-                        headers: {
-                            'Content-Type': 'application/json',
-                            ...testCase.headers
-                        }
-                    });
+            switch(method) {
+                case 'session_cookie':
+                    headers = {}; // Rely on cookies
+                    resultsDiv.innerHTML += `<div>Trying with cookies (credentials: include)</div>`;
+                    break;
                     
-                    const responseText = await response.text();
+                case 'firebase_uid':
+                    // Mobile apps often use Firebase UID format
+                    headers = { 
+                        'X-User-ID': currentSession.user_id,
+                        'X-Firebase-UID': currentSession.user_id
+                    };
+                    resultsDiv.innerHTML += `<div>Trying Firebase-style UID</div>`;
+                    break;
                     
-                    if (response.ok) {
-                        testResults.innerHTML += `<div class="success">✅ SUCCESS! Status: ${response.status}</div>`;
-                        testResults.innerHTML += `<div>Response: ${responseText.substring(0, 200)}...</div>`;
-                        successCount++;
-                    } else {
-                        testResults.innerHTML += `<div class="warning">Status: ${response.status} - ${getStatusText(response.status)}</div>`;
-                        if (responseText) {
-                            testResults.innerHTML += `<div>Error response: ${responseText.substring(0, 100)}</div>`;
-                        }
+                case 'different_endpoint':
+                    // Maybe mobile app uses different endpoints
+                    endpoint = `${API_BASE_URL}/stats`; // Non-admin endpoint
+                    headers = { 'X-User-ID': currentSession.user_id };
+                    resultsDiv.innerHTML += `<div>Trying non-admin endpoint: ${endpoint}</div>`;
+                    break;
+                    
+                case 'token_auth':
+                    // Maybe mobile app gets a token we're not seeing
+                    headers = { 
+                        'Authorization': `Token ${currentSession.user_id}`,
+                        'X-Auth-Token': currentSession.user_id
+                    };
+                    resultsDiv.innerHTML += `<div>Trying token-based authentication</div>`;
+                    break;
+            }
+            
+            try {
+                const options = {
+                    headers: {
+                        'Content-Type': 'application/json',
+                        ...headers
                     }
-                } catch (error) {
-                    testResults.innerHTML += `<div class="error">Request failed: ${error.message}</div>`;
+                };
+                
+                if (method === 'session_cookie') {
+                    options.credentials = 'include';
                 }
                 
-                testResults.innerHTML += `<div style="border-bottom: 1px solid #eee; margin: 5px 0;"></div>`;
-            }
-
-            if (successCount > 0) {
-                testResults.innerHTML += `<div class="success" style="margin-top: 10px;">🎉 Found ${successCount} working authentication method(s)!</div>`;
-            } else {
-                testResults.innerHTML += `<div class="error" style="margin-top: 10px;">❌ No standard authentication methods worked.</div>`;
-                testResults.innerHTML += `<div style="margin-top: 10px;">This means your backend expects a specific authentication format that we haven't discovered yet.</div>`;
-                testResults.innerHTML += `<div>Try using the manual test above with different header combinations, or check your backend code for the expected authentication format.</div>`;
+                const response = await fetch(endpoint, options);
+                const responseText = await response.text();
+                
+                if (response.ok) {
+                    resultsDiv.innerHTML += `<div class="success">✅ SUCCESS with ${method}! Status: ${response.status}</div>`;
+                    resultsDiv.innerHTML += `<div>Response: ${responseText.substring(0, 200)}...</div>`;
+                } else {
+                    resultsDiv.innerHTML += `<div class="warning">Status: ${response.status}</div>`;
+                    if (responseText) {
+                        resultsDiv.innerHTML += `<div>Error: ${responseText.substring(0, 100)}</div>`;
+                    }
+                }
+            } catch (error) {
+                resultsDiv.innerHTML += `<div class="error">Request failed: ${error.message}</div>`;
             }
         }
 
-        async function testCustomAuth() {
-            const headerName = document.getElementById('customHeader').value.trim();
-            const headerValue = document.getElementById('customValue').value.trim();
-            const resultDiv = document.getElementById('customTestResult');
-            
-            if (!headerName || !headerValue) {
-                alert('Please enter both header name and value');
-                return;
-            }
-
-            resultDiv.style.display = 'block';
-            resultDiv.innerHTML = `<div>Testing custom header: <strong>${headerName}: ${headerValue}</strong></div>`;
+        async function testWithBackendLogs() {
+            const resultsDiv = document.getElementById('mobileTestResults');
+            resultsDiv.innerHTML = `<div>Testing with standard header (check your backend logs now)</div>`;
             
             try {
                 const response = await fetch(`${API_BASE_URL}/admin/stats`, {
                     headers: {
                         'Content-Type': 'application/json',
-                        [headerName]: headerValue
+                        'X-User-ID': currentSession.user_id
                     }
                 });
                 
-                const responseText = await response.text();
+                resultsDiv.innerHTML += `<div>Request sent with X-User-ID: ${currentSession.user_id}</div>`;
+                resultsDiv.innerHTML += `<div>Check your backend console logs to see what headers are received</div>`;
+                resultsDiv.innerHTML += `<div>Response status: ${response.status}</div>`;
                 
-                if (response.ok) {
-                    resultDiv.innerHTML += `<div class="success">✅ SUCCESS! Status: ${response.status}</div>`;
-                    resultDiv.innerHTML += `<div>Full response: ${JSON.stringify(JSON.parse(responseText), null, 2)}</div>`;
-                } else {
-                    resultDiv.innerHTML += `<div class="warning">Status: ${response.status} - ${getStatusText(response.status)}</div>`;
-                    if (responseText) {
-                        resultDiv.innerHTML += `<div>Error: ${responseText}</div>`;
-                    }
-                }
             } catch (error) {
-                resultDiv.innerHTML += `<div class="error">Request failed: ${error.message}</div>`;
+                resultsDiv.innerHTML += `<div class="error">Request failed: ${error.message}</div>`;
             }
-        }
-
-        function getStatusText(status) {
-            const statusMap = {
-                200: 'OK',
-                401: 'Unauthorized',
-                403: 'Forbidden', 
-                422: 'Unprocessable Entity',
-                500: 'Internal Server Error'
-            };
-            return statusMap[status] || 'Unknown';
         }
 
         function logout() {
@@ -332,7 +323,6 @@
                 currentSession = JSON.parse(savedSession);
                 document.getElementById('loginScreen').style.display = 'none';
                 document.getElementById('dashboard').style.display = 'block';
-                runComprehensiveAuthTests();
             }
         });
     </script>
