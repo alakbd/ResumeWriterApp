@@ -324,14 +324,14 @@
     </div>
 
     <script>
-        // Firebase Configuration - REPLACE WITH YOUR ACTUAL CONFIG
+        // Your actual Firebase configuration
         const firebaseConfig = {
-            apiKey: "your-api-key",
-            authDomain: "your-project.firebaseapp.com",
-            projectId: "your-project-id",
-            storageBucket: "your-project.appspot.com",
-            messagingSenderId: "123456789",
-            appId: "your-app-id"
+            apiKey: "AIzaSyDD44Ygnpb-Xl9sHZhVr9McmUTtuM0bW_Q",
+            authDomain: "resumewriter-2025.firebaseapp.com",
+            projectId: "resumewriter-2025",
+            storageBucket: "resumewriter-2025.firebasestorage.app",
+            messagingSenderId: "802908398477",
+            appId: "1:802908398477:web:0b7625c7826bd5a1a353c4"
         };
 
         // Initialize Firebase
@@ -373,7 +373,7 @@
                 
                 if (userDoc.exists) {
                     const userData = userDoc.data();
-                    // You might want to add an 'isAdmin' field to your users collection
+                    // Check if user is admin (you might need to add an isAdmin field)
                     if (user.email === 'alakbd2009@gmail.com' || userData.isAdmin === true) {
                         handleSuccessfulLogin(user);
                     } else {
@@ -457,6 +457,7 @@
                 document.getElementById('liveUserCount').textContent = stats.total;
             }, (error) => {
                 console.error('Users listener error:', error);
+                showMessage('Error connecting to Firestore: ' + error.message, 'error');
             });
 
             // Real-time listener for credit awards
@@ -482,6 +483,11 @@
         function updateRecentUsers() {
             const recentUsersDiv = document.getElementById('recentUsers');
             const recentUsers = users.slice(0, 10);
+            
+            if (recentUsers.length === 0) {
+                recentUsersDiv.innerHTML = '<p>No users found</p>';
+                return;
+            }
             
             let html = '<table>';
             html += '<tr><th>Email</th><th>Credits</th><th>CVs</th><th>Status</th></tr>';
@@ -672,10 +678,6 @@
                 container.style.display = 'none';
             }, 5000);
         }
-
-        // You'll need to add your actual Firebase config here
-        // Go to Firebase Console > Project Settings > General > Your apps
-        // Copy the config object and replace the firebaseConfig above
     </script>
 </body>
 </html>
