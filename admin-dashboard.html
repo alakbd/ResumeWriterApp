@@ -4,6 +4,11 @@
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>Resume Writer - Admin Dashboard</title>
+    
+    <!-- Add Firebase SDK -->
+    <script src="https://www.gstatic.com/firebasejs/8.10.0/firebase-app.js"></script>
+    <script src="https://www.gstatic.com/firebasejs/8.10.0/firebase-auth.js"></script>
+    
     <style>
         * { margin: 0; padding: 0; box-sizing: border-box; }
         body { font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif; background: #f5f5f5; }
@@ -75,6 +80,8 @@
         .btn-danger:hover { background: #c0392b; }
         .btn-warning { background: #f39c12; }
         .btn-warning:hover { background: #e67e22; }
+        .btn-success { background: #27ae60; }
+        .btn-success:hover { background: #219653; }
         
         .login-container { 
             background: white; 
@@ -84,15 +91,6 @@
             max-width: 400px; 
             margin: 100px auto; 
             text-align: center;
-        }
-        
-        .login-input { 
-            width: 100%; 
-            padding: 15px; 
-            margin: 10px 0; 
-            border: 1px solid #ddd; 
-            border-radius: 5px; 
-            font-size: 14px;
         }
         
         .loading { 
@@ -174,6 +172,14 @@
             align-items: center; 
             flex-direction: column; 
         }
+        
+        .user-info {
+            background: #f8f9fa;
+            padding: 10px 15px;
+            border-radius: 5px;
+            margin: 10px 0;
+            font-size: 14px;
+        }
     </style>
 </head>
 <body>
@@ -181,7 +187,7 @@
         <!-- Auto-login overlay -->
         <div id="autoLoginOverlay" class="auto-login-overlay">
             <h2>🔄 Auto-Connecting...</h2>
-            <p>Attempting automatic authentication...</p>
+            <p>Checking Firebase authentication...</p>
             <div id="autoLoginStatus" style="margin-top: 20px;"></div>
         </div>
 
@@ -189,18 +195,41 @@
         <div id="loginScreen" class="login-container" style="display: none;">
             <h2 style="margin-bottom: 10px;">🔐 Admin Dashboard</h2>
             <p style="color: #666; margin-bottom: 20px;">
-                Enter your Admin Secret Key to continue
+                Please sign in with your Google account
             </p>
             
             <div id="loginMessage" style="display: none;"></div>
             
-            <input type="password" id="adminKey" class="login-input" placeholder="Enter Admin Secret Key" autocomplete="off">
-            
-            <button class="btn" onclick="login()" style="width: 100%; margin-top: 10px;">Login</button>
+            <button class="btn btn-success" onclick="loginWithGoogle()" style="width: 100%; margin-top: 10px;">
+                Sign in with Google
+            </button>
             
             <div class="info-message" style="margin-top: 20px;">
                 <small>
-                    <strong>Note:</strong> Public access available for basic stats
+                    <strong>Note:</strong> Only users with admin role can access this dashboard
+                </small>
+            </div>
+        </div>
+
+        <!-- Not Admin Screen -->
+        <div id="notAdminScreen" class="login-container" style="display: none;">
+            <h2 style="margin-bottom: 10px;">⛔ Access Denied</h2>
+            <p style="color: #666; margin-bottom: 20px;">
+                Your account doesn't have admin privileges.
+            </p>
+            
+            <div class="user-info">
+                <strong>Logged in as:</strong><br>
+                <span id="userEmail">-</span>
+            </div>
+            
+            <button class="btn" onclick="logout()" style="width: 100%; margin-top: 10px;">
+                Sign Out
+            </button>
+            
+            <div class="info-message" style="margin-top: 20px;">
+                <small>
+                    Contact the system administrator to get admin access.
                 </small>
             </div>
         </div>
@@ -210,7 +239,10 @@
             <div class="header">
                 <h1>📊 Resume Writer - Admin Dashboard</h1>
                 <p>Real-time API Monitoring & Cost Tracking</p>
-                <small id="accessModeDisplay">Public Access Mode • Auto-refresh every 30s</small>
+                <div class="user-info" style="background: rgba(255,255,255,0.2); display: inline-block; margin-top: 10px;">
+                    <strong>Admin:</strong> <span id="adminEmail">-</span>
+                </div>
+                <small id="accessModeDisplay">Admin Access Mode • Auto-refresh every 30s</small>
             </div>
 
             <div class="container">
@@ -299,7 +331,7 @@
                         </div>
                         <div>
                             <strong>Access Mode:</strong><br>
-                            <span id="accessMode" style="color: #27ae60;">Public</span>
+                            <span id="accessMode" style="color: #27ae60;">Admin</span>
                         </div>
                         <div>
                             <strong>Auto-refresh:</strong><br>
@@ -315,71 +347,60 @@
     </div>
 
     <script>
-        // Configuration - UPDATE THIS WITH YOUR ACTUAL RENDER URL
-        const API_BASE_URL = 'https://resume-writer-api.onrender.com/'; // ⚠️ CHANGE THIS!
-        let adminKey = '';
-        let usePublicEndpoints = true;
+        // Configuration - UPDATE THIS WITH YOUR ACTUAL URLs
+        const API_BASE_URL = 'https://resume-writer-api.onrender.com'; // Your backend URL
+        const FIREBASE_CONFIG = {
+            apiKey: "your-firebase-api-key",
+            authDomain: "your-project.firebaseapp.com",
+            projectId: "your-project-id",
+            appId: "your-app-id"
+        }; // ⚠️ Replace with your actual Firebase config
+
+        let currentUser = null;
         let refreshInterval;
         let sessionTimerInterval;
         let sessionStartTime;
         let autoRefreshEnabled = true;
 
+        // Initialize Firebase
+        firebase.initializeApp(FIREBASE_CONFIG);
+
         document.addEventListener('DOMContentLoaded', function() {
-            // Show auto-login immediately
             document.getElementById('autoLoginOverlay').style.display = 'flex';
-            
-            // Try auto-login with public endpoints
             attemptAutoLogin();
         });
 
         async function attemptAutoLogin() {
-            updateAutoLoginStatus('Attempting public admin access...');
+            updateAutoLoginStatus('Checking authentication state...');
             
-            // First try public endpoints
-            if (await testPublicAccess()) {
-                usePublicEndpoints = true;
-                handleSuccessfulLogin();
-                return;
-            }
-            
-            // Then try any saved key for secure endpoints
-            updateAutoLoginStatus('Trying secure access with saved credentials...');
-            const savedKey = localStorage.getItem('adminKey');
-            if (savedKey && await testAdminKey(savedKey)) {
-                adminKey = savedKey;
-                usePublicEndpoints = false;
-                handleSuccessfulLogin();
-                return;
-            }
-            
-            // Fallback to manual login
-            updateAutoLoginStatus('Auto-login failed. Switching to manual login...');
-            setTimeout(() => {
-                showManualLogin();
-            }, 2000);
-        }
-
-        async function testPublicAccess() {
-            try {
-                const response = await fetch(`${API_BASE_URL}/public/admin/stats`);
-                if (response.ok) {
-                    const data = await response.json();
-                    return data.success === true;
+            firebase.auth().onAuthStateChanged(async (user) => {
+                if (user) {
+                    currentUser = user;
+                    updateAutoLoginStatus('User authenticated, checking admin privileges...');
+                    
+                    // Test if user has admin access
+                    if (await testAdminAccess(user.uid)) {
+                        handleSuccessfulLogin();
+                    } else {
+                        showNotAdminScreen();
+                    }
+                } else {
+                    updateAutoLoginStatus('No user logged in. Showing login screen...');
+                    setTimeout(() => {
+                        showLoginScreen();
+                    }, 1000);
                 }
-                return false;
-            } catch (error) {
-                console.log('Public access test failed:', error);
-                return false;
-            }
+            });
         }
 
-        async function testAdminKey(key) {
+        async function testAdminAccess(userId) {
             try {
                 const response = await fetch(`${API_BASE_URL}/admin/stats`, {
-                    headers: { 'X-Admin-Key': key }
+                    headers: { 'X-User-ID': userId }
                 });
                 return response.ok;
             } catch (error) {
+                console.log('Admin access test failed:', error);
                 return false;
             }
         }
@@ -391,67 +412,52 @@
             }
         }
 
-        function showManualLogin() {
+        function showLoginScreen() {
             document.getElementById('autoLoginOverlay').style.display = 'none';
             document.getElementById('loginScreen').style.display = 'block';
+            document.getElementById('notAdminScreen').style.display = 'none';
+            document.getElementById('dashboard').style.display = 'none';
+        }
+
+        function showNotAdminScreen() {
+            document.getElementById('autoLoginOverlay').style.display = 'none';
+            document.getElementById('loginScreen').style.display = 'none';
+            document.getElementById('notAdminScreen').style.display = 'block';
+            document.getElementById('dashboard').style.display = 'none';
             
-            // Pre-fill with any saved key
-            const savedKey = localStorage.getItem('adminKey');
-            if (savedKey) {
-                document.getElementById('adminKey').value = savedKey;
+            if (currentUser) {
+                document.getElementById('userEmail').textContent = currentUser.email;
             }
-            document.getElementById('adminKey').focus();
         }
 
         function handleSuccessfulLogin() {
             document.getElementById('autoLoginOverlay').style.display = 'none';
             document.getElementById('loginScreen').style.display = 'none';
+            document.getElementById('notAdminScreen').style.display = 'none';
             document.getElementById('dashboard').style.display = 'block';
             
             // Initialize dashboard
             sessionStartTime = new Date();
             document.getElementById('sessionStart').textContent = sessionStartTime.toLocaleString();
             document.getElementById('apiBaseUrl').textContent = API_BASE_URL;
+            document.getElementById('adminEmail').textContent = currentUser.email;
             
-            const accessMode = usePublicEndpoints ? 'Public' : 'Secure';
-            document.getElementById('accessMode').textContent = accessMode;
-            document.getElementById('accessModeDisplay').textContent = `${accessMode} Access Mode • Auto-refresh every 30s`;
-            
-            // Show/hide reset button based on access mode
-            document.getElementById('resetBtn').style.display = usePublicEndpoints ? 'none' : 'inline-block';
-            
-            showMessage(`${accessMode} authentication successful!`, 'success');
+            showMessage('Admin authentication successful!', 'success');
             refreshStats();
             startAutoRefresh();
             startSessionTimer();
         }
 
-        function login() {
-            const manualKey = document.getElementById('adminKey').value.trim();
-            if (!manualKey) {
-                showLoginMessage('Please enter your Admin Secret Key', 'error');
-                return;
-            }
-
-            document.getElementById('loginScreen').classList.add('loading');
-            
-            fetch(`${API_BASE_URL}/admin/stats`, {
-                headers: { 'X-Admin-Key': manualKey }
-            })
-            .then(response => {
-                if (response.ok) {
-                    adminKey = manualKey;
-                    usePublicEndpoints = false;
-                    localStorage.setItem('adminKey', manualKey);
-                    handleSuccessfulLogin();
-                } else {
-                    throw new Error('Invalid admin key');
-                }
-            })
-            .catch(error => {
+        async function loginWithGoogle() {
+            try {
+                document.getElementById('loginScreen').classList.add('loading');
+                const provider = new firebase.auth.GoogleAuthProvider();
+                await firebase.auth().signInWithPopup(provider);
+                // onAuthStateChanged will handle the rest
+            } catch (error) {
                 document.getElementById('loginScreen').classList.remove('loading');
                 showLoginMessage('Login failed: ' + error.message, 'error');
-            });
+            }
         }
 
         function showLoginMessage(message, type) {
@@ -476,8 +482,10 @@
         }
 
         function refreshStats() {
-            const baseUrl = usePublicEndpoints ? `${API_BASE_URL}/public` : API_BASE_URL;
-            const headers = usePublicEndpoints ? {} : { 'X-Admin-Key': adminKey };
+            if (!currentUser) {
+                showMessage('Please log in first', 'error');
+                return;
+            }
 
             // Show loading states
             document.querySelectorAll('.stat-value').forEach(el => {
@@ -492,8 +500,10 @@
             const serverStatus = document.getElementById('serverStatus');
             if (serverStatus) serverStatus.textContent = '⏳ Loading...';
 
-            // Get main stats
-            fetch(`${baseUrl}/admin/stats`, { headers })
+            // Get main stats with user ID header
+            fetch(`${API_BASE_URL}/admin/stats`, {
+                headers: { 'X-User-ID': currentUser.uid }
+            })
             .then(response => {
                 if (!response.ok) throw new Error(`HTTP ${response.status}`);
                 return response.json();
@@ -516,37 +526,31 @@
             });
 
             // Get cost history
-            fetch(`${baseUrl}/admin/cost-history?days=7`, { headers })
+            fetch(`${API_BASE_URL}/admin/cost-history?days=7`, {
+                headers: { 'X-User-ID': currentUser.uid }
+            })
             .then(response => response.json())
             .then(data => {
                 updateCostHistory(data);
             })
             .catch(error => {
                 console.error('Cost history error:', error);
-                document.getElementById('costHistory').innerHTML = '<p>Cost history not available in current mode</p>';
+                document.getElementById('costHistory').innerHTML = '<p>Error loading cost history</p>';
             });
 
-            // Get user stats - only for secure mode
-            if (!usePublicEndpoints) {
-                fetch(`${baseUrl}/admin/users`, { headers })
-                .then(response => response.json())
-                .then(data => {
-                    if (data.success) {
-                        updateUserStats(data);
-                    }
-                })
-                .catch(error => {
-                    console.error('User stats error:', error);
-                });
-            } else {
-                // For public mode, show limited user info
-                document.getElementById('userStats').innerHTML = `
-                    <div class="info-message">
-                        <p>User details available in secure mode only</p>
-                        <small>Login with admin key to view detailed user statistics</small>
-                    </div>
-                `;
-            }
+            // Get user stats
+            fetch(`${API_BASE_URL}/admin/users`, {
+                headers: { 'X-User-ID': currentUser.uid }
+            })
+            .then(response => response.json())
+            .then(data => {
+                if (data.success) {
+                    updateUserStats(data);
+                }
+            })
+            .catch(error => {
+                console.error('User stats error:', error);
+            });
 
             checkServerHealth();
         }
@@ -562,8 +566,7 @@
             const cacheRatio = totalCache > 0 ? (stats.cache_hits / totalCache * 100).toFixed(1) : 0;
             document.getElementById('cacheRatio').textContent = `Ratio: ${cacheRatio}%`;
             
-            const accessMode = usePublicEndpoints ? 'Public' : 'Secure';
-            document.getElementById('lastUpdate').textContent = `Last update: ${new Date().toLocaleTimeString()} (${accessMode} Mode)`;
+            document.getElementById('lastUpdate').textContent = `Last update: ${new Date().toLocaleTimeString()}`;
             
             // Color code based on cost
             const costElement = document.getElementById('dailyCost');
@@ -685,10 +688,10 @@
         }
 
         function resetStats() {
-            if (!usePublicEndpoints && confirm('Are you sure you want to reset daily statistics?')) {
+            if (confirm('Are you sure you want to reset daily statistics?')) {
                 fetch(`${API_BASE_URL}/admin/reset-stats`, {
                     method: 'POST',
-                    headers: { 'X-Admin-Key': adminKey }
+                    headers: { 'X-User-ID': currentUser.uid }
                 })
                 .then(response => response.json())
                 .then(data => {
@@ -706,13 +709,12 @@
         }
 
         function logout() {
-            adminKey = '';
-            usePublicEndpoints = true;
-            localStorage.removeItem('adminKey');
+            firebase.auth().signOut();
+            currentUser = null;
             document.getElementById('loginScreen').style.display = 'block';
             document.getElementById('dashboard').style.display = 'none';
+            document.getElementById('notAdminScreen').style.display = 'none';
             document.getElementById('loginScreen').classList.remove('loading');
-            document.getElementById('adminKey').value = '';
             stopAutoRefresh();
             stopSessionTimer();
         }
@@ -759,7 +761,7 @@
 
         // Auto-logout after 1 hour
         setTimeout(() => {
-            if (adminKey) {
+            if (currentUser) {
                 showMessage('Session expired. Please login again.', 'error');
                 logout();
             }
