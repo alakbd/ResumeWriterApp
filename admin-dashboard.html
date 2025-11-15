@@ -193,6 +193,18 @@
             margin: 10px 0;
             border-radius: 0 5px 5px 0;
         }
+
+        .verified-badge {
+            color: #27ae60;
+            font-size: 0.8em;
+            margin-left: 5px;
+        }
+
+        .unverified-badge {
+            color: #e74c3c;
+            font-size: 0.8em;
+            margin-left: 5px;
+        }
     </style>
 </head>
 <body>
@@ -296,6 +308,12 @@
                     </div>
                     
                     <div class="stat-card">
+                        <div class="stat-label">New Users Today</div>
+                        <div class="stat-value" id="newUsersToday">...</div>
+                        <div class="stat-label" id="newUsersVerified">Email Verified: ...</div>
+                    </div>
+                    
+                    <div class="stat-card">
                         <div class="stat-label">Server Status</div>
                         <div class="stat-value" id="serverStatus">⏳ Loading...</div>
                         <div class="stat-label" id="lastUpdate">Last update: Never</div>
@@ -344,6 +362,14 @@
                     <h3>👥 User Statistics</h3>
                     <div id="userStats">
                         Loading user data...
+                    </div>
+                </div>
+
+                <!-- Today's New Users -->
+                <div class="chart-container">
+                    <h3>🆕 Today's New Users</h3>
+                    <div id="todaysUsers">
+                        <p>Loading today's user registrations...</p>
                     </div>
                 </div>
 
@@ -589,6 +615,7 @@
                 if (data.success) {
                     updateUserStats(data);
                     analyzeCreditUsage(data);
+                    analyzeTodaysUsers(data);
                 }
             })
             .catch(error => {
@@ -609,6 +636,14 @@
             document.getElementById('totalTokens').textContent = stats.total_tokens.toLocaleString();
             document.getElementById('apiRequests').textContent = stats.api_requests.toLocaleString();
             document.getElementById('userCount').textContent = stats.user_count.toLocaleString();
+            
+            // Update new users today if available in stats
+            if (stats.new_users_today !== undefined) {
+                document.getElementById('newUsersToday').textContent = stats.new_users_today.toLocaleString();
+            }
+            if (stats.verified_users_today !== undefined) {
+                document.getElementById('newUsersVerified').textContent = `Email Verified: ${stats.verified_users_today}`;
+            }
             
             document.getElementById('lastUpdate').textContent = `Last update: ${new Date().toLocaleTimeString()}`;
             
@@ -733,6 +768,77 @@
             document.getElementById('creditDistribution').innerHTML = distributionHTML || 'No credit data available';
         }
 
+        function analyzeTodaysUsers(userData) {
+            if (!userData || !userData.users) return;
+
+            const today = new Date().toDateString();
+            let todaysUsers = [];
+            let verifiedCount = 0;
+            let totalNewToday = 0;
+
+            userData.users.forEach(user => {
+                // Check if user was created today
+                if (user.created_at) {
+                    const userDate = new Date(user.created_at).toDateString();
+                    if (userDate === today) {
+                        todaysUsers.push(user);
+                        totalNewToday++;
+                        
+                        // Check if email is verified
+                        if (user.email_verified) {
+                            verifiedCount++;
+                        }
+                    }
+                }
+            });
+
+            // Update the stat card
+            document.getElementById('newUsersToday').textContent = totalNewToday.toLocaleString();
+            document.getElementById('newUsersVerified').textContent = `Email Verified: ${verifiedCount}`;
+
+            // Display today's users in the dedicated section
+            const todaysUsersDiv = document.getElementById('todaysUsers');
+            if (todaysUsers.length > 0) {
+                let html = `
+                    <div style="margin-bottom: 15px;">
+                        <strong>New Registrations Today: ${totalNewToday}</strong><br>
+                        <span style="color: #666;">Email Verified: ${verifiedCount} • Unverified: ${totalNewToday - verifiedCount}</span>
+                    </div>
+                    <div class="user-list">
+                `;
+                
+                todaysUsers.forEach(user => {
+                    const userDisplay = user.email || user.user_id || 'unknown';
+                    const shortDisplay = userDisplay.length > 25 ? userDisplay.substring(0, 25) + '...' : userDisplay;
+                    const verifiedStatus = user.email_verified ? 
+                        '<span class="verified-badge">✓ Verified</span>' : 
+                        '<span class="unverified-badge">✗ Unverified</span>';
+                    
+                    html += `
+                        <div class="user-item">
+                            <div>
+                                <strong>${shortDisplay}</strong>
+                                ${verifiedStatus}
+                            </div>
+                            <div style="font-size: 0.9rem; color: #666;">
+                                Credits: ${user.available_credits || 0} available • ${user.used_credits || 0} used
+                                ${user.created_at ? `• Joined: ${new Date(user.created_at).toLocaleTimeString()}` : ''}
+                            </div>
+                        </div>
+                    `;
+                });
+                
+                html += `</div>`;
+                todaysUsersDiv.innerHTML = html;
+            } else {
+                todaysUsersDiv.innerHTML = `
+                    <div class="info-message">
+                        <p>No new user registrations today.</p>
+                    </div>
+                `;
+            }
+        }
+
         function updateCostHistory(history) {
             const historyDiv = document.getElementById('costHistory');
             
@@ -810,10 +916,16 @@
                     // Use email if available, otherwise fall back to user ID
                     const userDisplay = user.email || user.user_id || 'unknown';
                     const shortDisplay = userDisplay.length > 25 ? userDisplay.substring(0, 25) + '...' : userDisplay;
+                    const verifiedStatus = user.email_verified ? 
+                        '<span class="verified-badge">✓ Verified</span>' : 
+                        '<span class="unverified-badge">✗ Unverified</span>';
                     
                     html += `
                         <div class="user-item">
-                            <div><strong>${shortDisplay}</strong></div>
+                            <div>
+                                <strong>${shortDisplay}</strong>
+                                ${verifiedStatus}
+                            </div>
                             <div style="font-size: 0.9rem; color: #666;">
                                 Credits: ${user.available_credits || 0} available • ${user.used_credits || 0} used
                             </div>
