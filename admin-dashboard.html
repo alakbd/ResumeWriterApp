@@ -193,6 +193,8 @@
             font-family: monospace;
             font-size: 12px;
             margin: 10px 0;
+            max-height: 200px;
+            overflow-y: auto;
         }
     </style>
 </head>
@@ -351,7 +353,7 @@
 
     <script>
         // Configuration
-        const API_BASE_URL = 'https://resume-writer-api.onrender.com'; // Your backend URL
+        const API_BASE_URL = 'https://resume-writer-api.onrender.com';
 
         let currentSession = null;
         let refreshInterval;
@@ -369,7 +371,6 @@
         async function attemptAutoLogin() {
             updateAutoLoginStatus('Checking for saved admin session...');
             
-            // Check if we have a saved session
             const savedSession = localStorage.getItem('adminSession');
             updateDebugInfo('Saved session in localStorage:', savedSession);
             
@@ -379,8 +380,8 @@
                     currentSession = JSON.parse(savedSession);
                     updateDebugInfo('Parsed session:', currentSession);
                     
-                    // Test if session is still valid
-                    const isValid = await testAdminAccess(currentSession.uid);
+                    // Test if session is still valid by making a simple request
+                    const isValid = await testAdminAccess();
                     updateDebugInfo('Session validation result:', isValid);
                     
                     if (isValid) {
@@ -406,12 +407,16 @@
             }, 1000);
         }
 
-        async function testAdminAccess(uid) {
+        async function testAdminAccess() {
+            if (!currentSession || !currentSession.uid) {
+                return false;
+            }
+
             try {
-                updateDebugInfo('Testing admin access with UID:', uid);
+                updateDebugInfo('Testing admin access with UID:', currentSession.uid);
                 const response = await fetch(`${API_BASE_URL}/admin/stats`, {
                     headers: { 
-                        'X-User-ID': uid,
+                        'X-User-ID': currentSession.uid,
                         'Content-Type': 'application/json'
                     }
                 });
@@ -436,7 +441,8 @@
             const debugElement = document.getElementById('debugInfo');
             if (debugElement) {
                 debugElement.style.display = 'block';
-                debugElement.innerHTML += `<div><strong>${label}</strong> ${JSON.stringify(data)}</div>`;
+                const content = typeof data === 'object' ? JSON.stringify(data, null, 2) : String(data);
+                debugElement.innerHTML += `<div><strong>${label}</strong><br>${content}</div><hr>`;
             }
         }
 
@@ -479,7 +485,7 @@
                     showMessage('Session expired. Please login again.', 'error');
                     logout();
                 }
-            }, 60 * 60 * 1000); // 1 hour
+            }, 60 * 60 * 1000);
         }
 
         async function login(event) {
@@ -516,16 +522,30 @@
                 });
                 
                 console.log('Login response status:', response.status);
-                const data = await response.json();
-                console.log('Login response data:', data);
+                const responseText = await response.text();
+                console.log('Login response text:', responseText);
+                
+                let data;
+                try {
+                    data = JSON.parse(responseText);
+                } catch (e) {
+                    throw new Error(`Invalid JSON response: ${responseText}`);
+                }
                 
                 debugElement.innerHTML += `<div>Response status: ${response.status}</div>`;
-                debugElement.innerHTML += `<div>Response data: ${JSON.stringify(data)}</div>`;
+                debugElement.innerHTML += `<div>Response data: ${JSON.stringify(data, null, 2)}</div>`;
                 
                 if (response.ok && data.success) {
+                    // CRITICAL FIX: Make sure we're getting the UID from the correct field
+                    const uid = data.uid || data.user_id || data.userId || data.id;
+                    
+                    if (!uid) {
+                        throw new Error('No UID received from server. Response: ' + JSON.stringify(data));
+                    }
+                    
                     // Store session information with UID
                     currentSession = {
-                        uid: data.uid || data.user_id || "admin-uid",
+                        uid: uid,
                         username: data.username || username
                     };
                     
@@ -567,7 +587,7 @@
         // Helper function for authenticated requests
         function makeAuthenticatedRequest(url, options = {}) {
             if (!currentSession || !currentSession.uid) {
-                throw new Error('No active session');
+                throw new Error('No active session or UID missing');
             }
 
             const defaultHeaders = {
@@ -577,6 +597,18 @@
 
             console.log('Making authenticated request to:', url);
             console.log('With UID:', currentSession.uid);
+            console.log('Full session:', currentSession);
+
+            // Update dashboard debug info
+            const dashboardDebug = document.getElementById('dashboardDebug');
+            if (dashboardDebug) {
+                dashboardDebug.style.display = 'block';
+                dashboardDebug.innerHTML = `
+                    <div><strong>Current UID:</strong> ${currentSession.uid}</div>
+                    <div><strong>Request URL:</strong> ${url}</div>
+                    <div><strong>Headers:</strong> ${JSON.stringify(defaultHeaders)}</div>
+                `;
+            }
 
             return fetch(url, {
                 ...options,
@@ -588,7 +620,7 @@
         }
 
         function refreshStats() {
-            if (!currentSession) {
+            if (!currentSession || !currentSession.uid) {
                 showMessage('Please log in first', 'error');
                 return;
             }
@@ -612,6 +644,8 @@
             makeAuthenticatedRequest(`${API_BASE_URL}/admin/stats`)
             .then(response => {
                 console.log('Stats response status:', response.status);
+                console.log('Stats response headers:', Object.fromEntries(response.headers.entries()));
+                
                 if (response.status === 401) {
                     throw new Error('Authentication failed - please login again');
                 }
