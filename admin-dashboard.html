@@ -605,22 +605,29 @@
 
             // Get user stats for credit analysis
             fetch(`${API_BASE_URL}/admin/users`, {
-                headers: {
-                    'X-User-ID': currentSession.uid,
-                    'Content-Type': 'application/json'
-                }
-            })
-            .then(response => response.json())
-            .then(data => {
-                if (data.success) {
-                    updateUserStats(data);
-                    analyzeCreditUsage(data);
-                    analyzeTodaysUsers(data);
-                }
-            })
-            .catch(error => {
-                console.error('User stats error:', error);
-            });
+    headers: {
+        'X-User-ID': currentSession.uid,
+        'Content-Type': 'application/json'
+    }
+})
+.then(response => response.json())
+.then(data => {
+    console.log('🔍 DEBUG - Full API response:', data);
+    if (data.users && data.users.length > 0) {
+        console.log('🔍 DEBUG - First user object:', data.users[0]);
+        console.log('🔍 DEBUG - All fields in first user:', Object.keys(data.users[0]));
+        console.log('🔍 DEBUG - Email field value:', data.users[0].email);
+        console.log('🔍 DEBUG - UID field value:', data.users[0].uid);
+    }
+    if (data.success) {
+        updateUserStats(data);
+        analyzeCreditUsage(data);
+        analyzeTodaysUsers(data);
+    }
+})
+.catch(error => {
+    console.error('User stats error:', error);
+});
 
             // Get purchase history if available
             fetchPurchaseHistory();
