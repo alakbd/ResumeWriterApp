@@ -777,15 +777,15 @@
     let totalNewToday = 0;
 
     userData.users.forEach(user => {
-        // Check if user was created today
-        if (user.created_at) {
-            const userDate = new Date(user.created_at).toDateString();
+        // Check if user was created today - use createdAt field
+        if (user.createdAt) {
+            const userDate = new Date(user.createdAt).toDateString();
             if (userDate === today) {
                 todaysUsers.push(user);
                 totalNewToday++;
                 
                 // Check if email is verified
-                if (user.email_verified) {
+                if (user.emailVerified) {
                     verifiedCount++;
                 }
             }
@@ -808,33 +808,29 @@
         `;
         
         todaysUsers.forEach(user => {
-            // Try to get email, if not available, use user_id
             const userEmail = user.email || 'No email';
-            const userId = user.user_id || 'unknown';
+            const userId = user.uid || user.user_id || 'unknown';
+            const availableCredits = user.availableCredits || user.available_credits || 0;
+            const usedCredits = user.used_credits || 0;
+            const emailVerified = user.emailVerified || user.email_verified || false;
             
-            // Create display - show email primarily, with UID as secondary
-            let userDisplay = userEmail;
-            if (userEmail === 'No email') {
-                userDisplay = userId;
-            }
-            
-            const shortDisplay = userDisplay.length > 25 ? userDisplay.substring(0, 25) + '...' : userDisplay;
-            const verifiedStatus = user.email_verified ? 
+            const shortEmail = userEmail.length > 25 ? userEmail.substring(0, 25) + '...' : userEmail;
+            const verifiedStatus = emailVerified ? 
                 '<span class="verified-badge">✓ Verified</span>' : 
                 '<span class="unverified-badge">✗ Unverified</span>';
             
             html += `
                 <div class="user-item">
                     <div>
-                        <strong>${shortDisplay}</strong>
-                        ${user.email_verified !== undefined ? verifiedStatus : ''}
+                        <strong>${shortEmail}</strong>
+                        ${verifiedStatus}
                     </div>
                     <div style="font-size: 0.8rem; color: #999; font-family: monospace;">
-                        UID: ${userId.substring(0, 8)}...
+                        UID: ${userId.substring(0, 12)}...
                     </div>
                     <div style="font-size: 0.9rem; color: #666;">
-                        Credits: ${user.available_credits || 0} available • ${user.used_credits || 0} used
-                        ${user.created_at ? `• Joined: ${new Date(user.created_at).toLocaleTimeString()}` : ''}
+                        Credits: ${availableCredits} available • ${usedCredits} used
+                        ${user.createdAt ? `• Joined: ${new Date(user.createdAt).toLocaleTimeString()}` : ''}
                     </div>
                 </div>
             `;
@@ -849,6 +845,62 @@
             </div>
         `;
     }
+}
+
+function analyzeCreditUsage(userData) {
+    if (!userData || !userData.users) return;
+
+    let purchasedUsed = 0;
+    let freeUsed = 0;
+    let purchasedAvailable = 0;
+    let freeAvailable = 0;
+
+    userData.users.forEach(user => {
+        // Use correct field names
+        const totalUsed = user.used_credits || 0;
+        const totalAvailable = user.availableCredits || user.available_credits || 0;
+        const totalEarned = user.totalCreditsEarned || user.total_credits || 0;
+
+        // Simple heuristic: if user has more than 10 credits, assume some are purchased
+        if (totalEarned > 10) {
+            purchasedUsed += Math.min(totalUsed, totalEarned - 10);
+            freeUsed += Math.max(0, totalUsed - (totalEarned - 10));
+            purchasedAvailable += Math.max(0, totalAvailable - 10);
+            freeAvailable += Math.min(totalAvailable, 10);
+        } else {
+            freeUsed += totalUsed;
+            freeAvailable += totalAvailable;
+        }
+    });
+
+    // Update the display
+    document.getElementById('purchasedUsed').textContent = purchasedUsed.toLocaleString();
+    document.getElementById('freeUsed').textContent = freeUsed.toLocaleString();
+    document.getElementById('purchasedAvailable').textContent = purchasedAvailable.toLocaleString();
+    document.getElementById('freeAvailable').textContent = freeAvailable.toLocaleString();
+
+    // Update credit distribution
+    const totalUsed = purchasedUsed + freeUsed;
+    const totalAvailable = purchasedAvailable + freeAvailable;
+    
+    let distributionHTML = '';
+    if (totalUsed > 0) {
+        const purchasedPercent = ((purchasedUsed / totalUsed) * 100).toFixed(1);
+        const freePercent = ((freeUsed / totalUsed) * 100).toFixed(1);
+        distributionHTML += `<div>Used Credits: ${totalUsed.toLocaleString()} total</div>`;
+        distributionHTML += `<div>→ Purchased: ${purchasedUsed.toLocaleString()} (${purchasedPercent}%)</div>`;
+        distributionHTML += `<div>→ Free/Awarded: ${freeUsed.toLocaleString()} (${freePercent}%)</div>`;
+    }
+    
+    if (totalAvailable > 0) {
+        const purchasedAvailPercent = ((purchasedAvailable / totalAvailable) * 100).toFixed(1);
+        const freeAvailPercent = ((freeAvailable / totalAvailable) * 100).toFixed(1);
+        distributionHTML += `<div>Available Credits: ${totalAvailable.toLocaleString()} total</div>`;
+        distributionHTML += `<div>→ Purchased: ${purchasedAvailable.toLocaleString()} (${purchasedAvailPercent}%)</div>`;
+        distributionHTML += `<div>→ Free/Awarded: ${freeAvailable.toLocaleString()} (${freeAvailPercent}%)</div>`;
+    }
+
+    document.getElementById('creditDistribution').innerHTML = distributionHTML || 'No credit data available';
 }
 
         function updateCostHistory(history) {
@@ -925,54 +977,36 @@
         `;
         
         userData.users.slice(0, 10).forEach(user => {
-            // Try multiple possible email fields
-            const userEmail = user.email || user.user_email || user.email_address || 'No email';
-            const userId = user.user_id || user.uid || user.id || 'unknown';
-            const userName = user.name || user.display_name || user.username || '';
+            // Use the correct field names from your Firestore
+            const userEmail = user.email || 'No email';
+            const userId = user.uid || user.user_id || 'unknown';
+            const availableCredits = user.availableCredits || user.available_credits || 0;
+            const usedCredits = user.used_credits || 0;
+            const emailVerified = user.emailVerified || user.email_verified || false;
             
-            // Create the best possible display name
-            let userDisplay = userEmail;
-            if (userEmail === 'No email' && userName) {
-                userDisplay = userName;
-            } else if (userEmail === 'No email' && !userName) {
-                userDisplay = userId;
-            }
-            
-            const shortDisplay = userDisplay.length > 25 ? userDisplay.substring(0, 25) + '...' : userDisplay;
-            const verifiedStatus = user.email_verified ? 
+            const shortEmail = userEmail.length > 25 ? userEmail.substring(0, 25) + '...' : userEmail;
+            const verifiedStatus = emailVerified ? 
                 '<span class="verified-badge">✓ Verified</span>' : 
-                (user.email_verified === false ? '<span class="unverified-badge">✗ Unverified</span>' : '');
+                '<span class="unverified-badge">✗ Unverified</span>';
             
             html += `
                 <div class="user-item">
                     <div>
-                        <strong>${shortDisplay}</strong>
+                        <strong>${shortEmail}</strong>
                         ${verifiedStatus}
                     </div>
-                    ${userName && userEmail !== 'No email' ? `<div style="font-size: 0.8rem; color: #666;">Name: ${userName}</div>` : ''}
                     <div style="font-size: 0.8rem; color: #999; font-family: monospace;">
-                        UID: ${userId.substring(0, 8)}...
+                        UID: ${userId.substring(0, 12)}...
                     </div>
                     <div style="font-size: 0.9rem; color: #666;">
-                        Credits: ${user.available_credits || 0} available • ${user.used_credits || 0} used
+                        Credits: ${availableCredits} available • ${usedCredits} used
                     </div>
+                    ${user.lastActive ? `<div style="font-size: 0.8rem; color: #666;">Last Active: ${new Date(user.lastActive).toLocaleDateString()}</div>` : ''}
                 </div>
             `;
         });
         
         html += `</div></div>`;
-        
-        // Add debug info
-        if (userData.users[0]) {
-            const sampleUser = userData.users[0];
-            html += `
-                <div class="info-message" style="margin-top: 15px;">
-                    <small>
-                        <strong>Debug Info:</strong> User objects contain: ${Object.keys(sampleUser).join(', ')}
-                    </small>
-                </div>
-            `;
-        }
     } else {
         html += '<p>No users found</p>';
     }
