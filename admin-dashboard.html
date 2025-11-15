@@ -4,11 +4,6 @@
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>Resume Writer - Admin Dashboard</title>
-    
-    <!-- Add Firebase SDK -->
-    <script src="https://www.gstatic.com/firebasejs/8.10.0/firebase-app.js"></script>
-    <script src="https://www.gstatic.com/firebasejs/8.10.0/firebase-auth.js"></script>
-    
     <style>
         * { margin: 0; padding: 0; box-sizing: border-box; }
         body { font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif; background: #f5f5f5; }
@@ -91,6 +86,15 @@
             max-width: 400px; 
             margin: 100px auto; 
             text-align: center;
+        }
+        
+        .login-input { 
+            width: 100%; 
+            padding: 12px; 
+            margin: 8px 0; 
+            border: 1px solid #ddd; 
+            border-radius: 5px; 
+            font-size: 14px;
         }
         
         .loading { 
@@ -187,7 +191,7 @@
         <!-- Auto-login overlay -->
         <div id="autoLoginOverlay" class="auto-login-overlay">
             <h2>🔄 Auto-Connecting...</h2>
-            <p>Checking Firebase authentication...</p>
+            <p>Checking for saved admin session...</p>
             <div id="autoLoginStatus" style="margin-top: 20px;"></div>
         </div>
 
@@ -195,41 +199,23 @@
         <div id="loginScreen" class="login-container" style="display: none;">
             <h2 style="margin-bottom: 10px;">🔐 Admin Dashboard</h2>
             <p style="color: #666; margin-bottom: 20px;">
-                Please sign in with your Google account
+                Enter your admin credentials
             </p>
             
             <div id="loginMessage" style="display: none;"></div>
             
-            <button class="btn btn-success" onclick="loginWithGoogle()" style="width: 100%; margin-top: 10px;">
-                Sign in with Google
-            </button>
+            <form id="loginForm" onsubmit="login(event)">
+                <input type="text" id="username" class="login-input" placeholder="Admin Username" required>
+                <input type="password" id="password" class="login-input" placeholder="Admin Password" required>
+                
+                <button type="submit" class="btn btn-success" style="width: 100%; margin-top: 10px;">
+                    Sign In
+                </button>
+            </form>
             
             <div class="info-message" style="margin-top: 20px;">
                 <small>
-                    <strong>Note:</strong> Only users with admin role can access this dashboard
-                </small>
-            </div>
-        </div>
-
-        <!-- Not Admin Screen -->
-        <div id="notAdminScreen" class="login-container" style="display: none;">
-            <h2 style="margin-bottom: 10px;">⛔ Access Denied</h2>
-            <p style="color: #666; margin-bottom: 20px;">
-                Your account doesn't have admin privileges.
-            </p>
-            
-            <div class="user-info">
-                <strong>Logged in as:</strong><br>
-                <span id="userEmail">-</span>
-            </div>
-            
-            <button class="btn" onclick="logout()" style="width: 100%; margin-top: 10px;">
-                Sign Out
-            </button>
-            
-            <div class="info-message" style="margin-top: 20px;">
-                <small>
-                    Contact the system administrator to get admin access.
+                    Use your app admin username and password
                 </small>
             </div>
         </div>
@@ -240,7 +226,7 @@
                 <h1>📊 Resume Writer - Admin Dashboard</h1>
                 <p>Real-time API Monitoring & Cost Tracking</p>
                 <div class="user-info" style="background: rgba(255,255,255,0.2); display: inline-block; margin-top: 10px;">
-                    <strong>Admin:</strong> <span id="adminEmail">-</span>
+                    <strong>Admin:</strong> <span id="adminUsername">-</span>
                 </div>
                 <small id="accessModeDisplay">Admin Access Mode • Auto-refresh every 30s</small>
             </div>
@@ -347,23 +333,14 @@
     </div>
 
     <script>
-        // Configuration - UPDATE THIS WITH YOUR ACTUAL URLs
+        // Configuration
         const API_BASE_URL = 'https://resume-writer-api.onrender.com'; // Your backend URL
-        const FIREBASE_CONFIG = {
-            apiKey: "your-firebase-api-key",
-            authDomain: "your-project.firebaseapp.com",
-            projectId: "your-project-id",
-            appId: "your-app-id"
-        }; // ⚠️ Replace with your actual Firebase config
 
-        let currentUser = null;
+        let currentSession = null;
         let refreshInterval;
         let sessionTimerInterval;
         let sessionStartTime;
         let autoRefreshEnabled = true;
-
-        // Initialize Firebase
-        firebase.initializeApp(FIREBASE_CONFIG);
 
         document.addEventListener('DOMContentLoaded', function() {
             document.getElementById('autoLoginOverlay').style.display = 'flex';
@@ -371,26 +348,29 @@
         });
 
         async function attemptAutoLogin() {
-            updateAutoLoginStatus('Checking authentication state...');
+            updateAutoLoginStatus('Checking for saved admin session...');
             
-            firebase.auth().onAuthStateChanged(async (user) => {
-                if (user) {
-                    currentUser = user;
-                    updateAutoLoginStatus('User authenticated, checking admin privileges...');
-                    
-                    // Test if user has admin access
-                    if (await testAdminAccess(user.uid)) {
-                        handleSuccessfulLogin();
-                    } else {
-                        showNotAdminScreen();
-                    }
+            // Check if we have a saved session
+            const savedSession = localStorage.getItem('adminSession');
+            if (savedSession) {
+                updateAutoLoginStatus('Found saved session, validating...');
+                currentSession = JSON.parse(savedSession);
+                
+                // Test if session is still valid
+                if (await testAdminAccess(currentSession.userId)) {
+                    handleSuccessfulLogin();
+                    return;
                 } else {
-                    updateAutoLoginStatus('No user logged in. Showing login screen...');
-                    setTimeout(() => {
-                        showLoginScreen();
-                    }, 1000);
+                    updateAutoLoginStatus('Saved session expired...');
+                    localStorage.removeItem('adminSession');
+                    currentSession = null;
                 }
-            });
+            }
+            
+            updateAutoLoginStatus('No valid session found. Showing login...');
+            setTimeout(() => {
+                showLoginScreen();
+            }, 1000);
         }
 
         async function testAdminAccess(userId) {
@@ -415,32 +395,19 @@
         function showLoginScreen() {
             document.getElementById('autoLoginOverlay').style.display = 'none';
             document.getElementById('loginScreen').style.display = 'block';
-            document.getElementById('notAdminScreen').style.display = 'none';
             document.getElementById('dashboard').style.display = 'none';
-        }
-
-        function showNotAdminScreen() {
-            document.getElementById('autoLoginOverlay').style.display = 'none';
-            document.getElementById('loginScreen').style.display = 'none';
-            document.getElementById('notAdminScreen').style.display = 'block';
-            document.getElementById('dashboard').style.display = 'none';
-            
-            if (currentUser) {
-                document.getElementById('userEmail').textContent = currentUser.email;
-            }
         }
 
         function handleSuccessfulLogin() {
             document.getElementById('autoLoginOverlay').style.display = 'none';
             document.getElementById('loginScreen').style.display = 'none';
-            document.getElementById('notAdminScreen').style.display = 'none';
             document.getElementById('dashboard').style.display = 'block';
             
             // Initialize dashboard
             sessionStartTime = new Date();
             document.getElementById('sessionStart').textContent = sessionStartTime.toLocaleString();
             document.getElementById('apiBaseUrl').textContent = API_BASE_URL;
-            document.getElementById('adminEmail').textContent = currentUser.email;
+            document.getElementById('adminUsername').textContent = currentSession.username;
             
             showMessage('Admin authentication successful!', 'success');
             refreshStats();
@@ -448,12 +415,53 @@
             startSessionTimer();
         }
 
-        async function loginWithGoogle() {
+        async function login(event) {
+            event.preventDefault();
+            
+            const username = document.getElementById('username').value.trim();
+            const password = document.getElementById('password').value.trim();
+            
+            if (!username || !password) {
+                showLoginMessage('Please enter both username and password', 'error');
+                return;
+            }
+
+            document.getElementById('loginScreen').classList.add('loading');
+            
             try {
-                document.getElementById('loginScreen').classList.add('loading');
-                const provider = new firebase.auth.GoogleAuthProvider();
-                await firebase.auth().signInWithPopup(provider);
-                // onAuthStateChanged will handle the rest
+                // First, we need to get the Firebase UID for this admin user
+                // This assumes you have a way to map admin credentials to Firebase users
+                const userResponse = await fetch(`${API_BASE_URL}/admin/login`, {
+                    method: 'POST',
+                    headers: {
+                        'Content-Type': 'application/json',
+                    },
+                    body: JSON.stringify({
+                        username: username,
+                        password: password
+                    })
+                });
+                
+                if (userResponse.ok) {
+                    const userData = await userResponse.json();
+                    
+                    if (userData.success && userData.user_id) {
+                        // Store session information
+                        currentSession = {
+                            userId: userData.user_id,
+                            username: username,
+                            sessionToken: userData.session_token
+                        };
+                        
+                        localStorage.setItem('adminSession', JSON.stringify(currentSession));
+                        handleSuccessfulLogin();
+                    } else {
+                        throw new Error(userData.detail || 'Login failed');
+                    }
+                } else {
+                    const errorData = await userResponse.json();
+                    throw new Error(errorData.detail || 'Login failed');
+                }
             } catch (error) {
                 document.getElementById('loginScreen').classList.remove('loading');
                 showLoginMessage('Login failed: ' + error.message, 'error');
@@ -482,7 +490,7 @@
         }
 
         function refreshStats() {
-            if (!currentUser) {
+            if (!currentSession) {
                 showMessage('Please log in first', 'error');
                 return;
             }
@@ -502,7 +510,7 @@
 
             // Get main stats with user ID header
             fetch(`${API_BASE_URL}/admin/stats`, {
-                headers: { 'X-User-ID': currentUser.uid }
+                headers: { 'X-User-ID': currentSession.userId }
             })
             .then(response => {
                 if (!response.ok) throw new Error(`HTTP ${response.status}`);
@@ -527,7 +535,7 @@
 
             // Get cost history
             fetch(`${API_BASE_URL}/admin/cost-history?days=7`, {
-                headers: { 'X-User-ID': currentUser.uid }
+                headers: { 'X-User-ID': currentSession.userId }
             })
             .then(response => response.json())
             .then(data => {
@@ -540,7 +548,7 @@
 
             // Get user stats
             fetch(`${API_BASE_URL}/admin/users`, {
-                headers: { 'X-User-ID': currentUser.uid }
+                headers: { 'X-User-ID': currentSession.userId }
             })
             .then(response => response.json())
             .then(data => {
@@ -691,7 +699,7 @@
             if (confirm('Are you sure you want to reset daily statistics?')) {
                 fetch(`${API_BASE_URL}/admin/reset-stats`, {
                     method: 'POST',
-                    headers: { 'X-User-ID': currentUser.uid }
+                    headers: { 'X-User-ID': currentSession.userId }
                 })
                 .then(response => response.json())
                 .then(data => {
@@ -709,12 +717,13 @@
         }
 
         function logout() {
-            firebase.auth().signOut();
-            currentUser = null;
+            currentSession = null;
+            localStorage.removeItem('adminSession');
             document.getElementById('loginScreen').style.display = 'block';
             document.getElementById('dashboard').style.display = 'none';
-            document.getElementById('notAdminScreen').style.display = 'none';
             document.getElementById('loginScreen').classList.remove('loading');
+            document.getElementById('username').value = '';
+            document.getElementById('password').value = '';
             stopAutoRefresh();
             stopSessionTimer();
         }
@@ -761,7 +770,7 @@
 
         // Auto-logout after 1 hour
         setTimeout(() => {
-            if (currentUser) {
+            if (currentSession) {
                 showMessage('Session expired. Please login again.', 'error');
                 logout();
             }
