@@ -3,7 +3,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Resume Writer - Secure Admin Dashboard</title>
+    <title>Resume Writer - Admin Dashboard</title>
     <style>
         * { margin: 0; padding: 0; box-sizing: border-box; }
         body { font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif; background: #f5f5f5; }
@@ -43,6 +43,41 @@
             margin: 10px 0; 
         }
         
+        .stat-label { 
+            color: #666; 
+            font-size: 0.9rem; 
+        }
+        
+        .cost-warning { color: #e74c3c; }
+        .cost-good { color: #27ae60; }
+        
+        .chart-container { 
+            background: white; 
+            padding: 20px; 
+            border-radius: 10px; 
+            box-shadow: 0 2px 10px rgba(0,0,0,0.1); 
+            margin-bottom: 20px; 
+        }
+        
+        .btn { 
+            background: #667eea; 
+            color: white; 
+            border: none; 
+            padding: 10px 20px; 
+            border-radius: 5px; 
+            cursor: pointer; 
+            margin: 5px; 
+            font-size: 14px;
+        }
+        
+        .btn:hover { background: #5a6fd8; }
+        .btn-danger { background: #e74c3c; }
+        .btn-danger:hover { background: #c0392b; }
+        .btn-warning { background: #f39c12; }
+        .btn-warning:hover { background: #e67e22; }
+        .btn-success { background: #27ae60; }
+        .btn-success:hover { background: #219653; }
+        
         .login-container { 
             background: white; 
             padding: 40px; 
@@ -62,17 +97,10 @@
             font-size: 14px;
         }
         
-        .btn { 
-            background: #667eea; 
-            color: white; 
-            border: none; 
-            padding: 10px 20px; 
-            border-radius: 5px; 
-            cursor: pointer; 
-            margin: 5px; 
+        .loading { 
+            opacity: 0.6; 
+            pointer-events: none; 
         }
-        
-        .btn-success { background: #27ae60; }
         
         .error-message { 
             background: #fee; 
@@ -92,66 +120,234 @@
             margin: 10px 0; 
         }
         
-        .debug-info {
+        .info-message { 
+            background: #e8f4fd; 
+            border: 1px solid #b6d7f7; 
+            color: #1a5a9a; 
+            padding: 10px; 
+            border-radius: 5px; 
+            margin: 10px 0; 
+        }
+        
+        table { 
+            width: 100%; 
+            border-collapse: collapse; 
+            margin: 10px 0; 
+        }
+        
+        th, td { 
+            padding: 12px; 
+            text-align: left; 
+            border-bottom: 1px solid #eee; 
+        }
+        
+        th { 
+            background: #f8f9fa; 
+            font-weight: 600; 
+        }
+        
+        .user-list { 
+            max-height: 300px; 
+            overflow-y: auto; 
+            border: 1px solid #ddd; 
+            border-radius: 5px; 
+        }
+        
+        .user-item { 
+            padding: 12px; 
+            border-bottom: 1px solid #eee; 
+            font-family: monospace; 
+        }
+        
+        .status-online { color: #27ae60; }
+        .status-offline { color: #e74c3c; }
+        .status-degraded { color: #f39c12; }
+        
+        .auto-login-overlay { 
+            position: fixed; 
+            top: 0; 
+            left: 0; 
+            width: 100%; 
+            height: 100%; 
+            background: white; 
+            z-index: 1000; 
+            display: flex; 
+            justify-content: center; 
+            align-items: center; 
+            flex-direction: column; 
+        }
+        
+        .user-info {
+            background: #f8f9fa;
+            padding: 10px 15px;
+            border-radius: 5px;
+            margin: 10px 0;
+            font-size: 14px;
+        }
+        
+        .debug-panel {
             background: #f8f9fa;
             border: 1px solid #ddd;
-            padding: 10px;
+            padding: 15px;
             border-radius: 5px;
+            margin: 10px 0;
             font-family: monospace;
             font-size: 12px;
-            margin: 10px 0;
         }
     </style>
 </head>
 <body>
     <div id="app">
+        <!-- Auto-login overlay -->
+        <div id="autoLoginOverlay" class="auto-login-overlay">
+            <h2>🔄 Loading Admin Dashboard...</h2>
+            <p>Initializing secure connection...</p>
+            <div id="autoLoginStatus" style="margin-top: 20px;"></div>
+        </div>
+
         <!-- Login Screen -->
-        <div id="loginScreen" class="login-container">
-            <h2 style="margin-bottom: 10px;">🔐 Secure Admin Dashboard</h2>
-            <p style="color: #666; margin-bottom: 20px;">Backend Authentication Required</p>
+        <div id="loginScreen" class="login-container" style="display: none;">
+            <h2 style="margin-bottom: 10px;">🔐 Admin Dashboard</h2>
+            <p style="color: #666; margin-bottom: 20px;">
+                Enter your admin credentials
+            </p>
             
             <div id="loginMessage" style="display: none;"></div>
             
             <form id="loginForm" onsubmit="login(event)">
-                <input type="text" id="username" class="login-input" placeholder="Admin Username" required value="alakbd2009@gmail.com">
+                <input type="text" id="username" class="login-input" placeholder="Admin Username" required>
                 <input type="password" id="password" class="login-input" placeholder="Admin Password" required>
                 
                 <button type="submit" class="btn btn-success" style="width: 100%; margin-top: 10px;">
-                    Sign In Securely
+                    Sign In
                 </button>
             </form>
             
-            <div class="debug-info" style="margin-top: 20px;">
-                <p><strong>Security Note:</strong> Firebase config is kept server-side</p>
-                <p>All API calls go through your FastAPI backend</p>
+            <div class="info-message" style="margin-top: 20px;">
+                <small>
+                    Use your backend admin username and password
+                </small>
+            </div>
+            
+            <!-- Debug Info -->
+            <div class="debug-panel" style="margin-top: 20px; display: none;" id="loginDebug">
+                <strong>Debug Info:</strong>
+                <div id="debugContent"></div>
             </div>
         </div>
 
         <!-- Dashboard -->
         <div id="dashboard" style="display: none;">
             <div class="header">
-                <h1>📊 Secure Admin Dashboard</h1>
-                <p>Backend-Protected API Access</p>
-                <div style="background: rgba(255,255,255,0.2); display: inline-block; margin-top: 10px; padding: 10px; border-radius: 5px;">
+                <h1>📊 Resume Writer - Admin Dashboard</h1>
+                <p>Real-time API Monitoring & Cost Tracking</p>
+                <div class="user-info" style="background: rgba(255,255,255,0.2); display: inline-block; margin-top: 10px;">
                     <strong>Admin:</strong> <span id="adminUsername">-</span>
                 </div>
+                <small id="accessModeDisplay">Backend Admin Access • Auto-refresh every 30s</small>
             </div>
 
             <div class="container">
-                <div style="display: flex; gap: 10px; margin-bottom: 20px;">
-                    <button class="btn" onclick="testBackendConnection()">🔌 Test Backend</button>
-                    <button class="btn" onclick="logout()">🚪 Logout</button>
+                <!-- Control Bar -->
+                <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 20px; flex-wrap: wrap; gap: 10px;">
+                    <div>
+                        <button class="btn" onclick="refreshStats()" id="refreshBtn">🔄 Refresh</button>
+                        <button class="btn btn-warning" onclick="resetStats()" id="resetBtn">📊 Reset Daily Stats</button>
+                        <button class="btn btn-danger" onclick="logout()">🚪 Logout</button>
+                    </div>
+                    <div style="color: #666; font-size: 14px;">
+                        Auto-refresh: <span id="autoRefreshStatus">On (30s)</span> • 
+                        Session: <span id="sessionTimer">0:00</span>
+                    </div>
                 </div>
 
+                <!-- Messages -->
                 <div id="messageContainer" style="display: none;"></div>
-                <div id="dashboardDebug" class="debug-info"></div>
 
-                <!-- Stats will go here -->
+                <!-- Debug Panel -->
+                <div class="debug-panel" id="debugPanel" style="display: none;">
+                    <strong>API Debug Information:</strong>
+                    <div id="debugInfo"></div>
+                </div>
+
+                <!-- Live Stats -->
                 <div class="stats-grid">
                     <div class="stat-card">
-                        <div>Backend Status</div>
-                        <div class="stat-value" id="backendStatus">❓</div>
-                        <div>API Connection</div>
+                        <div class="stat-label">Daily Cost</div>
+                        <div class="stat-value cost-good" id="dailyCost">...</div>
+                        <div class="stat-label">OpenAI API Usage</div>
+                    </div>
+                    
+                    <div class="stat-card">
+                        <div class="stat-label">Total Tokens</div>
+                        <div class="stat-value" id="totalTokens">...</div>
+                        <div class="stat-label">Today</div>
+                    </div>
+                    
+                    <div class="stat-card">
+                        <div class="stat-label">API Requests</div>
+                        <div class="stat-value" id="apiRequests">...</div>
+                        <div class="stat-label">Today</div>
+                    </div>
+                    
+                    <div class="stat-card">
+                        <div class="stat-label">Cache Performance</div>
+                        <div class="stat-value" id="cacheHits">...</div>
+                        <div class="stat-label" id="cacheRatio">Ratio: ...</div>
+                    </div>
+                    
+                    <div class="stat-card">
+                        <div class="stat-label">Total Users</div>
+                        <div class="stat-value" id="userCount">...</div>
+                        <div class="stat-label">Registered</div>
+                    </div>
+                    
+                    <div class="stat-card">
+                        <div class="stat-label">Server Status</div>
+                        <div class="stat-value" id="serverStatus">⏳ Loading...</div>
+                        <div class="stat-label" id="lastUpdate">Last update: Never</div>
+                    </div>
+                </div>
+
+                <!-- Cost History -->
+                <div class="chart-container">
+                    <h3>📈 Cost History (Last 7 Days)</h3>
+                    <div id="costHistory">
+                        <p>Loading cost history...</p>
+                    </div>
+                </div>
+
+                <!-- User Statistics -->
+                <div class="chart-container">
+                    <h3>👥 User Statistics</h3>
+                    <div id="userStats">
+                        Loading user data...
+                    </div>
+                </div>
+
+                <!-- System Info -->
+                <div class="chart-container">
+                    <h3>⚙️ System Information</h3>
+                    <div style="display: grid; grid-template-columns: repeat(auto-fit, minmax(200px, 1fr)); gap: 15px;">
+                        <div>
+                            <strong>API Base URL:</strong><br>
+                            <code id="apiBaseUrl">-</code>
+                        </div>
+                        <div>
+                            <strong>Session Started:</strong><br>
+                            <span id="sessionStart">-</span>
+                        </div>
+                        <div>
+                            <strong>Access Mode:</strong><br>
+                            <span id="accessMode" style="color: #27ae60;">Backend Admin</span>
+                        </div>
+                        <div>
+                            <strong>Auto-refresh:</strong><br>
+                            <label>
+                                <input type="checkbox" id="autoRefreshToggle" checked onchange="toggleAutoRefresh()">
+                                Every 30 seconds
+                            </label>
+                        </div>
                     </div>
                 </div>
             </div>
@@ -159,8 +355,49 @@
     </div>
 
     <script>
+        // Configuration
         const API_BASE_URL = 'https://resume-writer-api.onrender.com';
-        let authToken = null;
+
+        let currentSession = null;
+        let refreshInterval;
+        let sessionTimerInterval;
+        let sessionStartTime;
+        let autoRefreshEnabled = true;
+
+        document.addEventListener('DOMContentLoaded', function() {
+            document.getElementById('autoLoginOverlay').style.display = 'flex';
+            showLoginScreen();
+        });
+
+        function updateAutoLoginStatus(message) {
+            const statusElement = document.getElementById('autoLoginStatus');
+            if (statusElement) {
+                statusElement.textContent = message;
+            }
+        }
+
+        function showLoginScreen() {
+            document.getElementById('autoLoginOverlay').style.display = 'none';
+            document.getElementById('loginScreen').style.display = 'block';
+            document.getElementById('dashboard').style.display = 'none';
+        }
+
+        function handleSuccessfulLogin() {
+            document.getElementById('autoLoginOverlay').style.display = 'none';
+            document.getElementById('loginScreen').style.display = 'none';
+            document.getElementById('dashboard').style.display = 'block';
+            
+            // Initialize dashboard
+            sessionStartTime = new Date();
+            document.getElementById('sessionStart').textContent = sessionStartTime.toLocaleString();
+            document.getElementById('apiBaseUrl').textContent = API_BASE_URL;
+            document.getElementById('adminUsername').textContent = currentSession.username;
+            
+            showMessage('Admin authentication successful!', 'success');
+            refreshStats();
+            startAutoRefresh();
+            startSessionTimer();
+        }
 
         async function login(event) {
             event.preventDefault();
@@ -173,13 +410,18 @@
                 return;
             }
 
-            const loginBtn = document.querySelector('#loginForm button');
-            loginBtn.disabled = true;
-            loginBtn.textContent = 'Signing in...';
-            
+            document.getElementById('loginScreen').classList.add('loading');
             showLoginMessage('', '');
             
+            // Show debug panel
+            const debugPanel = document.getElementById('loginDebug');
+            const debugContent = document.getElementById('debugContent');
+            debugPanel.style.display = 'block';
+            debugContent.innerHTML = 'Starting login process...';
+            
             try {
+                debugContent.innerHTML += '<br>📡 Sending login request to /admin/login...';
+                
                 const response = await fetch(`${API_BASE_URL}/admin/login`, {
                     method: 'POST',
                     headers: {
@@ -191,101 +433,336 @@
                     })
                 });
                 
+                debugContent.innerHTML += `<br>📊 Response status: ${response.status}`;
+                
                 const data = await response.json();
+                debugContent.innerHTML += `<br>📦 Response data: ${JSON.stringify(data)}`;
                 
                 if (response.ok && data.success) {
-                    // Store the authentication token if your backend provides one
-                    authToken = data.token || data.access_token || 'authenticated';
+                    debugContent.innerHTML += '<br>✅ Login successful!';
                     
-                    document.getElementById('loginScreen').style.display = 'none';
-                    document.getElementById('dashboard').style.display = 'block';
-                    document.getElementById('adminUsername').textContent = username;
+                    // Store session information
+                    currentSession = {
+                        userId: data.user_id || "admin-user",
+                        username: data.username || username
+                    };
                     
-                    showMessage('Secure login successful!', 'success');
-                    testBackendConnection();
+                    debugContent.innerHTML += `<br>💾 Session stored: ${JSON.stringify(currentSession)}`;
                     
+                    handleSuccessfulLogin();
                 } else {
                     throw new Error(data.detail || data.message || 'Login failed');
                 }
             } catch (error) {
                 console.error('Login error:', error);
+                document.getElementById('loginScreen').classList.remove('loading');
                 showLoginMessage('Login failed: ' + error.message, 'error');
-            } finally {
-                loginBtn.disabled = false;
-                loginBtn.textContent = 'Sign In Securely';
-            }
-        }
-
-        async function testBackendConnection() {
-            const debugElement = document.getElementById('dashboardDebug');
-            debugElement.innerHTML = '<div>Testing backend connection...</div>';
-            
-            try {
-                // Test basic health endpoint
-                const healthResponse = await fetch(`${API_BASE_URL}/health`);
-                const healthData = await healthResponse.json();
-                debugElement.innerHTML += `<div>Health endpoint: ${healthResponse.status} - ${JSON.stringify(healthData)}</div>`;
-                
-                // Test admin stats with authentication
-                const statsResponse = await fetch(`${API_BASE_URL}/admin/stats`, {
-                    headers: {
-                        'Content-Type': 'application/json',
-                        'Authorization': `Bearer ${authToken}`,
-                        'X-User-ID': 'admin-user'
-                    }
-                });
-                
-                debugElement.innerHTML += `<div>Admin stats: ${statsResponse.status}</div>`;
-                
-                if (statsResponse.ok) {
-                    const statsData = await statsResponse.json();
-                    debugElement.innerHTML += `<div style="color: green;">✅ Backend connection successful!</div>`;
-                    debugElement.innerHTML += `<div>Stats data: ${JSON.stringify(statsData)}</div>`;
-                    document.getElementById('backendStatus').textContent = '✅';
-                } else {
-                    debugElement.innerHTML += `<div style="color: red;">❌ Admin access failed: ${statsResponse.status}</div>`;
-                    document.getElementById('backendStatus').textContent = '❌';
-                    
-                    // Show response body for debugging
-                    const errorText = await statsResponse.text();
-                    debugElement.innerHTML += `<div>Error details: ${errorText}</div>`;
-                }
-                
-            } catch (error) {
-                debugElement.innerHTML += `<div style="color: red;">Connection error: ${error.message}</div>`;
-                document.getElementById('backendStatus').textContent = '❌';
+                debugContent.innerHTML += `<br>❌ Error: ${error.message}`;
             }
         }
 
         function showLoginMessage(message, type) {
             const messageDiv = document.getElementById('loginMessage');
-            messageDiv.textContent = message;
-            messageDiv.className = type === 'error' ? 'error-message' : 'success-message';
-            messageDiv.style.display = 'block';
+            if (messageDiv) {
+                messageDiv.textContent = message;
+                messageDiv.className = type === 'error' ? 'error-message' : 'success-message';
+                messageDiv.style.display = 'block';
+            }
         }
 
         function showMessage(message, type) {
             const container = document.getElementById('messageContainer');
-            container.innerHTML = `<div class="${type === 'error' ? 'error-message' : 'success-message'}">${message}</div>`;
-            container.style.display = 'block';
-            setTimeout(() => container.style.display = 'none', 5000);
+            if (container) {
+                container.innerHTML = `<div class="${type === 'error' ? 'error-message' : 'success-message'}">${message}</div>`;
+                container.style.display = 'block';
+                
+                setTimeout(() => {
+                    container.style.display = 'none';
+                }, 5000);
+            }
+        }
+
+        function refreshStats() {
+            if (!currentSession) {
+                showMessage('Please log in first', 'error');
+                return;
+            }
+
+            // Show loading states
+            document.querySelectorAll('.stat-value').forEach(el => {
+                if (el.id !== 'serverStatus') {
+                    el.textContent = '...';
+                }
+            });
+            
+            const refreshBtn = document.getElementById('refreshBtn');
+            if (refreshBtn) refreshBtn.classList.add('loading');
+            
+            const serverStatus = document.getElementById('serverStatus');
+            if (serverStatus) serverStatus.textContent = '⏳ Loading...';
+
+            // Update debug panel
+            const debugPanel = document.getElementById('debugPanel');
+            const debugInfo = document.getElementById('debugInfo');
+            debugPanel.style.display = 'block';
+            debugInfo.innerHTML = 'Fetching admin stats...';
+
+            // Get main stats - NOTE: This will likely fail because it requires Firebase user auth
+            fetch(`${API_BASE_URL}/admin/stats`)
+            .then(response => {
+                debugInfo.innerHTML += `<br>📊 Stats response: ${response.status}`;
+                if (!response.ok) throw new Error(`HTTP ${response.status}`);
+                return response.json();
+            })
+            .then(data => {
+                debugInfo.innerHTML += `<br>✅ Stats data received`;
+                if (data.success) {
+                    updateDashboard(data);
+                }
+            })
+            .catch(error => {
+                console.error('Stats error:', error);
+                debugInfo.innerHTML += `<br>❌ Stats failed: ${error.message}`;
+                
+                // Try public endpoints as fallback
+                debugInfo.innerHTML += `<br>🔄 Trying public endpoints...`;
+                fetchPublicData();
+            })
+            .finally(() => {
+                if (refreshBtn) refreshBtn.classList.remove('loading');
+            });
+
+            // Get cost history from public endpoint
+            fetch(`${API_BASE_URL}/public/admin/cost-history?days=7`)
+            .then(response => {
+                debugInfo.innerHTML += `<br>📈 Cost history response: ${response.status}`;
+                if (!response.ok) throw new Error(`HTTP ${response.status}`);
+                return response.json();
+            })
+            .then(data => {
+                if (data.success) {
+                    updateCostHistory(data.data || data);
+                }
+            })
+            .catch(error => {
+                console.error('Cost history error:', error);
+                debugInfo.innerHTML += `<br>❌ Cost history failed: ${error.message}`;
+            });
+
+            // Get user stats from public endpoint
+            fetch(`${API_BASE_URL}/public/admin/users`)
+            .then(response => {
+                debugInfo.innerHTML += `<br>👥 Users response: ${response.status}`;
+                if (!response.ok) throw new Error(`HTTP ${response.status}`);
+                return response.json();
+            })
+            .then(data => {
+                if (data.success) {
+                    updateUserStats(data);
+                }
+            })
+            .catch(error => {
+                console.error('User stats error:', error);
+                debugInfo.innerHTML += `<br>❌ User stats failed: ${error.message}`;
+            });
+
+            checkServerHealth();
+        }
+
+        function fetchPublicData() {
+            // Use public endpoints that don't require Firebase authentication
+            const debugInfo = document.getElementById('debugInfo');
+            
+            // Public stats
+            fetch(`${API_BASE_URL}/public/admin/stats`)
+            .then(response => response.json())
+            .then(data => {
+                if (data.success) {
+                    debugInfo.innerHTML += `<br>✅ Public stats loaded`;
+                    updateDashboard(data);
+                }
+            })
+            .catch(error => {
+                debugInfo.innerHTML += `<br>❌ Public stats failed: ${error.message}`;
+            });
+        }
+
+        function updateDashboard(stats) {
+            document.getElementById('dailyCost').textContent = `$${stats.daily_cost?.toFixed(6) || '0'}`;
+            document.getElementById('totalTokens').textContent = (stats.total_tokens || 0).toLocaleString();
+            document.getElementById('apiRequests').textContent = (stats.api_requests || 0).toLocaleString();
+            document.getElementById('cacheHits').textContent = (stats.cache_hits || 0).toLocaleString();
+            document.getElementById('userCount').textContent = (stats.user_count || 0).toLocaleString();
+            
+            const totalCache = (stats.cache_hits || 0) + (stats.cache_misses || 0);
+            const cacheRatio = totalCache > 0 ? ((stats.cache_hits || 0) / totalCache * 100).toFixed(1) : 0;
+            document.getElementById('cacheRatio').textContent = `Ratio: ${cacheRatio}%`;
+            
+            document.getElementById('lastUpdate').textContent = `Last update: ${new Date().toLocaleTimeString()}`;
+            
+            // Color code based on cost
+            const costElement = document.getElementById('dailyCost');
+            const dailyCost = stats.daily_cost || 0;
+            if (dailyCost > 1.0) {
+                costElement.className = 'stat-value cost-warning';
+            } else if (dailyCost > 0.1) {
+                costElement.className = 'stat-value';
+            } else {
+                costElement.className = 'stat-value cost-good';
+            }
+        }
+
+        function updateCostHistory(history) {
+            const historyDiv = document.getElementById('costHistory');
+            
+            if (!history || history.length === 0) {
+                historyDiv.innerHTML = '<p>No cost history available yet. Stats will appear after daily reset.</p>';
+                return;
+            }
+
+            let html = '<table>';
+            html += '<tr>';
+            html += '<th>Date</th>';
+            html += '<th style="text-align: right;">Cost</th>';
+            html += '<th style="text-align: right;">Requests</th>';
+            html += '</tr>';
+            
+            history.forEach(day => {
+                const costColor = day.cost > 1.0 ? 'cost-warning' : (day.cost > 0.1 ? '' : 'cost-good');
+                html += `<tr>`;
+                html += `<td>${day.date}</td>`;
+                html += `<td style="text-align: right;" class="${costColor}">$${day.cost?.toFixed(6) || '0'}</td>`;
+                html += `<td style="text-align: right;">${day.requests?.toLocaleString() || '0'}</td>`;
+                html += `</tr>`;
+            });
+            
+            html += '</table>';
+            historyDiv.innerHTML = html;
+        }
+
+        function updateUserStats(userData) {
+            const userStatsDiv = document.getElementById('userStats');
+            
+            if (!userData) {
+                userStatsDiv.innerHTML = '<p>Error loading user data</p>';
+                return;
+            }
+
+            let html = `
+                <div style="display: grid; grid-template-columns: repeat(auto-fit, minmax(200px, 1fr)); gap: 15px; margin-bottom: 20px;">
+                    <div style="background: #f8f9fa; padding: 15px; border-radius: 5px;">
+                        <strong>Total Users</strong><br>
+                        <span style="font-size: 1.5rem; color: #667eea;">${userData.total_users || 0}</span>
+                    </div>
+                    <div style="background: #f8f9fa; padding: 15px; border-radius: 5px;">
+                        <strong>Credits Used</strong><br>
+                        <span style="font-size: 1.5rem; color: #e74c3c;">${userData.total_credits_used || 0}</span>
+                    </div>
+                    <div style="background: #f8f9fa; padding: 15px; border-radius: 5px;">
+                        <strong>Credits Available</strong><br>
+                        <span style="font-size: 1.5rem; color: #27ae60;">${userData.total_credits_available || 0}</span>
+                    </div>
+                </div>
+            `;
+            
+            userStatsDiv.innerHTML = html;
+        }
+
+        function checkServerHealth() {
+            fetch(`${API_BASE_URL}/health`)
+            .then(response => response.json())
+            .then(health => {
+                const statusEl = document.getElementById('serverStatus');
+                if (statusEl) {
+                    if (health.status === 'healthy') {
+                        statusEl.textContent = '✅ Online';
+                        statusEl.className = 'stat-value status-online';
+                    } else {
+                        statusEl.textContent = '⚠️ Degraded';
+                        statusEl.className = 'stat-value status-degraded';
+                    }
+                }
+            })
+            .catch(() => {
+                const statusEl = document.getElementById('serverStatus');
+                if (statusEl) {
+                    statusEl.textContent = '❌ Offline';
+                    statusEl.className = 'stat-value status-offline';
+                }
+            });
+        }
+
+        function resetStats() {
+            if (confirm('Are you sure you want to reset daily statistics?')) {
+                // Note: This will likely fail without proper Firebase admin auth
+                fetch(`${API_BASE_URL}/admin/reset-stats`, {
+                    method: 'POST'
+                })
+                .then(response => response.json())
+                .then(data => {
+                    if (data.success) {
+                        showMessage('Statistics reset successfully!', 'success');
+                        refreshStats();
+                    } else {
+                        throw new Error(data.detail || 'Reset failed');
+                    }
+                })
+                .catch(error => {
+                    showMessage('Reset failed: ' + error.message, 'error');
+                });
+            }
         }
 
         function logout() {
-            authToken = null;
+            currentSession = null;
             document.getElementById('loginScreen').style.display = 'block';
             document.getElementById('dashboard').style.display = 'none';
-            document.getElementById('username').value = 'alakbd2009@gmail.com';
+            document.getElementById('loginScreen').classList.remove('loading');
+            document.getElementById('username').value = '';
             document.getElementById('password').value = '';
+            stopAutoRefresh();
+            stopSessionTimer();
         }
 
-        // Check for existing session on load
-        document.addEventListener('DOMContentLoaded', function() {
-            const debugElement = document.getElementById('dashboardDebug');
-            debugElement.innerHTML = `<div>Secure admin dashboard loaded</div>`;
-            debugElement.innerHTML += `<div>Backend URL: ${API_BASE_URL}</div>`;
-            debugElement.innerHTML += `<div>All Firebase operations happen server-side</div>`;
-        });
+        function startSessionTimer() {
+            sessionTimerInterval = setInterval(() => {
+                const now = new Date();
+                const diff = Math.floor((now - sessionStartTime) / 1000);
+                const minutes = Math.floor(diff / 60);
+                const seconds = diff % 60;
+                document.getElementById('sessionTimer').textContent = 
+                    `${minutes}:${seconds.toString().padStart(2, '0')}`;
+            }, 1000);
+        }
+
+        function stopSessionTimer() {
+            if (sessionTimerInterval) {
+                clearInterval(sessionTimerInterval);
+            }
+        }
+
+        function startAutoRefresh() {
+            if (autoRefreshEnabled) {
+                refreshInterval = setInterval(refreshStats, 30000);
+                document.getElementById('autoRefreshStatus').textContent = 'On (30s)';
+            }
+        }
+        
+        function stopAutoRefresh() {
+            if (refreshInterval) {
+                clearInterval(refreshInterval);
+            }
+            document.getElementById('autoRefreshStatus').textContent = 'Off';
+        }
+        
+        function toggleAutoRefresh() {
+            autoRefreshEnabled = document.getElementById('autoRefreshToggle').checked;
+            if (autoRefreshEnabled) {
+                startAutoRefresh();
+            } else {
+                stopAutoRefresh();
+            }
+        }
     </script>
 </body>
 </html>
