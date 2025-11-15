@@ -50,6 +50,7 @@
         
         .cost-warning { color: #e74c3c; }
         .cost-good { color: #27ae60; }
+        .cost-info { color: #3498db; }
         
         .chart-container { 
             background: white; 
@@ -184,6 +185,14 @@
             margin: 10px 0;
             font-size: 14px;
         }
+        
+        .credit-breakdown {
+            background: #f8f9fa;
+            border-left: 4px solid #3498db;
+            padding: 15px;
+            margin: 10px 0;
+            border-radius: 0 5px 5px 0;
+        }
     </style>
 </head>
 <body>
@@ -236,6 +245,7 @@
                     <div>
                         <button class="btn" onclick="refreshStats()" id="refreshBtn">🔄 Refresh</button>
                         <button class="btn btn-warning" onclick="resetStats()" id="resetBtn">📊 Reset Daily Stats</button>
+                        <button class="btn" onclick="exportData()">📤 Export Data</button>
                         <button class="btn btn-danger" onclick="logout()">🚪 Logout</button>
                     </div>
                     <div style="color: #666; font-size: 14px;">
@@ -256,6 +266,12 @@
                     </div>
                     
                     <div class="stat-card">
+                        <div class="stat-label">Monthly Cost</div>
+                        <div class="stat-value cost-info" id="monthlyCost">...</div>
+                        <div class="stat-label" id="monthlyPeriod">This Month</div>
+                    </div>
+                    
+                    <div class="stat-card">
                         <div class="stat-label">Total Tokens</div>
                         <div class="stat-value" id="totalTokens">...</div>
                         <div class="stat-label">Today</div>
@@ -265,12 +281,6 @@
                         <div class="stat-label">API Requests</div>
                         <div class="stat-value" id="apiRequests">...</div>
                         <div class="stat-label">Today</div>
-                    </div>
-                    
-                    <div class="stat-card">
-                        <div class="stat-label">Cache Performance</div>
-                        <div class="stat-value" id="cacheHits">...</div>
-                        <div class="stat-label" id="cacheRatio">Ratio: ...</div>
                     </div>
                     
                     <div class="stat-card">
@@ -286,9 +296,38 @@
                     </div>
                 </div>
 
+                <!-- Credit Usage Breakdown -->
+                <div class="chart-container">
+                    <h3>💰 Credit Usage Breakdown</h3>
+                    <div class="credit-breakdown">
+                        <div style="display: grid; grid-template-columns: repeat(auto-fit, minmax(200px, 1fr)); gap: 15px; margin-bottom: 15px;">
+                            <div>
+                                <strong>Purchased Credits Used:</strong><br>
+                                <span style="font-size: 1.5rem; color: #e74c3c;" id="purchasedUsed">0</span>
+                            </div>
+                            <div>
+                                <strong>Free Credits Used:</strong><br>
+                                <span style="font-size: 1.5rem; color: #f39c12;" id="freeUsed">0</span>
+                            </div>
+                            <div>
+                                <strong>Purchased Available:</strong><br>
+                                <span style="font-size: 1.5rem; color: #27ae60;" id="purchasedAvailable">0</span>
+                            </div>
+                            <div>
+                                <strong>Free Available:</strong><br>
+                                <span style="font-size: 1.5rem; color: #3498db;" id="freeAvailable">0</span>
+                            </div>
+                        </div>
+                        <div style="background: white; padding: 10px; border-radius: 5px; border: 1px solid #eee;">
+                            <strong>Credit Distribution:</strong>
+                            <div id="creditDistribution">Loading credit analysis...</div>
+                        </div>
+                    </div>
+                </div>
+
                 <!-- Cost History -->
                 <div class="chart-container">
-                    <h3>📈 Cost History (Last 7 Days)</h3>
+                    <h3>📈 Cost History (Last 30 Days)</h3>
                     <div id="costHistory">
                         <p>Loading cost history...</p>
                     </div>
@@ -299,6 +338,14 @@
                     <h3>👥 User Statistics</h3>
                     <div id="userStats">
                         Loading user data...
+                    </div>
+                </div>
+
+                <!-- Credit Purchase History -->
+                <div class="chart-container">
+                    <h3>🛒 Credit Purchase History</h3>
+                    <div id="purchaseHistory">
+                        <p>Loading purchase history...</p>
                     </div>
                 </div>
 
@@ -340,6 +387,7 @@
         let sessionTimerInterval;
         let sessionStartTime;
         let autoRefreshEnabled = true;
+        let monthlyCostData = [];
 
         document.addEventListener('DOMContentLoaded', function() {
             document.getElementById('autoLoginOverlay').style.display = 'flex';
@@ -503,13 +551,10 @@
                     serverStatus.className = 'stat-value status-offline';
                 }
                 showMessage('Failed to fetch stats: ' + error.message, 'error');
-            })
-            .finally(() => {
-                if (refreshBtn) refreshBtn.classList.remove('loading');
             });
 
-            // Get cost history
-            fetch(`${API_BASE_URL}/admin/cost-history?days=7`, {
+            // Get cost history for monthly calculation
+            fetch(`${API_BASE_URL}/admin/cost-history?days=30`, {
                 headers: {
                     'X-User-ID': currentSession.uid,
                     'Content-Type': 'application/json'
@@ -518,13 +563,14 @@
             .then(response => response.json())
             .then(data => {
                 updateCostHistory(data);
+                calculateMonthlyCost(data);
             })
             .catch(error => {
                 console.error('Cost history error:', error);
                 document.getElementById('costHistory').innerHTML = '<p>Error loading cost history</p>';
             });
 
-            // Get user stats
+            // Get user stats for credit analysis
             fetch(`${API_BASE_URL}/admin/users`, {
                 headers: {
                     'X-User-ID': currentSession.uid,
@@ -535,25 +581,29 @@
             .then(data => {
                 if (data.success) {
                     updateUserStats(data);
+                    analyzeCreditUsage(data);
                 }
             })
             .catch(error => {
                 console.error('User stats error:', error);
             });
 
+            // Get purchase history if available
+            fetchPurchaseHistory();
+
             checkServerHealth();
+            
+            // Final loading cleanup
+            .finally(() => {
+                if (refreshBtn) refreshBtn.classList.remove('loading');
+            });
         }
 
         function updateDashboard(stats) {
             document.getElementById('dailyCost').textContent = `$${stats.daily_cost.toFixed(6)}`;
             document.getElementById('totalTokens').textContent = stats.total_tokens.toLocaleString();
             document.getElementById('apiRequests').textContent = stats.api_requests.toLocaleString();
-            document.getElementById('cacheHits').textContent = stats.cache_hits.toLocaleString();
             document.getElementById('userCount').textContent = stats.user_count.toLocaleString();
-            
-            const totalCache = stats.cache_hits + stats.cache_misses;
-            const cacheRatio = totalCache > 0 ? (stats.cache_hits / totalCache * 100).toFixed(1) : 0;
-            document.getElementById('cacheRatio').textContent = `Ratio: ${cacheRatio}%`;
             
             document.getElementById('lastUpdate').textContent = `Last update: ${new Date().toLocaleTimeString()}`;
             
@@ -568,11 +618,95 @@
             }
         }
 
+        function calculateMonthlyCost(costHistory) {
+            if (!costHistory || costHistory.length === 0) {
+                document.getElementById('monthlyCost').textContent = '$0';
+                return;
+            }
+
+            // Calculate monthly total from last 30 days
+            const monthlyTotal = costHistory.reduce((sum, day) => sum + day.cost, 0);
+            document.getElementById('monthlyCost').textContent = `$${monthlyTotal.toFixed(2)}`;
+            
+            // Set current month period
+            const now = new Date();
+            const monthName = now.toLocaleString('default', { month: 'long' });
+            document.getElementById('monthlyPeriod').textContent = `${monthName} ${now.getFullYear()}`;
+            
+            // Color code monthly cost
+            const monthlyElement = document.getElementById('monthlyCost');
+            if (monthlyTotal > 50) {
+                monthlyElement.className = 'stat-value cost-warning';
+            } else if (monthlyTotal > 10) {
+                monthlyElement.className = 'stat-value';
+            } else {
+                monthlyElement.className = 'stat-value cost-good';
+            }
+        }
+
+        function analyzeCreditUsage(userData) {
+            if (!userData || !userData.users) return;
+
+            let purchasedUsed = 0;
+            let freeUsed = 0;
+            let purchasedAvailable = 0;
+            let freeAvailable = 0;
+            let totalUsers = userData.users.length;
+
+            // Simple estimation logic (you'll need to enhance this based on your actual data structure)
+            userData.users.forEach(user => {
+                // Estimate purchased vs free credits (this is a simplified example)
+                const totalUsed = user.used_credits || 0;
+                const totalAvailable = user.available_credits || 0;
+                const totalEarned = user.total_credits || 0;
+
+                // Simple heuristic: if user has more than 10 credits, assume some are purchased
+                if (totalEarned > 10) {
+                    purchasedUsed += Math.min(totalUsed, totalEarned - 10);
+                    freeUsed += Math.max(0, totalUsed - (totalEarned - 10));
+                    purchasedAvailable += Math.max(0, totalAvailable - 10);
+                    freeAvailable += Math.min(totalAvailable, 10);
+                } else {
+                    freeUsed += totalUsed;
+                    freeAvailable += totalAvailable;
+                }
+            });
+
+            // Update the display
+            document.getElementById('purchasedUsed').textContent = purchasedUsed.toLocaleString();
+            document.getElementById('freeUsed').textContent = freeUsed.toLocaleString();
+            document.getElementById('purchasedAvailable').textContent = purchasedAvailable.toLocaleString();
+            document.getElementById('freeAvailable').textContent = freeAvailable.toLocaleString();
+
+            // Update credit distribution
+            const totalUsed = purchasedUsed + freeUsed;
+            const totalAvailable = purchasedAvailable + freeAvailable;
+            
+            let distributionHTML = '';
+            if (totalUsed > 0) {
+                const purchasedPercent = ((purchasedUsed / totalUsed) * 100).toFixed(1);
+                const freePercent = ((freeUsed / totalUsed) * 100).toFixed(1);
+                distributionHTML += `<div>Used Credits: ${totalUsed.toLocaleString()} total</div>`;
+                distributionHTML += `<div>→ Purchased: ${purchasedUsed.toLocaleString()} (${purchasedPercent}%)</div>`;
+                distributionHTML += `<div>→ Free/Awarded: ${freeUsed.toLocaleString()} (${freePercent}%)</div>`;
+            }
+            
+            if (totalAvailable > 0) {
+                const purchasedAvailPercent = ((purchasedAvailable / totalAvailable) * 100).toFixed(1);
+                const freeAvailPercent = ((freeAvailable / totalAvailable) * 100).toFixed(1);
+                distributionHTML += `<div>Available Credits: ${totalAvailable.toLocaleString()} total</div>`;
+                distributionHTML += `<div>→ Purchased: ${purchasedAvailable.toLocaleString()} (${purchasedAvailPercent}%)</div>`;
+                distributionHTML += `<div>→ Free/Awarded: ${freeAvailable.toLocaleString()} (${freeAvailPercent}%)</div>`;
+            }
+
+            document.getElementById('creditDistribution').innerHTML = distributionHTML || 'No credit data available';
+        }
+
         function updateCostHistory(history) {
             const historyDiv = document.getElementById('costHistory');
             
             if (!history || history.length === 0) {
-                historyDiv.innerHTML = '<p>No cost history available yet. Stats will appear after daily reset.</p>';
+                historyDiv.innerHTML = '<p>No cost history available yet.</p>';
                 return;
             }
 
@@ -584,7 +718,9 @@
             html += '<th style="text-align: right;">Requests</th>';
             html += '</tr>';
             
-            history.forEach(day => {
+            // Show last 30 days
+            const recentHistory = history.slice(-30);
+            recentHistory.forEach(day => {
                 const costColor = day.cost > 1.0 ? 'cost-warning' : (day.cost > 0.1 ? '' : 'cost-good');
                 html += `<tr>`;
                 html += `<td>${day.date}</td>`;
@@ -593,6 +729,15 @@
                 html += `<td style="text-align: right;">${day.requests.toLocaleString()}</td>`;
                 html += `</tr>`;
             });
+            
+            // Add monthly total
+            const monthlyTotal = recentHistory.reduce((sum, day) => sum + day.cost, 0);
+            html += `<tr style="background: #f8f9fa; font-weight: bold;">`;
+            html += `<td>Monthly Total</td>`;
+            html += `<td style="text-align: right;">$${monthlyTotal.toFixed(2)}</td>`;
+            html += `<td style="text-align: right;">${recentHistory.reduce((sum, day) => sum + day.tokens, 0).toLocaleString()}</td>`;
+            html += `<td style="text-align: right;">${recentHistory.reduce((sum, day) => sum + day.requests, 0).toLocaleString()}</td>`;
+            html += `</tr>`;
             
             html += '</table>';
             historyDiv.innerHTML = html;
@@ -650,6 +795,32 @@
             }
             
             userStatsDiv.innerHTML = html;
+        }
+
+        function fetchPurchaseHistory() {
+            // This would need to be implemented in your backend
+            // For now, we'll show a placeholder
+            const purchaseDiv = document.getElementById('purchaseHistory');
+            purchaseDiv.innerHTML = `
+                <div class="info-message">
+                    <p><strong>Purchase Tracking Note:</strong></p>
+                    <p>To track purchased credits separately, you'll need to:</p>
+                    <ol>
+                        <li>Add a "credit_type" field to your credit awards (purchased/free)</li>
+                        <li>Add purchase records when users buy credits</li>
+                        <li>Update the credit usage analysis logic</li>
+                    </ol>
+                    <p>Current display shows estimated breakdown based on credit amounts.</p>
+                </div>
+            `;
+        }
+
+        function exportData() {
+            showMessage('Export feature would generate CSV reports of usage data', 'info');
+            // Implementation would generate CSV files for:
+            // - Monthly cost reports
+            // - User credit usage
+            // - Purchase history
         }
 
         function checkServerHealth() {
