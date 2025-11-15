@@ -3,11 +3,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Resume Writer - Admin Dashboard</title>
-    <!-- Add Firebase SDK -->
-    <script src="https://www.gstatic.com/firebasejs/9.22.0/firebase-app-compat.js"></script>
-    <script src="https://www.gstatic.com/firebasejs/9.22.0/firebase-auth-compat.js"></script>
-    <script src="https://www.gstatic.com/firebasejs/9.22.0/firebase-firestore-compat.js"></script>
+    <title>Resume Writer - Secure Admin Dashboard</title>
     <style>
         * { margin: 0; padding: 0; box-sizing: border-box; }
         body { font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif; background: #f5f5f5; }
@@ -47,41 +43,6 @@
             margin: 10px 0; 
         }
         
-        .stat-label { 
-            color: #666; 
-            font-size: 0.9rem; 
-        }
-        
-        .cost-warning { color: #e74c3c; }
-        .cost-good { color: #27ae60; }
-        
-        .chart-container { 
-            background: white; 
-            padding: 20px; 
-            border-radius: 10px; 
-            box-shadow: 0 2px 10px rgba(0,0,0,0.1); 
-            margin-bottom: 20px; 
-        }
-        
-        .btn { 
-            background: #667eea; 
-            color: white; 
-            border: none; 
-            padding: 10px 20px; 
-            border-radius: 5px; 
-            cursor: pointer; 
-            margin: 5px; 
-            font-size: 14px;
-        }
-        
-        .btn:hover { background: #5a6fd8; }
-        .btn-danger { background: #e74c3c; }
-        .btn-danger:hover { background: #c0392b; }
-        .btn-warning { background: #f39c12; }
-        .btn-warning:hover { background: #e67e22; }
-        .btn-success { background: #27ae60; }
-        .btn-success:hover { background: #219653; }
-        
         .login-container { 
             background: white; 
             padding: 40px; 
@@ -101,10 +62,17 @@
             font-size: 14px;
         }
         
-        .loading { 
-            opacity: 0.6; 
-            pointer-events: none; 
+        .btn { 
+            background: #667eea; 
+            color: white; 
+            border: none; 
+            padding: 10px 20px; 
+            border-radius: 5px; 
+            cursor: pointer; 
+            margin: 5px; 
         }
+        
+        .btn-success { background: #27ae60; }
         
         .error-message { 
             background: #fee; 
@@ -124,199 +92,66 @@
             margin: 10px 0; 
         }
         
-        .info-message { 
-            background: #e8f4fd; 
-            border: 1px solid #b6d7f7; 
-            color: #1a5a9a; 
-            padding: 10px; 
-            border-radius: 5px; 
-            margin: 10px 0; 
-        }
-        
-        table { 
-            width: 100%; 
-            border-collapse: collapse; 
-            margin: 10px 0; 
-        }
-        
-        th, td { 
-            padding: 12px; 
-            text-align: left; 
-            border-bottom: 1px solid #eee; 
-        }
-        
-        th { 
-            background: #f8f9fa; 
-            font-weight: 600; 
-        }
-        
-        .user-list { 
-            max-height: 300px; 
-            overflow-y: auto; 
-            border: 1px solid #ddd; 
-            border-radius: 5px; 
-        }
-        
-        .user-item { 
-            padding: 12px; 
-            border-bottom: 1px solid #eee; 
-            font-family: monospace; 
-        }
-        
-        .status-online { color: #27ae60; }
-        .status-offline { color: #e74c3c; }
-        .status-degraded { color: #f39c12; }
-        
-        .auto-login-overlay { 
-            position: fixed; 
-            top: 0; 
-            left: 0; 
-            width: 100%; 
-            height: 100%; 
-            background: white; 
-            z-index: 1000; 
-            display: flex; 
-            justify-content: center; 
-            align-items: center; 
-            flex-direction: column; 
-        }
-        
-        .user-info {
+        .debug-info {
             background: #f8f9fa;
-            padding: 10px 15px;
+            border: 1px solid #ddd;
+            padding: 10px;
             border-radius: 5px;
+            font-family: monospace;
+            font-size: 12px;
             margin: 10px 0;
-            font-size: 14px;
         }
     </style>
 </head>
 <body>
     <div id="app">
-        <!-- Auto-login overlay -->
-        <div id="autoLoginOverlay" class="auto-login-overlay">
-            <h2>🔄 Initializing Firebase...</h2>
-            <p>Loading admin dashboard...</p>
-            <div id="autoLoginStatus" style="margin-top: 20px;"></div>
-        </div>
-
         <!-- Login Screen -->
-        <div id="loginScreen" class="login-container" style="display: none;">
-            <h2 style="margin-bottom: 10px;">🔐 Firebase Admin Dashboard</h2>
-            <p style="color: #666; margin-bottom: 20px;">
-                Use your Firebase admin credentials
-            </p>
+        <div id="loginScreen" class="login-container">
+            <h2 style="margin-bottom: 10px;">🔐 Secure Admin Dashboard</h2>
+            <p style="color: #666; margin-bottom: 20px;">Backend Authentication Required</p>
             
             <div id="loginMessage" style="display: none;"></div>
             
             <form id="loginForm" onsubmit="login(event)">
-                <input type="email" id="email" class="login-input" placeholder="Admin Email" required value="alakbd2009@gmail.com">
+                <input type="text" id="username" class="login-input" placeholder="Admin Username" required value="alakbd2009@gmail.com">
                 <input type="password" id="password" class="login-input" placeholder="Admin Password" required>
                 
                 <button type="submit" class="btn btn-success" style="width: 100%; margin-top: 10px;">
-                    Sign In with Firebase
+                    Sign In Securely
                 </button>
             </form>
             
-            <div class="info-message" style="margin-top: 20px;">
-                <small>
-                    This dashboard connects directly to your Firebase Firestore
-                </small>
+            <div class="debug-info" style="margin-top: 20px;">
+                <p><strong>Security Note:</strong> Firebase config is kept server-side</p>
+                <p>All API calls go through your FastAPI backend</p>
             </div>
         </div>
 
         <!-- Dashboard -->
         <div id="dashboard" style="display: none;">
             <div class="header">
-                <h1>📊 Resume Writer - Firebase Admin Dashboard</h1>
-                <p>Direct Firestore Monitoring & User Management</p>
-                <div class="user-info" style="background: rgba(255,255,255,0.2); display: inline-block; margin-top: 10px;">
-                    <strong>Admin:</strong> <span id="adminEmail">-</span>
+                <h1>📊 Secure Admin Dashboard</h1>
+                <p>Backend-Protected API Access</p>
+                <div style="background: rgba(255,255,255,0.2); display: inline-block; margin-top: 10px; padding: 10px; border-radius: 5px;">
+                    <strong>Admin:</strong> <span id="adminUsername">-</span>
                 </div>
-                <small>Connected to Firebase • Real-time updates</small>
             </div>
 
             <div class="container">
-                <!-- Control Bar -->
-                <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 20px; flex-wrap: wrap; gap: 10px;">
-                    <div>
-                        <button class="btn" onclick="refreshStats()" id="refreshBtn">🔄 Refresh</button>
-                        <button class="btn btn-warning" onclick="showUserManagement()">👥 Manage Users</button>
-                        <button class="btn btn-danger" onclick="logout()">🚪 Logout</button>
-                    </div>
-                    <div style="color: #666; font-size: 14px;">
-                        Firebase: <span id="firebaseStatus">Connected</span> • 
-                        Users: <span id="liveUserCount">0</span>
-                    </div>
+                <div style="display: flex; gap: 10px; margin-bottom: 20px;">
+                    <button class="btn" onclick="testBackendConnection()">🔌 Test Backend</button>
+                    <button class="btn" onclick="logout()">🚪 Logout</button>
                 </div>
 
-                <!-- Messages -->
                 <div id="messageContainer" style="display: none;"></div>
+                <div id="dashboardDebug" class="debug-info"></div>
 
-                <!-- Live Stats -->
+                <!-- Stats will go here -->
                 <div class="stats-grid">
                     <div class="stat-card">
-                        <div class="stat-label">Total Users</div>
-                        <div class="stat-value" id="totalUsers">0</div>
-                        <div class="stat-label">Registered</div>
-                    </div>
-                    
-                    <div class="stat-card">
-                        <div class="stat-label">Active Users</div>
-                        <div class="stat-value" id="activeUsers">0</div>
-                        <div class="stat-label">Not Blocked</div>
-                    </div>
-                    
-                    <div class="stat-card">
-                        <div class="stat-label">Verified Emails</div>
-                        <div class="stat-value" id="verifiedUsers">0</div>
-                        <div class="stat-label">Email Confirmed</div>
-                    </div>
-                    
-                    <div class="stat-card">
-                        <div class="stat-label">Total Credits</div>
-                        <div class="stat-value" id="totalCredits">0</div>
-                        <div class="stat-label">Available + Used</div>
-                    </div>
-                    
-                    <div class="stat-card">
-                        <div class="stat-label">CVs Generated</div>
-                        <div class="stat-value" id="totalCVs">0</div>
-                        <div class="stat-label">Total Usage</div>
-                    </div>
-                    
-                    <div class="stat-card">
-                        <div class="stat-label">Blocked Users</div>
-                        <div class="stat-value" id="blockedUsers">0</div>
-                        <div class="stat-label">Suspended Accounts</div>
-                    </div>
-                </div>
-
-                <!-- Recent Users -->
-                <div class="chart-container">
-                    <h3>👥 Recent Users</h3>
-                    <div id="recentUsers">
-                        <p>Loading recent users...</p>
-                    </div>
-                </div>
-
-                <!-- Credit Awards -->
-                <div class="chart-container">
-                    <h3>💰 Recent Credit Awards</h3>
-                    <div id="recentAwards">
-                        <p>Loading credit awards...</p>
-                    </div>
-                </div>
-
-                <!-- User Management Modal (hidden by default) -->
-                <div id="userManagementModal" style="display: none; position: fixed; top: 0; left: 0; width: 100%; height: 100%; background: rgba(0,0,0,0.5); z-index: 1000;">
-                    <div style="background: white; margin: 50px auto; padding: 20px; border-radius: 10px; max-width: 800px; max-height: 80vh; overflow-y: auto;">
-                        <div style="display: flex; justify-content: between; align-items: center; margin-bottom: 20px;">
-                            <h3>👥 User Management</h3>
-                            <button class="btn btn-danger" onclick="closeUserManagement()">Close</button>
-                        </div>
-                        <div id="userManagementContent">
-                            Loading users...
-                        </div>
+                        <div>Backend Status</div>
+                        <div class="stat-value" id="backendStatus">❓</div>
+                        <div>API Connection</div>
                     </div>
                 </div>
             </div>
@@ -324,343 +159,102 @@
     </div>
 
     <script>
-        // Your actual Firebase configuration
-        const firebaseConfig = {
-            apiKey: "AIzaSyDD44Ygnpb-Xl9sHZhVr9McmUTtuM0bW_Q",
-            authDomain: "resumewriter-2025.firebaseapp.com",
-            projectId: "resumewriter-2025",
-            storageBucket: "resumewriter-2025.firebasestorage.app",
-            messagingSenderId: "802908398477",
-            appId: "1:802908398477:web:0b7625c7826bd5a1a353c4"
-        };
-
-        // Initialize Firebase
-        firebase.initializeApp(firebaseConfig);
-        const auth = firebase.auth();
-        const db = firebase.firestore();
-
-        let currentUser = null;
-        let users = [];
-        let unsubscribeUsers = null;
-
-        document.addEventListener('DOMContentLoaded', function() {
-            initializeFirebase();
-        });
-
-        function initializeFirebase() {
-            updateAutoLoginStatus('Initializing Firebase...');
-            
-            // Check if user is already logged in
-            auth.onAuthStateChanged((user) => {
-                if (user) {
-                    currentUser = user;
-                    checkAdminAccess(user);
-                } else {
-                    updateAutoLoginStatus('No active session. Showing login...');
-                    setTimeout(() => {
-                        showLoginScreen();
-                    }, 1000);
-                }
-            });
-        }
-
-        async function checkAdminAccess(user) {
-            updateAutoLoginStatus('Checking admin privileges...');
-            
-            try {
-                // Check if user exists in admin collection or has admin privileges
-                const userDoc = await db.collection('users').doc(user.uid).get();
-                
-                if (userDoc.exists) {
-                    const userData = userDoc.data();
-                    // Check if user is admin (you might need to add an isAdmin field)
-                    if (user.email === 'alakbd2009@gmail.com' || userData.isAdmin === true) {
-                        handleSuccessfulLogin(user);
-                    } else {
-                        throw new Error('User does not have admin privileges');
-                    }
-                } else {
-                    throw new Error('User document not found');
-                }
-            } catch (error) {
-                updateAutoLoginStatus('Admin check failed: ' + error.message);
-                showLoginScreen();
-                showLoginMessage('Admin access required: ' + error.message, 'error');
-            }
-        }
+        const API_BASE_URL = 'https://resume-writer-api.onrender.com';
+        let authToken = null;
 
         async function login(event) {
             event.preventDefault();
             
-            const email = document.getElementById('email').value.trim();
+            const username = document.getElementById('username').value.trim();
             const password = document.getElementById('password').value.trim();
             
-            if (!email || !password) {
-                showLoginMessage('Please enter both email and password', 'error');
+            if (!username || !password) {
+                showLoginMessage('Please enter both username and password', 'error');
                 return;
             }
 
-            document.getElementById('loginScreen').classList.add('loading');
+            const loginBtn = document.querySelector('#loginForm button');
+            loginBtn.disabled = true;
+            loginBtn.textContent = 'Signing in...';
+            
             showLoginMessage('', '');
             
             try {
-                const userCredential = await auth.signInWithEmailAndPassword(email, password);
-                currentUser = userCredential.user;
-                await checkAdminAccess(currentUser);
+                const response = await fetch(`${API_BASE_URL}/admin/login`, {
+                    method: 'POST',
+                    headers: {
+                        'Content-Type': 'application/json',
+                    },
+                    body: JSON.stringify({
+                        username: username,
+                        password: password
+                    })
+                });
+                
+                const data = await response.json();
+                
+                if (response.ok && data.success) {
+                    // Store the authentication token if your backend provides one
+                    authToken = data.token || data.access_token || 'authenticated';
+                    
+                    document.getElementById('loginScreen').style.display = 'none';
+                    document.getElementById('dashboard').style.display = 'block';
+                    document.getElementById('adminUsername').textContent = username;
+                    
+                    showMessage('Secure login successful!', 'success');
+                    testBackendConnection();
+                    
+                } else {
+                    throw new Error(data.detail || data.message || 'Login failed');
+                }
             } catch (error) {
                 console.error('Login error:', error);
-                document.getElementById('loginScreen').classList.remove('loading');
                 showLoginMessage('Login failed: ' + error.message, 'error');
+            } finally {
+                loginBtn.disabled = false;
+                loginBtn.textContent = 'Sign In Securely';
             }
         }
 
-        function handleSuccessfulLogin(user) {
-            document.getElementById('autoLoginOverlay').style.display = 'none';
-            document.getElementById('loginScreen').style.display = 'none';
-            document.getElementById('dashboard').style.display = 'block';
+        async function testBackendConnection() {
+            const debugElement = document.getElementById('dashboardDebug');
+            debugElement.innerHTML = '<div>Testing backend connection...</div>';
             
-            document.getElementById('adminEmail').textContent = user.email;
-            
-            showMessage('Firebase authentication successful!', 'success');
-            startRealTimeListeners();
-            refreshStats();
-        }
-
-        function startRealTimeListeners() {
-            // Real-time listener for users collection
-            unsubscribeUsers = db.collection('users').onSnapshot((snapshot) => {
-                users = [];
-                let stats = {
-                    total: 0,
-                    active: 0,
-                    verified: 0,
-                    blocked: 0,
-                    totalCredits: 0,
-                    totalCVs: 0
-                };
-
-                snapshot.forEach((doc) => {
-                    const userData = doc.data();
-                    users.push({ id: doc.id, ...userData });
-                    
-                    stats.total++;
-                    if (!userData.isBlocked) stats.active++;
-                    if (userData.emailVerified) stats.verified++;
-                    if (userData.isBlocked) stats.blocked++;
-                    
-                    stats.totalCredits += (userData.availableCredits || 0) + (userData.usedCredits || 0);
-                    stats.totalCVs += (userData.usedCredits || 0); // Using usedCredits as CV count
-                });
-
-                updateStats(stats);
-                updateRecentUsers();
-                document.getElementById('liveUserCount').textContent = stats.total;
-            }, (error) => {
-                console.error('Users listener error:', error);
-                showMessage('Error connecting to Firestore: ' + error.message, 'error');
-            });
-
-            // Real-time listener for credit awards
-            db.collection('creditAwards')
-                .orderBy('timestamp', 'desc')
-                .limit(10)
-                .onSnapshot((snapshot) => {
-                    updateRecentAwards(snapshot);
-                }, (error) => {
-                    console.error('Credit awards listener error:', error);
-                });
-        }
-
-        function updateStats(stats) {
-            document.getElementById('totalUsers').textContent = stats.total;
-            document.getElementById('activeUsers').textContent = stats.active;
-            document.getElementById('verifiedUsers').textContent = stats.verified;
-            document.getElementById('totalCredits').textContent = stats.totalCredits;
-            document.getElementById('totalCVs').textContent = stats.totalCVs;
-            document.getElementById('blockedUsers').textContent = stats.blocked;
-        }
-
-        function updateRecentUsers() {
-            const recentUsersDiv = document.getElementById('recentUsers');
-            const recentUsers = users.slice(0, 10);
-            
-            if (recentUsers.length === 0) {
-                recentUsersDiv.innerHTML = '<p>No users found</p>';
-                return;
-            }
-            
-            let html = '<table>';
-            html += '<tr><th>Email</th><th>Credits</th><th>CVs</th><th>Status</th></tr>';
-            
-            recentUsers.forEach(user => {
-                const status = user.isBlocked ? '🚫 Blocked' : (user.emailVerified ? '✅ Verified' : '❌ Not Verified');
-                html += `
-                    <tr>
-                        <td>${user.email || 'No email'}</td>
-                        <td>${user.availableCredits || 0}</td>
-                        <td>${user.usedCredits || 0}</td>
-                        <td>${status}</td>
-                    </tr>
-                `;
-            });
-            
-            html += '</table>';
-            recentUsersDiv.innerHTML = html;
-        }
-
-        function updateRecentAwards(snapshot) {
-            const awardsDiv = document.getElementById('recentAwards');
-            
-            if (snapshot.empty) {
-                awardsDiv.innerHTML = '<p>No credit awards found</p>';
-                return;
-            }
-            
-            let html = '<table>';
-            html += '<tr><th>User</th><th>Amount</th><th>Reason</th><th>Date</th></tr>';
-            
-            snapshot.forEach(doc => {
-                const award = doc.data();
-                const date = new Date(award.timestamp).toLocaleDateString();
-                html += `
-                    <tr>
-                        <td>${award.userEmail || 'Unknown'}</td>
-                        <td>${award.amount || 0}</td>
-                        <td>${award.reason || 'N/A'}</td>
-                        <td>${date}</td>
-                    </tr>
-                `;
-            });
-            
-            html += '</table>';
-            awardsDiv.innerHTML = html;
-        }
-
-        function showUserManagement() {
-            const modal = document.getElementById('userManagementModal');
-            const content = document.getElementById('userManagementContent');
-            
-            let html = '<div style="margin-bottom: 20px;">';
-            html += '<input type="text" id="userSearch" placeholder="Search users by email..." style="width: 100%; padding: 10px; margin-bottom: 10px; border: 1px solid #ddd; border-radius: 5px;">';
-            html += '</div>';
-            html += '<div class="user-list">';
-            
-            users.forEach(user => {
-                html += `
-                    <div class="user-item">
-                        <div><strong>${user.email}</strong></div>
-                        <div>Credits: ${user.availableCredits || 0} available • ${user.usedCredits || 0} used</div>
-                        <div>Status: ${user.isBlocked ? '🚫 Blocked' : '✅ Active'} • ${user.emailVerified ? '✅ Verified' : '❌ Not Verified'}</div>
-                        <div style="margin-top: 5px;">
-                            <button class="btn" onclick="addCredits('${user.id}', 5)">+5 Credits</button>
-                            <button class="btn" onclick="addCredits('${user.id}', 10)">+10 Credits</button>
-                            <button class="btn btn-warning" onclick="toggleBlockUser('${user.id}', ${!!user.isBlocked})">
-                                ${user.isBlocked ? 'Unblock' : 'Block'}
-                            </button>
-                        </div>
-                    </div>
-                `;
-            });
-            
-            html += '</div>';
-            content.innerHTML = html;
-            modal.style.display = 'block';
-            
-            // Add search functionality
-            document.getElementById('userSearch').addEventListener('input', function(e) {
-                const searchTerm = e.target.value.toLowerCase();
-                const items = document.querySelectorAll('.user-item');
-                items.forEach(item => {
-                    const text = item.textContent.toLowerCase();
-                    item.style.display = text.includes(searchTerm) ? 'block' : 'none';
-                });
-            });
-        }
-
-        function closeUserManagement() {
-            document.getElementById('userManagementModal').style.display = 'none';
-        }
-
-        async function addCredits(userId, amount) {
             try {
-                const userRef = db.collection('users').doc(userId);
-                await db.runTransaction(async (transaction) => {
-                    const userDoc = await transaction.get(userRef);
-                    if (!userDoc.exists) {
-                        throw new Error('User does not exist');
+                // Test basic health endpoint
+                const healthResponse = await fetch(`${API_BASE_URL}/health`);
+                const healthData = await healthResponse.json();
+                debugElement.innerHTML += `<div>Health endpoint: ${healthResponse.status} - ${JSON.stringify(healthData)}</div>`;
+                
+                // Test admin stats with authentication
+                const statsResponse = await fetch(`${API_BASE_URL}/admin/stats`, {
+                    headers: {
+                        'Content-Type': 'application/json',
+                        'Authorization': `Bearer ${authToken}`,
+                        'X-User-ID': 'admin-user'
                     }
+                });
+                
+                debugElement.innerHTML += `<div>Admin stats: ${statsResponse.status}</div>`;
+                
+                if (statsResponse.ok) {
+                    const statsData = await statsResponse.json();
+                    debugElement.innerHTML += `<div style="color: green;">✅ Backend connection successful!</div>`;
+                    debugElement.innerHTML += `<div>Stats data: ${JSON.stringify(statsData)}</div>`;
+                    document.getElementById('backendStatus').textContent = '✅';
+                } else {
+                    debugElement.innerHTML += `<div style="color: red;">❌ Admin access failed: ${statsResponse.status}</div>`;
+                    document.getElementById('backendStatus').textContent = '❌';
                     
-                    const currentCredits = userDoc.data().availableCredits || 0;
-                    const newCredits = currentCredits + amount;
-                    
-                    transaction.update(userRef, {
-                        availableCredits: newCredits,
-                        totalCreditsEarned: (userDoc.data().totalCreditsEarned || 0) + amount,
-                        lastUpdated: firebase.firestore.FieldValue.serverTimestamp()
-                    });
-                });
+                    // Show response body for debugging
+                    const errorText = await statsResponse.text();
+                    debugElement.innerHTML += `<div>Error details: ${errorText}</div>`;
+                }
                 
-                // Record credit award
-                await db.collection('creditAwards').add({
-                    userId: userId,
-                    userEmail: users.find(u => u.id === userId)?.email,
-                    amount: amount,
-                    reason: 'Admin added credits via web dashboard',
-                    timestamp: firebase.firestore.FieldValue.serverTimestamp(),
-                    adminAction: true,
-                    adminEmail: currentUser.email
-                });
-                
-                showMessage(`Added ${amount} credits to user`, 'success');
             } catch (error) {
-                console.error('Error adding credits:', error);
-                showMessage('Failed to add credits: ' + error.message, 'error');
+                debugElement.innerHTML += `<div style="color: red;">Connection error: ${error.message}</div>`;
+                document.getElementById('backendStatus').textContent = '❌';
             }
-        }
-
-        async function toggleBlockUser(userId, currentlyBlocked) {
-            try {
-                await db.collection('users').doc(userId).update({
-                    isBlocked: !currentlyBlocked,
-                    lastUpdated: firebase.firestore.FieldValue.serverTimestamp()
-                });
-                
-                showMessage(`User ${currentlyBlocked ? 'unblocked' : 'blocked'} successfully`, 'success');
-            } catch (error) {
-                console.error('Error toggling block status:', error);
-                showMessage('Failed to update user: ' + error.message, 'error');
-            }
-        }
-
-        function refreshStats() {
-            showMessage('Stats refreshed', 'success');
-            // Real-time listeners will automatically update the stats
-        }
-
-        function logout() {
-            if (unsubscribeUsers) {
-                unsubscribeUsers();
-            }
-            auth.signOut();
-            currentUser = null;
-            users = [];
-            document.getElementById('loginScreen').style.display = 'block';
-            document.getElementById('dashboard').style.display = 'none';
-            document.getElementById('email').value = 'alakbd2009@gmail.com';
-            document.getElementById('password').value = '';
-        }
-
-        function updateAutoLoginStatus(message) {
-            const statusElement = document.getElementById('autoLoginStatus');
-            if (statusElement) {
-                statusElement.textContent = message;
-            }
-        }
-
-        function showLoginScreen() {
-            document.getElementById('autoLoginOverlay').style.display = 'none';
-            document.getElementById('loginScreen').style.display = 'block';
-            document.getElementById('dashboard').style.display = 'none';
         }
 
         function showLoginMessage(message, type) {
@@ -674,10 +268,24 @@
             const container = document.getElementById('messageContainer');
             container.innerHTML = `<div class="${type === 'error' ? 'error-message' : 'success-message'}">${message}</div>`;
             container.style.display = 'block';
-            setTimeout(() => {
-                container.style.display = 'none';
-            }, 5000);
+            setTimeout(() => container.style.display = 'none', 5000);
         }
+
+        function logout() {
+            authToken = null;
+            document.getElementById('loginScreen').style.display = 'block';
+            document.getElementById('dashboard').style.display = 'none';
+            document.getElementById('username').value = 'alakbd2009@gmail.com';
+            document.getElementById('password').value = '';
+        }
+
+        // Check for existing session on load
+        document.addEventListener('DOMContentLoaded', function() {
+            const debugElement = document.getElementById('dashboardDebug');
+            debugElement.innerHTML = `<div>Secure admin dashboard loaded</div>`;
+            debugElement.innerHTML += `<div>Backend URL: ${API_BASE_URL}</div>`;
+            debugElement.innerHTML += `<div>All Firebase operations happen server-side</div>`;
+        });
     </script>
 </body>
 </html>
