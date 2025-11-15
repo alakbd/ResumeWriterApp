@@ -925,27 +925,31 @@
         `;
         
         userData.users.slice(0, 10).forEach(user => {
-            // Try to get email, if not available, use user_id
-            const userEmail = user.email || 'No email';
-            const userId = user.user_id || 'unknown';
+            // Try multiple possible email fields
+            const userEmail = user.email || user.user_email || user.email_address || 'No email';
+            const userId = user.user_id || user.uid || user.id || 'unknown';
+            const userName = user.name || user.display_name || user.username || '';
             
-            // Create display - show email primarily, with UID as secondary
+            // Create the best possible display name
             let userDisplay = userEmail;
-            if (userEmail === 'No email') {
+            if (userEmail === 'No email' && userName) {
+                userDisplay = userName;
+            } else if (userEmail === 'No email' && !userName) {
                 userDisplay = userId;
             }
             
             const shortDisplay = userDisplay.length > 25 ? userDisplay.substring(0, 25) + '...' : userDisplay;
             const verifiedStatus = user.email_verified ? 
                 '<span class="verified-badge">✓ Verified</span>' : 
-                '<span class="unverified-badge">✗ Unverified</span>';
+                (user.email_verified === false ? '<span class="unverified-badge">✗ Unverified</span>' : '');
             
             html += `
                 <div class="user-item">
                     <div>
                         <strong>${shortDisplay}</strong>
-                        ${user.email_verified !== undefined ? verifiedStatus : ''}
+                        ${verifiedStatus}
                     </div>
+                    ${userName && userEmail !== 'No email' ? `<div style="font-size: 0.8rem; color: #666;">Name: ${userName}</div>` : ''}
                     <div style="font-size: 0.8rem; color: #999; font-family: monospace;">
                         UID: ${userId.substring(0, 8)}...
                     </div>
@@ -957,6 +961,18 @@
         });
         
         html += `</div></div>`;
+        
+        // Add debug info
+        if (userData.users[0]) {
+            const sampleUser = userData.users[0];
+            html += `
+                <div class="info-message" style="margin-top: 15px;">
+                    <small>
+                        <strong>Debug Info:</strong> User objects contain: ${Object.keys(sampleUser).join(', ')}
+                    </small>
+                </div>
+            `;
+        }
     } else {
         html += '<p>No users found</p>';
     }
