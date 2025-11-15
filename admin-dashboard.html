@@ -416,57 +416,54 @@
         }
 
         async function login(event) {
-            event.preventDefault();
-            
-            const username = document.getElementById('username').value.trim();
-            const password = document.getElementById('password').value.trim();
-            
-            if (!username || !password) {
-                showLoginMessage('Please enter both username and password', 'error');
-                return;
-            }
+    event.preventDefault();
+    
+    const username = document.getElementById('username').value.trim();
+    const password = document.getElementById('password').value.trim();
+    
+    if (!username || !password) {
+        showLoginMessage('Please enter both username and password', 'error');
+        return;
+    }
 
-            document.getElementById('loginScreen').classList.add('loading');
+    document.getElementById('loginScreen').classList.add('loading');
+    
+    try {
+        const response = await fetch(`${API_BASE_URL}/admin/login`, {
+            method: 'POST',
+            headers: {
+                'Content-Type': 'application/json',
+            },
+            body: JSON.stringify({
+                username: username,
+                password: password
+            })
+        });
+        
+        if (response.ok) {
+            const userData = await response.json();
             
-            try {
-                // First, we need to get the Firebase UID for this admin user
-                // This assumes you have a way to map admin credentials to Firebase users
-                const userResponse = await fetch(`${API_BASE_URL}/admin/login`, {
-                    method: 'POST',
-                    headers: {
-                        'Content-Type': 'application/json',
-                    },
-                    body: JSON.stringify({
-                        username: username,
-                        password: password
-                    })
-                });
+            if (userData.success) {
+                // Store session information
+                currentSession = {
+                    userId: userData.user_id || "admin-user", // Use the returned user_id or default
+                    username: userData.username || username
+                };
                 
-                if (userResponse.ok) {
-                    const userData = await userResponse.json();
-                    
-                    if (userData.success && userData.user_id) {
-                        // Store session information
-                        currentSession = {
-                            userId: userData.user_id,
-                            username: username,
-                            sessionToken: userData.session_token
-                        };
-                        
-                        localStorage.setItem('adminSession', JSON.stringify(currentSession));
-                        handleSuccessfulLogin();
-                    } else {
-                        throw new Error(userData.detail || 'Login failed');
-                    }
-                } else {
-                    const errorData = await userResponse.json();
-                    throw new Error(errorData.detail || 'Login failed');
-                }
-            } catch (error) {
-                document.getElementById('loginScreen').classList.remove('loading');
-                showLoginMessage('Login failed: ' + error.message, 'error');
+                localStorage.setItem('adminSession', JSON.stringify(currentSession));
+                handleSuccessfulLogin();
+            } else {
+                throw new Error(userData.detail || 'Login failed');
             }
+        } else {
+            const errorData = await response.json();
+            throw new Error(errorData.detail || 'Login failed');
         }
+    } catch (error) {
+        document.getElementById('loginScreen').classList.remove('loading');
+        showLoginMessage('Login failed: ' + error.message, 'error');
+    }
+}
 
         function showLoginMessage(message, type) {
             const messageDiv = document.getElementById('loginMessage');
