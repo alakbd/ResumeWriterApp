@@ -43,48 +43,13 @@
             margin: 10px 0; 
         }
         
-        .stat-label { 
-            color: #666; 
-            font-size: 0.9rem; 
-        }
-        
-        .cost-warning { color: #e74c3c; }
-        .cost-good { color: #27ae60; }
-        
-        .chart-container { 
-            background: white; 
-            padding: 20px; 
-            border-radius: 10px; 
-            box-shadow: 0 2px 10px rgba(0,0,0,0.1); 
-            margin-bottom: 20px; 
-        }
-        
-        .btn { 
-            background: #667eea; 
-            color: white; 
-            border: none; 
-            padding: 10px 20px; 
-            border-radius: 5px; 
-            cursor: pointer; 
-            margin: 5px; 
-            font-size: 14px;
-        }
-        
-        .btn:hover { background: #5a6fd8; }
-        .btn-danger { background: #e74c3c; }
-        .btn-danger:hover { background: #c0392b; }
-        .btn-warning { background: #f39c12; }
-        .btn-warning:hover { background: #e67e22; }
-        .btn-success { background: #27ae60; }
-        .btn-success:hover { background: #219653; }
-        
         .login-container { 
             background: white; 
             padding: 40px; 
             border-radius: 10px; 
             box-shadow: 0 2px 10px rgba(0,0,0,0.1); 
-            max-width: 400px; 
-            margin: 100px auto; 
+            max-width: 500px; 
+            margin: 50px auto; 
             text-align: center;
         }
         
@@ -97,10 +62,17 @@
             font-size: 14px;
         }
         
-        .loading { 
-            opacity: 0.6; 
-            pointer-events: none; 
+        .btn { 
+            background: #667eea; 
+            color: white; 
+            border: none; 
+            padding: 10px 20px; 
+            border-radius: 5px; 
+            cursor: pointer; 
+            margin: 5px; 
         }
+        
+        .btn-success { background: #27ae60; }
         
         .error-message { 
             background: #fee; 
@@ -120,71 +92,6 @@
             margin: 10px 0; 
         }
         
-        .info-message { 
-            background: #e8f4fd; 
-            border: 1px solid #b6d7f7; 
-            color: #1a5a9a; 
-            padding: 10px; 
-            border-radius: 5px; 
-            margin: 10px 0; 
-        }
-        
-        table { 
-            width: 100%; 
-            border-collapse: collapse; 
-            margin: 10px 0; 
-        }
-        
-        th, td { 
-            padding: 12px; 
-            text-align: left; 
-            border-bottom: 1px solid #eee; 
-        }
-        
-        th { 
-            background: #f8f9fa; 
-            font-weight: 600; 
-        }
-        
-        .user-list { 
-            max-height: 300px; 
-            overflow-y: auto; 
-            border: 1px solid #ddd; 
-            border-radius: 5px; 
-        }
-        
-        .user-item { 
-            padding: 12px; 
-            border-bottom: 1px solid #eee; 
-            font-family: monospace; 
-        }
-        
-        .status-online { color: #27ae60; }
-        .status-offline { color: #e74c3c; }
-        .status-degraded { color: #f39c12; }
-        
-        .auto-login-overlay { 
-            position: fixed; 
-            top: 0; 
-            left: 0; 
-            width: 100%; 
-            height: 100%; 
-            background: white; 
-            z-index: 1000; 
-            display: flex; 
-            justify-content: center; 
-            align-items: center; 
-            flex-direction: column; 
-        }
-        
-        .user-info {
-            background: #f8f9fa;
-            padding: 10px 15px;
-            border-radius: 5px;
-            margin: 10px 0;
-            font-size: 14px;
-        }
-        
         .debug-panel {
             background: #f8f9fa;
             border: 1px solid #ddd;
@@ -194,39 +101,67 @@
             font-family: monospace;
             font-size: 12px;
         }
+        
+        .tab-container {
+            display: flex;
+            margin-bottom: 20px;
+            border-bottom: 1px solid #ddd;
+        }
+        
+        .tab {
+            padding: 10px 20px;
+            cursor: pointer;
+            border: 1px solid transparent;
+            border-bottom: none;
+            margin-right: 5px;
+            border-radius: 5px 5px 0 0;
+        }
+        
+        .tab.active {
+            background: #667eea;
+            color: white;
+            border-color: #667eea;
+        }
     </style>
 </head>
 <body>
     <div id="app">
-        <!-- Auto-login overlay -->
-        <div id="autoLoginOverlay" class="auto-login-overlay">
-            <h2>🔄 Loading Admin Dashboard...</h2>
-            <p>Initializing secure connection...</p>
-            <div id="autoLoginStatus" style="margin-top: 20px;"></div>
-        </div>
-
         <!-- Login Screen -->
-        <div id="loginScreen" class="login-container" style="display: none;">
+        <div id="loginScreen" class="login-container">
             <h2 style="margin-bottom: 10px;">🔐 Admin Dashboard</h2>
-            <p style="color: #666; margin-bottom: 20px;">
-                Enter your admin credentials
-            </p>
+            <p style="color: #666; margin-bottom: 20px;">Choose authentication method</p>
+            
+            <div class="tab-container">
+                <div class="tab active" onclick="showTab('firebaseTab')">Firebase UID</div>
+                <div class="tab" onclick="showTab('credentialsTab')">Username/Password</div>
+            </div>
             
             <div id="loginMessage" style="display: none;"></div>
             
-            <form id="loginForm" onsubmit="login(event)">
-                <input type="text" id="username" class="login-input" placeholder="Admin Username" required>
-                <input type="password" id="password" class="login-input" placeholder="Admin Password" required>
-                
-                <button type="submit" class="btn btn-success" style="width: 100%; margin-top: 10px;">
-                    Sign In
-                </button>
-            </form>
+            <!-- Firebase UID Tab -->
+            <div id="firebaseTab" class="tab-content">
+                <p style="color: #666; margin-bottom: 15px;">Enter your Firebase Admin UID</p>
+                <form id="firebaseForm" onsubmit="loginWithFirebaseUID(event)">
+                    <input type="text" id="firebaseUID" class="login-input" placeholder="Firebase Admin UID" required value="admin-user">
+                    <button type="submit" class="btn btn-success" style="width: 100%; margin-top: 10px;">
+                        Sign In with Firebase UID
+                    </button>
+                </form>
+                <div class="debug-panel" style="margin-top: 15px;">
+                    <small><strong>Note:</strong> Your UID should be a Firebase user with admin role in Firestore</small>
+                </div>
+            </div>
             
-            <div class="info-message" style="margin-top: 20px;">
-                <small>
-                    Use your backend admin username and password
-                </small>
+            <!-- Username/Password Tab -->
+            <div id="credentialsTab" class="tab-content" style="display: none;">
+                <p style="color: #666; margin-bottom: 15px;">Enter backend admin credentials</p>
+                <form id="credentialsForm" onsubmit="loginWithCredentials(event)">
+                    <input type="text" id="username" class="login-input" placeholder="Admin Username" required>
+                    <input type="password" id="password" class="login-input" placeholder="Admin Password" required>
+                    <button type="submit" class="btn btn-success" style="width: 100%; margin-top: 10px;">
+                        Sign In with Credentials
+                    </button>
+                </form>
             </div>
             
             <!-- Debug Info -->
@@ -240,113 +175,46 @@
         <div id="dashboard" style="display: none;">
             <div class="header">
                 <h1>📊 Resume Writer - Admin Dashboard</h1>
-                <p>Real-time API Monitoring & Cost Tracking</p>
-                <div class="user-info" style="background: rgba(255,255,255,0.2); display: inline-block; margin-top: 10px;">
-                    <strong>Admin:</strong> <span id="adminUsername">-</span>
+                <p>Firebase UID Authentication</p>
+                <div style="background: rgba(255,255,255,0.2); display: inline-block; margin-top: 10px; padding: 10px; border-radius: 5px;">
+                    <strong>Admin UID:</strong> <span id="adminUID">-</span>
                 </div>
-                <small id="accessModeDisplay">Backend Admin Access • Auto-refresh every 30s</small>
             </div>
 
             <div class="container">
-                <!-- Control Bar -->
-                <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 20px; flex-wrap: wrap; gap: 10px;">
-                    <div>
-                        <button class="btn" onclick="refreshStats()" id="refreshBtn">🔄 Refresh</button>
-                        <button class="btn btn-warning" onclick="resetStats()" id="resetBtn">📊 Reset Daily Stats</button>
-                        <button class="btn btn-danger" onclick="logout()">🚪 Logout</button>
-                    </div>
-                    <div style="color: #666; font-size: 14px;">
-                        Auto-refresh: <span id="autoRefreshStatus">On (30s)</span> • 
-                        Session: <span id="sessionTimer">0:00</span>
-                    </div>
+                <div style="display: flex; gap: 10px; margin-bottom: 20px;">
+                    <button class="btn" onclick="testAdminAccess()">🔍 Test Admin Access</button>
+                    <button class="btn" onclick="refreshPublicStats()">📊 Public Stats</button>
+                    <button class="btn" onclick="logout()">🚪 Logout</button>
                 </div>
 
-                <!-- Messages -->
                 <div id="messageContainer" style="display: none;"></div>
 
                 <!-- Debug Panel -->
-                <div class="debug-panel" id="debugPanel" style="display: none;">
+                <div class="debug-panel" id="debugPanel">
                     <strong>API Debug Information:</strong>
-                    <div id="debugInfo"></div>
+                    <div id="debugInfo">Ready to test admin access...</div>
                 </div>
 
-                <!-- Live Stats -->
-                <div class="stats-grid">
-                    <div class="stat-card">
-                        <div class="stat-label">Daily Cost</div>
-                        <div class="stat-value cost-good" id="dailyCost">...</div>
-                        <div class="stat-label">OpenAI API Usage</div>
-                    </div>
-                    
-                    <div class="stat-card">
-                        <div class="stat-label">Total Tokens</div>
-                        <div class="stat-value" id="totalTokens">...</div>
-                        <div class="stat-label">Today</div>
-                    </div>
-                    
-                    <div class="stat-card">
-                        <div class="stat-label">API Requests</div>
-                        <div class="stat-value" id="apiRequests">...</div>
-                        <div class="stat-label">Today</div>
-                    </div>
-                    
-                    <div class="stat-card">
-                        <div class="stat-label">Cache Performance</div>
-                        <div class="stat-value" id="cacheHits">...</div>
-                        <div class="stat-label" id="cacheRatio">Ratio: ...</div>
-                    </div>
-                    
-                    <div class="stat-card">
-                        <div class="stat-label">Total Users</div>
-                        <div class="stat-value" id="userCount">...</div>
-                        <div class="stat-label">Registered</div>
-                    </div>
-                    
-                    <div class="stat-card">
-                        <div class="stat-label">Server Status</div>
-                        <div class="stat-value" id="serverStatus">⏳ Loading...</div>
-                        <div class="stat-label" id="lastUpdate">Last update: Never</div>
-                    </div>
-                </div>
-
-                <!-- Cost History -->
-                <div class="chart-container">
-                    <h3>📈 Cost History (Last 7 Days)</h3>
-                    <div id="costHistory">
-                        <p>Loading cost history...</p>
-                    </div>
-                </div>
-
-                <!-- User Statistics -->
-                <div class="chart-container">
-                    <h3>👥 User Statistics</h3>
-                    <div id="userStats">
-                        Loading user data...
-                    </div>
-                </div>
-
-                <!-- System Info -->
-                <div class="chart-container">
-                    <h3>⚙️ System Information</h3>
-                    <div style="display: grid; grid-template-columns: repeat(auto-fit, minmax(200px, 1fr)); gap: 15px;">
-                        <div>
-                            <strong>API Base URL:</strong><br>
-                            <code id="apiBaseUrl">-</code>
+                <!-- Stats will appear here -->
+                <div id="statsContainer" style="display: none;">
+                    <div class="stats-grid">
+                        <div class="stat-card">
+                            <div>Total Users</div>
+                            <div class="stat-value" id="totalUsers">0</div>
+                            <div>Registered</div>
                         </div>
-                        <div>
-                            <strong>Session Started:</strong><br>
-                            <span id="sessionStart">-</span>
+                        
+                        <div class="stat-card">
+                            <div>Daily Cost</div>
+                            <div class="stat-value" id="dailyCost">$0</div>
+                            <div>OpenAI Usage</div>
                         </div>
-                        <div>
-                            <strong>Access Mode:</strong><br>
-                            <span id="accessMode" style="color: #27ae60;">Backend Admin</span>
-                        </div>
-                        <div>
-                            <strong>Auto-refresh:</strong><br>
-                            <label>
-                                <input type="checkbox" id="autoRefreshToggle" checked onchange="toggleAutoRefresh()">
-                                Every 30 seconds
-                            </label>
+                        
+                        <div class="stat-card">
+                            <div>API Requests</div>
+                            <div class="stat-value" id="apiRequests">0</div>
+                            <div>Today</div>
                         </div>
                     </div>
                 </div>
@@ -355,51 +223,84 @@
     </div>
 
     <script>
-        // Configuration
         const API_BASE_URL = 'https://resume-writer-api.onrender.com';
-
         let currentSession = null;
-        let refreshInterval;
-        let sessionTimerInterval;
-        let sessionStartTime;
-        let autoRefreshEnabled = true;
 
-        document.addEventListener('DOMContentLoaded', function() {
-            document.getElementById('autoLoginOverlay').style.display = 'flex';
-            showLoginScreen();
-        });
+        function showTab(tabName) {
+            // Update tabs
+            document.querySelectorAll('.tab').forEach(tab => tab.classList.remove('active'));
+            document.querySelectorAll('.tab-content').forEach(content => content.style.display = 'none');
+            
+            // Show selected tab
+            event.target.classList.add('active');
+            document.getElementById(tabName).style.display = 'block';
+        }
 
-        function updateAutoLoginStatus(message) {
-            const statusElement = document.getElementById('autoLoginStatus');
-            if (statusElement) {
-                statusElement.textContent = message;
+        async function loginWithFirebaseUID(event) {
+            event.preventDefault();
+            
+            const firebaseUID = document.getElementById('firebaseUID').value.trim();
+            
+            if (!firebaseUID) {
+                showLoginMessage('Please enter Firebase UID', 'error');
+                return;
+            }
+
+            document.getElementById('firebaseForm').classList.add('loading');
+            showLoginMessage('', '');
+            
+            // Show debug panel
+            const debugPanel = document.getElementById('loginDebug');
+            const debugContent = document.getElementById('debugContent');
+            debugPanel.style.display = 'block';
+            debugContent.innerHTML = 'Testing Firebase UID authentication...';
+            
+            try {
+                debugContent.innerHTML += '<br>🔐 Testing UID: ' + firebaseUID;
+                
+                // Test if this UID has admin access by calling admin stats
+                const response = await fetch(`${API_BASE_URL}/admin/stats`, {
+                    headers: {
+                        'X-User-ID': firebaseUID,
+                        'Content-Type': 'application/json'
+                    }
+                });
+                
+                debugContent.innerHTML += `<br>📊 Admin stats response: ${response.status}`;
+                
+                if (response.ok) {
+                    const data = await response.json();
+                    debugContent.innerHTML += '<br>✅ Admin access granted!';
+                    
+                    currentSession = {
+                        uid: firebaseUID,
+                        type: 'firebase'
+                    };
+                    
+                    handleSuccessfulLogin();
+                } else {
+                    const errorText = await response.text();
+                    debugContent.innerHTML += `<br>❌ Admin access denied: ${response.status}`;
+                    debugContent.innerHTML += `<br>Error details: ${errorText}`;
+                    
+                    if (response.status === 401) {
+                        throw new Error('UID does not have admin privileges');
+                    } else if (response.status === 422) {
+                        throw new Error('User not found in Firestore or missing admin role');
+                    } else {
+                        throw new Error(`HTTP ${response.status}: ${errorText}`);
+                    }
+                }
+            } catch (error) {
+                console.error('Login error:', error);
+                showLoginMessage('Admin access failed: ' + error.message, 'error');
+                debugContent.innerHTML += `<br>❌ Error: ${error.message}`;
+            } finally {
+                document.getElementById('firebaseForm').classList.remove('loading');
             }
         }
 
-        function showLoginScreen() {
-            document.getElementById('autoLoginOverlay').style.display = 'none';
-            document.getElementById('loginScreen').style.display = 'block';
-            document.getElementById('dashboard').style.display = 'none';
-        }
-
-        function handleSuccessfulLogin() {
-            document.getElementById('autoLoginOverlay').style.display = 'none';
-            document.getElementById('loginScreen').style.display = 'none';
-            document.getElementById('dashboard').style.display = 'block';
-            
-            // Initialize dashboard
-            sessionStartTime = new Date();
-            document.getElementById('sessionStart').textContent = sessionStartTime.toLocaleString();
-            document.getElementById('apiBaseUrl').textContent = API_BASE_URL;
-            document.getElementById('adminUsername').textContent = currentSession.username;
-            
-            showMessage('Admin authentication successful!', 'success');
-            refreshStats();
-            startAutoRefresh();
-            startSessionTimer();
-        }
-
-        async function login(event) {
+        async function loginWithCredentials(event) {
             event.preventDefault();
             
             const username = document.getElementById('username').value.trim();
@@ -410,17 +311,16 @@
                 return;
             }
 
-            document.getElementById('loginScreen').classList.add('loading');
+            document.getElementById('credentialsForm').classList.add('loading');
             showLoginMessage('', '');
             
-            // Show debug panel
             const debugPanel = document.getElementById('loginDebug');
             const debugContent = document.getElementById('debugContent');
             debugPanel.style.display = 'block';
-            debugContent.innerHTML = 'Starting login process...';
+            debugContent.innerHTML = 'Testing username/password authentication...';
             
             try {
-                debugContent.innerHTML += '<br>📡 Sending login request to /admin/login...';
+                debugContent.innerHTML += '<br>📡 Sending to /admin/login...';
                 
                 const response = await fetch(`${API_BASE_URL}/admin/login`, {
                     method: 'POST',
@@ -436,18 +336,16 @@
                 debugContent.innerHTML += `<br>📊 Response status: ${response.status}`;
                 
                 const data = await response.json();
-                debugContent.innerHTML += `<br>📦 Response data: ${JSON.stringify(data)}`;
+                debugContent.innerHTML += `<br>📦 Response: ${JSON.stringify(data)}`;
                 
                 if (response.ok && data.success) {
                     debugContent.innerHTML += '<br>✅ Login successful!';
                     
-                    // Store session information
                     currentSession = {
-                        userId: data.user_id || "admin-user",
-                        username: data.username || username
+                        uid: data.user_id || "admin-user",
+                        username: data.username || username,
+                        type: 'credentials'
                     };
-                    
-                    debugContent.innerHTML += `<br>💾 Session stored: ${JSON.stringify(currentSession)}`;
                     
                     handleSuccessfulLogin();
                 } else {
@@ -455,314 +353,159 @@
                 }
             } catch (error) {
                 console.error('Login error:', error);
-                document.getElementById('loginScreen').classList.remove('loading');
                 showLoginMessage('Login failed: ' + error.message, 'error');
                 debugContent.innerHTML += `<br>❌ Error: ${error.message}`;
+            } finally {
+                document.getElementById('credentialsForm').classList.remove('loading');
             }
         }
 
-        function showLoginMessage(message, type) {
-            const messageDiv = document.getElementById('loginMessage');
-            if (messageDiv) {
-                messageDiv.textContent = message;
-                messageDiv.className = type === 'error' ? 'error-message' : 'success-message';
-                messageDiv.style.display = 'block';
-            }
+        function handleSuccessfulLogin() {
+            document.getElementById('loginScreen').style.display = 'none';
+            document.getElementById('dashboard').style.display = 'block';
+            document.getElementById('adminUID').textContent = currentSession.uid;
+            
+            showMessage('Authentication successful!', 'success');
+            testAdminAccess();
         }
 
-        function showMessage(message, type) {
-            const container = document.getElementById('messageContainer');
-            if (container) {
-                container.innerHTML = `<div class="${type === 'error' ? 'error-message' : 'success-message'}">${message}</div>`;
-                container.style.display = 'block';
-                
-                setTimeout(() => {
-                    container.style.display = 'none';
-                }, 5000);
-            }
-        }
-
-        function refreshStats() {
+        async function testAdminAccess() {
             if (!currentSession) {
                 showMessage('Please log in first', 'error');
                 return;
             }
 
-            // Show loading states
-            document.querySelectorAll('.stat-value').forEach(el => {
-                if (el.id !== 'serverStatus') {
-                    el.textContent = '...';
-                }
-            });
-            
-            const refreshBtn = document.getElementById('refreshBtn');
-            if (refreshBtn) refreshBtn.classList.add('loading');
-            
-            const serverStatus = document.getElementById('serverStatus');
-            if (serverStatus) serverStatus.textContent = '⏳ Loading...';
-
-            // Update debug panel
-            const debugPanel = document.getElementById('debugPanel');
             const debugInfo = document.getElementById('debugInfo');
-            debugPanel.style.display = 'block';
-            debugInfo.innerHTML = 'Fetching admin stats...';
-
-            // Get main stats - NOTE: This will likely fail because it requires Firebase user auth
-            fetch(`${API_BASE_URL}/admin/stats`)
-            .then(response => {
-                debugInfo.innerHTML += `<br>📊 Stats response: ${response.status}`;
-                if (!response.ok) throw new Error(`HTTP ${response.status}`);
-                return response.json();
-            })
-            .then(data => {
-                debugInfo.innerHTML += `<br>✅ Stats data received`;
-                if (data.success) {
-                    updateDashboard(data);
-                }
-            })
-            .catch(error => {
-                console.error('Stats error:', error);
-                debugInfo.innerHTML += `<br>❌ Stats failed: ${error.message}`;
-                
-                // Try public endpoints as fallback
-                debugInfo.innerHTML += `<br>🔄 Trying public endpoints...`;
-                fetchPublicData();
-            })
-            .finally(() => {
-                if (refreshBtn) refreshBtn.classList.remove('loading');
-            });
-
-            // Get cost history from public endpoint
-            fetch(`${API_BASE_URL}/public/admin/cost-history?days=7`)
-            .then(response => {
-                debugInfo.innerHTML += `<br>📈 Cost history response: ${response.status}`;
-                if (!response.ok) throw new Error(`HTTP ${response.status}`);
-                return response.json();
-            })
-            .then(data => {
-                if (data.success) {
-                    updateCostHistory(data.data || data);
-                }
-            })
-            .catch(error => {
-                console.error('Cost history error:', error);
-                debugInfo.innerHTML += `<br>❌ Cost history failed: ${error.message}`;
-            });
-
-            // Get user stats from public endpoint
-            fetch(`${API_BASE_URL}/public/admin/users`)
-            .then(response => {
-                debugInfo.innerHTML += `<br>👥 Users response: ${response.status}`;
-                if (!response.ok) throw new Error(`HTTP ${response.status}`);
-                return response.json();
-            })
-            .then(data => {
-                if (data.success) {
-                    updateUserStats(data);
-                }
-            })
-            .catch(error => {
-                console.error('User stats error:', error);
-                debugInfo.innerHTML += `<br>❌ User stats failed: ${error.message}`;
-            });
-
-            checkServerHealth();
-        }
-
-        function fetchPublicData() {
-            // Use public endpoints that don't require Firebase authentication
-            const debugInfo = document.getElementById('debugInfo');
+            debugInfo.innerHTML = 'Testing admin endpoints with UID: ' + currentSession.uid;
             
-            // Public stats
-            fetch(`${API_BASE_URL}/public/admin/stats`)
-            .then(response => response.json())
-            .then(data => {
-                if (data.success) {
-                    debugInfo.innerHTML += `<br>✅ Public stats loaded`;
-                    updateDashboard(data);
-                }
-            })
-            .catch(error => {
-                debugInfo.innerHTML += `<br>❌ Public stats failed: ${error.message}`;
-            });
-        }
-
-        function updateDashboard(stats) {
-            document.getElementById('dailyCost').textContent = `$${stats.daily_cost?.toFixed(6) || '0'}`;
-            document.getElementById('totalTokens').textContent = (stats.total_tokens || 0).toLocaleString();
-            document.getElementById('apiRequests').textContent = (stats.api_requests || 0).toLocaleString();
-            document.getElementById('cacheHits').textContent = (stats.cache_hits || 0).toLocaleString();
-            document.getElementById('userCount').textContent = (stats.user_count || 0).toLocaleString();
-            
-            const totalCache = (stats.cache_hits || 0) + (stats.cache_misses || 0);
-            const cacheRatio = totalCache > 0 ? ((stats.cache_hits || 0) / totalCache * 100).toFixed(1) : 0;
-            document.getElementById('cacheRatio').textContent = `Ratio: ${cacheRatio}%`;
-            
-            document.getElementById('lastUpdate').textContent = `Last update: ${new Date().toLocaleTimeString()}`;
-            
-            // Color code based on cost
-            const costElement = document.getElementById('dailyCost');
-            const dailyCost = stats.daily_cost || 0;
-            if (dailyCost > 1.0) {
-                costElement.className = 'stat-value cost-warning';
-            } else if (dailyCost > 0.1) {
-                costElement.className = 'stat-value';
-            } else {
-                costElement.className = 'stat-value cost-good';
-            }
-        }
-
-        function updateCostHistory(history) {
-            const historyDiv = document.getElementById('costHistory');
-            
-            if (!history || history.length === 0) {
-                historyDiv.innerHTML = '<p>No cost history available yet. Stats will appear after daily reset.</p>';
-                return;
-            }
-
-            let html = '<table>';
-            html += '<tr>';
-            html += '<th>Date</th>';
-            html += '<th style="text-align: right;">Cost</th>';
-            html += '<th style="text-align: right;">Requests</th>';
-            html += '</tr>';
-            
-            history.forEach(day => {
-                const costColor = day.cost > 1.0 ? 'cost-warning' : (day.cost > 0.1 ? '' : 'cost-good');
-                html += `<tr>`;
-                html += `<td>${day.date}</td>`;
-                html += `<td style="text-align: right;" class="${costColor}">$${day.cost?.toFixed(6) || '0'}</td>`;
-                html += `<td style="text-align: right;">${day.requests?.toLocaleString() || '0'}</td>`;
-                html += `</tr>`;
-            });
-            
-            html += '</table>';
-            historyDiv.innerHTML = html;
-        }
-
-        function updateUserStats(userData) {
-            const userStatsDiv = document.getElementById('userStats');
-            
-            if (!userData) {
-                userStatsDiv.innerHTML = '<p>Error loading user data</p>';
-                return;
-            }
-
-            let html = `
-                <div style="display: grid; grid-template-columns: repeat(auto-fit, minmax(200px, 1fr)); gap: 15px; margin-bottom: 20px;">
-                    <div style="background: #f8f9fa; padding: 15px; border-radius: 5px;">
-                        <strong>Total Users</strong><br>
-                        <span style="font-size: 1.5rem; color: #667eea;">${userData.total_users || 0}</span>
-                    </div>
-                    <div style="background: #f8f9fa; padding: 15px; border-radius: 5px;">
-                        <strong>Credits Used</strong><br>
-                        <span style="font-size: 1.5rem; color: #e74c3c;">${userData.total_credits_used || 0}</span>
-                    </div>
-                    <div style="background: #f8f9fa; padding: 15px; border-radius: 5px;">
-                        <strong>Credits Available</strong><br>
-                        <span style="font-size: 1.5rem; color: #27ae60;">${userData.total_credits_available || 0}</span>
-                    </div>
-                </div>
-            `;
-            
-            userStatsDiv.innerHTML = html;
-        }
-
-        function checkServerHealth() {
-            fetch(`${API_BASE_URL}/health`)
-            .then(response => response.json())
-            .then(health => {
-                const statusEl = document.getElementById('serverStatus');
-                if (statusEl) {
-                    if (health.status === 'healthy') {
-                        statusEl.textContent = '✅ Online';
-                        statusEl.className = 'stat-value status-online';
-                    } else {
-                        statusEl.textContent = '⚠️ Degraded';
-                        statusEl.className = 'stat-value status-degraded';
+            try {
+                // Test admin stats
+                debugInfo.innerHTML += '<br><br>🔐 Testing /admin/stats...';
+                const statsResponse = await fetch(`${API_BASE_URL}/admin/stats`, {
+                    headers: {
+                        'X-User-ID': currentSession.uid,
+                        'Content-Type': 'application/json'
                     }
-                }
-            })
-            .catch(() => {
-                const statusEl = document.getElementById('serverStatus');
-                if (statusEl) {
-                    statusEl.textContent = '❌ Offline';
-                    statusEl.className = 'stat-value status-offline';
-                }
-            });
-        }
-
-        function resetStats() {
-            if (confirm('Are you sure you want to reset daily statistics?')) {
-                // Note: This will likely fail without proper Firebase admin auth
-                fetch(`${API_BASE_URL}/admin/reset-stats`, {
-                    method: 'POST'
-                })
-                .then(response => response.json())
-                .then(data => {
-                    if (data.success) {
-                        showMessage('Statistics reset successfully!', 'success');
-                        refreshStats();
-                    } else {
-                        throw new Error(data.detail || 'Reset failed');
-                    }
-                })
-                .catch(error => {
-                    showMessage('Reset failed: ' + error.message, 'error');
                 });
+                
+                if (statsResponse.ok) {
+                    const statsData = await statsResponse.json();
+                    debugInfo.innerHTML += '<br>✅ Admin stats: SUCCESS';
+                    updateStats(statsData);
+                    document.getElementById('statsContainer').style.display = 'block';
+                } else {
+                    debugInfo.innerHTML += `<br>❌ Admin stats: FAILED (${statsResponse.status})`;
+                }
+
+                // Test admin users
+                debugInfo.innerHTML += '<br><br>👥 Testing /admin/users...';
+                const usersResponse = await fetch(`${API_BASE_URL}/admin/users`, {
+                    headers: {
+                        'X-User-ID': currentSession.uid,
+                        'Content-Type': 'application/json'
+                    }
+                });
+                
+                if (usersResponse.ok) {
+                    const usersData = await usersResponse.json();
+                    debugInfo.innerHTML += '<br>✅ Admin users: SUCCESS';
+                } else {
+                    debugInfo.innerHTML += `<br>❌ Admin users: FAILED (${usersResponse.status})`;
+                }
+
+                // Test cost history
+                debugInfo.innerHTML += '<br><br>📈 Testing /admin/cost-history...';
+                const costResponse = await fetch(`${API_BASE_URL}/admin/cost-history?days=7`, {
+                    headers: {
+                        'X-User-ID': currentSession.uid,
+                        'Content-Type': 'application/json'
+                    }
+                });
+                
+                if (costResponse.ok) {
+                    const costData = await costResponse.json();
+                    debugInfo.innerHTML += '<br>✅ Cost history: SUCCESS';
+                } else {
+                    debugInfo.innerHTML += `<br>❌ Cost history: FAILED (${costResponse.status})`;
+                }
+
+            } catch (error) {
+                debugInfo.innerHTML += `<br><br>❌ Network error: ${error.message}`;
             }
+        }
+
+        async function refreshPublicStats() {
+            const debugInfo = document.getElementById('debugInfo');
+            debugInfo.innerHTML = 'Loading public statistics...';
+            
+            try {
+                // Public stats
+                const publicStatsResponse = await fetch(`${API_BASE_URL}/public/admin/stats`);
+                if (publicStatsResponse.ok) {
+                    const publicStats = await publicStatsResponse.json();
+                    debugInfo.innerHTML += '<br>✅ Public stats loaded';
+                    updateStats(publicStats);
+                    document.getElementById('statsContainer').style.display = 'block';
+                }
+
+                // Public users
+                const publicUsersResponse = await fetch(`${API_BASE_URL}/public/admin/users`);
+                if (publicUsersResponse.ok) {
+                    const publicUsers = await publicUsersResponse.json();
+                    debugInfo.innerHTML += '<br>✅ Public users loaded';
+                }
+
+                // Public cost history
+                const publicCostResponse = await fetch(`${API_BASE_URL}/public/admin/cost-history?days=7`);
+                if (publicCostResponse.ok) {
+                    const publicCost = await publicCostResponse.json();
+                    debugInfo.innerHTML += '<br>✅ Public cost history loaded';
+                }
+
+            } catch (error) {
+                debugInfo.innerHTML += `<br>❌ Public data error: ${error.message}`;
+            }
+        }
+
+        function updateStats(stats) {
+            if (stats.daily_cost !== undefined) {
+                document.getElementById('dailyCost').textContent = `$${stats.daily_cost.toFixed(6)}`;
+            }
+            if (stats.user_count !== undefined) {
+                document.getElementById('totalUsers').textContent = stats.user_count.toLocaleString();
+            }
+            if (stats.api_requests !== undefined) {
+                document.getElementById('apiRequests').textContent = stats.api_requests.toLocaleString();
+            }
+        }
+
+        function showLoginMessage(message, type) {
+            const messageDiv = document.getElementById('loginMessage');
+            messageDiv.textContent = message;
+            messageDiv.className = type === 'error' ? 'error-message' : 'success-message';
+            messageDiv.style.display = 'block';
+        }
+
+        function showMessage(message, type) {
+            const container = document.getElementById('messageContainer');
+            container.innerHTML = `<div class="${type === 'error' ? 'error-message' : 'success-message'}">${message}</div>`;
+            container.style.display = 'block';
+            setTimeout(() => container.style.display = 'none', 5000);
         }
 
         function logout() {
             currentSession = null;
             document.getElementById('loginScreen').style.display = 'block';
             document.getElementById('dashboard').style.display = 'none';
-            document.getElementById('loginScreen').classList.remove('loading');
+            document.getElementById('firebaseUID').value = 'admin-user';
             document.getElementById('username').value = '';
             document.getElementById('password').value = '';
-            stopAutoRefresh();
-            stopSessionTimer();
         }
 
-        function startSessionTimer() {
-            sessionTimerInterval = setInterval(() => {
-                const now = new Date();
-                const diff = Math.floor((now - sessionStartTime) / 1000);
-                const minutes = Math.floor(diff / 60);
-                const seconds = diff % 60;
-                document.getElementById('sessionTimer').textContent = 
-                    `${minutes}:${seconds.toString().padStart(2, '0')}`;
-            }, 1000);
-        }
-
-        function stopSessionTimer() {
-            if (sessionTimerInterval) {
-                clearInterval(sessionTimerInterval);
-            }
-        }
-
-        function startAutoRefresh() {
-            if (autoRefreshEnabled) {
-                refreshInterval = setInterval(refreshStats, 30000);
-                document.getElementById('autoRefreshStatus').textContent = 'On (30s)';
-            }
-        }
-        
-        function stopAutoRefresh() {
-            if (refreshInterval) {
-                clearInterval(refreshInterval);
-            }
-            document.getElementById('autoRefreshStatus').textContent = 'Off';
-        }
-        
-        function toggleAutoRefresh() {
-            autoRefreshEnabled = document.getElementById('autoRefreshToggle').checked;
-            if (autoRefreshEnabled) {
-                startAutoRefresh();
-            } else {
-                stopAutoRefresh();
-            }
-        }
+        // Initialize with Firebase UID tab
+        document.addEventListener('DOMContentLoaded', function() {
+            showTab('firebaseTab');
+        });
     </script>
 </body>
 </html>
