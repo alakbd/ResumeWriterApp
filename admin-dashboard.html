@@ -101,6 +101,14 @@
             font-size: 12px;
             margin: 10px 0;
         }
+        
+        .test-section {
+            background: #fff3cd;
+            border: 1px solid #ffeaa7;
+            padding: 15px;
+            border-radius: 5px;
+            margin: 10px 0;
+        }
     </style>
 </head>
 <body>
@@ -138,10 +146,19 @@
             <div class="container">
                 <div style="display: flex; gap: 10px; margin-bottom: 20px;">
                     <button class="btn" onclick="refreshStats()" id="refreshBtn">🔄 Refresh</button>
+                    <button class="btn" onclick="testAllAuthMethods()">🔍 Test Auth Methods</button>
                     <button class="btn" onclick="logout()">🚪 Logout</button>
                 </div>
 
                 <div id="messageContainer" style="display: none;"></div>
+                
+                <!-- Authentication Testing Section -->
+                <div class="test-section">
+                    <h3>🔍 Authentication Testing</h3>
+                    <p>Testing different authentication methods to find what works:</p>
+                    <div id="authTestResults" class="debug-info"></div>
+                </div>
+
                 <div id="dashboardDebug" class="debug-info" style="display: none;"></div>
 
                 <!-- Live Stats -->
@@ -177,6 +194,7 @@
     <script>
         const API_BASE_URL = 'https://resume-writer-api.onrender.com';
         let currentSession = null;
+        let workingAuthMethod = null;
 
         async function login(event) {
             event.preventDefault();
@@ -221,8 +239,9 @@
                 if (response.ok && data.success) {
                     debugElement.innerHTML += `<div style="color: green;">✓ Login successful!</div>`;
                     
-                    // Store the session
+                    // Store the session with ALL data from response
                     currentSession = {
+                        ...data, // Store everything from the response
                         user_id: data.user_id,
                         username: data.username || username
                     };
@@ -237,9 +256,8 @@
                     document.getElementById('adminUsername').textContent = currentSession.username;
                     document.getElementById('adminUserID').textContent = currentSession.user_id;
                     
-                    // Test API call immediately
-                    debugElement.innerHTML += `<div>Testing API call with user_id: ${currentSession.user_id}</div>`;
-                    await testAPICall();
+                    // Test different authentication methods
+                    await testAllAuthMethods();
                     
                 } else {
                     throw new Error(data.detail || data.message || 'Login failed');
@@ -254,33 +272,80 @@
             }
         }
 
-        async function testAPICall() {
-            const debugElement = document.getElementById('dashboardDebug');
-            debugElement.style.display = 'block';
-            debugElement.innerHTML = '<div>Testing API call to /admin/stats...</div>';
+        async function testAllAuthMethods() {
+            const testResults = document.getElementById('authTestResults');
+            testResults.innerHTML = '<div>Testing authentication methods...</div>';
             
-            try {
-                const response = await fetch(`${API_BASE_URL}/admin/stats`, {
-                    headers: { 
-                        'X-User-ID': currentSession.user_id,
-                        'Content-Type': 'application/json'
-                    }
-                });
-                
-                debugElement.innerHTML += `<div>API Response status: ${response.status}</div>`;
-                
-                if (response.ok) {
-                    const data = await response.json();
-                    debugElement.innerHTML += `<div style="color: green;">✓ API call successful! Data: ${JSON.stringify(data)}</div>`;
-                    updateDashboard(data);
-                } else {
-                    debugElement.innerHTML += `<div style="color: red;">✗ API call failed with status: ${response.status}</div>`;
-                    if (response.status === 401) {
-                        debugElement.innerHTML += `<div style="color: red;">Unauthorized - check if user_id is correct</div>`;
-                    }
+            const methods = [
+                {
+                    name: 'X-User-ID header',
+                    headers: { 'X-User-ID': currentSession.user_id }
+                },
+                {
+                    name: 'Authorization Bearer with user_id',
+                    headers: { 'Authorization': `Bearer ${currentSession.user_id}` }
+                },
+                {
+                    name: 'Authorization Bearer with token (if exists)',
+                    headers: { 'Authorization': `Bearer ${currentSession.token || currentSession.access_token}` }
+                },
+                {
+                    name: 'X-Admin-User-ID header',
+                    headers: { 'X-Admin-User-ID': currentSession.user_id }
+                },
+                {
+                    name: 'X-API-Key header',
+                    headers: { 'X-API-Key': currentSession.user_id }
+                },
+                {
+                    name: 'Cookie session (if provided)',
+                    headers: { },
+                    credentials: 'include'
+                },
+                {
+                    name: 'No authentication (public access)',
+                    headers: { }
                 }
-            } catch (error) {
-                debugElement.innerHTML += `<div style="color: red;">API call error: ${error.message}</div>`;
+            ];
+
+            for (const method of methods) {
+                testResults.innerHTML += `<div>Testing: ${method.name}...</div>`;
+                
+                try {
+                    const options = {
+                        headers: {
+                            'Content-Type': 'application/json',
+                            ...method.headers
+                        }
+                    };
+                    
+                    if (method.credentials) {
+                        options.credentials = method.credentials;
+                    }
+
+                    const response = await fetch(`${API_BASE_URL}/admin/stats`, options);
+                    
+                    if (response.ok) {
+                        testResults.innerHTML += `<div style="color: green;">✓ SUCCESS: ${method.name} - Status: ${response.status}</div>`;
+                        workingAuthMethod = method;
+                        
+                        // If this method works, update the dashboard
+                        const data = await response.json();
+                        updateDashboard(data);
+                        break;
+                    } else {
+                        testResults.innerHTML += `<div style="color: orange;">✗ FAILED: ${method.name} - Status: ${response.status}</div>`;
+                    }
+                } catch (error) {
+                    testResults.innerHTML += `<div style="color: red;">ERROR: ${method.name} - ${error.message}</div>`;
+                }
+            }
+
+            if (workingAuthMethod) {
+                testResults.innerHTML += `<div style="color: green; font-weight: bold;">🎉 Working authentication method found: ${workingAuthMethod.name}</div>`;
+                showMessage(`Using authentication: ${workingAuthMethod.name}`, 'success');
+            } else {
+                testResults.innerHTML += `<div style="color: red; font-weight: bold;">❌ No authentication method worked. Please check backend requirements.</div>`;
             }
         }
 
@@ -291,17 +356,31 @@
             }
 
             const debugElement = document.getElementById('dashboardDebug');
-            debugElement.innerHTML += `<div>Refreshing stats with user_id: ${currentSession.user_id}</div>`;
+            debugElement.style.display = 'block';
+            
+            if (!workingAuthMethod) {
+                debugElement.innerHTML = `<div>No working auth method found. Running tests again...</div>`;
+                await testAllAuthMethods();
+                return;
+            }
+
+            debugElement.innerHTML = `<div>Refreshing with method: ${workingAuthMethod.name}</div>`;
 
             try {
-                const response = await fetch(`${API_BASE_URL}/admin/stats`, {
-                    headers: { 
-                        'X-User-ID': currentSession.user_id,
-                        'Content-Type': 'application/json'
+                const options = {
+                    headers: {
+                        'Content-Type': 'application/json',
+                        ...workingAuthMethod.headers
                     }
-                });
+                };
                 
-                debugElement.innerHTML += `<div>Refresh response status: ${response.status}</div>`;
+                if (workingAuthMethod.credentials) {
+                    options.credentials = workingAuthMethod.credentials;
+                }
+
+                const response = await fetch(`${API_BASE_URL}/admin/stats`, options);
+                
+                debugElement.innerHTML += `<div>Response status: ${response.status}</div>`;
                 
                 if (response.ok) {
                     const data = await response.json();
@@ -313,15 +392,20 @@
             } catch (error) {
                 debugElement.innerHTML += `<div style="color: red;">Refresh failed: ${error.message}</div>`;
                 showMessage('Failed to refresh stats: ' + error.message, 'error');
+                
+                // If the working method stops working, test again
+                workingAuthMethod = null;
             }
         }
 
         function updateDashboard(stats) {
-            document.getElementById('dailyCost').textContent = `$${stats.daily_cost?.toFixed(6) || '0'}`;
-            document.getElementById('totalTokens').textContent = stats.total_tokens?.toLocaleString() || '0';
-            document.getElementById('apiRequests').textContent = stats.api_requests?.toLocaleString() || '0';
-            document.getElementById('lastUpdate').textContent = `Last update: ${new Date().toLocaleTimeString()}`;
-            document.getElementById('serverStatus').textContent = '✅ Online';
+            if (stats && typeof stats === 'object') {
+                document.getElementById('dailyCost').textContent = `$${stats.daily_cost?.toFixed(6) || '0'}`;
+                document.getElementById('totalTokens').textContent = stats.total_tokens?.toLocaleString() || '0';
+                document.getElementById('apiRequests').textContent = stats.api_requests?.toLocaleString() || '0';
+                document.getElementById('lastUpdate').textContent = `Last update: ${new Date().toLocaleTimeString()}`;
+                document.getElementById('serverStatus').textContent = '✅ Online';
+            }
         }
 
         function showLoginMessage(message, type) {
@@ -340,6 +424,7 @@
 
         function logout() {
             currentSession = null;
+            workingAuthMethod = null;
             localStorage.removeItem('adminSession');
             document.getElementById('loginScreen').style.display = 'block';
             document.getElementById('dashboard').style.display = 'none';
@@ -361,7 +446,7 @@
                 debugElement.style.display = 'block';
                 debugElement.innerHTML = `<div>Resumed session with user_id: ${currentSession.user_id}</div>`;
                 
-                refreshStats();
+                testAllAuthMethods();
             }
         });
     </script>
