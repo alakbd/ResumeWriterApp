@@ -184,6 +184,16 @@
             margin: 10px 0;
             font-size: 14px;
         }
+        
+        .debug-info {
+            background: #f8f9fa;
+            border: 1px solid #ddd;
+            padding: 10px;
+            border-radius: 5px;
+            font-family: monospace;
+            font-size: 12px;
+            margin: 10px 0;
+        }
     </style>
 </head>
 <body>
@@ -193,6 +203,7 @@
             <h2>🔄 Auto-Connecting...</h2>
             <p>Checking for saved admin session...</p>
             <div id="autoLoginStatus" style="margin-top: 20px;"></div>
+            <div id="debugInfo" class="debug-info" style="display: none; margin-top: 20px;"></div>
         </div>
 
         <!-- Login Screen -->
@@ -218,6 +229,8 @@
                     Use your app admin username and password
                 </small>
             </div>
+            
+            <div id="loginDebug" class="debug-info" style="display: none; margin-top: 20px;"></div>
         </div>
 
         <!-- Dashboard -->
@@ -248,6 +261,9 @@
 
                 <!-- Messages -->
                 <div id="messageContainer" style="display: none;"></div>
+
+                <!-- Debug Info -->
+                <div id="dashboardDebug" class="debug-info" style="display: none;"></div>
 
                 <!-- Live Stats -->
                 <div class="stats-grid">
@@ -342,8 +358,10 @@
         let sessionTimerInterval;
         let sessionStartTime;
         let autoRefreshEnabled = true;
+        let sessionTimeoutId = null;
 
         document.addEventListener('DOMContentLoaded', function() {
+            console.log('DOM loaded, starting auto-login...');
             document.getElementById('autoLoginOverlay').style.display = 'flex';
             attemptAutoLogin();
         });
@@ -353,19 +371,33 @@
             
             // Check if we have a saved session
             const savedSession = localStorage.getItem('adminSession');
+            updateDebugInfo('Saved session in localStorage:', savedSession);
+            
             if (savedSession) {
-                updateAutoLoginStatus('Found saved session, validating...');
-                currentSession = JSON.parse(savedSession);
-                
-                // Test if session is still valid
-                if (await testAdminAccess(currentSession.uid)) {
-                    handleSuccessfulLogin();
-                    return;
-                } else {
-                    updateAutoLoginStatus('Saved session expired...');
+                try {
+                    updateAutoLoginStatus('Found saved session, validating...');
+                    currentSession = JSON.parse(savedSession);
+                    updateDebugInfo('Parsed session:', currentSession);
+                    
+                    // Test if session is still valid
+                    const isValid = await testAdminAccess(currentSession.uid);
+                    updateDebugInfo('Session validation result:', isValid);
+                    
+                    if (isValid) {
+                        handleSuccessfulLogin();
+                        return;
+                    } else {
+                        updateAutoLoginStatus('Saved session expired or invalid...');
+                        localStorage.removeItem('adminSession');
+                        currentSession = null;
+                    }
+                } catch (error) {
+                    updateAutoLoginStatus('Error parsing saved session...');
                     localStorage.removeItem('adminSession');
                     currentSession = null;
                 }
+            } else {
+                updateAutoLoginStatus('No saved session found...');
             }
             
             updateAutoLoginStatus('No valid session found. Showing login...');
@@ -376,15 +408,17 @@
 
         async function testAdminAccess(uid) {
             try {
+                updateDebugInfo('Testing admin access with UID:', uid);
                 const response = await fetch(`${API_BASE_URL}/admin/stats`, {
                     headers: { 
                         'X-User-ID': uid,
                         'Content-Type': 'application/json'
                     }
                 });
+                updateDebugInfo('Admin access test response status:', response.status);
                 return response.ok;
             } catch (error) {
-                console.log('Admin access test failed:', error);
+                updateDebugInfo('Admin access test failed:', error.message);
                 return false;
             }
         }
@@ -394,15 +428,34 @@
             if (statusElement) {
                 statusElement.textContent = message;
             }
+            console.log('Auto-login:', message);
+        }
+
+        function updateDebugInfo(label, data) {
+            console.log(label, data);
+            const debugElement = document.getElementById('debugInfo');
+            if (debugElement) {
+                debugElement.style.display = 'block';
+                debugElement.innerHTML += `<div><strong>${label}</strong> ${JSON.stringify(data)}</div>`;
+            }
         }
 
         function showLoginScreen() {
+            console.log('Showing login screen');
             document.getElementById('autoLoginOverlay').style.display = 'none';
             document.getElementById('loginScreen').style.display = 'block';
             document.getElementById('dashboard').style.display = 'none';
         }
 
         function handleSuccessfulLogin() {
+            console.log('Login successful, showing dashboard');
+            
+            // Clear any existing session timeout
+            if (sessionTimeoutId) {
+                clearTimeout(sessionTimeoutId);
+                sessionTimeoutId = null;
+            }
+            
             document.getElementById('autoLoginOverlay').style.display = 'none';
             document.getElementById('loginScreen').style.display = 'none';
             document.getElementById('dashboard').style.display = 'block';
@@ -418,10 +471,20 @@
             refreshStats();
             startAutoRefresh();
             startSessionTimer();
+            
+            // Set session timeout for 1 hour FROM NOW
+            sessionTimeoutId = setTimeout(() => {
+                if (currentSession) {
+                    console.log('Session timeout reached, logging out');
+                    showMessage('Session expired. Please login again.', 'error');
+                    logout();
+                }
+            }, 60 * 60 * 1000); // 1 hour
         }
 
         async function login(event) {
             event.preventDefault();
+            console.log('Login attempt started');
             
             const username = document.getElementById('username').value.trim();
             const password = document.getElementById('password').value.trim();
@@ -434,7 +497,13 @@
             document.getElementById('loginScreen').classList.add('loading');
             showLoginMessage('', '');
             
+            // Show debug info
+            const debugElement = document.getElementById('loginDebug');
+            debugElement.style.display = 'block';
+            debugElement.innerHTML = `<div>Attempting login to: ${API_BASE_URL}/admin/login</div>`;
+            
             try {
+                console.log('Sending login request...');
                 const response = await fetch(`${API_BASE_URL}/admin/login`, {
                     method: 'POST',
                     headers: {
@@ -446,7 +515,12 @@
                     })
                 });
                 
+                console.log('Login response status:', response.status);
                 const data = await response.json();
+                console.log('Login response data:', data);
+                
+                debugElement.innerHTML += `<div>Response status: ${response.status}</div>`;
+                debugElement.innerHTML += `<div>Response data: ${JSON.stringify(data)}</div>`;
                 
                 if (response.ok && data.success) {
                     // Store session information with UID
@@ -455,15 +529,17 @@
                         username: data.username || username
                     };
                     
+                    console.log('Login successful, session:', currentSession);
                     localStorage.setItem('adminSession', JSON.stringify(currentSession));
                     handleSuccessfulLogin();
                 } else {
-                    throw new Error(data.detail || data.message || 'Login failed');
+                    throw new Error(data.detail || data.message || `Login failed with status ${response.status}`);
                 }
             } catch (error) {
                 console.error('Login error:', error);
                 document.getElementById('loginScreen').classList.remove('loading');
                 showLoginMessage('Login failed: ' + error.message, 'error');
+                debugElement.innerHTML += `<div style="color: red;">Error: ${error.message}</div>`;
             }
         }
 
@@ -499,6 +575,9 @@
                 'X-User-ID': currentSession.uid
             };
 
+            console.log('Making authenticated request to:', url);
+            console.log('With UID:', currentSession.uid);
+
             return fetch(url, {
                 ...options,
                 headers: {
@@ -513,6 +592,8 @@
                 showMessage('Please log in first', 'error');
                 return;
             }
+
+            console.log('Refreshing stats with UID:', currentSession.uid);
 
             // Show loading states
             document.querySelectorAll('.stat-value').forEach(el => {
@@ -530,6 +611,7 @@
             // Get main stats
             makeAuthenticatedRequest(`${API_BASE_URL}/admin/stats`)
             .then(response => {
+                console.log('Stats response status:', response.status);
                 if (response.status === 401) {
                     throw new Error('Authentication failed - please login again');
                 }
@@ -537,6 +619,7 @@
                 return response.json();
             })
             .then(data => {
+                console.log('Stats data:', data);
                 if (data.success) {
                     updateDashboard(data);
                 } else {
@@ -562,6 +645,7 @@
             // Get cost history
             makeAuthenticatedRequest(`${API_BASE_URL}/admin/cost-history?days=7`)
             .then(response => {
+                console.log('Cost history response status:', response.status);
                 if (!response.ok) throw new Error(`HTTP ${response.status}`);
                 return response.json();
             })
@@ -576,6 +660,7 @@
             // Get user stats
             makeAuthenticatedRequest(`${API_BASE_URL}/admin/users`)
             .then(response => {
+                console.log('Users response status:', response.status);
                 if (!response.ok) throw new Error(`HTTP ${response.status}`);
                 return response.json();
             })
@@ -745,6 +830,14 @@
         }
 
         function logout() {
+            console.log('Logging out...');
+            
+            // Clear session timeout
+            if (sessionTimeoutId) {
+                clearTimeout(sessionTimeoutId);
+                sessionTimeoutId = null;
+            }
+            
             currentSession = null;
             localStorage.removeItem('adminSession');
             document.getElementById('loginScreen').style.display = 'block';
@@ -795,14 +888,6 @@
                 stopAutoRefresh();
             }
         }
-
-        // Auto-logout after 1 hour
-        setTimeout(() => {
-            if (currentSession) {
-                showMessage('Session expired. Please login again.', 'error');
-                logout();
-            }
-        }, 60 * 60 * 1000);
     </script>
 </body>
 </html>
