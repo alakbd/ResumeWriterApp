@@ -510,94 +510,92 @@
         }
 
         function refreshStats() {
-            if (!currentSession) {
-                showMessage('Please log in first', 'error');
-                return;
-            }
+    if (!currentSession) {
+        showMessage('Please log in first', 'error');
+        return;
+    }
 
-            // Show loading states
-            document.querySelectorAll('.stat-value').forEach(el => {
-                if (el.id !== 'serverStatus') {
-                    el.textContent = '...';
-                }
-            });
-            
-            const refreshBtn = document.getElementById('refreshBtn');
-            if (refreshBtn) refreshBtn.classList.add('loading');
-            
-            const serverStatus = document.getElementById('serverStatus');
-            if (serverStatus) serverStatus.textContent = '⏳ Loading...';
-
-            // Get main stats
-            fetch(`${API_BASE_URL}/admin/stats`, {
-                headers: {
-                    'X-User-ID': currentSession.uid,
-                    'Content-Type': 'application/json'
-                }
-            })
-            .then(response => {
-                if (!response.ok) throw new Error(`HTTP ${response.status}`);
-                return response.json();
-            })
-            .then(data => {
-                if (data.success) {
-                    updateDashboard(data);
-                }
-            })
-            .catch(error => {
-                console.error('Stats error:', error);
-                if (serverStatus) {
-                    serverStatus.textContent = '❌ Error';
-                    serverStatus.className = 'stat-value status-offline';
-                }
-                showMessage('Failed to fetch stats: ' + error.message, 'error');
-            });
-
-            // Get cost history for monthly calculation
-            fetch(`${API_BASE_URL}/admin/cost-history?days=30`, {
-                headers: {
-                    'X-User-ID': currentSession.uid,
-                    'Content-Type': 'application/json'
-                }
-            })
-            .then(response => response.json())
-            .then(data => {
-                updateCostHistory(data);
-                calculateMonthlyCost(data);
-            })
-            .catch(error => {
-                console.error('Cost history error:', error);
-                document.getElementById('costHistory').innerHTML = '<p>Error loading cost history</p>';
-            });
-
-            // Get user stats for credit analysis
-            fetch(`${API_BASE_URL}/admin/users`, {
-                headers: {
-                    'X-User-ID': currentSession.uid,
-                    'Content-Type': 'application/json'
-                }
-            })
-            .then(response => response.json())
-            .then(data => {
-                if (data.success) {
-                    updateUserStats(data);
-                    analyzeCreditUsage(data);
-                }
-            })
-            .catch(error => {
-                console.error('User stats error:', error);
-            });
-
-            // Get purchase history if available
-            fetchPurchaseHistory();
-
-            checkServerHealth();
-            
-            // Final loading cleanup
-            .finally(() => {
-                if (refreshBtn) refreshBtn.classList.remove('loading');
-            });
+    // Show loading states
+    document.querySelectorAll('.stat-value').forEach(el => {
+        if (el.id !== 'serverStatus') {
+            el.textContent = '...';
         }
+    });
+    
+    const refreshBtn = document.getElementById('refreshBtn');
+    if (refreshBtn) refreshBtn.classList.add('loading');
+    
+    const serverStatus = document.getElementById('serverStatus');
+    if (serverStatus) serverStatus.textContent = '⏳ Loading...';
+
+    // Get main stats
+    fetch(`${API_BASE_URL}/admin/stats`, {
+        headers: {
+            'X-User-ID': currentSession.uid,
+            'Content-Type': 'application/json'
+        }
+    })
+    .then(response => {
+        if (!response.ok) throw new Error(`HTTP ${response.status}`);
+        return response.json();
+    })
+    .then(data => {
+        if (data.success) {
+            updateDashboard(data);
+        }
+    })
+    .catch(error => {
+        console.error('Stats error:', error);
+        if (serverStatus) {
+            serverStatus.textContent = '❌ Error';
+            serverStatus.className = 'stat-value status-offline';
+        }
+        showMessage('Failed to fetch stats: ' + error.message, 'error');
+    });
+
+    // Get cost history for monthly calculation
+    fetch(`${API_BASE_URL}/admin/cost-history?days=30`, {
+        headers: {
+            'X-User-ID': currentSession.uid,
+            'Content-Type': 'application/json'
+        }
+    })
+    .then(response => response.json())
+    .then(data => {
+        updateCostHistory(data);
+        calculateMonthlyCost(data);
+    })
+    .catch(error => {
+        console.error('Cost history error:', error);
+        document.getElementById('costHistory').innerHTML = '<p>Error loading cost history</p>';
+    });
+
+    // Get user stats for credit analysis
+    fetch(`${API_BASE_URL}/admin/users`, {
+        headers: {
+            'X-User-ID': currentSession.uid,
+            'Content-Type': 'application/json'
+        }
+    })
+    .then(response => response.json())
+    .then(data => {
+        if (data.success) {
+            updateUserStats(data);
+            analyzeCreditUsage(data);
+        }
+    })
+    .catch(error => {
+        console.error('User stats error:', error);
+    });
+
+    // Get purchase history if available
+    fetchPurchaseHistory();
+
+    checkServerHealth();
+    
+    // Final loading cleanup - REMOVED THE PROBLEMATIC .finally() AND REPLACED WITH:
+    if (refreshBtn) refreshBtn.classList.remove('loading');
+}
 
         function updateDashboard(stats) {
             document.getElementById('dailyCost').textContent = `$${stats.daily_cost.toFixed(6)}`;
