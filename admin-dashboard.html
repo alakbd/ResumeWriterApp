@@ -227,6 +227,7 @@
                 <p>Real-time API Monitoring & Cost Tracking</p>
                 <div class="user-info" style="background: rgba(255,255,255,0.2); display: inline-block; margin-top: 10px;">
                     <strong>Admin:</strong> <span id="adminUsername">-</span>
+                    <strong>UID:</strong> <span id="adminUID">-</span>
                 </div>
                 <small id="accessModeDisplay">Admin Access Mode • Auto-refresh every 30s</small>
             </div>
@@ -357,7 +358,7 @@
                 currentSession = JSON.parse(savedSession);
                 
                 // Test if session is still valid
-                if (await testAdminAccess(currentSession.userId)) {
+                if (await testAdminAccess(currentSession.uid)) {
                     handleSuccessfulLogin();
                     return;
                 } else {
@@ -373,10 +374,13 @@
             }, 1000);
         }
 
-        async function testAdminAccess(userId) {
+        async function testAdminAccess(uid) {
             try {
                 const response = await fetch(`${API_BASE_URL}/admin/stats`, {
-                    headers: { 'X-User-ID': userId }
+                    headers: { 
+                        'X-User-ID': uid,
+                        'Content-Type': 'application/json'
+                    }
                 });
                 return response.ok;
             } catch (error) {
@@ -408,6 +412,7 @@
             document.getElementById('sessionStart').textContent = sessionStartTime.toLocaleString();
             document.getElementById('apiBaseUrl').textContent = API_BASE_URL;
             document.getElementById('adminUsername').textContent = currentSession.username;
+            document.getElementById('adminUID').textContent = currentSession.uid;
             
             showMessage('Admin authentication successful!', 'success');
             refreshStats();
@@ -416,54 +421,51 @@
         }
 
         async function login(event) {
-    event.preventDefault();
-    
-    const username = document.getElementById('username').value.trim();
-    const password = document.getElementById('password').value.trim();
-    
-    if (!username || !password) {
-        showLoginMessage('Please enter both username and password', 'error');
-        return;
-    }
-
-    document.getElementById('loginScreen').classList.add('loading');
-    
-    try {
-        const response = await fetch(`${API_BASE_URL}/admin/login`, {
-            method: 'POST',
-            headers: {
-                'Content-Type': 'application/json',
-            },
-            body: JSON.stringify({
-                username: username,
-                password: password
-            })
-        });
-        
-        if (response.ok) {
-            const userData = await response.json();
+            event.preventDefault();
             
-            if (userData.success) {
-                // Store session information
-                currentSession = {
-                    userId: userData.user_id || "admin-user", // Use the returned user_id or default
-                    username: userData.username || username
-                };
-                
-                localStorage.setItem('adminSession', JSON.stringify(currentSession));
-                handleSuccessfulLogin();
-            } else {
-                throw new Error(userData.detail || 'Login failed');
+            const username = document.getElementById('username').value.trim();
+            const password = document.getElementById('password').value.trim();
+            
+            if (!username || !password) {
+                showLoginMessage('Please enter both username and password', 'error');
+                return;
             }
-        } else {
-            const errorData = await response.json();
-            throw new Error(errorData.detail || 'Login failed');
+
+            document.getElementById('loginScreen').classList.add('loading');
+            showLoginMessage('', '');
+            
+            try {
+                const response = await fetch(`${API_BASE_URL}/admin/login`, {
+                    method: 'POST',
+                    headers: {
+                        'Content-Type': 'application/json',
+                    },
+                    body: JSON.stringify({
+                        username: username,
+                        password: password
+                    })
+                });
+                
+                const data = await response.json();
+                
+                if (response.ok && data.success) {
+                    // Store session information with UID
+                    currentSession = {
+                        uid: data.uid || data.user_id || "admin-uid",
+                        username: data.username || username
+                    };
+                    
+                    localStorage.setItem('adminSession', JSON.stringify(currentSession));
+                    handleSuccessfulLogin();
+                } else {
+                    throw new Error(data.detail || data.message || 'Login failed');
+                }
+            } catch (error) {
+                console.error('Login error:', error);
+                document.getElementById('loginScreen').classList.remove('loading');
+                showLoginMessage('Login failed: ' + error.message, 'error');
+            }
         }
-    } catch (error) {
-        document.getElementById('loginScreen').classList.remove('loading');
-        showLoginMessage('Login failed: ' + error.message, 'error');
-    }
-}
 
         function showLoginMessage(message, type) {
             const messageDiv = document.getElementById('loginMessage');
@@ -486,6 +488,26 @@
             }
         }
 
+        // Helper function for authenticated requests
+        function makeAuthenticatedRequest(url, options = {}) {
+            if (!currentSession || !currentSession.uid) {
+                throw new Error('No active session');
+            }
+
+            const defaultHeaders = {
+                'Content-Type': 'application/json',
+                'X-User-ID': currentSession.uid
+            };
+
+            return fetch(url, {
+                ...options,
+                headers: {
+                    ...defaultHeaders,
+                    ...options.headers
+                }
+            });
+        }
+
         function refreshStats() {
             if (!currentSession) {
                 showMessage('Please log in first', 'error');
@@ -505,21 +527,28 @@
             const serverStatus = document.getElementById('serverStatus');
             if (serverStatus) serverStatus.textContent = '⏳ Loading...';
 
-            // Get main stats with user ID header
-            fetch(`${API_BASE_URL}/admin/stats`, {
-                headers: { 'X-User-ID': currentSession.userId }
-            })
+            // Get main stats
+            makeAuthenticatedRequest(`${API_BASE_URL}/admin/stats`)
             .then(response => {
+                if (response.status === 401) {
+                    throw new Error('Authentication failed - please login again');
+                }
                 if (!response.ok) throw new Error(`HTTP ${response.status}`);
                 return response.json();
             })
             .then(data => {
                 if (data.success) {
                     updateDashboard(data);
+                } else {
+                    throw new Error(data.detail || 'Failed to fetch stats');
                 }
             })
             .catch(error => {
                 console.error('Stats error:', error);
+                if (error.message.includes('Authentication failed')) {
+                    logout();
+                    showLoginMessage('Session expired. Please login again.', 'error');
+                }
                 if (serverStatus) {
                     serverStatus.textContent = '❌ Error';
                     serverStatus.className = 'stat-value status-offline';
@@ -531,10 +560,11 @@
             });
 
             // Get cost history
-            fetch(`${API_BASE_URL}/admin/cost-history?days=7`, {
-                headers: { 'X-User-ID': currentSession.userId }
+            makeAuthenticatedRequest(`${API_BASE_URL}/admin/cost-history?days=7`)
+            .then(response => {
+                if (!response.ok) throw new Error(`HTTP ${response.status}`);
+                return response.json();
             })
-            .then(response => response.json())
             .then(data => {
                 updateCostHistory(data);
             })
@@ -544,10 +574,11 @@
             });
 
             // Get user stats
-            fetch(`${API_BASE_URL}/admin/users`, {
-                headers: { 'X-User-ID': currentSession.userId }
+            makeAuthenticatedRequest(`${API_BASE_URL}/admin/users`)
+            .then(response => {
+                if (!response.ok) throw new Error(`HTTP ${response.status}`);
+                return response.json();
             })
-            .then(response => response.json())
             .then(data => {
                 if (data.success) {
                     updateUserStats(data);
@@ -555,6 +586,7 @@
             })
             .catch(error => {
                 console.error('User stats error:', error);
+                document.getElementById('userStats').innerHTML = '<p>Error loading user data</p>';
             });
 
             checkServerHealth();
@@ -694,9 +726,8 @@
 
         function resetStats() {
             if (confirm('Are you sure you want to reset daily statistics?')) {
-                fetch(`${API_BASE_URL}/admin/reset-stats`, {
-                    method: 'POST',
-                    headers: { 'X-User-ID': currentSession.userId }
+                makeAuthenticatedRequest(`${API_BASE_URL}/admin/reset-stats`, {
+                    method: 'POST'
                 })
                 .then(response => response.json())
                 .then(data => {
