@@ -769,75 +769,87 @@
         }
 
         function analyzeTodaysUsers(userData) {
-            if (!userData || !userData.users) return;
+    if (!userData || !userData.users) return;
 
-            const today = new Date().toDateString();
-            let todaysUsers = [];
-            let verifiedCount = 0;
-            let totalNewToday = 0;
+    const today = new Date().toDateString();
+    let todaysUsers = [];
+    let verifiedCount = 0;
+    let totalNewToday = 0;
 
-            userData.users.forEach(user => {
-                // Check if user was created today
-                if (user.created_at) {
-                    const userDate = new Date(user.created_at).toDateString();
-                    if (userDate === today) {
-                        todaysUsers.push(user);
-                        totalNewToday++;
-                        
-                        // Check if email is verified
-                        if (user.email_verified) {
-                            verifiedCount++;
-                        }
-                    }
+    userData.users.forEach(user => {
+        // Check if user was created today
+        if (user.created_at) {
+            const userDate = new Date(user.created_at).toDateString();
+            if (userDate === today) {
+                todaysUsers.push(user);
+                totalNewToday++;
+                
+                // Check if email is verified
+                if (user.email_verified) {
+                    verifiedCount++;
                 }
-            });
-
-            // Update the stat card
-            document.getElementById('newUsersToday').textContent = totalNewToday.toLocaleString();
-            document.getElementById('newUsersVerified').textContent = `Email Verified: ${verifiedCount}`;
-
-            // Display today's users in the dedicated section
-            const todaysUsersDiv = document.getElementById('todaysUsers');
-            if (todaysUsers.length > 0) {
-                let html = `
-                    <div style="margin-bottom: 15px;">
-                        <strong>New Registrations Today: ${totalNewToday}</strong><br>
-                        <span style="color: #666;">Email Verified: ${verifiedCount} • Unverified: ${totalNewToday - verifiedCount}</span>
-                    </div>
-                    <div class="user-list">
-                `;
-                
-                todaysUsers.forEach(user => {
-                    const userDisplay = user.email || user.user_id || 'unknown';
-                    const shortDisplay = userDisplay.length > 25 ? userDisplay.substring(0, 25) + '...' : userDisplay;
-                    const verifiedStatus = user.email_verified ? 
-                        '<span class="verified-badge">✓ Verified</span>' : 
-                        '<span class="unverified-badge">✗ Unverified</span>';
-                    
-                    html += `
-                        <div class="user-item">
-                            <div>
-                                <strong>${shortDisplay}</strong>
-                                ${verifiedStatus}
-                            </div>
-                            <div style="font-size: 0.9rem; color: #666;">
-                                Credits: ${user.available_credits || 0} available • ${user.used_credits || 0} used
-                                ${user.created_at ? `• Joined: ${new Date(user.created_at).toLocaleTimeString()}` : ''}
-                            </div>
-                        </div>
-                    `;
-                });
-                
-                html += `</div>`;
-                todaysUsersDiv.innerHTML = html;
-            } else {
-                todaysUsersDiv.innerHTML = `
-                    <div class="info-message">
-                        <p>No new user registrations today.</p>
-                    </div>
-                `;
             }
         }
+    });
+
+    // Update the stat card
+    document.getElementById('newUsersToday').textContent = totalNewToday.toLocaleString();
+    document.getElementById('newUsersVerified').textContent = `Email Verified: ${verifiedCount}`;
+
+    // Display today's users in the dedicated section
+    const todaysUsersDiv = document.getElementById('todaysUsers');
+    if (todaysUsers.length > 0) {
+        let html = `
+            <div style="margin-bottom: 15px;">
+                <strong>New Registrations Today: ${totalNewToday}</strong><br>
+                <span style="color: #666;">Email Verified: ${verifiedCount} • Unverified: ${totalNewToday - verifiedCount}</span>
+            </div>
+            <div class="user-list">
+        `;
+        
+        todaysUsers.forEach(user => {
+            // Try to get email, if not available, use user_id
+            const userEmail = user.email || 'No email';
+            const userId = user.user_id || 'unknown';
+            
+            // Create display - show email primarily, with UID as secondary
+            let userDisplay = userEmail;
+            if (userEmail === 'No email') {
+                userDisplay = userId;
+            }
+            
+            const shortDisplay = userDisplay.length > 25 ? userDisplay.substring(0, 25) + '...' : userDisplay;
+            const verifiedStatus = user.email_verified ? 
+                '<span class="verified-badge">✓ Verified</span>' : 
+                '<span class="unverified-badge">✗ Unverified</span>';
+            
+            html += `
+                <div class="user-item">
+                    <div>
+                        <strong>${shortDisplay}</strong>
+                        ${user.email_verified !== undefined ? verifiedStatus : ''}
+                    </div>
+                    <div style="font-size: 0.8rem; color: #999; font-family: monospace;">
+                        UID: ${userId.substring(0, 8)}...
+                    </div>
+                    <div style="font-size: 0.9rem; color: #666;">
+                        Credits: ${user.available_credits || 0} available • ${user.used_credits || 0} used
+                        ${user.created_at ? `• Joined: ${new Date(user.created_at).toLocaleTimeString()}` : ''}
+                    </div>
+                </div>
+            `;
+        });
+        
+        html += `</div>`;
+        todaysUsersDiv.innerHTML = html;
+    } else {
+        todaysUsersDiv.innerHTML = `
+            <div class="info-message">
+                <p>No new user registrations today.</p>
+            </div>
+        `;
+    }
+}
 
         function updateCostHistory(history) {
             const historyDiv = document.getElementById('costHistory');
@@ -881,65 +893,77 @@
         }
 
         function updateUserStats(userData) {
-            const userStatsDiv = document.getElementById('userStats');
-            
-            if (!userData || !userData.users) {
-                userStatsDiv.innerHTML = '<p>Error loading user data</p>';
-                return;
-            }
+    const userStatsDiv = document.getElementById('userStats');
+    
+    if (!userData || !userData.users) {
+        userStatsDiv.innerHTML = '<p>Error loading user data</p>';
+        return;
+    }
 
-            let html = `
-                <div style="display: grid; grid-template-columns: repeat(auto-fit, minmax(200px, 1fr)); gap: 15px; margin-bottom: 20px;">
-                    <div style="background: #f8f9fa; padding: 15px; border-radius: 5px;">
-                        <strong>Total Users</strong><br>
-                        <span style="font-size: 1.5rem; color: #667eea;">${userData.total_users || 0}</span>
+    let html = `
+        <div style="display: grid; grid-template-columns: repeat(auto-fit, minmax(200px, 1fr)); gap: 15px; margin-bottom: 20px;">
+            <div style="background: #f8f9fa; padding: 15px; border-radius: 5px;">
+                <strong>Total Users</strong><br>
+                <span style="font-size: 1.5rem; color: #667eea;">${userData.total_users || 0}</span>
+            </div>
+            <div style="background: #f8f9fa; padding: 15px; border-radius: 5px;">
+                <strong>Credits Used</strong><br>
+                <span style="font-size: 1.5rem; color: #e74c3c;">${userData.total_credits_used || 0}</span>
+            </div>
+            <div style="background: #f8f9fa; padding: 15px; border-radius: 5px;">
+                <strong>Credits Available</strong><br>
+                <span style="font-size: 1.5rem; color: #27ae60;">${userData.total_credits_available || 0}</span>
+            </div>
+        </div>
+    `;
+    
+    if (userData.users && userData.users.length > 0) {
+        html += `
+            <div style="margin-top: 15px;">
+                <strong>Recent Users (max 10):</strong>
+                <div class="user-list">
+        `;
+        
+        userData.users.slice(0, 10).forEach(user => {
+            // Try to get email, if not available, use user_id
+            const userEmail = user.email || 'No email';
+            const userId = user.user_id || 'unknown';
+            
+            // Create display - show email primarily, with UID as secondary
+            let userDisplay = userEmail;
+            if (userEmail === 'No email') {
+                userDisplay = userId;
+            }
+            
+            const shortDisplay = userDisplay.length > 25 ? userDisplay.substring(0, 25) + '...' : userDisplay;
+            const verifiedStatus = user.email_verified ? 
+                '<span class="verified-badge">✓ Verified</span>' : 
+                '<span class="unverified-badge">✗ Unverified</span>';
+            
+            html += `
+                <div class="user-item">
+                    <div>
+                        <strong>${shortDisplay}</strong>
+                        ${user.email_verified !== undefined ? verifiedStatus : ''}
                     </div>
-                    <div style="background: #f8f9fa; padding: 15px; border-radius: 5px;">
-                        <strong>Credits Used</strong><br>
-                        <span style="font-size: 1.5rem; color: #e74c3c;">${userData.total_credits_used || 0}</span>
+                    <div style="font-size: 0.8rem; color: #999; font-family: monospace;">
+                        UID: ${userId.substring(0, 8)}...
                     </div>
-                    <div style="background: #f8f9fa; padding: 15px; border-radius: 5px;">
-                        <strong>Credits Available</strong><br>
-                        <span style="font-size: 1.5rem; color: #27ae60;">${userData.total_credits_available || 0}</span>
+                    <div style="font-size: 0.9rem; color: #666;">
+                        Credits: ${user.available_credits || 0} available • ${user.used_credits || 0} used
                     </div>
                 </div>
             `;
-            
-            if (userData.users && userData.users.length > 0) {
-                html += `
-                    <div style="margin-top: 15px;">
-                        <strong>Recent Users (max 10):</strong>
-                        <div class="user-list">
-                `;
-                
-                userData.users.slice(0, 10).forEach(user => {
-                    // Use email if available, otherwise fall back to user ID
-                    const userDisplay = user.email || user.user_id || 'unknown';
-                    const shortDisplay = userDisplay.length > 25 ? userDisplay.substring(0, 25) + '...' : userDisplay;
-                    const verifiedStatus = user.email_verified ? 
-                        '<span class="verified-badge">✓ Verified</span>' : 
-                        '<span class="unverified-badge">✗ Unverified</span>';
-                    
-                    html += `
-                        <div class="user-item">
-                            <div>
-                                <strong>${shortDisplay}</strong>
-                                ${verifiedStatus}
-                            </div>
-                            <div style="font-size: 0.9rem; color: #666;">
-                                Credits: ${user.available_credits || 0} available • ${user.used_credits || 0} used
-                            </div>
-                        </div>
-                    `;
-                });
-                
-                html += `</div></div>`;
-            } else {
-                html += '<p>No users found</p>';
-            }
-            
-            userStatsDiv.innerHTML = html;
-        }
+        });
+        
+        html += `</div></div>`;
+    } else {
+        html += '<p>No users found</p>';
+    }
+    
+    userStatsDiv.innerHTML = html;
+}
+
 
         function fetchPurchaseHistory() {
             // This would need to be implemented in your backend
