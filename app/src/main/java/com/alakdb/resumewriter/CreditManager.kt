@@ -22,7 +22,7 @@ class CreditManager(private val context: Context) {
         private const val LAST_SYNC_TIME_KEY = "last_sync_time" // NEW: Track sync time
         
         // 🔒 Admin emails - keep this centralized
-        private val ADMIN_EMAILS = listOf("alakbd2009@gmail.com", "admin@resumewriter.com", "alakbd@yahoo.com")
+        private val ADMIN_EMAILS = listOf("alakbd2009@gmail.com", "alakbd@yahoo.com")
         
         // Sync intervals
         private const val SYNC_COOLDOWN_MS = 30000L // 30 seconds between syncs
