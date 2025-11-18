@@ -443,8 +443,8 @@ class MainActivity : AppCompatActivity() {
         val price3 = billingManager.getProductPrice("cv_package_3")
         val price8 = billingManager.getProductPrice("cv_package_8")
 
-        binding.btnBuy3Cv.text = "3 CV Credits - ${if (price3 != "Not available") price3 else "€4.065"}"
-        binding.btnBuy8Cv.text = "8 CV Credits - ${if (price8 != "Not available") price8 else "€8.130"}"
+        binding.btnBuy3Cv.text = "3 CV Credits - ${if (price3 != "Not available") price3 else "€4.06"}"
+        binding.btnBuy8Cv.text = "8 CV Credits - ${if (price8 != "Not available") price8 else "€8.13"}"
     }
 
     private fun updateCreditDisplay() {
