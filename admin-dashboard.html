@@ -811,7 +811,7 @@
             if (refreshBtn) refreshBtn.classList.remove('loading');
         }
 
-    <script>
+      <script>
         // Configuration
         const API_BASE_URL = 'https://resume-writer-api.onrender.com';
 
@@ -822,100 +822,115 @@
         let autoRefreshEnabled = true;
 
         document.addEventListener('DOMContentLoaded', function() {
-            document.getElementById('autoLoginOverlay').style.display = 'flex';
-            // Auto-login with the working UID
-            setTimeout(() => {
-                attemptAutoLogin();
-            }, 1000);
+            console.log('🚀 Dashboard loading...');
+            showLoginScreen(); // Directly show login screen, skip auto-login
         });
 
-        // ========== IMPROVED LOGIN SYSTEM ==========
+        // ========== SIMPLE & ROBUST LOGIN SYSTEM ==========
 
-        function attemptAutoLogin() {
-            const firebaseUID = document.getElementById('firebaseUID').value.trim();
-            if (firebaseUID) {
-                loginWithUID(firebaseUID);
-            } else {
-                showLoginScreen();
-            }
+        function showLoginScreen() {
+            console.log('📱 Showing login screen');
+            document.getElementById('autoLoginOverlay').style.display = 'none';
+            document.getElementById('loginScreen').style.display = 'block';
+            document.getElementById('dashboard').style.display = 'none';
+            
+            // Clear any previous messages
+            showLoginMessage('', '');
         }
 
-        async function loginWithUID(firebaseUID) {
-            updateAutoLoginStatus('🔐 Testing Firebase authentication...');
+        async function login(event) {
+            if (event) event.preventDefault();
             
+            const firebaseUID = document.getElementById('firebaseUID').value.trim();
+            console.log('🔐 Attempting login with UID:', firebaseUID);
+            
+            if (!firebaseUID) {
+                showLoginMessage('❌ Please enter Firebase UID', 'error');
+                return;
+            }
+
+            // Show loading state
+            document.getElementById('loginScreen').classList.add('loading');
+            showLoginMessage('🔄 Testing authentication...', 'info');
+
             try {
-                // Test authentication with a simple endpoint that requires auth
-                const response = await fetch(`${API_BASE_URL}/user/credits`, {
-                    method: 'GET',
+                // Test with the health endpoint first (no auth required)
+                console.log('🩺 Testing API health...');
+                const healthResponse = await fetch(`${API_BASE_URL}/health`);
+                if (!healthResponse.ok) {
+                    throw new Error('API server is not responding');
+                }
+                
+                const healthData = await healthResponse.json();
+                console.log('✅ API Health:', healthData);
+
+                // Now test authentication with a simple endpoint
+                console.log('🔑 Testing authentication...');
+                const testResponse = await fetch(`${API_BASE_URL}/user/credits`, {
                     headers: {
                         'X-User-ID': firebaseUID,
                         'Content-Type': 'application/json'
                     }
                 });
-                
-                console.log('Auth response status:', response.status);
-                
-                if (response.ok || response.status === 401 || response.status === 403) {
-                    // Even if we get auth error, it means the UID is valid but may not have admin access
-                    // Let's try the stats endpoint which should work for authenticated users
-                    const statsResponse = await fetch(`${API_BASE_URL}/stats`, {
-                        headers: {
-                            'X-User-ID': firebaseUID,
-                            'Content-Type': 'application/json'
-                        }
-                    });
+
+                console.log('🔑 Auth response status:', testResponse.status);
+
+                if (testResponse.ok) {
+                    // Success! User is authenticated
+                    console.log('✅ Authentication successful');
+                    currentSession = {
+                        uid: firebaseUID,
+                        type: 'firebase',
+                        authenticated: true
+                    };
                     
-                    if (statsResponse.ok) {
-                        currentSession = {
-                            uid: firebaseUID,
-                            type: 'firebase',
-                            authenticated: true
-                        };
-                        updateAutoLoginStatus('✅ Authentication successful! Loading dashboard...');
-                        setTimeout(() => {
-                            handleSuccessfulLogin();
-                        }, 1000);
-                    } else {
-                        // If stats fails but credits worked, still allow access (might be regular user)
-                        currentSession = {
-                            uid: firebaseUID,
-                            type: 'firebase',
-                            authenticated: true
-                        };
-                        updateAutoLoginStatus('✅ Authentication successful! Loading dashboard...');
-                        setTimeout(() => {
-                            handleSuccessfulLogin();
-                        }, 1000);
-                    }
+                    showLoginMessage('✅ Authentication successful! Loading dashboard...', 'success');
+                    
+                    // Small delay to show success message
+                    setTimeout(() => {
+                        handleSuccessfulLogin();
+                    }, 1000);
+                    
+                } else if (testResponse.status === 401 || testResponse.status === 403) {
+                    // Auth failed but API is working
+                    throw new Error('Invalid Firebase UID - Authentication failed');
                 } else {
-                    throw new Error('Invalid Firebase UID or authentication failed');
+                    // Some other error
+                    const errorText = await testResponse.text();
+                    console.error('Auth error response:', errorText);
+                    throw new Error(`Server error: ${testResponse.status}`);
                 }
+
             } catch (error) {
-                console.error('Login error:', error);
-                updateAutoLoginStatus('❌ Authentication failed: ' + error.message);
-                setTimeout(() => {
-                    showLoginScreen();
-                }, 3000);
+                console.error('❌ Login error:', error);
+                showLoginMessage(`❌ Login failed: ${error.message}`, 'error');
+                document.getElementById('loginScreen').classList.remove('loading');
             }
         }
 
-        function updateAutoLoginStatus(message) {
-            const statusElement = document.getElementById('autoLoginStatus');
-            if (statusElement) {
-                statusElement.innerHTML = `<div style="margin: 10px 0; padding: 10px; background: #f8f9fa; border-radius: 5px;">${message}</div>`;
+        function showLoginMessage(message, type) {
+            const messageDiv = document.getElementById('loginMessage');
+            if (messageDiv) {
+                messageDiv.innerHTML = message;
+                if (type === 'error') {
+                    messageDiv.className = 'error-message';
+                } else if (type === 'success') {
+                    messageDiv.className = 'success-message';
+                } else if (type === 'info') {
+                    messageDiv.className = 'info-message';
+                } else {
+                    messageDiv.className = '';
+                }
+                messageDiv.style.display = message ? 'block' : 'none';
             }
-        }
-
-        function showLoginScreen() {
-            document.getElementById('autoLoginOverlay').style.display = 'none';
-            document.getElementById('loginScreen').style.display = 'block';
-            document.getElementById('dashboard').style.display = 'none';
         }
 
         function handleSuccessfulLogin() {
-            document.getElementById('autoLoginOverlay').style.display = 'none';
+            console.log('🎉 Login successful, showing dashboard');
+            
             document.getElementById('loginScreen').style.display = 'none';
             document.getElementById('dashboard').style.display = 'block';
+            document.getElementById('loginScreen').classList.remove('loading');
             
             // Initialize dashboard
             sessionStartTime = new Date();
@@ -923,41 +938,12 @@
             document.getElementById('apiBaseUrl').textContent = API_BASE_URL;
             document.getElementById('adminUID').textContent = currentSession.uid;
             
-            showMessage('✅ Authentication successful! Dashboard loaded.', 'success');
+            showMessage('✅ Dashboard loaded successfully!', 'success');
+            
+            // Load initial data
             refreshStats();
             startAutoRefresh();
             startSessionTimer();
-        }
-
-        async function login(event) {
-            if (event) event.preventDefault();
-            
-            const firebaseUID = document.getElementById('firebaseUID').value.trim();
-            
-            if (!firebaseUID) {
-                showLoginMessage('Please enter Firebase UID', 'error');
-                return;
-            }
-
-            document.getElementById('loginScreen').classList.add('loading');
-            showLoginMessage('', '');
-            
-            try {
-                await loginWithUID(firebaseUID);
-            } catch (error) {
-                console.error('Login error:', error);
-                document.getElementById('loginScreen').classList.remove('loading');
-                showLoginMessage('Authentication failed: ' + error.message, 'error');
-            }
-        }
-
-        function showLoginMessage(message, type) {
-            const messageDiv = document.getElementById('loginMessage');
-            if (messageDiv) {
-                messageDiv.textContent = message;
-                messageDiv.className = type === 'error' ? 'error-message' : 'success-message';
-                messageDiv.style.display = 'block';
-            }
         }
 
         function showMessage(message, type) {
@@ -972,9 +958,93 @@
             }
         }
 
-        // ========== COMPREHENSIVE STATS FUNCTIONS ==========
+        // ========== DASHBOARD DATA FUNCTIONS ==========
+
+        function refreshStats() {
+            if (!currentSession) {
+                showMessage('Please log in first', 'error');
+                return;
+            }
+
+            console.log('🔄 Refreshing stats...');
+
+            // Show loading states
+            document.querySelectorAll('.stat-value, .stat-mini-value').forEach(el => {
+                if (el.id !== 'serverStatus') {
+                    el.textContent = '...';
+                }
+            });
+            
+            const refreshBtn = document.getElementById('refreshBtn');
+            if (refreshBtn) refreshBtn.classList.add('loading');
+            
+            const serverStatus = document.getElementById('serverStatus');
+            if (serverStatus) serverStatus.textContent = '⏳ Loading...';
+
+            // Try to get comprehensive stats
+            fetch(`${API_BASE_URL}/stats`, {
+                headers: {
+                    'X-User-ID': currentSession.uid,
+                    'Content-Type': 'application/json'
+                }
+            })
+            .then(response => {
+                console.log('📊 Stats response status:', response.status);
+                if (!response.ok) {
+                    throw new Error(`Stats endpoint returned ${response.status}`);
+                }
+                return response.json();
+            })
+            .then(data => {
+                console.log('📊 Stats data received:', data);
+                if (data.success) {
+                    updateComprehensiveStats(data);
+                    updateDashboard(data.daily_stats || {});
+                    showMessage('✅ Stats updated successfully', 'success');
+                } else {
+                    throw new Error('Stats endpoint returned unsuccessful response');
+                }
+            })
+            .catch(error => {
+                console.error('❌ Stats error:', error);
+                showMessage('⚠️ Limited data: ' + error.message, 'error');
+                // Still try to load basic info
+                loadBasicInfo();
+            });
+
+            checkServerHealth();
+            
+            // Final loading cleanup
+            setTimeout(() => {
+                if (refreshBtn) refreshBtn.classList.remove('loading');
+            }, 1000);
+        }
+
+        function loadBasicInfo() {
+            // Load user credits as basic info
+            fetch(`${API_BASE_URL}/user/credits`, {
+                headers: {
+                    'X-User-ID': currentSession.uid,
+                    'Content-Type': 'application/json'
+                }
+            })
+            .then(response => response.json())
+            .then(data => {
+                console.log('💳 Credits data:', data);
+                // Update basic user info
+                document.getElementById('userCount').textContent = '1'; // At least current user
+                if (data.available_credits !== undefined) {
+                    document.getElementById('apiRequests').textContent = 'User authenticated';
+                }
+            })
+            .catch(error => {
+                console.error('Credits load error:', error);
+            });
+        }
 
         function updateComprehensiveStats(stats) {
+            console.log('Updating comprehensive stats:', stats);
+            
             // Update JD Alignment Statistics
             if (stats.jd_alignment_stats) {
                 document.getElementById('totalAlignments').textContent = stats.jd_alignment_stats.total_alignments || 0;
@@ -982,8 +1052,10 @@
                 document.getElementById('avgFinalScore').textContent = (stats.jd_alignment_stats.average_final_score || 0).toFixed(3);
                 document.getElementById('maxImprovement').textContent = '+' + (stats.jd_alignment_stats.max_improvement || 0).toFixed(3);
                 
-                // Update recent alignments table
                 updateRecentAlignments(stats.jd_alignment_stats.recent_alignments || []);
+            } else {
+                document.getElementById('totalAlignments').textContent = '0';
+                document.getElementById('recentAlignments').innerHTML = '<p>No alignment data available</p>';
             }
 
             // Update Cost & Token Analytics
@@ -994,12 +1066,6 @@
                 document.getElementById('tokensPerRequest').textContent = (stats.daily_stats.tokens_per_request || 0).toFixed(2);
                 document.getElementById('dailyRequests').textContent = (stats.daily_stats.daily_requests || 0).toLocaleString();
                 document.getElementById('dailyAlignments').textContent = (stats.daily_stats.daily_alignments || 0).toLocaleString();
-                
-                // Estimate cost breakdown
-                const alignmentCost = (stats.daily_stats.daily_alignments || 0) * 0.02;
-                const generationCost = (stats.daily_stats.daily_cost || 0) - alignmentCost;
-                document.getElementById('generationCost').textContent = '$' + Math.max(0, generationCost).toFixed(6);
-                document.getElementById('alignmentCost').textContent = '$' + Math.max(0, alignmentCost).toFixed(6);
             }
 
             // Update Cache Performance
@@ -1009,7 +1075,6 @@
                 document.getElementById('cacheHitRate').textContent = (stats.cache_performance.hit_rate_today || 0).toFixed(1) + '%';
                 document.getElementById('totalRequests').textContent = (stats.cache_performance.total_requests_today || 0).toLocaleString();
                 
-                // Update cache progress bar
                 const hitRate = stats.cache_performance.hit_rate_today || 0;
                 document.getElementById('cacheHitBar').style.width = hitRate + '%';
                 document.getElementById('cacheEfficiency').textContent = hitRate.toFixed(1) + '%';
@@ -1021,12 +1086,6 @@
                 document.getElementById('activeUsersToday').textContent = (stats.user_analytics.active_users_today || 0).toLocaleString();
                 document.getElementById('totalUserRequests').textContent = (stats.user_analytics.total_requests_tracked || 0).toLocaleString();
                 
-                const topUserRequests = stats.user_analytics.top_users && stats.user_analytics.top_users.length > 0 
-                    ? stats.user_analytics.top_users[0].total_requests 
-                    : 0;
-                document.getElementById('topUserRequests').textContent = topUserRequests.toLocaleString();
-                
-                // Update top users list
                 updateTopUsersList(stats.user_analytics.top_users || []);
             }
         }
@@ -1070,15 +1129,14 @@
             }
 
             let html = '<table>';
-            html += '<tr><th>User ID</th><th>Total Requests</th><th>Last Active</th></tr>';
+            html += '<tr><th>User ID</th><th>Total Requests</th></tr>';
             
-            topUsers.slice(0, 10).forEach(user => {
+            topUsers.slice(0, 5).forEach(user => {
                 const shortUserId = user.user_id ? user.user_id.substring(0, 12) + '...' : 'Unknown';
                 html += `
                     <tr>
                         <td style="font-family: monospace;">${shortUserId}</td>
                         <td>${user.total_requests.toLocaleString()}</td>
-                        <td>${user.last_active ? new Date(user.last_active).toLocaleDateString() : 'Never'}</td>
                     </tr>
                 `;
             });
@@ -1087,77 +1145,7 @@
             container.innerHTML = html;
         }
 
-        // ========== DASHBOARD FUNCTIONS ==========
-
-        function refreshStats() {
-            if (!currentSession) {
-                showMessage('Please log in first', 'error');
-                return;
-            }
-
-            // Show loading states
-            document.querySelectorAll('.stat-value, .stat-mini-value').forEach(el => {
-                if (el.id !== 'serverStatus') {
-                    el.textContent = '...';
-                }
-            });
-            
-            const refreshBtn = document.getElementById('refreshBtn');
-            if (refreshBtn) refreshBtn.classList.add('loading');
-            
-            const serverStatus = document.getElementById('serverStatus');
-            if (serverStatus) serverStatus.textContent = '⏳ Loading...';
-
-            // Get comprehensive stats
-            fetch(`${API_BASE_URL}/stats`, {
-                headers: {
-                    'X-User-ID': currentSession.uid,
-                    'Content-Type': 'application/json'
-                }
-            })
-            .then(response => {
-                if (!response.ok) throw new Error(`HTTP ${response.status}`);
-                return response.json();
-            })
-            .then(data => {
-                if (data.success) {
-                    updateComprehensiveStats(data);
-                    updateDashboard(data.daily_stats || {});
-                } else {
-                    throw new Error('Failed to load stats');
-                }
-            })
-            .catch(error => {
-                console.error('Stats error:', error);
-                showMessage('Failed to fetch stats: ' + error.message, 'error');
-            });
-
-            // Get user credits for basic auth verification
-            fetch(`${API_BASE_URL}/user/credits`, {
-                headers: {
-                    'X-User-ID': currentSession.uid,
-                    'Content-Type': 'application/json'
-                }
-            })
-            .then(response => response.json())
-            .then(data => {
-                // Update user count if available
-                if (data.available_credits !== undefined) {
-                    document.getElementById('userCount').textContent = '1'; // At least current user
-                }
-            })
-            .catch(error => {
-                console.error('Credits error:', error);
-            });
-
-            checkServerHealth();
-            
-            // Final loading cleanup
-            if (refreshBtn) refreshBtn.classList.remove('loading');
-        }
-
         function updateDashboard(stats) {
-            // Update the main stat cards
             if (stats.daily_cost !== undefined) {
                 document.getElementById('dailyCostOverview').textContent = `$${stats.daily_cost.toFixed(6)}`;
             }
@@ -1169,16 +1157,6 @@
             }
             
             document.getElementById('lastUpdate').textContent = `Last update: ${new Date().toLocaleTimeString()}`;
-            
-            // Color code based on cost
-            const costElement = document.getElementById('dailyCostOverview');
-            if (stats.daily_cost > 1.0) {
-                costElement.className = 'stat-value cost-warning';
-            } else if (stats.daily_cost > 0.1) {
-                costElement.className = 'stat-value';
-            } else {
-                costElement.className = 'stat-value cost-good';
-            }
         }
 
         function checkServerHealth() {
@@ -1207,33 +1185,18 @@
 
         function resetStats() {
             if (confirm('Are you sure you want to reset daily statistics?')) {
-                fetch(`${API_BASE_URL}/stats/reset-daily`, {
-                    method: 'POST',
-                    headers: {
-                        'X-User-ID': currentSession.uid,
-                        'Admin-Key': 'your-admin-key-here'
-                    }
-                })
-                .then(response => response.json())
-                .then(data => {
-                    if (data.success) {
-                        showMessage('Statistics reset successfully!', 'success');
-                        refreshStats();
-                    } else {
-                        throw new Error(data.detail || 'Reset failed');
-                    }
-                })
-                .catch(error => {
-                    showMessage('Reset failed: ' + error.message, 'error');
-                });
+                showMessage('Reset feature would clear daily stats', 'info');
+                // Note: You'll need to implement this endpoint in your API
             }
         }
 
         function logout() {
+            console.log('👋 Logging out...');
             currentSession = null;
             stopAutoRefresh();
             stopSessionTimer();
             showLoginScreen();
+            showLoginMessage('👋 Logged out successfully', 'info');
         }
 
         function startSessionTimer() {
@@ -1276,9 +1239,8 @@
             }
         }
 
-        // Simple export function
         function exportData() {
-            showMessage('Export feature would generate CSV reports of usage data', 'info');
+            showMessage('Export feature would generate CSV reports', 'info');
         }
     </script>
 </body>
