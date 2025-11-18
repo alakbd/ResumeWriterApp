@@ -1172,22 +1172,6 @@
             showMessage('Export feature would generate CSV reports', 'info');
         }
 
-        // Remove the old analyze functions that depend on /admin endpoints
-        function analyzeCreditUsage() {
-            document.getElementById('creditDistribution').innerHTML = '<p>Credit analysis requires admin endpoints</p>';
-        }
-
-        function analyzeTodaysUsers() {
-            document.getElementById('todaysUsers').innerHTML = '<p>User analysis requires admin endpoints</p>';
-        }
-
-        function updateUserStats() {
-            document.getElementById('userStats').innerHTML = '<p>User stats require admin endpoints</p>';
-        }
-
-        function fetchPurchaseHistory() {
-            document.getElementById('purchaseHistory').innerHTML = '<p>Purchase history requires admin endpoints</p>';
-        }
     </script>
 </body>
 </html>
