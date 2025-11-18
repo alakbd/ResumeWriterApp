@@ -584,234 +584,7 @@
         </div>
     </div>
 
-    <script>
-        // Configuration
-        const API_BASE_URL = 'https://resume-writer-api.onrender.com';
-
-        let currentSession = null;
-        let refreshInterval;
-        let sessionTimerInterval;
-        let sessionStartTime;
-        let autoRefreshEnabled = true;
-        let monthlyCostData = [];
-
-        document.addEventListener('DOMContentLoaded', function() {
-            document.getElementById('autoLoginOverlay').style.display = 'flex';
-            // Auto-login with the working UID
-            setTimeout(() => {
-                attemptAutoLogin();
-            }, 1000);
-        });
-
-        // ========== NEW: COMPREHENSIVE STATS FUNCTIONS ==========
-
-        function updateComprehensiveStats(stats) {
-            // Update JD Alignment Statistics
-            if (stats.jd_alignment_stats) {
-                document.getElementById('totalAlignments').textContent = stats.jd_alignment_stats.total_alignments || 0;
-                document.getElementById('avgImprovement').textContent = '+' + (stats.jd_alignment_stats.average_improvement || 0).toFixed(3);
-                document.getElementById('avgFinalScore').textContent = (stats.jd_alignment_stats.average_final_score || 0).toFixed(3);
-                document.getElementById('maxImprovement').textContent = '+' + (stats.jd_alignment_stats.max_improvement || 0).toFixed(3);
-                
-                // Update recent alignments table
-                updateRecentAlignments(stats.jd_alignment_stats.recent_alignments || []);
-            }
-
-            // Update Cost & Token Analytics
-            if (stats.daily_stats) {
-                document.getElementById('dailyCost').textContent = '$' + (stats.daily_stats.daily_cost || 0).toFixed(6);
-                document.getElementById('totalTokens').textContent = (stats.daily_stats.daily_tokens || 0).toLocaleString();
-                document.getElementById('costPerRequest').textContent = '$' + (stats.daily_stats.cost_per_request || 0).toFixed(6);
-                document.getElementById('tokensPerRequest').textContent = (stats.daily_stats.tokens_per_request || 0).toFixed(2);
-                document.getElementById('dailyRequests').textContent = (stats.daily_stats.daily_requests || 0).toLocaleString();
-                document.getElementById('dailyAlignments').textContent = (stats.daily_stats.daily_alignments || 0).toLocaleString();
-                
-                // Estimate cost breakdown (you might want to track this separately in your backend)
-                const alignmentCost = (stats.daily_stats.daily_alignments || 0) * 0.02; // Example calculation
-                const generationCost = (stats.daily_stats.daily_cost || 0) - alignmentCost;
-                document.getElementById('generationCost').textContent = '$' + Math.max(0, generationCost).toFixed(6);
-                document.getElementById('alignmentCost').textContent = '$' + Math.max(0, alignmentCost).toFixed(6);
-            }
-
-            // Update Cache Performance
-            if (stats.cache_performance) {
-                document.getElementById('cacheHits').textContent = (stats.cache_performance.hits_today || 0).toLocaleString();
-                document.getElementById('cacheMisses').textContent = (stats.cache_performance.misses_today || 0).toLocaleString();
-                document.getElementById('cacheHitRate').textContent = (stats.cache_performance.hit_rate_today || 0).toFixed(1) + '%';
-                document.getElementById('totalRequests').textContent = (stats.cache_performance.total_requests_today || 0).toLocaleString();
-                
-                // Update cache progress bar
-                const hitRate = stats.cache_performance.hit_rate_today || 0;
-                document.getElementById('cacheHitBar').style.width = hitRate + '%';
-                document.getElementById('cacheEfficiency').textContent = hitRate.toFixed(1) + '%';
-            }
-
-            // Update User Analytics
-            if (stats.user_analytics) {
-                document.getElementById('totalUsersTracked').textContent = (stats.user_analytics.total_users_tracked || 0).toLocaleString();
-                document.getElementById('activeUsersToday').textContent = (stats.user_analytics.active_users_today || 0).toLocaleString();
-                document.getElementById('totalUserRequests').textContent = (stats.user_analytics.total_requests_tracked || 0).toLocaleString();
-                
-                const topUserRequests = stats.user_analytics.top_users && stats.user_analytics.top_users.length > 0 
-                    ? stats.user_analytics.top_users[0].total_requests 
-                    : 0;
-                document.getElementById('topUserRequests').textContent = topUserRequests.toLocaleString();
-                
-                // Update top users list
-                updateTopUsersList(stats.user_analytics.top_users || []);
-            }
-        }
-
-        function updateRecentAlignments(alignments) {
-            const container = document.getElementById('recentAlignments');
-            
-            if (!alignments || alignments.length === 0) {
-                container.innerHTML = '<p>No recent alignment data available.</p>';
-                return;
-            }
-
-            let html = '<table>';
-            html += '<tr><th>Timestamp</th><th>Initial</th><th>Final</th><th>Improvement</th><th>Keywords</th></tr>';
-            
-            alignments.forEach(align => {
-                const improvementPercent = align.improvement_percentage ? align.improvement_percentage.toFixed(1) + '%' : 'N/A';
-                html += `
-                    <tr>
-                        <td>${new Date(align.timestamp).toLocaleTimeString()}</td>
-                        <td>${align.initial_score.toFixed(3)}</td>
-                        <td>${align.final_score.toFixed(3)}</td>
-                        <td style="color: ${align.improvement > 0 ? '#27ae60' : '#e74c3c'}">
-                            +${align.improvement.toFixed(3)} (${improvementPercent})
-                        </td>
-                        <td>${align.keywords_found || 0}</td>
-                    </tr>
-                `;
-            });
-            
-            html += '</table>';
-            container.innerHTML = html;
-        }
-
-        function updateTopUsersList(topUsers) {
-            const container = document.getElementById('topUsersList');
-            
-            if (!topUsers || topUsers.length === 0) {
-                container.innerHTML = '<p>No user activity data available.</p>';
-                return;
-            }
-
-            let html = '<table>';
-            html += '<tr><th>User ID</th><th>Total Requests</th><th>Last Active</th></tr>';
-            
-            topUsers.slice(0, 10).forEach(user => {
-                const shortUserId = user.user_id ? user.user_id.substring(0, 12) + '...' : 'Unknown';
-                html += `
-                    <tr>
-                        <td style="font-family: monospace;">${shortUserId}</td>
-                        <td>${user.total_requests.toLocaleString()}</td>
-                        <td>${user.last_active ? new Date(user.last_active).toLocaleDateString() : 'Never'}</td>
-                    </tr>
-                `;
-            });
-            
-            html += '</table>';
-            container.innerHTML = html;
-        }
-
-        // ========== MODIFIED refreshStats FUNCTION ==========
-
-        function refreshStats() {
-            if (!currentSession) {
-                showMessage('Please log in first', 'error');
-                return;
-            }
-
-            // Show loading states
-            document.querySelectorAll('.stat-value, .stat-mini-value').forEach(el => {
-                if (el.id !== 'serverStatus') {
-                    el.textContent = '...';
-                }
-            });
-            
-            const refreshBtn = document.getElementById('refreshBtn');
-            if (refreshBtn) refreshBtn.classList.add('loading');
-            
-            const serverStatus = document.getElementById('serverStatus');
-            if (serverStatus) serverStatus.textContent = '⏳ Loading...';
-
-            // Get comprehensive stats from your API
-            fetch(`${API_BASE_URL}/stats`, {
-                headers: {
-                    'X-User-ID': currentSession.uid,
-                    'Content-Type': 'application/json'
-                }
-            })
-            .then(response => {
-                if (!response.ok) throw new Error(`HTTP ${response.status}`);
-                return response.json();
-            })
-            .then(data => {
-                if (data.success) {
-                    // Update the new comprehensive stats
-                    updateComprehensiveStats(data);
-                    
-                    // Also update existing dashboard stats for backward compatibility
-                    updateDashboard(data.daily_stats || {});
-                }
-            })
-            .catch(error => {
-                console.error('Comprehensive stats error:', error);
-                showMessage('Failed to fetch comprehensive stats: ' + error.message, 'error');
-            });
-
-            // Rest of your existing refreshStats code remains the same...
-            // Get cost history for monthly calculation
-            fetch(`${API_BASE_URL}/admin/cost-history?days=30`, {
-                headers: {
-                    'X-User-ID': currentSession.uid,
-                    'Content-Type': 'application/json'
-                }
-            })
-            .then(response => response.json())
-            .then(data => {
-                updateCostHistory(data);
-                calculateMonthlyCost(data);
-                calculateWeeklyCost(data);
-            })
-            .catch(error => {
-                console.error('Cost history error:', error);
-                document.getElementById('costHistory').innerHTML = '<p>Error loading cost history</p>';
-            });
-
-            // Get user stats for credit analysis
-            fetch(`${API_BASE_URL}/admin/users`, {
-                headers: {
-                    'X-User-ID': currentSession.uid,
-                    'Content-Type': 'application/json'
-                }
-            })
-            .then(response => response.json())
-            .then(data => {
-                if (data.success) {
-                    updateUserStats(data);
-                    analyzeCreditUsage(data);
-                    analyzeTodaysUsers(data);
-                }
-            })
-            .catch(error => {
-                console.error('User stats error:', error);
-            });
-
-            // Get purchase history if available
-            fetchPurchaseHistory();
-
-            checkServerHealth();
-            
-            // Final loading cleanup
-            if (refreshBtn) refreshBtn.classList.remove('loading');
-        }
-
-      <script>
+     <script>
         // Configuration
         const API_BASE_URL = 'https://resume-writer-api.onrender.com';
 
@@ -823,36 +596,27 @@
 
         document.addEventListener('DOMContentLoaded', function() {
             console.log('🚀 Dashboard loading...');
-            showLoginScreen(); // Directly show login screen, skip auto-login
+            document.getElementById('autoLoginOverlay').style.display = 'flex';
+            // Auto-login with the working UID
+            setTimeout(() => {
+                attemptAutoLogin();
+            }, 1000);
         });
 
-        // ========== SIMPLE & ROBUST LOGIN SYSTEM ==========
-
-        function showLoginScreen() {
-            console.log('📱 Showing login screen');
-            document.getElementById('autoLoginOverlay').style.display = 'none';
-            document.getElementById('loginScreen').style.display = 'block';
-            document.getElementById('dashboard').style.display = 'none';
-            
-            // Clear any previous messages
-            showLoginMessage('', '');
+        function attemptAutoLogin() {
+            // Try to login with the pre-filled UID that we know works
+            const firebaseUID = document.getElementById('firebaseUID').value.trim();
+            console.log('🔐 Attempting auto-login with UID:', firebaseUID);
+            if (firebaseUID) {
+                loginWithUID(firebaseUID);
+            } else {
+                showLoginScreen();
+            }
         }
 
-        async function login(event) {
-            if (event) event.preventDefault();
+        async function loginWithUID(firebaseUID) {
+            updateAutoLoginStatus('🔄 Testing authentication...');
             
-            const firebaseUID = document.getElementById('firebaseUID').value.trim();
-            console.log('🔐 Attempting login with UID:', firebaseUID);
-            
-            if (!firebaseUID) {
-                showLoginMessage('❌ Please enter Firebase UID', 'error');
-                return;
-            }
-
-            // Show loading state
-            document.getElementById('loginScreen').classList.add('loading');
-            showLoginMessage('🔄 Testing authentication...', 'info');
-
             try {
                 // Test with the health endpoint first (no auth required)
                 console.log('🩺 Testing API health...');
@@ -861,50 +625,110 @@
                     throw new Error('API server is not responding');
                 }
                 
-                const healthData = await healthResponse.json();
-                console.log('✅ API Health:', healthData);
-
-                // Now test authentication with a simple endpoint
-                console.log('🔑 Testing authentication...');
-                const testResponse = await fetch(`${API_BASE_URL}/user/credits`, {
+                // Now test authentication with the /user/credits endpoint which should work for any authenticated user
+                console.log('🔑 Testing authentication with /user/credits...');
+                const response = await fetch(`${API_BASE_URL}/user/credits`, {
                     headers: {
                         'X-User-ID': firebaseUID,
                         'Content-Type': 'application/json'
                     }
                 });
-
-                console.log('🔑 Auth response status:', testResponse.status);
-
-                if (testResponse.ok) {
-                    // Success! User is authenticated
-                    console.log('✅ Authentication successful');
+                
+                console.log('🔑 Auth response status:', response.status);
+                
+                if (response.ok) {
                     currentSession = {
                         uid: firebaseUID,
-                        type: 'firebase',
-                        authenticated: true
+                        type: 'firebase'
                     };
-                    
-                    showLoginMessage('✅ Authentication successful! Loading dashboard...', 'success');
-                    
-                    // Small delay to show success message
+                    updateAutoLoginStatus('✅ Authentication successful!');
                     setTimeout(() => {
                         handleSuccessfulLogin();
                     }, 1000);
-                    
-                } else if (testResponse.status === 401 || testResponse.status === 403) {
-                    // Auth failed but API is working
-                    throw new Error('Invalid Firebase UID - Authentication failed');
                 } else {
-                    // Some other error
-                    const errorText = await testResponse.text();
-                    console.error('Auth error response:', errorText);
-                    throw new Error(`Server error: ${testResponse.status}`);
+                    // Try the /stats endpoint as fallback
+                    console.log('🔄 Trying /stats endpoint as fallback...');
+                    const statsResponse = await fetch(`${API_BASE_URL}/stats`, {
+                        headers: {
+                            'X-User-ID': firebaseUID,
+                            'Content-Type': 'application/json'
+                        }
+                    });
+                    
+                    if (statsResponse.ok) {
+                        currentSession = {
+                            uid: firebaseUID,
+                            type: 'firebase'
+                        };
+                        updateAutoLoginStatus('✅ Authentication successful!');
+                        setTimeout(() => {
+                            handleSuccessfulLogin();
+                        }, 1000);
+                    } else {
+                        throw new Error('Authentication failed with both endpoints');
+                    }
                 }
-
             } catch (error) {
                 console.error('❌ Login error:', error);
-                showLoginMessage(`❌ Login failed: ${error.message}`, 'error');
+                updateAutoLoginStatus('❌ Auto-login failed: ' + error.message);
+                setTimeout(() => {
+                    showLoginScreen();
+                }, 3000);
+            }
+        }
+
+        function updateAutoLoginStatus(message) {
+            const statusElement = document.getElementById('autoLoginStatus');
+            if (statusElement) {
+                statusElement.innerHTML = `<div style="margin: 10px 0; padding: 10px; background: #f8f9fa; border-radius: 5px;">${message}</div>`;
+            }
+        }
+
+        function showLoginScreen() {
+            console.log('📱 Showing login screen');
+            document.getElementById('autoLoginOverlay').style.display = 'none';
+            document.getElementById('loginScreen').style.display = 'block';
+            document.getElementById('dashboard').style.display = 'none';
+        }
+
+        function handleSuccessfulLogin() {
+            console.log('🎉 Login successful, showing dashboard');
+            document.getElementById('autoLoginOverlay').style.display = 'none';
+            document.getElementById('loginScreen').style.display = 'none';
+            document.getElementById('dashboard').style.display = 'block';
+            
+            // Initialize dashboard
+            sessionStartTime = new Date();
+            document.getElementById('sessionStart').textContent = sessionStartTime.toLocaleString();
+            document.getElementById('apiBaseUrl').textContent = API_BASE_URL;
+            document.getElementById('adminUID').textContent = currentSession.uid;
+            
+            showMessage('✅ Authentication successful! Dashboard loaded.', 'success');
+            refreshStats();
+            startAutoRefresh();
+            startSessionTimer();
+        }
+
+        async function login(event) {
+            if (event) event.preventDefault();
+            
+            const firebaseUID = document.getElementById('firebaseUID').value.trim();
+            console.log('🔐 Manual login with UID:', firebaseUID);
+            
+            if (!firebaseUID) {
+                showLoginMessage('❌ Please enter Firebase UID', 'error');
+                return;
+            }
+
+            document.getElementById('loginScreen').classList.add('loading');
+            showLoginMessage('🔄 Testing authentication...', 'info');
+            
+            try {
+                await loginWithUID(firebaseUID);
+            } catch (error) {
+                console.error('Login error:', error);
                 document.getElementById('loginScreen').classList.remove('loading');
+                showLoginMessage('❌ Login failed: ' + error.message, 'error');
             }
         }
 
@@ -925,27 +749,6 @@
             }
         }
 
-        function handleSuccessfulLogin() {
-            console.log('🎉 Login successful, showing dashboard');
-            
-            document.getElementById('loginScreen').style.display = 'none';
-            document.getElementById('dashboard').style.display = 'block';
-            document.getElementById('loginScreen').classList.remove('loading');
-            
-            // Initialize dashboard
-            sessionStartTime = new Date();
-            document.getElementById('sessionStart').textContent = sessionStartTime.toLocaleString();
-            document.getElementById('apiBaseUrl').textContent = API_BASE_URL;
-            document.getElementById('adminUID').textContent = currentSession.uid;
-            
-            showMessage('✅ Dashboard loaded successfully!', 'success');
-            
-            // Load initial data
-            refreshStats();
-            startAutoRefresh();
-            startSessionTimer();
-        }
-
         function showMessage(message, type) {
             const container = document.getElementById('messageContainer');
             if (container) {
@@ -958,7 +761,7 @@
             }
         }
 
-        // ========== DASHBOARD DATA FUNCTIONS ==========
+        // ========== ENHANCED STATS FUNCTIONS ==========
 
         function refreshStats() {
             if (!currentSession) {
@@ -969,7 +772,7 @@
             console.log('🔄 Refreshing stats...');
 
             // Show loading states
-            document.querySelectorAll('.stat-value, .stat-mini-value').forEach(el => {
+            document.querySelectorAll('.stat-value').forEach(el => {
                 if (el.id !== 'serverStatus') {
                     el.textContent = '...';
                 }
@@ -981,7 +784,7 @@
             const serverStatus = document.getElementById('serverStatus');
             if (serverStatus) serverStatus.textContent = '⏳ Loading...';
 
-            // Try to get comprehensive stats
+            // Get comprehensive stats from /stats endpoint
             fetch(`${API_BASE_URL}/stats`, {
                 headers: {
                     'X-User-ID': currentSession.uid,
@@ -998,8 +801,7 @@
             .then(data => {
                 console.log('📊 Stats data received:', data);
                 if (data.success) {
-                    updateComprehensiveStats(data);
-                    updateDashboard(data.daily_stats || {});
+                    updateEnhancedDashboard(data);
                     showMessage('✅ Stats updated successfully', 'success');
                 } else {
                     throw new Error('Stats endpoint returned unsuccessful response');
@@ -1007,8 +809,8 @@
             })
             .catch(error => {
                 console.error('❌ Stats error:', error);
-                showMessage('⚠️ Limited data: ' + error.message, 'error');
-                // Still try to load basic info
+                showMessage('⚠️ Could not load comprehensive stats: ' + error.message, 'error');
+                // Fallback to basic info
                 loadBasicInfo();
             });
 
@@ -1020,78 +822,143 @@
             }, 1000);
         }
 
-        function loadBasicInfo() {
-            // Load user credits as basic info
-            fetch(`${API_BASE_URL}/user/credits`, {
-                headers: {
-                    'X-User-ID': currentSession.uid,
-                    'Content-Type': 'application/json'
-                }
-            })
-            .then(response => response.json())
-            .then(data => {
-                console.log('💳 Credits data:', data);
-                // Update basic user info
-                document.getElementById('userCount').textContent = '1'; // At least current user
-                if (data.available_credits !== undefined) {
-                    document.getElementById('apiRequests').textContent = 'User authenticated';
-                }
-            })
-            .catch(error => {
-                console.error('Credits load error:', error);
-            });
-        }
-
-        function updateComprehensiveStats(stats) {
-            console.log('Updating comprehensive stats:', stats);
+        function updateEnhancedDashboard(stats) {
+            console.log('Updating enhanced dashboard with:', stats);
             
-            // Update JD Alignment Statistics
+            // Update existing stat cards
+            if (stats.daily_stats) {
+                document.getElementById('dailyCost').textContent = `$${(stats.daily_stats.daily_cost || 0).toFixed(6)}`;
+                document.getElementById('totalTokens').textContent = (stats.daily_stats.daily_tokens || 0).toLocaleString();
+                document.getElementById('apiRequests').textContent = (stats.daily_stats.daily_requests || 0).toLocaleString();
+                
+                // Color code based on cost
+                const costElement = document.getElementById('dailyCost');
+                if (stats.daily_stats.daily_cost > 1.0) {
+                    costElement.className = 'stat-value cost-warning';
+                } else if (stats.daily_stats.daily_cost > 0.1) {
+                    costElement.className = 'stat-value';
+                } else {
+                    costElement.className = 'stat-value cost-good';
+                }
+            }
+
+            // Update user count from user analytics
+            if (stats.user_analytics) {
+                document.getElementById('userCount').textContent = (stats.user_analytics.total_users_tracked || 0).toLocaleString();
+                document.getElementById('newUsersToday').textContent = (stats.user_analytics.active_users_today || 0).toLocaleString();
+            }
+
+            // Update cost history
+            if (stats.cost_history && stats.cost_history.length > 0) {
+                updateCostHistory(stats.cost_history);
+                calculateMonthlyCost(stats.cost_history);
+                calculateWeeklyCost(stats.cost_history);
+            }
+
+            document.getElementById('lastUpdate').textContent = `Last update: ${new Date().toLocaleTimeString()}`;
+
+            // ========== NEW: JD ALIGNMENT STATS ==========
             if (stats.jd_alignment_stats) {
+                // Create or update JD Alignment section
+                let jdSection = document.getElementById('jdAlignmentSection');
+                if (!jdSection) {
+                    jdSection = document.createElement('div');
+                    jdSection.className = 'chart-container';
+                    jdSection.id = 'jdAlignmentSection';
+                    jdSection.innerHTML = `
+                        <h3>🎯 JD Alignment Statistics</h3>
+                        <div class="stats-row">
+                            <div class="stat-mini-card">
+                                <div class="stat-mini-label">Total Alignments</div>
+                                <div class="stat-mini-value" id="totalAlignments">0</div>
+                            </div>
+                            <div class="stat-mini-card">
+                                <div class="stat-mini-label">Avg Improvement</div>
+                                <div class="stat-mini-value score-improvement" id="avgImprovement">+0.00</div>
+                            </div>
+                            <div class="stat-mini-card">
+                                <div class="stat-mini-label">Avg Final Score</div>
+                                <div class="stat-mini-value alignment-score" id="avgFinalScore">0.00</div>
+                            </div>
+                            <div class="stat-mini-card">
+                                <div class="stat-mini-label">Max Improvement</div>
+                                <div class="stat-mini-value score-improvement" id="maxImprovement">+0.00</div>
+                            </div>
+                        </div>
+                        <div id="recentAlignments">
+                            <p>Loading alignment data...</p>
+                        </div>
+                    `;
+                    // Insert after Live Stats grid
+                    document.querySelector('.stats-grid').after(jdSection);
+                }
+
+                // Update JD Alignment values
                 document.getElementById('totalAlignments').textContent = stats.jd_alignment_stats.total_alignments || 0;
                 document.getElementById('avgImprovement').textContent = '+' + (stats.jd_alignment_stats.average_improvement || 0).toFixed(3);
                 document.getElementById('avgFinalScore').textContent = (stats.jd_alignment_stats.average_final_score || 0).toFixed(3);
                 document.getElementById('maxImprovement').textContent = '+' + (stats.jd_alignment_stats.max_improvement || 0).toFixed(3);
                 
                 updateRecentAlignments(stats.jd_alignment_stats.recent_alignments || []);
-            } else {
-                document.getElementById('totalAlignments').textContent = '0';
-                document.getElementById('recentAlignments').innerHTML = '<p>No alignment data available</p>';
             }
 
-            // Update Cost & Token Analytics
-            if (stats.daily_stats) {
-                document.getElementById('dailyCost').textContent = '$' + (stats.daily_stats.daily_cost || 0).toFixed(6);
-                document.getElementById('totalTokens').textContent = (stats.daily_stats.daily_tokens || 0).toLocaleString();
-                document.getElementById('costPerRequest').textContent = '$' + (stats.daily_stats.cost_per_request || 0).toFixed(6);
-                document.getElementById('tokensPerRequest').textContent = (stats.daily_stats.tokens_per_request || 0).toFixed(2);
-                document.getElementById('dailyRequests').textContent = (stats.daily_stats.daily_requests || 0).toLocaleString();
-                document.getElementById('dailyAlignments').textContent = (stats.daily_stats.daily_alignments || 0).toLocaleString();
-            }
-
-            // Update Cache Performance
+            // ========== NEW: CACHE PERFORMANCE STATS ==========
             if (stats.cache_performance) {
+                let cacheSection = document.getElementById('cachePerformanceSection');
+                if (!cacheSection) {
+                    cacheSection = document.createElement('div');
+                    cacheSection.className = 'chart-container';
+                    cacheSection.id = 'cachePerformanceSection';
+                    cacheSection.innerHTML = `
+                        <h3>⚡ Cache Performance</h3>
+                        <div class="stats-row">
+                            <div class="stat-mini-card">
+                                <div class="stat-mini-label">Cache Hits</div>
+                                <div class="stat-mini-value cache-hit" id="cacheHits">0</div>
+                            </div>
+                            <div class="stat-mini-card">
+                                <div class="stat-mini-label">Cache Misses</div>
+                                <div class="stat-mini-value cache-miss" id="cacheMisses">0</div>
+                            </div>
+                            <div class="stat-mini-card">
+                                <div class="stat-mini-label">Hit Rate</div>
+                                <div class="stat-mini-value" id="cacheHitRate">0%</div>
+                            </div>
+                        </div>
+                        <div class="progress-bar">
+                            <div class="progress-fill" id="cacheHitBar" style="width: 0%"></div>
+                        </div>
+                    `;
+                    // Add some CSS for the new elements
+                    const style = document.createElement('style');
+                    style.textContent = `
+                        .stats-row { display: grid; grid-template-columns: repeat(auto-fit, minmax(150px, 1fr)); gap: 15px; margin-bottom: 15px; }
+                        .stat-mini-card { background: #f8f9fa; padding: 15px; border-radius: 8px; text-align: center; border-left: 4px solid #667eea; }
+                        .stat-mini-value { font-size: 1.5rem; font-weight: bold; color: #2c3e50; margin: 5px 0; }
+                        .stat-mini-label { color: #666; font-size: 0.8rem; }
+                        .progress-bar { background: #ecf0f1; border-radius: 10px; height: 10px; margin: 10px 0; overflow: hidden; }
+                        .progress-fill { height: 100%; background: linear-gradient(90deg, #667eea, #764ba2); transition: width 0.3s ease; }
+                        .alignment-score { color: #27ae60; }
+                        .score-improvement { color: #e74c3c; }
+                        .cache-hit { color: #27ae60; }
+                        .cache-miss { color: #e74c3c; }
+                    `;
+                    document.head.appendChild(style);
+                }
+
+                // Update cache values
                 document.getElementById('cacheHits').textContent = (stats.cache_performance.hits_today || 0).toLocaleString();
                 document.getElementById('cacheMisses').textContent = (stats.cache_performance.misses_today || 0).toLocaleString();
                 document.getElementById('cacheHitRate').textContent = (stats.cache_performance.hit_rate_today || 0).toFixed(1) + '%';
-                document.getElementById('totalRequests').textContent = (stats.cache_performance.total_requests_today || 0).toLocaleString();
                 
                 const hitRate = stats.cache_performance.hit_rate_today || 0;
                 document.getElementById('cacheHitBar').style.width = hitRate + '%';
-                document.getElementById('cacheEfficiency').textContent = hitRate.toFixed(1) + '%';
-            }
-
-            // Update User Analytics
-            if (stats.user_analytics) {
-                document.getElementById('totalUsersTracked').textContent = (stats.user_analytics.total_users_tracked || 0).toLocaleString();
-                document.getElementById('activeUsersToday').textContent = (stats.user_analytics.active_users_today || 0).toLocaleString();
-                document.getElementById('totalUserRequests').textContent = (stats.user_analytics.total_requests_tracked || 0).toLocaleString();
-                
-                updateTopUsersList(stats.user_analytics.top_users || []);
             }
         }
 
         function updateRecentAlignments(alignments) {
             const container = document.getElementById('recentAlignments');
+            if (!container) return;
             
             if (!alignments || alignments.length === 0) {
                 container.innerHTML = '<p>No recent alignment data available.</p>';
@@ -1120,43 +987,108 @@
             container.innerHTML = html;
         }
 
-        function updateTopUsersList(topUsers) {
-            const container = document.getElementById('topUsersList');
+        function loadBasicInfo() {
+            // Load user credits as basic info
+            fetch(`${API_BASE_URL}/user/credits`, {
+                headers: {
+                    'X-User-ID': currentSession.uid,
+                    'Content-Type': 'application/json'
+                }
+            })
+            .then(response => response.json())
+            .then(data => {
+                console.log('💳 Credits data:', data);
+                document.getElementById('userCount').textContent = '1';
+                document.getElementById('apiRequests').textContent = 'Basic access';
+            })
+            .catch(error => {
+                console.error('Credits load error:', error);
+            });
+        }
+
+        // Rest of your existing functions remain the same...
+        function calculateMonthlyCost(costHistory) {
+            if (!costHistory || costHistory.length === 0) {
+                document.getElementById('monthlyCost').textContent = '$0';
+                return;
+            }
+
+            const monthlyTotal = costHistory.reduce((sum, day) => sum + (day.daily_cost || day.cost || 0), 0);
+            document.getElementById('monthlyCost').textContent = `$${monthlyTotal.toFixed(2)}`;
             
-            if (!topUsers || topUsers.length === 0) {
-                container.innerHTML = '<p>No user activity data available.</p>';
+            const now = new Date();
+            const monthName = now.toLocaleString('default', { month: 'long' });
+            document.getElementById('monthlyPeriod').textContent = `${monthName} ${now.getFullYear()}`;
+            
+            const monthlyElement = document.getElementById('monthlyCost');
+            if (monthlyTotal > 50) {
+                monthlyElement.className = 'stat-value cost-warning';
+            } else if (monthlyTotal > 10) {
+                monthlyElement.className = 'stat-value';
+            } else {
+                monthlyElement.className = 'stat-value cost-good';
+            }
+        }
+
+        function calculateWeeklyCost(costHistory) {
+            if (!costHistory || costHistory.length === 0) {
+                document.getElementById('weeklyCost').textContent = '$0';
+                return;
+            }
+
+            const weeklyTotal = costHistory.slice(-7).reduce((sum, day) => sum + (day.daily_cost || day.cost || 0), 0);
+            document.getElementById('weeklyCost').textContent = `$${weeklyTotal.toFixed(2)}`;
+            
+            const now = new Date();
+            const weekAgo = new Date(now.getTime() - 7 * 24 * 60 * 60 * 1000);
+            document.getElementById('weeklyPeriod').textContent = `${weekAgo.toLocaleDateString()} - ${now.toLocaleDateString()}`;
+            
+            const weeklyElement = document.getElementById('weeklyCost');
+            if (weeklyTotal > 10) {
+                weeklyElement.className = 'stat-value cost-warning';
+            } else if (weeklyTotal > 2) {
+                weeklyElement.className = 'stat-value';
+            } else {
+                weeklyElement.className = 'stat-value cost-good';
+            }
+        }
+
+        function updateCostHistory(history) {
+            const historyDiv = document.getElementById('costHistory');
+            
+            if (!history || history.length === 0) {
+                historyDiv.innerHTML = '<p>No cost history available yet.</p>';
                 return;
             }
 
             let html = '<table>';
-            html += '<tr><th>User ID</th><th>Total Requests</th></tr>';
+            html += '<tr><th>Date</th><th style="text-align: right;">Cost</th><th style="text-align: right;">Tokens</th><th style="text-align: right;">Requests</th></tr>';
             
-            topUsers.slice(0, 5).forEach(user => {
-                const shortUserId = user.user_id ? user.user_id.substring(0, 12) + '...' : 'Unknown';
-                html += `
-                    <tr>
-                        <td style="font-family: monospace;">${shortUserId}</td>
-                        <td>${user.total_requests.toLocaleString()}</td>
-                    </tr>
-                `;
+            const recentHistory = history.slice(-30);
+            recentHistory.forEach(day => {
+                const cost = day.daily_cost || day.cost || 0;
+                const tokens = day.daily_tokens || day.tokens || 0;
+                const requests = day.daily_requests || day.requests || 0;
+                
+                const costColor = cost > 1.0 ? 'cost-warning' : (cost > 0.1 ? '' : 'cost-good');
+                html += `<tr>`;
+                html += `<td>${day.date || 'Unknown'}</td>`;
+                html += `<td style="text-align: right;" class="${costColor}">$${cost.toFixed(6)}</td>`;
+                html += `<td style="text-align: right;">${tokens.toLocaleString()}</td>`;
+                html += `<td style="text-align: right;">${requests.toLocaleString()}</td>`;
+                html += `</tr>`;
             });
             
-            html += '</table>';
-            container.innerHTML = html;
-        }
-
-        function updateDashboard(stats) {
-            if (stats.daily_cost !== undefined) {
-                document.getElementById('dailyCostOverview').textContent = `$${stats.daily_cost.toFixed(6)}`;
-            }
-            if (stats.daily_tokens !== undefined) {
-                document.getElementById('totalTokensOverview').textContent = stats.daily_tokens.toLocaleString();
-            }
-            if (stats.daily_requests !== undefined) {
-                document.getElementById('apiRequests').textContent = stats.daily_requests.toLocaleString();
-            }
+            const monthlyTotal = recentHistory.reduce((sum, day) => sum + (day.daily_cost || day.cost || 0), 0);
+            html += `<tr style="background: #f8f9fa; font-weight: bold;">`;
+            html += `<td>Monthly Total</td>`;
+            html += `<td style="text-align: right;">$${monthlyTotal.toFixed(2)}</td>`;
+            html += `<td style="text-align: right;">${recentHistory.reduce((sum, day) => sum + (day.daily_tokens || day.tokens || 0), 0).toLocaleString()}</td>`;
+            html += `<td style="text-align: right;">${recentHistory.reduce((sum, day) => sum + (day.daily_requests || day.requests || 0), 0).toLocaleString()}</td>`;
+            html += `</tr>`;
             
-            document.getElementById('lastUpdate').textContent = `Last update: ${new Date().toLocaleTimeString()}`;
+            html += '</table>';
+            historyDiv.innerHTML = html;
         }
 
         function checkServerHealth() {
@@ -1186,17 +1118,14 @@
         function resetStats() {
             if (confirm('Are you sure you want to reset daily statistics?')) {
                 showMessage('Reset feature would clear daily stats', 'info');
-                // Note: You'll need to implement this endpoint in your API
             }
         }
 
         function logout() {
-            console.log('👋 Logging out...');
             currentSession = null;
             stopAutoRefresh();
             stopSessionTimer();
             showLoginScreen();
-            showLoginMessage('👋 Logged out successfully', 'info');
         }
 
         function startSessionTimer() {
@@ -1241,6 +1170,23 @@
 
         function exportData() {
             showMessage('Export feature would generate CSV reports', 'info');
+        }
+
+        // Remove the old analyze functions that depend on /admin endpoints
+        function analyzeCreditUsage() {
+            document.getElementById('creditDistribution').innerHTML = '<p>Credit analysis requires admin endpoints</p>';
+        }
+
+        function analyzeTodaysUsers() {
+            document.getElementById('todaysUsers').innerHTML = '<p>User analysis requires admin endpoints</p>';
+        }
+
+        function updateUserStats() {
+            document.getElementById('userStats').innerHTML = '<p>User stats require admin endpoints</p>';
+        }
+
+        function fetchPurchaseHistory() {
+            document.getElementById('purchaseHistory').innerHTML = '<p>Purchase history requires admin endpoints</p>';
         }
     </script>
 </body>
