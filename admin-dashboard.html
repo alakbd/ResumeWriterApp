@@ -811,16 +811,797 @@
             if (refreshBtn) refreshBtn.classList.remove('loading');
         }
 
-        // ========== REST OF YOUR EXISTING JAVASCRIPT FUNCTIONS ==========
-        // (All your existing functions remain unchanged below this point)
-        // attemptAutoLogin, loginWithUID, updateAutoLoginStatus, showLoginScreen, handleSuccessfulLogin, 
-        // login, showLoginMessage, showMessage, updateDashboard, calculateMonthlyCost, calculateWeeklyCost,
-        // analyzeCreditUsage, analyzeTodaysUsers, updateCostHistory, updateUserStats, fetchPurchaseHistory,
-        // exportData, checkServerHealth, resetStats, logout, startSessionTimer, stopSessionTimer, 
-        // startAutoRefresh, stopAutoRefresh, toggleAutoRefresh
+       <script>
+        // Configuration
+        const API_BASE_URL = 'https://resume-writer-api.onrender.com';
 
-        // ... (include all your existing JavaScript functions here - they remain unchanged)
+        let currentSession = null;
+        let refreshInterval;
+        let sessionTimerInterval;
+        let sessionStartTime;
+        let autoRefreshEnabled = true;
+        let monthlyCostData = [];
 
+        document.addEventListener('DOMContentLoaded', function() {
+            document.getElementById('autoLoginOverlay').style.display = 'flex';
+            // Auto-login with the working UID
+            setTimeout(() => {
+                attemptAutoLogin();
+            }, 1000);
+        });
+
+        // ========== NEW: COMPREHENSIVE STATS FUNCTIONS ==========
+
+        function updateComprehensiveStats(stats) {
+            // Update JD Alignment Statistics
+            if (stats.jd_alignment_stats) {
+                document.getElementById('totalAlignments').textContent = stats.jd_alignment_stats.total_alignments || 0;
+                document.getElementById('avgImprovement').textContent = '+' + (stats.jd_alignment_stats.average_improvement || 0).toFixed(3);
+                document.getElementById('avgFinalScore').textContent = (stats.jd_alignment_stats.average_final_score || 0).toFixed(3);
+                document.getElementById('maxImprovement').textContent = '+' + (stats.jd_alignment_stats.max_improvement || 0).toFixed(3);
+                
+                // Update recent alignments table
+                updateRecentAlignments(stats.jd_alignment_stats.recent_alignments || []);
+            }
+
+            // Update Cost & Token Analytics
+            if (stats.daily_stats) {
+                document.getElementById('dailyCost').textContent = '$' + (stats.daily_stats.daily_cost || 0).toFixed(6);
+                document.getElementById('totalTokens').textContent = (stats.daily_stats.daily_tokens || 0).toLocaleString();
+                document.getElementById('costPerRequest').textContent = '$' + (stats.daily_stats.cost_per_request || 0).toFixed(6);
+                document.getElementById('tokensPerRequest').textContent = (stats.daily_stats.tokens_per_request || 0).toFixed(2);
+                document.getElementById('dailyRequests').textContent = (stats.daily_stats.daily_requests || 0).toLocaleString();
+                document.getElementById('dailyAlignments').textContent = (stats.daily_stats.daily_alignments || 0).toLocaleString();
+                
+                // Estimate cost breakdown (you might want to track this separately in your backend)
+                const alignmentCost = (stats.daily_stats.daily_alignments || 0) * 0.02; // Example calculation
+                const generationCost = (stats.daily_stats.daily_cost || 0) - alignmentCost;
+                document.getElementById('generationCost').textContent = '$' + Math.max(0, generationCost).toFixed(6);
+                document.getElementById('alignmentCost').textContent = '$' + Math.max(0, alignmentCost).toFixed(6);
+            }
+
+            // Update Cache Performance
+            if (stats.cache_performance) {
+                document.getElementById('cacheHits').textContent = (stats.cache_performance.hits_today || 0).toLocaleString();
+                document.getElementById('cacheMisses').textContent = (stats.cache_performance.misses_today || 0).toLocaleString();
+                document.getElementById('cacheHitRate').textContent = (stats.cache_performance.hit_rate_today || 0).toFixed(1) + '%';
+                document.getElementById('totalRequests').textContent = (stats.cache_performance.total_requests_today || 0).toLocaleString();
+                
+                // Update cache progress bar
+                const hitRate = stats.cache_performance.hit_rate_today || 0;
+                document.getElementById('cacheHitBar').style.width = hitRate + '%';
+                document.getElementById('cacheEfficiency').textContent = hitRate.toFixed(1) + '%';
+            }
+
+            // Update User Analytics
+            if (stats.user_analytics) {
+                document.getElementById('totalUsersTracked').textContent = (stats.user_analytics.total_users_tracked || 0).toLocaleString();
+                document.getElementById('activeUsersToday').textContent = (stats.user_analytics.active_users_today || 0).toLocaleString();
+                document.getElementById('totalUserRequests').textContent = (stats.user_analytics.total_requests_tracked || 0).toLocaleString();
+                
+                const topUserRequests = stats.user_analytics.top_users && stats.user_analytics.top_users.length > 0 
+                    ? stats.user_analytics.top_users[0].total_requests 
+                    : 0;
+                document.getElementById('topUserRequests').textContent = topUserRequests.toLocaleString();
+                
+                // Update top users list
+                updateTopUsersList(stats.user_analytics.top_users || []);
+            }
+        }
+
+        function updateRecentAlignments(alignments) {
+            const container = document.getElementById('recentAlignments');
+            
+            if (!alignments || alignments.length === 0) {
+                container.innerHTML = '<p>No recent alignment data available.</p>';
+                return;
+            }
+
+            let html = '<table>';
+            html += '<tr><th>Timestamp</th><th>Initial</th><th>Final</th><th>Improvement</th><th>Keywords</th></tr>';
+            
+            alignments.forEach(align => {
+                const improvementPercent = align.improvement_percentage ? align.improvement_percentage.toFixed(1) + '%' : 'N/A';
+                html += `
+                    <tr>
+                        <td>${new Date(align.timestamp).toLocaleTimeString()}</td>
+                        <td>${align.initial_score.toFixed(3)}</td>
+                        <td>${align.final_score.toFixed(3)}</td>
+                        <td style="color: ${align.improvement > 0 ? '#27ae60' : '#e74c3c'}">
+                            +${align.improvement.toFixed(3)} (${improvementPercent})
+                        </td>
+                        <td>${align.keywords_found || 0}</td>
+                    </tr>
+                `;
+            });
+            
+            html += '</table>';
+            container.innerHTML = html;
+        }
+
+        function updateTopUsersList(topUsers) {
+            const container = document.getElementById('topUsersList');
+            
+            if (!topUsers || topUsers.length === 0) {
+                container.innerHTML = '<p>No user activity data available.</p>';
+                return;
+            }
+
+            let html = '<table>';
+            html += '<tr><th>User ID</th><th>Total Requests</th><th>Last Active</th></tr>';
+            
+            topUsers.slice(0, 10).forEach(user => {
+                const shortUserId = user.user_id ? user.user_id.substring(0, 12) + '...' : 'Unknown';
+                html += `
+                    <tr>
+                        <td style="font-family: monospace;">${shortUserId}</td>
+                        <td>${user.total_requests.toLocaleString()}</td>
+                        <td>${user.last_active ? new Date(user.last_active).toLocaleDateString() : 'Never'}</td>
+                    </tr>
+                `;
+            });
+            
+            html += '</table>';
+            container.innerHTML = html;
+        }
+
+        // ========== EXISTING FUNCTIONS (YOUR ORIGINAL CODE) ==========
+
+        function attemptAutoLogin() {
+            // Try to login with the pre-filled UID that we know works
+            const firebaseUID = document.getElementById('firebaseUID').value.trim();
+            if (firebaseUID) {
+                loginWithUID(firebaseUID);
+            } else {
+                showLoginScreen();
+            }
+        }
+
+        async function loginWithUID(firebaseUID) {
+            updateAutoLoginStatus('Testing admin access...');
+            
+            try {
+                // Test if this UID has admin access - using the /stats endpoint instead
+                const response = await fetch(`${API_BASE_URL}/stats`, {
+                    headers: {
+                        'X-User-ID': firebaseUID,
+                        'Content-Type': 'application/json'
+                    }
+                });
+                
+                if (response.ok) {
+                    currentSession = {
+                        uid: firebaseUID,
+                        type: 'firebase'
+                    };
+                    handleSuccessfulLogin();
+                } else {
+                    throw new Error('Admin access denied');
+                }
+            } catch (error) {
+                updateAutoLoginStatus('Auto-login failed: ' + error.message);
+                setTimeout(() => {
+                    showLoginScreen();
+                }, 2000);
+            }
+        }
+
+        function updateAutoLoginStatus(message) {
+            const statusElement = document.getElementById('autoLoginStatus');
+            if (statusElement) {
+                statusElement.textContent = message;
+            }
+        }
+
+        function showLoginScreen() {
+            document.getElementById('autoLoginOverlay').style.display = 'none';
+            document.getElementById('loginScreen').style.display = 'block';
+            document.getElementById('dashboard').style.display = 'none';
+        }
+
+        function handleSuccessfulLogin() {
+            document.getElementById('autoLoginOverlay').style.display = 'none';
+            document.getElementById('loginScreen').style.display = 'none';
+            document.getElementById('dashboard').style.display = 'block';
+            
+            // Initialize dashboard
+            sessionStartTime = new Date();
+            document.getElementById('sessionStart').textContent = sessionStartTime.toLocaleString();
+            document.getElementById('apiBaseUrl').textContent = API_BASE_URL;
+            document.getElementById('adminUID').textContent = currentSession.uid;
+            
+            showMessage('Admin authentication successful! Full access granted.', 'success');
+            refreshStats();
+            startAutoRefresh();
+            startSessionTimer();
+        }
+
+        async function login(event) {
+            event.preventDefault();
+            
+            const firebaseUID = document.getElementById('firebaseUID').value.trim();
+            
+            if (!firebaseUID) {
+                showLoginMessage('Please enter Firebase UID', 'error');
+                return;
+            }
+
+            document.getElementById('loginScreen').classList.add('loading');
+            showLoginMessage('', '');
+            
+            try {
+                await loginWithUID(firebaseUID);
+            } catch (error) {
+                console.error('Login error:', error);
+                document.getElementById('loginScreen').classList.remove('loading');
+                showLoginMessage('Admin access failed: ' + error.message, 'error');
+            }
+        }
+
+        function showLoginMessage(message, type) {
+            const messageDiv = document.getElementById('loginMessage');
+            if (messageDiv) {
+                messageDiv.textContent = message;
+                messageDiv.className = type === 'error' ? 'error-message' : 'success-message';
+                messageDiv.style.display = 'block';
+            }
+        }
+
+        function showMessage(message, type) {
+            const container = document.getElementById('messageContainer');
+            if (container) {
+                container.innerHTML = `<div class="${type === 'error' ? 'error-message' : 'success-message'}">${message}</div>`;
+                container.style.display = 'block';
+                
+                setTimeout(() => {
+                    container.style.display = 'none';
+                }, 5000);
+            }
+        }
+
+        function refreshStats() {
+            if (!currentSession) {
+                showMessage('Please log in first', 'error');
+                return;
+            }
+
+            // Show loading states
+            document.querySelectorAll('.stat-value, .stat-mini-value').forEach(el => {
+                if (el.id !== 'serverStatus') {
+                    el.textContent = '...';
+                }
+            });
+            
+            const refreshBtn = document.getElementById('refreshBtn');
+            if (refreshBtn) refreshBtn.classList.add('loading');
+            
+            const serverStatus = document.getElementById('serverStatus');
+            if (serverStatus) serverStatus.textContent = '⏳ Loading...';
+
+            // Get comprehensive stats from your API
+            fetch(`${API_BASE_URL}/stats`, {
+                headers: {
+                    'X-User-ID': currentSession.uid,
+                    'Content-Type': 'application/json'
+                }
+            })
+            .then(response => {
+                if (!response.ok) throw new Error(`HTTP ${response.status}`);
+                return response.json();
+            })
+            .then(data => {
+                if (data.success) {
+                    // Update the new comprehensive stats
+                    updateComprehensiveStats(data);
+                    
+                    // Also update existing dashboard stats for backward compatibility
+                    updateDashboard(data.daily_stats || {});
+                }
+            })
+            .catch(error => {
+                console.error('Comprehensive stats error:', error);
+                showMessage('Failed to fetch comprehensive stats: ' + error.message, 'error');
+            });
+
+            // Get cost history for monthly calculation
+            fetch(`${API_BASE_URL}/stats`, {
+                headers: {
+                    'X-User-ID': currentSession.uid,
+                    'Content-Type': 'application/json'
+                }
+            })
+            .then(response => response.json())
+            .then(data => {
+                if (data.success && data.cost_history) {
+                    updateCostHistory(data.cost_history);
+                    calculateMonthlyCost(data.cost_history);
+                    calculateWeeklyCost(data.cost_history);
+                }
+            })
+            .catch(error => {
+                console.error('Cost history error:', error);
+                document.getElementById('costHistory').innerHTML = '<p>Error loading cost history</p>';
+            });
+
+            // Get user stats for credit analysis - using your existing /admin/users endpoint
+            fetch(`${API_BASE_URL}/admin/users`, {
+                headers: {
+                    'X-User-ID': currentSession.uid,
+                    'Content-Type': 'application/json'
+                }
+            })
+            .then(response => response.json())
+            .then(data => {
+                if (data.success) {
+                    updateUserStats(data);
+                    analyzeCreditUsage(data);
+                    analyzeTodaysUsers(data);
+                }
+            })
+            .catch(error => {
+                console.error('User stats error:', error);
+            });
+
+            // Get purchase history if available
+            fetchPurchaseHistory();
+
+            checkServerHealth();
+            
+            // Final loading cleanup
+            if (refreshBtn) refreshBtn.classList.remove('loading');
+        }
+
+        function updateDashboard(stats) {
+            // Update the main stat cards
+            if (stats.daily_cost !== undefined) {
+                document.getElementById('dailyCostOverview').textContent = `$${stats.daily_cost.toFixed(6)}`;
+            }
+            if (stats.daily_tokens !== undefined) {
+                document.getElementById('totalTokensOverview').textContent = stats.daily_tokens.toLocaleString();
+            }
+            if (stats.daily_requests !== undefined) {
+                document.getElementById('apiRequests').textContent = stats.daily_requests.toLocaleString();
+            }
+            
+            // Update other existing stats
+            document.getElementById('lastUpdate').textContent = `Last update: ${new Date().toLocaleTimeString()}`;
+            
+            // Color code based on cost
+            const costElement = document.getElementById('dailyCostOverview');
+            if (stats.daily_cost > 1.0) {
+                costElement.className = 'stat-value cost-warning';
+            } else if (stats.daily_cost > 0.1) {
+                costElement.className = 'stat-value';
+            } else {
+                costElement.className = 'stat-value cost-good';
+            }
+        }
+
+        function calculateMonthlyCost(costHistory) {
+            if (!costHistory || costHistory.length === 0) {
+                document.getElementById('monthlyCost').textContent = '$0';
+                return;
+            }
+
+            // Calculate monthly total from last 30 days
+            const monthlyTotal = costHistory.reduce((sum, day) => sum + (day.daily_cost || day.cost || 0), 0);
+            document.getElementById('monthlyCost').textContent = `$${monthlyTotal.toFixed(2)}`;
+            
+            // Set current month period
+            const now = new Date();
+            const monthName = now.toLocaleString('default', { month: 'long' });
+            document.getElementById('monthlyPeriod').textContent = `${monthName} ${now.getFullYear()}`;
+            
+            // Color code monthly cost
+            const monthlyElement = document.getElementById('monthlyCost');
+            if (monthlyTotal > 50) {
+                monthlyElement.className = 'stat-value cost-warning';
+            } else if (monthlyTotal > 10) {
+                monthlyElement.className = 'stat-value';
+            } else {
+                monthlyElement.className = 'stat-value cost-good';
+            }
+        }
+
+        function calculateWeeklyCost(costHistory) {
+            if (!costHistory || costHistory.length === 0) {
+                document.getElementById('weeklyCost').textContent = '$0';
+                return;
+            }
+
+            // Calculate weekly total from last 7 days
+            const weeklyTotal = costHistory.slice(-7).reduce((sum, day) => sum + (day.daily_cost || day.cost || 0), 0);
+            document.getElementById('weeklyCost').textContent = `$${weeklyTotal.toFixed(2)}`;
+            
+            // Set current week period
+            const now = new Date();
+            const weekAgo = new Date(now.getTime() - 7 * 24 * 60 * 60 * 1000);
+            document.getElementById('weeklyPeriod').textContent = `${weekAgo.toLocaleDateString()} - ${now.toLocaleDateString()}`;
+            
+            // Color code weekly cost
+            const weeklyElement = document.getElementById('weeklyCost');
+            if (weeklyTotal > 10) {
+                weeklyElement.className = 'stat-value cost-warning';
+            } else if (weeklyTotal > 2) {
+                weeklyElement.className = 'stat-value';
+            } else {
+                weeklyElement.className = 'stat-value cost-good';
+            }
+        }
+
+        function analyzeCreditUsage(userData) {
+            if (!userData || !userData.users) return;
+
+            let purchasedUsed = 0;
+            let freeUsed = 0;
+            let purchasedAvailable = 0;
+            let freeAvailable = 0;
+
+            userData.users.forEach(user => {
+                // Use correct field names
+                const totalUsed = user.used_credits || 0;
+                const totalAvailable = user.availableCredits || user.available_credits || 0;
+                const totalEarned = user.totalCreditsEarned || user.total_credits || 0;
+
+                // Simple heuristic: if user has more than 10 credits, assume some are purchased
+                if (totalEarned > 10) {
+                    purchasedUsed += Math.min(totalUsed, totalEarned - 10);
+                    freeUsed += Math.max(0, totalUsed - (totalEarned - 10));
+                    purchasedAvailable += Math.max(0, totalAvailable - 10);
+                    freeAvailable += Math.min(totalAvailable, 10);
+                } else {
+                    freeUsed += totalUsed;
+                    freeAvailable += totalAvailable;
+                }
+            });
+
+            // Update the display
+            document.getElementById('purchasedUsed').textContent = purchasedUsed.toLocaleString();
+            document.getElementById('freeUsed').textContent = freeUsed.toLocaleString();
+            document.getElementById('purchasedAvailable').textContent = purchasedAvailable.toLocaleString();
+            document.getElementById('freeAvailable').textContent = freeAvailable.toLocaleString();
+
+            // Update credit distribution
+            const totalUsed = purchasedUsed + freeUsed;
+            const totalAvailable = purchasedAvailable + freeAvailable;
+            
+            let distributionHTML = '';
+            if (totalUsed > 0) {
+                const purchasedPercent = ((purchasedUsed / totalUsed) * 100).toFixed(1);
+                const freePercent = ((freeUsed / totalUsed) * 100).toFixed(1);
+                distributionHTML += `<div>Used Credits: ${totalUsed.toLocaleString()} total</div>`;
+                distributionHTML += `<div>→ Purchased: ${purchasedUsed.toLocaleString()} (${purchasedPercent}%)</div>`;
+                distributionHTML += `<div>→ Free/Awarded: ${freeUsed.toLocaleString()} (${freePercent}%)</div>`;
+            }
+            
+            if (totalAvailable > 0) {
+                const purchasedAvailPercent = ((purchasedAvailable / totalAvailable) * 100).toFixed(1);
+                const freeAvailPercent = ((freeAvailable / totalAvailable) * 100).toFixed(1);
+                distributionHTML += `<div>Available Credits: ${totalAvailable.toLocaleString()} total</div>`;
+                distributionHTML += `<div>→ Purchased: ${purchasedAvailable.toLocaleString()} (${purchasedAvailPercent}%)</div>`;
+                distributionHTML += `<div>→ Free/Awarded: ${freeAvailable.toLocaleString()} (${freeAvailPercent}%)</div>`;
+            }
+
+            document.getElementById('creditDistribution').innerHTML = distributionHTML || 'No credit data available';
+        }
+
+        function analyzeTodaysUsers(userData) {
+            if (!userData || !userData.users) return;
+
+            const today = new Date().toDateString();
+            let todaysUsers = [];
+            let verifiedCount = 0;
+            let totalNewToday = 0;
+
+            userData.users.forEach(user => {
+                // Check if user was created today - use createdAt field
+                if (user.createdAt) {
+                    const userDate = new Date(user.createdAt).toDateString();
+                    if (userDate === today) {
+                        todaysUsers.push(user);
+                        totalNewToday++;
+                        
+                        // Check if email is verified
+                        if (user.emailVerified) {
+                            verifiedCount++;
+                        }
+                    }
+                }
+            });
+
+            // Update the stat card
+            document.getElementById('newUsersToday').textContent = totalNewToday.toLocaleString();
+            document.getElementById('newUsersVerified').textContent = `Email Verified: ${verifiedCount}`;
+
+            // Display today's users in the dedicated section
+            const todaysUsersDiv = document.getElementById('todaysUsers');
+            if (todaysUsers.length > 0) {
+                let html = `
+                    <div style="margin-bottom: 15px;">
+                        <strong>New Registrations Today: ${totalNewToday}</strong><br>
+                        <span style="color: #666;">Email Verified: ${verifiedCount} • Unverified: ${totalNewToday - verifiedCount}</span>
+                    </div>
+                    <div class="user-list">
+                `;
+                
+                todaysUsers.forEach(user => {
+                    const userEmail = user.email || 'No email';
+                    const userId = user.uid || user.user_id || 'unknown';
+                    const availableCredits = user.availableCredits || user.available_credits || 0;
+                    const usedCredits = user.used_credits || 0;
+                    const emailVerified = user.emailVerified || user.email_verified || false;
+                    
+                    const shortEmail = userEmail.length > 25 ? userEmail.substring(0, 25) + '...' : userEmail;
+                    const verifiedStatus = emailVerified ? 
+                        '<span class="verified-badge">✓ Verified</span>' : 
+                        '<span class="unverified-badge">✗ Unverified</span>';
+                    
+                    html += `
+                        <div class="user-item">
+                            <div>
+                                <strong>${shortEmail}</strong>
+                                ${verifiedStatus}
+                            </div>
+                            <div style="font-size: 0.8rem; color: #999; font-family: monospace;">
+                                UID: ${userId.substring(0, 12)}...
+                            </div>
+                            <div style="font-size: 0.9rem; color: #666;">
+                                Credits: ${availableCredits} available • ${usedCredits} used
+                                ${user.createdAt ? `• Joined: ${new Date(user.createdAt).toLocaleTimeString()}` : ''}
+                            </div>
+                        </div>
+                    `;
+                });
+                
+                html += `</div>`;
+                todaysUsersDiv.innerHTML = html;
+            } else {
+                todaysUsersDiv.innerHTML = `
+                    <div class="info-message">
+                        <p>No new user registrations today.</p>
+                    </div>
+                `;
+            }
+        }
+
+        function updateCostHistory(history) {
+            const historyDiv = document.getElementById('costHistory');
+            
+            if (!history || history.length === 0) {
+                historyDiv.innerHTML = '<p>No cost history available yet.</p>';
+                return;
+            }
+
+            let html = '<table>';
+            html += '<tr>';
+            html += '<th>Date</th>';
+            html += '<th style="text-align: right;">Cost</th>';
+            html += '<th style="text-align: right;">Tokens</th>';
+            html += '<th style="text-align: right;">Requests</th>';
+            html += '</tr>';
+            
+            // Show last 30 days
+            const recentHistory = history.slice(-30);
+            recentHistory.forEach(day => {
+                const cost = day.daily_cost || day.cost || 0;
+                const tokens = day.daily_tokens || day.tokens || 0;
+                const requests = day.daily_requests || day.requests || 0;
+                
+                const costColor = cost > 1.0 ? 'cost-warning' : (cost > 0.1 ? '' : 'cost-good');
+                html += `<tr>`;
+                html += `<td>${day.date || 'Unknown'}</td>`;
+                html += `<td style="text-align: right;" class="${costColor}">$${cost.toFixed(6)}</td>`;
+                html += `<td style="text-align: right;">${tokens.toLocaleString()}</td>`;
+                html += `<td style="text-align: right;">${requests.toLocaleString()}</td>`;
+                html += `</tr>`;
+            });
+            
+            // Add monthly total
+            const monthlyTotal = recentHistory.reduce((sum, day) => sum + (day.daily_cost || day.cost || 0), 0);
+            html += `<tr style="background: #f8f9fa; font-weight: bold;">`;
+            html += `<td>Monthly Total</td>`;
+            html += `<td style="text-align: right;">$${monthlyTotal.toFixed(2)}</td>`;
+            html += `<td style="text-align: right;">${recentHistory.reduce((sum, day) => sum + (day.daily_tokens || day.tokens || 0), 0).toLocaleString()}</td>`;
+            html += `<td style="text-align: right;">${recentHistory.reduce((sum, day) => sum + (day.daily_requests || day.requests || 0), 0).toLocaleString()}</td>`;
+            html += `</tr>`;
+            
+            html += '</table>';
+            historyDiv.innerHTML = html;
+        }
+
+        function updateUserStats(userData) {
+            const userStatsDiv = document.getElementById('userStats');
+            
+            if (!userData || !userData.users) {
+                userStatsDiv.innerHTML = '<p>Error loading user data</p>';
+                return;
+            }
+
+            let html = `
+                <div style="display: grid; grid-template-columns: repeat(auto-fit, minmax(200px, 1fr)); gap: 15px; margin-bottom: 20px;">
+                    <div style="background: #f8f9fa; padding: 15px; border-radius: 5px;">
+                        <strong>Total Users</strong><br>
+                        <span style="font-size: 1.5rem; color: #667eea;">${userData.total_users || userData.users.length || 0}</span>
+                    </div>
+                    <div style="background: #f8f9fa; padding: 15px; border-radius: 5px;">
+                        <strong>Credits Used</strong><br>
+                        <span style="font-size: 1.5rem; color: #e74c3c;">${userData.total_credits_used || 0}</span>
+                    </div>
+                    <div style="background: #f8f9fa; padding: 15px; border-radius: 5px;">
+                        <strong>Credits Available</strong><br>
+                        <span style="font-size: 1.5rem; color: #27ae60;">${userData.total_credits_available || 0}</span>
+                    </div>
+                </div>
+            `;
+            
+            if (userData.users && userData.users.length > 0) {
+                html += `
+                    <div style="margin-top: 15px;">
+                        <strong>Recent Users (max 10):</strong>
+                        <div class="user-list">
+                `;
+                
+                userData.users.slice(0, 10).forEach(user => {
+                    // Use the correct field names from your Firestore
+                    const userEmail = user.email || 'No email';
+                    const userId = user.uid || user.user_id || 'unknown';
+                    const availableCredits = user.availableCredits || user.available_credits || 0;
+                    const usedCredits = user.used_credits || 0;
+                    const emailVerified = user.emailVerified || user.email_verified || false;
+                    
+                    const shortEmail = userEmail.length > 25 ? userEmail.substring(0, 25) + '...' : userEmail;
+                    const verifiedStatus = emailVerified ? 
+                        '<span class="verified-badge">✓ Verified</span>' : 
+                        '<span class="unverified-badge">✗ Unverified</span>';
+                    
+                    html += `
+                        <div class="user-item">
+                            <div>
+                                <strong>${shortEmail}</strong>
+                                ${verifiedStatus}
+                            </div>
+                            <div style="font-size: 0.8rem; color: #999; font-family: monospace;">
+                                UID: ${userId.substring(0, 12)}...
+                            </div>
+                            <div style="font-size: 0.9rem; color: #666;">
+                                Credits: ${availableCredits} available • ${usedCredits} used
+                            </div>
+                            ${user.lastActive ? `<div style="font-size: 0.8rem; color: #666;">Last Active: ${new Date(user.lastActive).toLocaleDateString()}</div>` : ''}
+                        </div>
+                    `;
+                });
+                
+                html += `</div></div>`;
+            } else {
+                html += '<p>No users found</p>';
+            }
+            
+            userStatsDiv.innerHTML = html;
+        }
+
+        function fetchPurchaseHistory() {
+            // This would need to be implemented in your backend
+            // For now, we'll show a placeholder
+            const purchaseDiv = document.getElementById('purchaseHistory');
+            purchaseDiv.innerHTML = `
+                <div class="info-message">
+                    <p><strong>Purchase Tracking Note:</strong></p>
+                    <p>To track purchased credits separately, you'll need to:</p>
+                    <ol>
+                        <li>Add a "credit_type" field to your credit awards (purchased/free)</li>
+                        <li>Add purchase records when users buy credits</li>
+                        <li>Update the credit usage analysis logic</li>
+                    </ol>
+                    <p>Current display shows estimated breakdown based on credit amounts.</p>
+                </div>
+            `;
+        }
+
+        function exportData() {
+            showMessage('Export feature would generate CSV reports of usage data', 'info');
+            // Implementation would generate CSV files for:
+            // - Monthly cost reports
+            // - User credit usage
+            // - Purchase history
+        }
+
+        function checkServerHealth() {
+            fetch(`${API_BASE_URL}/health`)
+            .then(response => response.json())
+            .then(health => {
+                const statusEl = document.getElementById('serverStatus');
+                if (statusEl) {
+                    if (health.status === 'healthy') {
+                        statusEl.textContent = '✅ Online';
+                        statusEl.className = 'stat-value status-online';
+                    } else {
+                        statusEl.textContent = '⚠️ Degraded';
+                        statusEl.className = 'stat-value status-degraded';
+                    }
+                }
+            })
+            .catch(() => {
+                const statusEl = document.getElementById('serverStatus');
+                if (statusEl) {
+                    statusEl.textContent = '❌ Offline';
+                    statusEl.className = 'stat-value status-offline';
+                }
+            });
+        }
+
+        function resetStats() {
+            if (confirm('Are you sure you want to reset daily statistics?')) {
+                fetch(`${API_BASE_URL}/stats/reset-daily`, {
+                    method: 'POST',
+                    headers: {
+                        'X-User-ID': currentSession.uid,
+                        'Admin-Key': 'your-admin-key-here' // You'll need to set this
+                    }
+                })
+                .then(response => response.json())
+                .then(data => {
+                    if (data.success) {
+                        showMessage('Statistics reset successfully!', 'success');
+                        refreshStats();
+                    } else {
+                        throw new Error(data.detail || 'Reset failed');
+                    }
+                })
+                .catch(error => {
+                    showMessage('Reset failed: ' + error.message, 'error');
+                });
+            }
+        }
+
+        function logout() {
+            currentSession = null;
+            document.getElementById('loginScreen').style.display = 'block';
+            document.getElementById('dashboard').style.display = 'none';
+            document.getElementById('loginScreen').classList.remove('loading');
+            document.getElementById('firebaseUID').value = 'heqvlWyje8h4Jh7iF75NwZAgCwD2';
+            stopAutoRefresh();
+            stopSessionTimer();
+        }
+
+        function startSessionTimer() {
+            sessionTimerInterval = setInterval(() => {
+                const now = new Date();
+                const diff = Math.floor((now - sessionStartTime) / 1000);
+                const minutes = Math.floor(diff / 60);
+                const seconds = diff % 60;
+                document.getElementById('sessionTimer').textContent = 
+                    `${minutes}:${seconds.toString().padStart(2, '0')}`;
+            }, 1000);
+        }
+
+        function stopSessionTimer() {
+            if (sessionTimerInterval) {
+                clearInterval(sessionTimerInterval);
+            }
+        }
+
+        function startAutoRefresh() {
+            if (autoRefreshEnabled) {
+                refreshInterval = setInterval(refreshStats, 30000);
+                document.getElementById('autoRefreshStatus').textContent = 'On (30s)';
+            }
+        }
+        
+        function stopAutoRefresh() {
+            if (refreshInterval) {
+                clearInterval(refreshInterval);
+            }
+            document.getElementById('autoRefreshStatus').textContent = 'Off';
+        }
+        
+        function toggleAutoRefresh() {
+            autoRefreshEnabled = document.getElementById('autoRefreshToggle').checked;
+            if (autoRefreshEnabled) {
+                startAutoRefresh();
+            } else {
+                stopAutoRefresh();
+            }
+        }
     </script>
 </body>
 </html>
