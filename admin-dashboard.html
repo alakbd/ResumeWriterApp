@@ -242,6 +242,50 @@
             font-size: 0.8rem;
         }
 
+        .stats-row { 
+            display: grid; 
+            grid-template-columns: repeat(auto-fit, minmax(150px, 1fr)); 
+            gap: 15px; 
+            margin-bottom: 15px; 
+        }
+
+.stat-mini-card { 
+    background: #f8f9fa; 
+    padding: 15px; 
+    border-radius: 8px; 
+    text-align: center; 
+    border-left: 4px solid #667eea; 
+}
+
+.stat-mini-value { 
+    font-size: 1.5rem; 
+    font-weight: bold; 
+    color: #2c3e50; 
+    margin: 5px 0; 
+}
+
+.stat-mini-label { 
+    color: #666; 
+    font-size: 0.8rem; 
+}
+
+.progress-bar { 
+    background: #ecf0f1; 
+    border-radius: 10px; 
+    height: 10px; 
+    margin: 10px 0; 
+    overflow: hidden; 
+}
+
+.progress-fill { 
+    height: 100%; 
+    background: linear-gradient(90deg, #667eea, #764ba2); 
+    transition: width 0.3s ease; 
+}
+
+.cache-hit { color: #27ae60; }
+.cache-miss { color: #e74c3c; }
+
         .progress-bar {
             background: #ecf0f1;
             border-radius: 10px;
@@ -514,6 +558,37 @@
                     </div>
                 </div>
 
+                <!-- Add this after your Live Stats grid and before Credit Usage Breakdown -->
+<div class="chart-container">
+    <h3>⚡ Cache Performance & Savings</h3>
+    <div class="stats-row">
+        <div class="stat-mini-card">
+            <div class="stat-mini-label">Cache Hits Today</div>
+            <div class="stat-mini-value cache-hit" id="cacheHitsToday">0</div>
+        </div>
+        <div class="stat-mini-card">
+            <div class="stat-mini-label">Cache Misses Today</div>
+            <div class="stat-mini-value cache-miss" id="cacheMissesToday">0</div>
+        </div>
+        <div class="stat-mini-card">
+            <div class="stat-mini-label">Hit Rate</div>
+            <div class="stat-mini-value" id="cacheHitRate">0%</div>
+        </div>
+        <div class="stat-mini-card">
+            <div class="stat-mini-label">Estimated Savings</div>
+            <div class="stat-mini-value cost-good" id="cacheSavings">$0.00</div>
+        </div>
+    </div>
+    
+    <div class="progress-bar">
+        <div class="progress-fill" id="cacheHitBar" style="width: 0%"></div>
+    </div>
+    <div style="text-align: center; color: #666; font-size: 0.9rem;">
+        Cache Efficiency: <span id="cacheEfficiency">0%</span> of requests served from cache
+        • Estimated savings based on $0.02 per cache hit
+    </div>
+</div>
+
                 <!-- Rest of your existing sections remain unchanged -->
                 <!-- Credit Usage Breakdown -->
                 <div class="chart-container">
@@ -761,6 +836,44 @@
             }
         }
 
+         function updateCacheStats(stats) {
+    if (stats.cache_performance) {
+        const hits = stats.cache_performance.hits_today || 0;
+        const misses = stats.cache_performance.misses_today || 0;
+        const hitRate = stats.cache_performance.hit_rate_today || 0;
+        const totalRequests = hits + misses;
+        
+        // Calculate estimated savings ($0.02 per cache hit - adjust as needed)
+        const savings = hits * 0.02;
+        
+        // Update the display
+        document.getElementById('cacheHitsToday').textContent = hits.toLocaleString();
+        document.getElementById('cacheMissesToday').textContent = misses.toLocaleString();
+        document.getElementById('cacheHitRate').textContent = hitRate.toFixed(1) + '%';
+        document.getElementById('cacheSavings').textContent = `$${savings.toFixed(2)}`;
+        document.getElementById('cacheEfficiency').textContent = `${hitRate.toFixed(1)}%`;
+        
+        // Update progress bar
+        document.getElementById('cacheHitBar').style.width = hitRate + '%';
+        
+        console.log('📊 Cache Stats Updated:', { hits, misses, hitRate, savings });
+    } else if (stats.daily_stats) {
+        // Fallback to daily_stats if cache_performance is not available
+        const hits = stats.daily_stats.daily_cache_hits || 0;
+        const misses = stats.daily_stats.daily_cache_misses || 0;
+        const totalRequests = hits + misses;
+        const hitRate = totalRequests > 0 ? (hits / totalRequests) * 100 : 0;
+        const savings = hits * 0.02;
+        
+        document.getElementById('cacheHitsToday').textContent = hits.toLocaleString();
+        document.getElementById('cacheMissesToday').textContent = misses.toLocaleString();
+        document.getElementById('cacheHitRate').textContent = hitRate.toFixed(1) + '%';
+        document.getElementById('cacheSavings').textContent = `$${savings.toFixed(2)}`;
+        document.getElementById('cacheEfficiency').textContent = `${hitRate.toFixed(1)}%`;
+        document.getElementById('cacheHitBar').style.width = hitRate + '%';
+    }
+}
+
         // ========== ENHANCED STATS FUNCTIONS ==========
 
         function refreshStats() {
@@ -847,6 +960,9 @@
                 document.getElementById('userCount').textContent = (stats.user_analytics.total_users_tracked || 0).toLocaleString();
                 document.getElementById('newUsersToday').textContent = (stats.user_analytics.active_users_today || 0).toLocaleString();
             }
+
+             // ========== NEW: UPDATE CACHE STATS ==========
+             updateCacheStats(stats);
 
             // Update cost history
             if (stats.cost_history && stats.cost_history.length > 0) {
