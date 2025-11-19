@@ -1,7 +1,7 @@
 plugins {
     id 'com.android.application'
     id 'org.jetbrains.kotlin.android'
-    id 'com.google.gms.google-services' // Firebase plugin
+    id 'com.google.gms.google-services'
 }
 
 android {
@@ -12,15 +12,31 @@ android {
         applicationId "com.alakdb.resumewriter"
         minSdk 21
         targetSdk 35
-        versionCode 7
-        versionName "1.6"
+
+        versionCode 8
+        versionName "1.7"
 
         // API base URL
         buildConfigField "String", "API_BASE_URL", "\"https://resume-writer-api.onrender.com/\""
 
-        // APP_SECRET_KEY from env file
+        // APP_SECRET_KEY
         def secretKey = System.getenv("APP_SECRET_KEY") ?: "your-secret-key-change-in-production"
         buildConfigField "String", "APP_SECRET_KEY", "\"${secretKey}\""
+
+        // 🔥 Android 13 Compatibility Fix (Required)
+        ndk {
+            abiFilters "arm64-v8a", "armeabi-v7a"
+        }
+    }
+
+    // 🔥 Play Store compatibility: generate ABI splits AND universal APK
+    splits {
+        abi {
+            enable true
+            reset()
+            include "arm64-v8a", "armeabi-v7a"
+            universalApk true   // creates universal APK for all devices
+        }
     }
 
     buildFeatures {
@@ -32,7 +48,7 @@ android {
         release {
             minifyEnabled false
             proguardFiles getDefaultProguardFile('proguard-android-optimize.txt'), 'proguard-rules.pro'
-         }
+        }
         debug {
             buildConfigField "String", "APP_SECRET_KEY", "\"${System.getenv("APP_SECRET_KEY") ?: "dev-secret"}\""
         }
@@ -49,7 +65,8 @@ android {
 }
 
 dependencies {
-    // AndroidX
+
+    // ---------- ANDROIDX ----------
     implementation 'androidx.core:core-ktx:1.12.0'
     implementation 'androidx.appcompat:appcompat:1.6.1'
     implementation 'com.google.android.material:material:1.10.0'
@@ -59,31 +76,24 @@ dependencies {
     implementation 'androidx.fragment:fragment-ktx:1.6.2'
     implementation 'androidx.webkit:webkit:1.8.0'
 
-    // Billing
+    // ---------- BILLING ----------
     implementation 'com.android.billingclient:billing:6.2.0'
     implementation 'com.android.billingclient:billing-ktx:6.2.0'
 
-    // Firebase BoM
+    // ---------- FIREBASE ----------
     implementation platform('com.google.firebase:firebase-bom:32.7.0')
     implementation 'com.google.firebase:firebase-firestore-ktx'
     implementation 'com.google.firebase:firebase-auth-ktx'
-    implementation 'com.google.firebase:firebase-auth-ktx:22.1.1'
 
-    // Networking
+    // ---------- NETWORKING ----------
     implementation "com.squareup.okhttp3:okhttp:4.12.0"
     implementation "com.squareup.okhttp3:logging-interceptor:4.11.0"
     implementation "com.squareup.retrofit2:retrofit:2.9.0"
     implementation "com.squareup.retrofit2:converter-gson:2.9.0"
     implementation "com.google.code.gson:gson:2.10.1"
 
-    // Coroutines (cleaned duplicates)
-    implementation "org.jetbrains.kotlinx:kotlinx-coroutines-android:1.8.0"
-    implementation "org.jetbrains.kotlinx:kotlinx-coroutines-play-services:1.7.3"
-    implementation 'org.jetbrains.kotlinx:kotlinx-coroutines-android:1.7.3'
+    // ---------- COROUTINES ----------
     implementation "org.jetbrains.kotlinx:kotlinx-coroutines-core:1.8.1"
-
-    // AndroidX
-    implementation 'androidx.core:core-ktx:1.12.0'
-
-    
+    implementation "org.jetbrains.kotlinx:kotlinx-coroutines-android:1.8.1"
+    implementation "org.jetbrains.kotlinx:kotlinx-coroutines-play-services:1.7.3"
 }
