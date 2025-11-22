@@ -328,12 +328,27 @@ class ResumeGenerationActivity : AppCompatActivity() {
             
             recordApiCall() // Record the attempt
             
-            when {
-                selectedResumeUri != null && selectedJobDescUri != null -> generateResumeFromFiles()
-                binding.etResumeText.text.isNotEmpty() && binding.etJobDescription.text.isNotEmpty() -> generateResumeFromText()
-                else -> showToast("Please provide both resume and job description", true)
-            }
-        }
+    // DETECT INPUT COMBINATION AND ROUTE ACCORDINGLY
+    when {
+        // CASE 1: File → File (both files selected)
+        selectedResumeUri != null && selectedJobDescUri != null -> 
+            generateResumeFromFiles()
+        
+        // CASE 2: Text → Text (both text fields filled)
+        binding.etResumeText.text.isNotEmpty() && binding.etJobDescription.text.isNotEmpty() -> 
+            generateResumeFromText()
+        
+        // CASE 3: NEW! File → Text (resume file + job description text)
+        selectedResumeUri != null && binding.etJobDescription.text.isNotEmpty() -> 
+            generateResumeFromFileToText()
+        
+        // CASE 4: Text → File (resume text + job description file) - if needed
+        binding.etResumeText.text.isNotEmpty() && selectedJobDescUri != null -> 
+            showToast("Text resume + File job description not supported yet", true)
+        
+        else -> showToast("Please provide both resume and job description", true)
+    }
+ }
         
         binding.btnDownloadDocx.setOnClickListener { 
                 downloadFile("docx") 
@@ -403,23 +418,32 @@ private fun setupScrollableResumeArea() {
 }
 
     private fun checkGenerateButtonState() {
-    val hasFiles = selectedResumeUri != null && selectedJobDescUri != null
-    val hasText = binding.etResumeText.text.toString().isNotEmpty() && 
-                  binding.etJobDescription.text.toString().isNotEmpty()
+    val hasResumeFile = selectedResumeUri != null
+    val hasJobDescFile = selectedJobDescUri != null
+    val hasResumeText = binding.etResumeText.text.toString().isNotEmpty()
+    val hasJobDescText = binding.etJobDescription.text.toString().isNotEmpty()
     val isLoggedIn = userManager.isUserLoggedIn()
-    val isEmailVerified = isEmailVerified() // ✅ Add this check
+    val isEmailVerified = isEmailVerified()
 
-    val shouldEnable = (hasFiles || hasText) && isLoggedIn && isEmailVerified // ✅ Include email verification
+    // Determine which combinations are valid
+    val fileToFile = hasResumeFile && hasJobDescFile
+    val textToText = hasResumeText && hasJobDescText
+    val fileToText = hasResumeFile && hasJobDescText  // NEW!
+    val textToFile = hasResumeText && hasJobDescFile  // Optional for future
+
+    val shouldEnable = (fileToFile || textToText || fileToText) && isLoggedIn && isEmailVerified
     
-    Log.d("ButtonState", "Files: $hasFiles, Text: $hasText, LoggedIn: $isLoggedIn, EmailVerified: $isEmailVerified, ShouldEnable: $shouldEnable")
+    Log.d("ButtonState", "ResumeFile: $hasResumeFile, JobFile: $hasJobDescFile, ResumeText: $hasResumeText, JobText: $hasJobDescText, Enable: $shouldEnable")
     
     binding.btnGenerateResume.isEnabled = shouldEnable
     
+    // Update button text to show what will happen
     binding.btnGenerateResume.text = when {
         !isLoggedIn -> "Please Log In"
-        !isEmailVerified -> "Verify Email First" // ✅ New state
-        hasFiles -> "Generate Resume from Files (1 Credit)"
-        hasText -> "Generate Resume from Text (1 Credit)"
+        !isEmailVerified -> "Verify Email First"
+        fileToFile -> "Generate from Files (1 Credit)"
+        textToText -> "Generate from Text (1 Credit)"
+        fileToText -> "Generate from File+Text (1 Credit)"  // NEW!
         else -> "Generate Resume"
     }
 }
