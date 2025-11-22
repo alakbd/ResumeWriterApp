@@ -563,6 +563,85 @@ private fun setupScrollableResumeArea() {
         }
     }
 
+/** ---------------- NEW: File to Text Resume Generation ---------------- **/
+private fun generateResumeFromFileToText() {
+    val resumeUri = selectedResumeUri ?: return showToast("Please select resume file", true)
+    val jobDescText = binding.etJobDescription.text.toString().trim()
+
+    if (jobDescText.isEmpty()) {
+        showToast("Please enter job description text", true)
+        return
+    }
+
+    // Email verification check
+    if (!userManager.canGenerateResume()) {
+        showVerificationRequiredDialog()
+        return
+    }
+
+    // Rate limiting check
+    if (!canMakeApiCall()) {
+        return
+    }
+
+    recordApiCall()
+    disableGenerateButton("Processing...")
+
+    lifecycleScope.launch {
+        try {
+            if (!ensureUserAuthenticated()) {
+                resetGenerateButton()
+                return@launch
+            }
+
+            Log.d("ResumeActivity", "Checking user credits for FILE→TEXT generation")
+            val creditResult = safeApiCallWithResult<ApiService.UserCreditsResponse>("getUserCredits") { 
+                apiService.getUserCredits() 
+            }
+
+            when (creditResult) {
+                is ApiService.ApiResult.Success -> {
+                    val credits = creditResult.data.available_credits
+                    Log.d("ResumeActivity", "User has $credits credits for FILE→TEXT")
+
+                    if (credits <= 0) {
+                        showToastAndReset("Insufficient credits. Please purchase more.", true)
+                        return@launch
+                    }
+
+                    Log.d("ResumeActivity", "Generating resume from FILE→TEXT")
+                    val genResult = safeApiCallWithResult<ApiService.GenerateResumeResponse>("generateResumeFromFileToText") { 
+                        apiService.generateResumeFromFileToText(resumeUri, jobDescText, selectedTone) 
+                    }
+
+                    handleGenerationResult(genResult)
+                }
+
+                is ApiService.ApiResult.Error -> {
+                    Log.e("ResumeActivity", "Failed to get credits for FILE→TEXT: ${creditResult.message}")
+                    
+                    if (creditResult.code == 429) {
+                        showToastAndReset("Rate limit exceeded. Please wait a moment before trying again.", true)
+                    } else {
+                        showToastAndReset("Failed to check credits: ${creditResult.message}", true)
+                    }
+
+                    if (creditResult.code == 401) {
+                        showToast("Authentication failed. Please log out and log in again.", true)
+                        userManager.logout()
+                        checkGenerateButtonState()
+                    }
+                }
+            }
+        } catch (e: Exception) {
+            Log.e("ResumeActivity", "Exception in generateResumeFromFileToText: ${e.message}", e)
+            showToastAndReset("Generation failed: ${e.message}", true)
+        } finally {
+            resetGenerateButton()
+        }
+    }
+}
+
     /** ---------------- Display & Download ---------------- **/
     private fun displayGeneratedResume(resumeData: ApiService.GenerateResumeResponse) {
         try {
