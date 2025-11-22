@@ -334,6 +334,82 @@ private fun getFileNameFromUri(uri: Uri): String? {
         ApiResult.Error("File resume generation failed: ${e.message}")
     }
 }
+   
+suspend fun generateResumeFromFileToText(
+    resumeUri: Uri,
+    jobDescription: String,
+    tone: String = "Professional"
+): ApiResult<GenerateResumeResponse> = withContext(Dispatchers.IO) {
+    try {
+        Log.d("ApiService", "📄 Generating resume from FILE to TEXT...")
+
+        // Convert resume URI to file
+        val resumeFile = uriToFile(resumeUri)
+        Log.d("ApiService", "✅ Resume file selected: ${resumeFile.name}")
+
+        // Detect MIME type
+        fun getMimeType(file: File): MediaType {
+            return when {
+                file.name.endsWith(".pdf", true) -> "application/pdf".toMediaType()
+                file.name.endsWith(".docx", true) -> "application/vnd.openxmlformats-officedocument.wordprocessingml.document".toMediaType()
+                else -> "application/octet-stream".toMediaType()
+            }
+        }
+
+        val resumeMime = getMimeType(resumeFile)
+
+        val body = MultipartBody.Builder()
+            .setType(MultipartBody.FORM)
+            .addFormDataPart("tone", tone)
+            .addFormDataPart("job_description", jobDescription) // Text job description
+            .addFormDataPart(
+                "resume_file",
+                resumeFile.name,
+                resumeFile.asRequestBody(resumeMime)
+            )
+            .build()
+
+        val request = Request.Builder()
+            .url("$baseUrl/generate-resume-from-file-to-text") // New endpoint
+            .addHeader("Accept", "application/json")
+            .post(body)
+            .build()
+
+        Log.d("ApiService", "➡️ Sending FILE→TEXT resume generation request")
+
+        client.newCall(request).execute().use { response ->
+            val respBody = response.body?.string() ?: "{}"
+            Log.d("ApiService", "📬 FILE→TEXT response: ${response.code}")
+
+            return@withContext if (response.isSuccessful) {
+                try {
+                    val jsonResponse = JSONObject(respBody)
+                    val resumeResponse = GenerateResumeResponse(
+                        success = jsonResponse.optBoolean("success", false),
+                        resume_text = jsonResponse.optString("resume_text", ""),
+                        remaining_credits = jsonResponse.optInt("remaining_credits", 0),
+                        generation_id = jsonResponse.optString("generation_id", null),
+                        docx_url = jsonResponse.optString("docx_url", ""),
+                        pdf_url = jsonResponse.optString("pdf_url", ""),
+                        message = jsonResponse.optString("message", "")
+                    )
+                    ApiResult.Success(resumeResponse)
+                } catch (e: Exception) {
+                    Log.e("ApiService", "❌ JSON parsing error", e)
+                    ApiResult.Error("Invalid server response format", response.code)
+                }
+            } else {
+                val errorMsg = "HTTP ${response.code}: ${response.message} – $respBody"
+                Log.e("ApiService", errorMsg)
+                ApiResult.Error(errorMsg, response.code)
+            }
+        }
+    } catch (e: Exception) {
+        val analysis = analyzeNetworkException(e, "$baseUrl/generate-resume-from-file-to-text")
+        Log.e("ApiService", analysis)
+        ApiResult.Error("File→Text resume generation failed: ${e.message}")
+    }
+}
 
     suspend fun generateResumeFromText(
         resumeText: String,
