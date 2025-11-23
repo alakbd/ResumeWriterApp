@@ -589,10 +589,13 @@ private fun setupScrollableResumeArea() {
 
 /** ---------------- NEW: File to Text Resume Generation ---------------- **/
 private fun generateResumeFromFileToText() {
+    Log.d("FLOW_DEBUG", "🎯 START: generateResumeFromFileToText() called")
+    
     val resumeUri = selectedResumeUri ?: return showToast("Please select resume file", true)
     val jobDescText = binding.etJobDescription.text.toString().trim()
-
-    Log.d("ResumeActivity", "🚀 START FILE→TEXT - Resume URI: $resumeUri, JobDesc length: ${jobDescText.length}")
+    
+    Log.d("FLOW_DEBUG", "📄 Resume URI: $resumeUri")
+    Log.d("FLOW_DEBUG", "📝 Job desc length: ${jobDescText.length}")
 
     if (jobDescText.isEmpty()) {
         showToast("Please enter job description text", true)
@@ -613,69 +616,59 @@ private fun generateResumeFromFileToText() {
     recordApiCall()
     disableGenerateButton("Processing...")
 
-    lifecycleScope.launch {
-        try {
-            Log.d("ResumeActivity", "🔍 Step 1: Authentication check...")
-            if (!ensureUserAuthenticated()) {
-                Log.e("ResumeActivity", "❌ Authentication failed")
-                resetGenerateButton()
-                return@launch
-            }
+    Log.d("FLOW_DEBUG", "🔴 Button disabled")
 
-            Log.d("ResumeActivity", "💰 Step 2: Checking credits...")
+    lifecycleScope.launch {
+        Log.d("FLOW_DEBUG", "🚀 Coroutine started")
+        
+        try {
+            Log.d("FLOW_DEBUG", "💰 Step 1: Checking credits...")
             val creditResult = safeApiCallWithResult<ApiService.UserCreditsResponse>("getUserCredits") { 
                 apiService.getUserCredits() 
             }
 
+            Log.d("FLOW_DEBUG", "💰 Credit result: ${creditResult.javaClass.simpleName}")
+            
             when (creditResult) {
                 is ApiService.ApiResult.Success -> {
-                    val credits = creditResult.data.available_credits
-                    Log.d("ResumeActivity", "✅ Credits available: $credits")
-
-                    if (credits <= 0) {
-                        Log.e("ResumeActivity", "❌ Insufficient credits")
-                        showToastAndReset("Insufficient credits. Please purchase more.", true)
-                        return@launch
-                    }
-
-                    Log.d("ResumeActivity", "🚀 Step 3: Calling FILE→TEXT API...")
-                    disableGenerateButton("Generating resume...")
+                    Log.d("FLOW_DEBUG", "✅ Credits available: ${creditResult.data.available_credits}")
                     
+                    Log.d("FLOW_DEBUG", "🚀 Step 2: Calling generateResumeFromFileToText API...")
                     val genResult = safeApiCallWithResult<ApiService.GenerateResumeResponse>("generateResumeFromFileToText") { 
                         apiService.generateResumeFromFileToText(resumeUri, jobDescText, selectedTone) 
                     }
 
-                    Log.d("ResumeActivity", "📬 Step 4: API call completed - Result type: ${genResult.javaClass.simpleName}")
+                    Log.d("FLOW_DEBUG", "📬 Generation result: ${genResult.javaClass.simpleName}")
                     
+                    // CRITICAL: Check what type of result we got
                     when (genResult) {
                         is ApiService.ApiResult.Success -> {
-                            Log.d("ResumeActivity", "✅ API Success - Resume length: ${genResult.data.resume_text.length}")
-                            Log.d("ResumeActivity", "✅ Generation ID: ${genResult.data.generation_id}")
-                            Log.d("ResumeActivity", "✅ Remaining credits: ${genResult.data.remaining_credits}")
-                            
-                            handleGenerationResult(genResult)
+                            Log.d("FLOW_DEBUG", "🎉 API SUCCESS - Resume length: ${genResult.data.resume_text.length}")
+                            Log.d("FLOW_DEBUG", "🎉 Remaining credits: ${genResult.data.remaining_credits}")
+                            Log.d("FLOW_DEBUG", "🎉 Success flag: ${genResult.data.success}")
                         }
                         is ApiService.ApiResult.Error -> {
-                            Log.e("ResumeActivity", "❌ API Error: ${genResult.message} - Code: ${genResult.code}")
-                            showToastAndReset("API Error: ${genResult.message}", true)
+                            Log.e("FLOW_DEBUG", "❌ API ERROR: ${genResult.message}")
+                            Log.e("FLOW_DEBUG", "❌ Error code: ${genResult.code}")
                         }
                     }
+                    
+                    Log.d("FLOW_DEBUG", "🔄 Calling handleGenerationResult...")
+                    handleGenerationResult(genResult)
                 }
                 is ApiService.ApiResult.Error -> {
-                    Log.e("ResumeActivity", "❌ Credit check failed: ${creditResult.message}")
-                    showToastAndReset("Failed to check credits: ${creditResult.message}", true)
+                    Log.e("FLOW_DEBUG", "❌ CREDIT CHECK ERROR: ${creditResult.message}")
                 }
             }
         } catch (e: Exception) {
-            Log.e("ResumeActivity", "💥 Exception in generateResumeFromFileToText: ${e.message}", e)
-            showToastAndReset("Generation failed: ${e.message}", true)
+            Log.e("FLOW_DEBUG", "💥 COROUTINE EXCEPTION: ${e.message}", e)
         } finally {
-            Log.d("ResumeActivity", "🏁 FILE→TEXT flow completed")
+            Log.d("FLOW_DEBUG", "🏁 Finally block reached")
             resetGenerateButton()
         }
     }
+    Log.d("FLOW_DEBUG", "🎯 END: generateResumeFromFileToText() completed")
 }
-
     /** ---------------- Display & Download ---------------- **/
     private fun displayGeneratedResume(resumeData: ApiService.GenerateResumeResponse) {
         try {
@@ -802,30 +795,36 @@ private fun generateResumeFromFileToText() {
 
     /** ---------------- Generation Result Handler ---------------- **/
     private fun <T> handleGenerationResult(result: ApiService.ApiResult<T>) {
-        when (result) {
-            is ApiService.ApiResult.Success -> {
-                when (val data = result.data) {
-                    is ApiService.GenerateResumeResponse -> {
-                        Log.d("ResumeActivity", "Resume generation success: ${data.message}")
-                        currentGeneratedResume = data
+    Log.d("ResumeActivity", "🎯 handleGenerationResult CALLED")
+    Log.d("ResumeActivity", "📊 Result type: ${result.javaClass.simpleName}")
+    
+    when (result) {
+        is ApiService.ApiResult.Success -> {
+            Log.d("ResumeActivity", "✅ SUCCESS branch entered")
+            when (val data = result.data) {
+                is ApiService.GenerateResumeResponse -> {
+                    Log.d("ResumeActivity", "📝 Processing GenerateResumeResponse")
+                    Log.d("ResumeActivity", "💰 Credits: ${data.remaining_credits}")
+                    Log.d("ResumeActivity", "📄 Resume length: ${data.resume_text.length}")
+                    
+                    currentGeneratedResume = data
+                    
+                    runOnUiThread {
+                        Log.d("ResumeActivity", "🎯 UI Thread - Calling displayGeneratedResume")
                         displayGeneratedResume(data)
+                        binding.creditText.text = "Credits: ${data.remaining_credits}"
                         showToast("Resume generated successfully!", false)
-
-                        val remaining = data.remaining_credits
-                        lifecycleScope.launch {
-                            withContext(Dispatchers.Main) {
-                                binding.creditText.text = "Credits: $remaining"
-                            }
-                        }
-                    }
-                    else -> {
-                        Log.e("ResumeActivity", "Unexpected response type: ${data?.let { it::class.java.simpleName } ?: "null"}")
-                        showToast("Unexpected response from server", true)
+                        Log.d("ResumeActivity", "✅ UI updates completed")
                     }
                 }
+                else -> {
+                    Log.e("ResumeActivity", "❌ UNEXPECTED TYPE: ${data?.let { it::class.java.simpleName } ?: "null"}")
+                    showToast("Unexpected response from server", true)
+                }
             }
-            is ApiService.ApiResult.Error -> {
-                Log.e("ResumeActivity", "Resume generation failed: ${result.message}")
+        }
+        is ApiService.ApiResult.Error -> {
+            Log.e("ResumeActivity", "❌ ERROR: ${result.message} - Code: ${result.code}")
                 
                 if (result.code == 429) {
                     showToast("Rate limit exceeded. Please wait before trying again.", true)
