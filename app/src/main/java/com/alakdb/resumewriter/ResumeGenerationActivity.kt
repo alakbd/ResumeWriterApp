@@ -592,6 +592,8 @@ private fun generateResumeFromFileToText() {
     val resumeUri = selectedResumeUri ?: return showToast("Please select resume file", true)
     val jobDescText = binding.etJobDescription.text.toString().trim()
 
+    Log.d("ResumeActivity", "🚀 START FILE→TEXT - Resume URI: $resumeUri, JobDesc length: ${jobDescText.length}")
+
     if (jobDescText.isEmpty()) {
         showToast("Please enter job description text", true)
         return
@@ -613,12 +615,14 @@ private fun generateResumeFromFileToText() {
 
     lifecycleScope.launch {
         try {
+            Log.d("ResumeActivity", "🔍 Step 1: Authentication check...")
             if (!ensureUserAuthenticated()) {
+                Log.e("ResumeActivity", "❌ Authentication failed")
                 resetGenerateButton()
                 return@launch
             }
 
-            Log.d("ResumeActivity", "Checking user credits for FILE→TEXT generation")
+            Log.d("ResumeActivity", "💰 Step 2: Checking credits...")
             val creditResult = safeApiCallWithResult<ApiService.UserCreditsResponse>("getUserCredits") { 
                 apiService.getUserCredits() 
             }
@@ -626,41 +630,47 @@ private fun generateResumeFromFileToText() {
             when (creditResult) {
                 is ApiService.ApiResult.Success -> {
                     val credits = creditResult.data.available_credits
-                    Log.d("ResumeActivity", "User has $credits credits for FILE→TEXT")
+                    Log.d("ResumeActivity", "✅ Credits available: $credits")
 
                     if (credits <= 0) {
+                        Log.e("ResumeActivity", "❌ Insufficient credits")
                         showToastAndReset("Insufficient credits. Please purchase more.", true)
                         return@launch
                     }
 
-                    Log.d("ResumeActivity", "Generating resume from FILE→TEXT")
+                    Log.d("ResumeActivity", "🚀 Step 3: Calling FILE→TEXT API...")
+                    disableGenerateButton("Generating resume...")
+                    
                     val genResult = safeApiCallWithResult<ApiService.GenerateResumeResponse>("generateResumeFromFileToText") { 
                         apiService.generateResumeFromFileToText(resumeUri, jobDescText, selectedTone) 
                     }
 
-                    handleGenerationResult(genResult)
-                }
-
-                is ApiService.ApiResult.Error -> {
-                    Log.e("ResumeActivity", "Failed to get credits for FILE→TEXT: ${creditResult.message}")
+                    Log.d("ResumeActivity", "📬 Step 4: API call completed - Result type: ${genResult.javaClass.simpleName}")
                     
-                    if (creditResult.code == 429) {
-                        showToastAndReset("Rate limit exceeded. Please wait a moment before trying again.", true)
-                    } else {
-                        showToastAndReset("Failed to check credits: ${creditResult.message}", true)
+                    when (genResult) {
+                        is ApiService.ApiResult.Success -> {
+                            Log.d("ResumeActivity", "✅ API Success - Resume length: ${genResult.data.resume_text.length}")
+                            Log.d("ResumeActivity", "✅ Generation ID: ${genResult.data.generation_id}")
+                            Log.d("ResumeActivity", "✅ Remaining credits: ${genResult.data.remaining_credits}")
+                            
+                            handleGenerationResult(genResult)
+                        }
+                        is ApiService.ApiResult.Error -> {
+                            Log.e("ResumeActivity", "❌ API Error: ${genResult.message} - Code: ${genResult.code}")
+                            showToastAndReset("API Error: ${genResult.message}", true)
+                        }
                     }
-
-                    if (creditResult.code == 401) {
-                        showToast("Authentication failed. Please log out and log in again.", true)
-                        userManager.logout()
-                        checkGenerateButtonState()
-                    }
+                }
+                is ApiService.ApiResult.Error -> {
+                    Log.e("ResumeActivity", "❌ Credit check failed: ${creditResult.message}")
+                    showToastAndReset("Failed to check credits: ${creditResult.message}", true)
                 }
             }
         } catch (e: Exception) {
-            Log.e("ResumeActivity", "Exception in generateResumeFromFileToText: ${e.message}", e)
+            Log.e("ResumeActivity", "💥 Exception in generateResumeFromFileToText: ${e.message}", e)
             showToastAndReset("Generation failed: ${e.message}", true)
         } finally {
+            Log.d("ResumeActivity", "🏁 FILE→TEXT flow completed")
             resetGenerateButton()
         }
     }
