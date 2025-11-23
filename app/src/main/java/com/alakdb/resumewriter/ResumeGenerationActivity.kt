@@ -83,36 +83,36 @@ class ResumeGenerationActivity : AppCompatActivity() {
 
     // Conservative limits - PREVENT hitting server limits
     private companion object {
-        const val MAX_REQUESTS_PER_MINUTE = 6  // Even more conservative
-        const val MIN_TIME_BETWEEN_CALLS = 5000L // 5 seconds between API calls
-        const val MAX_RETRIES = 1 // Only retry once
-        const val RETRY_DELAY = 15000L // 15 seconds for retry
+        const val MAX_REQUESTS_PER_MINUTE = 15  // Even more conservative
+        const val MIN_TIME_BETWEEN_CALLS = 2000L // 2 seconds between API calls
+        const val MAX_RETRIES = 2 // Only retry twice
+        const val RETRY_DELAY = 10000L // 10 seconds for retry
     }
 
     // More efficient rate limiting
     private fun canMakeApiCall(): Boolean {
-        val now = System.currentTimeMillis()
-        
-        // Clean up old timestamps (older than 1 minute)
-        val oneMinuteAgo = now - 60000L
-        apiCallTimestamps.removeAll { it < oneMinuteAgo }
-        
-        // Check per-minute limit
-        if (apiCallTimestamps.size >= MAX_REQUESTS_PER_MINUTE) {
-            val timeToWait = (apiCallTimestamps.first() + 60000L - now) / 1000
-            showToast("Too many requests. Please wait ${timeToWait}s", true)
-            return false
-        }
-        
-        // Check minimum time between calls
-        if (now - lastApiCallTime < MIN_API_CALL_INTERVAL) {
-            val timeToWait = (MIN_API_CALL_INTERVAL - (now - lastApiCallTime)) / 1000
-            showToast("Please wait ${timeToWait}s between requests", true)
-            return false
-        }
-        
-        return true
+    val now = System.currentTimeMillis()
+    
+    // Clean up old timestamps (older than 1 minute)
+    val oneMinuteAgo = now - 60000L
+    apiCallTimestamps.removeAll { it < oneMinuteAgo }
+    
+    // Check per-minute limit
+    if (apiCallTimestamps.size >= MAX_REQUESTS_PER_MINUTE) {
+        val timeToWait = (apiCallTimestamps.first() + 60000L - now) / 1000
+        showToast("Too many requests. Please wait ${timeToWait}s", true)
+        return false
     }
+    
+    // Check minimum time between calls - THIS IS TOO STRICT!
+    if (now - lastApiCallTime < MIN_API_CALL_INTERVAL) {
+        val timeToWait = (MIN_API_CALL_INTERVAL - (now - lastApiCallTime)) / 1000
+        showToast("Please wait ${timeToWait}s between requests", true)
+        return false
+    }
+    
+    return true
+}
 
     private fun recordApiCall() {
         val now = System.currentTimeMillis()
