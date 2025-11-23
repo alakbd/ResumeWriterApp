@@ -93,24 +93,35 @@ class ResumeGenerationActivity : AppCompatActivity() {
     private fun canMakeApiCall(): Boolean {
     val now = System.currentTimeMillis()
     
+    Log.d("RateLimitDebug", "=== canMakeApiCall() Check ===")
+    Log.d("RateLimitDebug", "Current time: $now")
+    Log.d("RateLimitDebug", "Last API call time: $lastApiCallTime")
+    Log.d("RateLimitDebug", "Time since last call: ${now - lastApiCallTime}ms")
+    Log.d("RateLimitDebug", "MIN_API_CALL_INTERVAL: ${MIN_API_CALL_INTERVAL}ms")
+    
     // Clean up old timestamps (older than 1 minute)
     val oneMinuteAgo = now - 60000L
     apiCallTimestamps.removeAll { it < oneMinuteAgo }
     
+    Log.d("RateLimitDebug", "Recent calls in last minute: ${apiCallTimestamps.size}/$MAX_REQUESTS_PER_MINUTE")
+    
     // Check per-minute limit
     if (apiCallTimestamps.size >= MAX_REQUESTS_PER_MINUTE) {
         val timeToWait = (apiCallTimestamps.first() + 60000L - now) / 1000
+        Log.e("RateLimitDebug", "❌ PER-MINUTE LIMIT HIT - Wait ${timeToWait}s")
         showToast("Too many requests. Please wait ${timeToWait}s", true)
         return false
     }
     
-    // Check minimum time between calls - THIS IS TOO STRICT!
+    // Check minimum time between calls
     if (now - lastApiCallTime < MIN_API_CALL_INTERVAL) {
         val timeToWait = (MIN_API_CALL_INTERVAL - (now - lastApiCallTime)) / 1000
+        Log.e("RateLimitDebug", "❌ MIN INTERVAL LIMIT HIT - Wait ${timeToWait}s")
         showToast("Please wait ${timeToWait}s between requests", true)
         return false
     }
     
+    Log.d("RateLimitDebug", "✅ Rate limit check PASSED")
     return true
 }
 
@@ -608,11 +619,14 @@ private fun generateResumeFromFileToText() {
         return
     }
 
+    
+    // TEMPORARY: Bypass rate limits for testing
+    Log.d("FLOW_DEBUG", "🔧 TEMPORARY: Bypassing rate limits")
     // Rate limiting check
-    if (!canMakeApiCall()) {
-        return
-    }
-
+    //if (!canMakeApiCall()) {
+        //return
+    //}
+    Log.d("FLOW_DEBUG", "✅ Rate limits bypassed, proceeding with API call...")
     recordApiCall()
     disableGenerateButton("Processing...")
 
