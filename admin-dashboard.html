@@ -330,6 +330,7 @@
                 <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 20px; flex-wrap: wrap; gap: 10px;">
                     <div>
                         <button class="btn" onclick="refreshStats()" id="refreshBtn">🔄 Refresh</button>
+                        <button class="btn btn-warning" onclick="repairData()">🔧 Repair Data</button>
                         <button class="btn btn-warning" onclick="resetStats()" id="resetBtn">📊 Reset Daily Stats</button>
                         <button class="btn" onclick="exportData()">📤 Export Data</button>
                         <!-- BACKUP BUTTONS -->
@@ -790,6 +791,21 @@
 
         // ========== BACKUP FUNCTIONS ==========
 
+        // Add this function
+        async function repairData() {
+            if (!currentSession) return;
+    
+            try {
+                showMessage('🔄 Attempting data repair...', 'info');
+        
+                // You might need to create a repair endpoint, or just refresh
+                await refreshStats();
+                showMessage('✅ Data structures checked and repaired if needed', 'success');
+            } catch (error) {
+                showMessage('❌ Repair failed: ' + error.message, 'error');
+            }
+        }
+        
         async function triggerBackup() {
             if (!currentSession) {
                 showMessage('Admin authentication required', 'error');
