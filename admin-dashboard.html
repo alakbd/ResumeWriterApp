@@ -904,7 +904,7 @@
             document.getElementById('localSnapshots').textContent = status.local_data.daily_snapshots || 0;
             document.getElementById('alignmentRecords').textContent = status.local_data.alignment_records || 0;
             document.getElementById('cloudBackups').textContent = status.cloud_backup.total_backup_files || 0;
-            
+    
             // Format last backup time
             const lastBackup = status.cloud_backup.latest_backup_time;
             if (lastBackup) {
@@ -913,16 +913,22 @@
             } else {
                 document.getElementById('lastBackupTime').textContent = 'Never';
             }
-            
-            // Update system status with color coding
-            const systemStatus = status.system_status;
-            const lastBackupElement = document.getElementById('lastBackupTime');
-            if (systemStatus === 'active') {
-                lastBackupElement.className = 'stat-mini-value backup-status-active';
-            } else {
-                lastBackupElement.className = 'stat-mini-value backup-status-inactive';
-            }
-        }
+    
+    // Update system status with color coding
+    const systemStatus = status.system_status;
+    const lastBackupElement = document.getElementById('lastBackupTime');
+    if (systemStatus === 'active') {
+        lastBackupElement.className = 'stat-mini-value backup-status-active';
+    } else {
+        lastBackupElement.className = 'stat-mini-value backup-status-inactive';
+    }
+    
+    // Show drive service availability
+    const driveAvailable = status.cloud_backup.drive_service_available;
+    if (!driveAvailable) {
+        showMessage('⚠️ Google Drive service is not configured', 'info');
+    }
+}
 
         function displayBackupFiles(files) {
             const container = document.getElementById('backupFilesContent');
