@@ -961,67 +961,88 @@
 
         // ========== ENHANCED STATS FUNCTIONS ==========
 
-        function refreshStats() {
-            if (!currentSession) {
+        async function refreshStats() {
+                if (!currentSession) {
                 showMessage('Please log in first', 'error');
                 return;
             }
 
-            console.log('🔄 Refreshing stats...');
+    console.log('🔄 Refreshing stats...');
 
-            // Show loading states
-            document.querySelectorAll('.stat-value').forEach(el => {
-                if (el.id !== 'serverStatus') {
-                    el.textContent = '...';
-                }
-            });
-            
-            const refreshBtn = document.getElementById('refreshBtn');
-            if (refreshBtn) refreshBtn.classList.add('loading');
-            
-            const serverStatus = document.getElementById('serverStatus');
-            if (serverStatus) serverStatus.textContent = '⏳ Loading...';
-
-            // Get comprehensive stats from /stats endpoint
-            fetch(`${API_BASE_URL}/stats`, {
-                headers: {
-                    'X-User-ID': currentSession.uid,
-                    'Content-Type': 'application/json'
-                }
-            })
-            .then(response => {
-                console.log('📊 Stats response status:', response.status);
-                if (!response.ok) {
-                    throw new Error(`Stats endpoint returned ${response.status}`);
-                }
-                return response.json();
-            })
-            .then(data => {
-                console.log('📊 Stats data received:', data);
-                if (data.success) {
-                    updateEnhancedDashboard(data);
-                    showMessage('✅ Stats updated successfully', 'success');
-                } else {
-                    throw new Error('Stats endpoint returned unsuccessful response');
-                }
-            })
-            .catch(error => {
-                console.error('❌ Stats error:', error);
-                showMessage('⚠️ Could not load comprehensive stats: ' + error.message, 'error');
-                // Fallback to basic info
-                loadBasicInfo();
-            });
-
-            // ALSO CHECK BACKUP STATUS WHEN REFRESHING
-            checkBackupStatus();
-            checkServerHealth();
-            
-            // Final loading cleanup
-            setTimeout(() => {
-                if (refreshBtn) refreshBtn.classList.remove('loading');
-            }, 1000);
+    // Show loading states
+    document.querySelectorAll('.stat-value').forEach(el => {
+        if (el.id !== 'serverStatus') {
+            el.textContent = '...';
         }
+    });
+    
+    const refreshBtn = document.getElementById('refreshBtn');
+    if (refreshBtn) refreshBtn.classList.add('loading');
+    
+    const serverStatus = document.getElementById('serverStatus');
+    if (serverStatus) serverStatus.textContent = '⏳ Loading...';
 
+    try {
+        // Get comprehensive stats from /stats endpoint
+        const response = await fetch(`${API_BASE_URL}/stats`, {
+            headers: {
+                'X-User-ID': currentSession.uid,
+                'Content-Type': 'application/json'
+            }
+        });
+        
+        console.log('📊 Stats response status:', response.status);
+        
+        if (!response.ok) {
+            const errorText = await response.text();
+            console.error('❌ Stats error response:', errorText);
+            throw new Error(`Stats endpoint returned ${response.status}: ${errorText}`);
+        }
+        
+        const data = await response.json();
+        console.log('📊 Stats data received:', data);
+        
+        if (data.success) {
+            updateEnhancedDashboard(data);
+            showMessage('✅ Stats updated successfully', 'success');
+        } else {
+            throw new Error('Stats endpoint returned unsuccessful response');
+        }
+    } catch (error) {
+        console.error('❌ Stats error:', error);
+        
+        // More specific error messages
+        if (error.message.includes('500')) {
+            showMessage('⚠️ Server error - check server logs for details', 'error');
+        } else if (error.message.includes('403')) {
+            showMessage('❌ Access denied - admin privileges required', 'error');
+        } else if (error.message.includes('401')) {
+            showMessage('🔐 Authentication failed - please log in again', 'error');
+        } else {
+            showMessage('⚠️ Could not load comprehensive stats: ' + error.message, 'error');
+        }
+        
+        // Fallback to basic info
+        loadBasicInfo();
+    }
+
+    // ALSO CHECK BACKUP STATUS WHEN REFRESHING
+    try {
+        await checkBackupStatus();
+    } catch (backupError) {
+        console.error('Backup status check failed:', backupError);
+    }
+    
+    checkServerHealth();
+    
+    // Final loading cleanup
+    setTimeout(() => {
+        if (refreshBtn) refreshBtn.classList.remove('loading');
+    }, 1000);
+}
+
+
+        
         function updateEnhancedDashboard(stats) {
             console.log('Updating enhanced dashboard with:', stats);
             
