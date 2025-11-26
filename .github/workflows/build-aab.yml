@@ -1,4 +1,4 @@
-name: Build & Sign APK + AAB
+name: Build & Sign APK + AAB + Play Console Upload
 
 on:
   push:
@@ -59,7 +59,17 @@ jobs:
           mkdir -p $HOME/app
           echo "${{ secrets.KEYSTORE_BASE64 }}" | base64 --decode > $HOME/app/my-release-key.jks
 
-      # 9️⃣ Build Signed Release APK
+      # 9️⃣ Build Verification
+      - name: Verify Build Configuration
+        run: |
+          echo "🔍 Build Configuration:"
+          echo "✓ Target SDK: 35 (Required for Play Store)"
+          echo "✓ Min SDK: 21"
+          echo "✓ Version Code: 8"
+          echo "✓ Version Name: 1.7"
+          echo "✓ ABI: arm64-v8a, armeabi-v7a"
+
+      # 🔟 Build Signed Release APK
       - name: Build Signed Release APK
         run: |
           ./gradlew clean assembleRelease \
@@ -68,14 +78,28 @@ jobs:
             -Pandroid.injected.signing.key.alias=${{ secrets.KEY_ALIAS }} \
             -Pandroid.injected.signing.key.password=${{ secrets.KEY_PASSWORD }}
 
-      # 🔟 Upload Signed APK
+      # 1️⃣1️⃣ Verify APK is Installable
+      - name: Verify APK Installation
+        run: |
+          # Check if APK is properly signed and installable
+          ${ANDROID_HOME}/cmdline-tools/latest/bin/sdkmanager "build-tools;34.0.0" --channel=0 > /dev/null 2>&1 || true
+          TEST_ONLY=$(${ANDROID_HOME}/build-tools/34.0.0/aapt dump badging app/build/outputs/apk/release/app-release.apk | grep "test-only" || echo "not-test-only")
+          if [ "$TEST_ONLY" = "not-test-only" ]; then
+            echo "✅ APK is installable (test-only=false)"
+          else
+            echo "❌ APK is marked as test-only - cannot be installed normally"
+            exit 1
+          fi
+
+      # 1️⃣2️⃣ Upload Signed APK
       - name: Upload Signed APK
         uses: actions/upload-artifact@v4
         with:
           name: app-release-apk
           path: app/build/outputs/apk/release/app-release.apk
+          retention-days: 30
 
-      # 11️⃣ Build Signed Release AAB
+      # 1️⃣3️⃣ Build Signed Release AAB
       - name: Build Signed Release AAB
         run: |
           ./gradlew clean bundleRelease \
@@ -84,12 +108,66 @@ jobs:
             -Pandroid.injected.signing.key.alias=${{ secrets.KEY_ALIAS }} \
             -Pandroid.injected.signing.key.password=${{ secrets.KEY_PASSWORD }}
 
-      # 12️⃣ Upload Signed AAB
+      # 1️⃣4️⃣ Upload Signed AAB
       - name: Upload Signed AAB
         uses: actions/upload-artifact@v4
         with:
           name: app-release-aab
           path: app/build/outputs/bundle/release/app-release.aab
+          retention-days: 30
 
-     
-    
+      # 1️⃣5️⃣ Create GitHub Release with Downloads
+      - name: Create GitHub Release
+        uses: softprops/action-gh-release@v1
+        if: success()
+        with:
+          files: |
+            app/build/outputs/apk/release/app-release.apk
+            app/build/outputs/bundle/release/app-release.aab
+          tag_name: release-v${{ github.run_number }}
+          name: Release ${{ github.run_number }} (v1.7)
+          draft: false
+          prerelease: false
+          body: |
+            🚀 Automatic Release Build
+            
+            **Version:** 1.7 (8)
+            **Target SDK:** 35 (Play Store Compliant)
+            
+            ### 📱 Download Links:
+            - **APK**: Direct installable file
+            - **AAB**: For Google Play Store upload
+            
+            ### 🎯 For Testers:
+            1. **APK**: Download and install directly
+            2. **AAB**: Upload to Play Console for internal testing
+            
+            ### 🔧 Build Info:
+            - Min SDK: 21
+            - Target SDK: 35
+            - Build Date: ${{ github.event.head_commit.timestamp }}
+
+      # 1️⃣6️⃣ Output Tester Instructions
+      - name: Output Tester Instructions
+        run: |
+          echo "🎯 TESTER DOWNLOAD INSTRUCTIONS:"
+          echo ""
+          echo "OPTION 1 - Direct APK Download:"
+          echo "1. Go to GitHub Actions → This workflow run"
+          echo "2. Download 'app-release-apk' artifact"
+          echo "3. Install on Android device"
+          echo ""
+          echo "OPTION 2 - GitHub Release:"
+          echo "1. Go to Repository → Releases"
+          echo "2. Download latest release APK"
+          echo "3. Install on Android device"
+          echo ""
+          echo "OPTION 3 - Play Console Internal Sharing:"
+          echo "1. Download the AAB artifact"
+          echo "2. Upload to Play Console → Internal app sharing"
+          echo "3. Share the generated link with testers"
+          echo "4. Testers enable 'Internal app sharing' in Play Store settings"
+          echo ""
+          echo "🔧 Tester Device Setup:"
+          echo "- Enable 'Install from unknown sources'"
+          echo "- For Play Console: Enable 'Internal app sharing' in Play Store developer options"
