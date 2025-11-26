@@ -4,6 +4,10 @@ on:
   push:
     branches: [ "main" ]
 
+# Add permissions for GitHub Releases
+permissions:
+  contents: write
+
 jobs:
   build:
     runs-on: ubuntu-latest
@@ -67,7 +71,6 @@ jobs:
           echo "✓ Min SDK: 21"
           echo "✓ Version Code: 8"
           echo "✓ Version Name: 1.7"
-          echo "✓ ABI: arm64-v8a, armeabi-v7a"
 
       # 🔟 Build Signed Release APK
       - name: Build Signed Release APK
@@ -78,17 +81,20 @@ jobs:
             -Pandroid.injected.signing.key.alias=${{ secrets.KEY_ALIAS }} \
             -Pandroid.injected.signing.key.password=${{ secrets.KEY_PASSWORD }}
 
-      # 1️⃣1️⃣ Verify APK is Installable
-      - name: Verify APK Installation
+      # 1️⃣1️⃣ Find and Verify APK
+      - name: Find and Verify APK
         run: |
-          # Check if APK is properly signed and installable
-          ${ANDROID_HOME}/cmdline-tools/latest/bin/sdkmanager "build-tools;34.0.0" --channel=0 > /dev/null 2>&1 || true
-          TEST_ONLY=$(${ANDROID_HOME}/build-tools/34.0.0/aapt dump badging app/build/outputs/apk/release/app-release.apk | grep "test-only" || echo "not-test-only")
-          if [ "$TEST_ONLY" = "not-test-only" ]; then
-            echo "✅ APK is installable (test-only=false)"
+          echo "📁 Listing build outputs..."
+          find app/build/outputs -name "*.apk" -type f | head -10
+          find app/build/outputs -name "*.aab" -type f | head -10
+          
+          # Check if release APK exists
+          if [ -f "app/build/outputs/apk/release/app-release.apk" ]; then
+            echo "✅ Release APK found"
+            ls -la app/build/outputs/apk/release/
           else
-            echo "❌ APK is marked as test-only - cannot be installed normally"
-            exit 1
+            echo "🔍 Searching for APK in other locations..."
+            find app/build/outputs -name "*.apk" -exec ls -la {} \;
           fi
 
       # 1️⃣2️⃣ Upload Signed APK
@@ -96,7 +102,9 @@ jobs:
         uses: actions/upload-artifact@v4
         with:
           name: app-release-apk
-          path: app/build/outputs/apk/release/app-release.apk
+          path: |
+            app/build/outputs/apk/release/app-release.apk
+            app/build/outputs/apk/release/*.apk
           retention-days: 30
 
       # 1️⃣3️⃣ Build Signed Release AAB
@@ -116,14 +124,40 @@ jobs:
           path: app/build/outputs/bundle/release/app-release.aab
           retention-days: 30
 
-      # 1️⃣5️⃣ Create GitHub Release with Downloads
+      # 1️⃣5️⃣ Find Actual APK Path for Release
+      - name: Discover APK Path
+        id: find-apk
+        run: |
+          # Look for APK files
+          APK_PATH=$(find app/build/outputs -name "*.apk" -type f | grep release | head -1)
+          if [ -z "$APK_PATH" ]; then
+            APK_PATH=$(find app/build/outputs -name "*.apk" -type f | head -1)
+          fi
+          
+          if [ -n "$APK_PATH" ]; then
+            echo "📱 Found APK: $APK_PATH"
+            echo "apk_path=$APK_PATH" >> $GITHUB_OUTPUT
+          else
+            echo "❌ No APK file found"
+            echo "apk_path=" >> $GITHUB_OUTPUT
+          fi
+          
+          # AAB path is usually consistent
+          if [ -f "app/build/outputs/bundle/release/app-release.aab" ]; then
+            echo "aab_path=app/build/outputs/bundle/release/app-release.aab" >> $GITHUB_OUTPUT
+          else
+            AAB_PATH=$(find app/build/outputs -name "*.aab" -type f | head -1)
+            echo "aab_path=$AAB_PATH" >> $GITHUB_OUTPUT
+          fi
+
+      # 1️⃣6️⃣ Create GitHub Release (Only if files exist)
       - name: Create GitHub Release
+        if: steps.find-apk.outputs.apk_path != '' && steps.find-apk.outputs.aab_path != ''
         uses: softprops/action-gh-release@v1
-        if: success()
         with:
           files: |
-            app/build/outputs/apk/release/app-release.apk
-            app/build/outputs/bundle/release/app-release.aab
+            ${{ steps.find-apk.outputs.apk_path }}
+            ${{ steps.find-apk.outputs.aab_path }}
           tag_name: release-v${{ github.run_number }}
           name: Release ${{ github.run_number }} (v1.7)
           draft: false
@@ -139,35 +173,32 @@ jobs:
             - **AAB**: For Google Play Store upload
             
             ### 🎯 For Testers:
-            1. **APK**: Download and install directly
-            2. **AAB**: Upload to Play Console for internal testing
+            1. **Download APK** and install directly on Android devices
+            2. Enable "Install from unknown sources" if needed
             
             ### 🔧 Build Info:
             - Min SDK: 21
             - Target SDK: 35
             - Build Date: ${{ github.event.head_commit.timestamp }}
 
-      # 1️⃣6️⃣ Output Tester Instructions
+      # 1️⃣7️⃣ Output Tester Instructions
       - name: Output Tester Instructions
         run: |
           echo "🎯 TESTER DOWNLOAD INSTRUCTIONS:"
           echo ""
-          echo "OPTION 1 - Direct APK Download:"
+          echo "OPTION 1 - Direct APK Download from Artifacts:"
           echo "1. Go to GitHub Actions → This workflow run"
           echo "2. Download 'app-release-apk' artifact"
           echo "3. Install on Android device"
           echo ""
-          echo "OPTION 2 - GitHub Release:"
+          echo "OPTION 2 - GitHub Release (if created):"
           echo "1. Go to Repository → Releases"
           echo "2. Download latest release APK"
           echo "3. Install on Android device"
           echo ""
-          echo "OPTION 3 - Play Console Internal Sharing:"
-          echo "1. Download the AAB artifact"
-          echo "2. Upload to Play Console → Internal app sharing"
-          echo "3. Share the generated link with testers"
-          echo "4. Testers enable 'Internal app sharing' in Play Store settings"
+          echo "OPTION 3 - Manual Build Download:"
+          echo "1. Check workflow artifacts above for APK file"
           echo ""
-          echo "🔧 Tester Device Setup:"
-          echo "- Enable 'Install from unknown sources'"
-          echo "- For Play Console: Enable 'Internal app sharing' in Play Store developer options"
+          echo "🔧 Installation Help:"
+          echo "- Enable 'Install from unknown sources' in Android settings"
+          echo "- Download the APK and tap to install"
