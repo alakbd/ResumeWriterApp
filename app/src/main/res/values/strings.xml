@@ -1,6 +1,7 @@
 <?xml version="1.0" encoding="utf-8"?>
 <resources>
-    <string name="app_name">Resume Boost</string>
+    <string name="app_name">Resume Tailor</string>
+    <string name="facebook_app_id">61583995713342</string>
     
     <string-array name="tone_options">
         <item>Professional</item>
