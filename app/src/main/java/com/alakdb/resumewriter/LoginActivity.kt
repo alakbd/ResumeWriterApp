@@ -5,6 +5,7 @@ import android.content.Intent
 import android.os.Bundle
 import android.util.Log
 import android.widget.Toast
+import com.facebook.share.widget.LikeView
 import androidx.appcompat.app.AlertDialog
 import androidx.appcompat.app.AppCompatActivity
 import com.google.firebase.auth.FirebaseAuth
@@ -40,8 +41,27 @@ class LoginActivity : AppCompatActivity() {
         checkExistingAuthState()
 
         setupClickListeners()
+        setupFacebookLike()
     }
-    
+
+        private fun setupFacebookLike() {
+        val likeView = findViewById<LikeView>(R.id.like_view)
+        
+        // Replace with your Facebook Page ID or username
+        likeView.setObjectIdAndType(
+            "61583995713342",  // Your actual Facebook Page ID
+            LikeView.ObjectType.PAGE
+        )
+        
+        // Customize the LikeView appearance
+        likeView.setLikeViewStyle(LikeView.Style.STANDARD)
+        likeView.setAuxiliaryViewPosition(LikeView.AuxiliaryViewPosition.INLINE)
+        likeView.setHorizontalAlignment(LikeView.HorizontalAlignment.CENTER)
+        
+        // Optional: Set foreground color to match your app theme
+        likeView.setForegroundColor(-1) // -1 for white foreground
+    }
+}
     private fun checkExistingAuthState() {
         Log.d("LoginActivity", "🔄 Checking existing auth state...")
         
