@@ -49,7 +49,7 @@ class LoginActivity : AppCompatActivity() {
         
         // Replace with your Facebook Page ID or username
         likeView.setObjectIdAndType(
-            "61583995713342",  // Your actual Facebook Page ID
+            "914724941720233",  // Your actual Facebook Page ID
             LikeView.ObjectType.PAGE
         )
         
