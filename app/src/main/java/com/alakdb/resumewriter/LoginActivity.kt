@@ -61,7 +61,7 @@ class LoginActivity : AppCompatActivity() {
         // Optional: Set foreground color to match your app theme
         likeView.setForegroundColor(-1) // -1 for white foreground
     }
-}
+
     private fun checkExistingAuthState() {
         Log.d("LoginActivity", "🔄 Checking existing auth state...")
         
