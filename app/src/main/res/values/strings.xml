@@ -2,6 +2,7 @@
 <resources>
     <string name="app_name">Resume Tailor</string>
     <string name="facebook_app_id">26247295134859769</string>
+    <string name="facebook_client_token">abc123def456ghi789</string>
     
     <string-array name="tone_options">
         <item>Professional</item>
