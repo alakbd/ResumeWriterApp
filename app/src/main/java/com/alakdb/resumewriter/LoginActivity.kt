@@ -45,23 +45,22 @@ class LoginActivity : AppCompatActivity() {
         setupFacebookButton()
     }
 
-        private fun setupFacebookButton() {
-            val facebookButton = findViewById<Button>(R.id.btnFacebookPage)
-            facebookButton.setOnClickListener {
-                val facebookPageId = "914724941720233" // Your numeric Page ID
-                val facebookUrl = "https://www.facebook.com/$facebookPageId"
-        
-                try {
-                    // Try Facebook app first with page ID
-                    val intent = Intent(Intent.ACTION_VIEW, Uri.parse("fb://page/$facebookPageId"))
-                    startActivity(intent)
-                } catch (e: Exception) {
-                    // Fallback to browser
-                    val intent = Intent(Intent.ACTION_VIEW, Uri.parse(facebookUrl))
-                    startActivity(intent)
-                }
+    private fun setupFacebookButton() {
+        binding.btnFacebookPage.setOnClickListener {
+            val facebookPageId = "914724941720233" // Your numeric Page ID
+            val facebookUrl = "https://www.facebook.com/$facebookPageId"
+
+            try {
+                // Open Facebook app
+                val intent = Intent(Intent.ACTION_VIEW, Uri.parse("fb://page/$facebookPageId"))
+                startActivity(intent)
+            } catch (e: Exception) {
+                // Fallback to browser
+                val intent = Intent(Intent.ACTION_VIEW, Uri.parse(facebookUrl))
+                startActivity(intent)
             }
         }
+    }
 
     private fun checkExistingAuthState() {
         Log.d("LoginActivity", "🔄 Checking existing auth state...")
