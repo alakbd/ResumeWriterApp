@@ -5,7 +5,6 @@ import android.content.Intent
 import android.os.Bundle
 import android.util.Log
 import android.widget.Toast
-import com.facebook.share.widget.LikeView
 import androidx.appcompat.app.AlertDialog
 import androidx.appcompat.app.AppCompatActivity
 import com.google.firebase.auth.FirebaseAuth
@@ -41,26 +40,26 @@ class LoginActivity : AppCompatActivity() {
         checkExistingAuthState()
 
         setupClickListeners()
-        setupFacebookLike()
+        setupFacebookButton()
     }
 
-        private fun setupFacebookLike() {
-        val likeView = findViewById<LikeView>(R.id.like_view)
+        private fun setupFacebookButton() {
+    val facebookButton = findViewById<Button>(R.id.btnFacebookPage)
+    facebookButton.setOnClickListener {
+        val facebookPageId = "YourPageName" // Replace with your actual page username
+        val facebookUrl = "https://www.facebook.com/$facebookPageId"
         
-        // Replace with your Facebook Page ID or username
-        likeView.setObjectIdAndType(
-            "914724941720233",  // Your actual Facebook Page ID
-            LikeView.ObjectType.PAGE
-        )
-        
-        // Customize the LikeView appearance
-        likeView.setLikeViewStyle(LikeView.Style.STANDARD)
-        likeView.setAuxiliaryViewPosition(LikeView.AuxiliaryViewPosition.INLINE)
-        likeView.setHorizontalAlignment(LikeView.HorizontalAlignment.CENTER)
-        
-        // Optional: Set foreground color to match your app theme
-        likeView.setForegroundColor(-1) // -1 for white foreground
+        try {
+            // Try Facebook app first
+            val intent = Intent(Intent.ACTION_VIEW, Uri.parse("fb://page/$facebookPageId"))
+            startActivity(intent)
+        } catch (e: Exception) {
+            // Fallback to browser
+            val intent = Intent(Intent.ACTION_VIEW, Uri.parse(facebookUrl))
+            startActivity(intent)
+        }
     }
+}
 
     private fun checkExistingAuthState() {
         Log.d("LoginActivity", "🔄 Checking existing auth state...")
