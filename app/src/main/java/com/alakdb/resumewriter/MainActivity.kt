@@ -56,6 +56,17 @@ class MainActivity : AppCompatActivity() {
         initializeApp()
     }
 
+    override fun onStart() {
+    super.onStart()
+    
+    // ⭐ CRITICAL FIX: Check authentication BEFORE UI becomes visible
+    if (::userManager.isInitialized && !userManager.isUserLoggedIn()) {
+        Log.d("MainActivity", "User not logged in - redirecting before UI loads")
+        redirectToLogin()
+        return
+    }
+}
+
     private fun initializeManagers() {
         userManager = UserManager(this)
         creditManager = CreditManager(this)
