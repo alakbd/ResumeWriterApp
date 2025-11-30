@@ -63,12 +63,6 @@ android {
 
 dependencies {
 
-    // Facebook Login SDK
-    implementation 'com.facebook.android:facebook-android-sdk:16.3.0'
-
-    // Facebook Share SDK (REQUIRED FOR LikeView)
-    implementation 'com.facebook.android:facebook-share:16.3.0'
-    
     // ---------- ANDROIDX ----------
     implementation 'androidx.core:core-ktx:1.12.0'
     implementation 'androidx.appcompat:appcompat:1.6.1'
