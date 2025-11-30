@@ -1,9 +1,6 @@
 <?xml version="1.0" encoding="utf-8"?>
 <resources>
     <string name="app_name">Resume Tailor</string>
-    <string name="facebook_app_id">26247295134859769</string>
-    <string name="facebook_client_token">eaf995f7ac7f2b76d2b290f9688f0365</string>
-    
     <string-array name="tone_options">
         <item>Professional</item>
         <item>Concise</item>
