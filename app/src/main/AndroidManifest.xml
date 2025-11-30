@@ -42,14 +42,6 @@
         android:label="Generate Resume"
         android:theme="@style/Theme.AppCompat.Light.NoActionBar" />
 
-        <!-- Facebook Application ID -->
-        <meta-data
-            android:name="com.facebook.sdk.ApplicationId"
-            android:value="@string/facebook_app_id" />
-        <meta-data
-            android:name="com.facebook.sdk.ClientToken"
-            android:value="@string/facebook_client_token" />
-
         <!-- Add LoginActivity -->
         <activity
             android:name=".LoginActivity"
