@@ -1131,64 +1131,93 @@
         }
 
         function updateEnhancedDashboard(stats) {
-            console.log('Updating enhanced dashboard with:', stats);
-            
+            console.log('📊 Updating enhanced dashboard with:', stats);
+    
             // Call all the display functions
             if (stats.daily_stats) {
                 updateCostAnalyticsDisplay(stats.daily_stats);
-                
-                // Update main stats grid
-                document.getElementById('dailyCostOverview').textContent = `$${(stats.daily_stats.daily_cost || 0).toFixed(6)}`;
-                document.getElementById('totalTokensOverview').textContent = (stats.daily_stats.daily_tokens || 0).toLocaleString();
-                document.getElementById('apiRequests').textContent = (stats.daily_stats.daily_requests || 0).toLocaleString();
-                document.getElementById('userCount').textContent = 'Calculating...';
-                document.getElementById('newUsersToday').textContent = 'Calculating...';
-                
-                // Color code based on cost
-                const costElement = document.getElementById('dailyCostOverview');
-                if (stats.daily_stats.daily_cost > 1.0) {
-                    costElement.className = 'stat-value cost-warning';
-                } else if (stats.daily_stats.daily_cost > 0.1) {
-                    costElement.className = 'stat-value';
-                } else {
-                    costElement.className = 'stat-value cost-good';
-                }
-            }
-            
-            if (stats.user_analytics) {
-                updateUserAnalyticsDisplay(stats.user_analytics);
-            }
-            
-            if (stats.cache_performance) {
-                updateCacheStatsDisplay(stats.cache_performance);
-            }
-            
-            if (stats.jd_alignment_stats) {
-                updateJDAlignmentDisplay(stats.jd_alignment_stats);
-            }
-
-            // Update cache stats
-            updateCacheStats(stats);
-
-            // Update cost history
-            if (stats.cost_history && stats.cost_history.length > 0) {
-                updateCostHistory(stats.cost_history);
-                calculateMonthlyCost(stats.cost_history);
-                calculateWeeklyCost(stats.cost_history);
-            }
-
-            document.getElementById('lastUpdate').textContent = `Last update: ${new Date().toLocaleTimeString()}`;
-
-            // Update JD Alignment stats
-            if (stats.jd_alignment_stats) {
-                document.getElementById('totalAlignments').textContent = stats.jd_alignment_stats.total_alignments || 0;
-                document.getElementById('avgImprovement').textContent = '+' + (stats.jd_alignment_stats.average_improvement || 0).toFixed(3);
-                document.getElementById('avgFinalScore').textContent = (stats.jd_alignment_stats.average_final_score || 0).toFixed(3);
-                document.getElementById('maxImprovement').textContent = '+' + (stats.jd_alignment_stats.max_improvement || 0).toFixed(3);
-                
-                updateRecentAlignments(stats.jd_alignment_stats.recent_alignments || []);
-            }
+        
+        // Update main stats grid
+        document.getElementById('dailyCostOverview').textContent = `$${(stats.daily_stats.daily_cost || 0).toFixed(6)}`;
+        document.getElementById('totalTokensOverview').textContent = (stats.daily_stats.daily_tokens || 0).toLocaleString();
+        document.getElementById('apiRequests').textContent = (stats.daily_stats.daily_requests || 0).toLocaleString();
+        
+        // 🔥 FIXED: Get user counts from daily_stats
+        const userCount = stats.daily_stats.user_count || 0;
+        const newUsersToday = stats.daily_stats.new_users_today || 0;
+        const emailVerifiedCount = stats.daily_stats.email_verified_count || 0;
+        
+        document.getElementById('userCount').textContent = userCount;
+        document.getElementById('newUsersToday').textContent = newUsersToday;
+        
+        const verifiedElement = document.getElementById('newUsersVerified');
+        if (verifiedElement) {
+            verifiedElement.textContent = `Email Verified: ${emailVerifiedCount}`;
         }
+        
+        console.log('👤 User counts extracted:', {
+            total: userCount,
+            today: newUsersToday,
+            verified: emailVerifiedCount
+        });
+        
+        // Color code based on cost
+        const costElement = document.getElementById('dailyCostOverview');
+        if (stats.daily_stats.daily_cost > 1.0) {
+            costElement.className = 'stat-value cost-warning';
+        } else if (stats.daily_stats.daily_cost > 0.1) {
+            costElement.className = 'stat-value';
+        } else {
+            costElement.className = 'stat-value cost-good';
+        }
+    } else {
+        // Fallback if no daily_stats
+        document.getElementById('userCount').textContent = 'No Data';
+        document.getElementById('newUsersToday').textContent = 'No Data';
+        document.getElementById('newUsersVerified').textContent = 'Email Verified: No Data';
+    }
+    
+    if (stats.user_analytics) {
+        updateUserAnalyticsDisplay(stats.user_analytics);
+    }
+    
+    if (stats.cache_performance) {
+        updateCacheStatsDisplay(stats.cache_performance);
+    }
+    
+    if (stats.jd_alignment_stats) {
+        updateJDAlignmentDisplay(stats.jd_alignment_stats);
+    }
+
+    // Update cache stats
+    updateCacheStats(stats);
+
+    // Update cost history
+    if (stats.cost_history && stats.cost_history.length > 0) {
+        updateCostHistory(stats.cost_history);
+        calculateMonthlyCost(stats.cost_history);
+        calculateWeeklyCost(stats.cost_history);
+    }
+
+    document.getElementById('lastUpdate').textContent = `Last update: ${new Date().toLocaleTimeString()}`;
+
+    // Update JD Alignment stats
+    if (stats.jd_alignment_stats) {
+        document.getElementById('totalAlignments').textContent = stats.jd_alignment_stats.total_alignments || 0;
+        document.getElementById('avgImprovement').textContent = '+' + (stats.jd_alignment_stats.average_improvement || 0).toFixed(3);
+        document.getElementById('avgFinalScore').textContent = (stats.jd_alignment_stats.average_final_score || 0).toFixed(3);
+        document.getElementById('maxImprovement').textContent = '+' + (stats.jd_alignment_stats.max_improvement || 0).toFixed(3);
+        
+        updateRecentAlignments(stats.jd_alignment_stats.recent_alignments || []);
+    }
+    
+    // 🔥 NEW: Debug output to console for verification
+    console.log('✅ Dashboard update complete with:', {
+        userCount: stats.daily_stats?.user_count || 'Not found',
+        newUsersToday: stats.daily_stats?.new_users_today || 'Not found',
+        emailVerified: stats.daily_stats?.email_verified_count || 'Not found'
+    });
+}
 
         function updateCacheStats(stats) {
             if (stats.cache_performance) {
