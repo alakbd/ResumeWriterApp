@@ -47,7 +47,7 @@ class LoginActivity : AppCompatActivity() {
 
     private fun setupFacebookButton() {
         binding.btnFacebookPage.setOnClickListener {
-            val facebookPageId = "914724941720233" // Your numeric Page ID
+            val facebookPageId = "835190596349640" // Your numeric Page ID
             val facebookUrl = "https://www.facebook.com/$facebookPageId"
 
             try {
