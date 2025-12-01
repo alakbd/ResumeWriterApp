@@ -791,7 +791,6 @@
 
         // ========== BACKUP FUNCTIONS ==========
 
-        // Add this function
         async function repairData() {
             if (!currentSession) return;
     
@@ -916,36 +915,34 @@
         }
 
         function updateBackupStatusDisplay(status) {
-    // Update the backup status cards
-    if (status.local_data) {
-        document.getElementById('localSnapshots').textContent = status.local_data.daily_snapshots || 0;
-        document.getElementById('alignmentRecords').textContent = status.local_data.alignment_records || 0;
-        document.getElementById('costRecords').textContent = status.local_data.cost_records || 0;
-    }
-    
-    if (status.cloud_backup) {
-        document.getElementById('cloudBackups').textContent = status.cloud_backup.total_backup_files || 0;
-        
-        // Format last backup time
-        const lastBackup = status.cloud_backup.latest_backup_time;
-        if (lastBackup) {
-            const backupDate = new Date(lastBackup);
-            document.getElementById('lastBackupTime').textContent = backupDate.toLocaleString();
-        } else {
-            document.getElementById('lastBackupTime').textContent = 'Never';
+            // Update the backup status cards
+            if (status.local_data) {
+                document.getElementById('localSnapshots').textContent = status.local_data.daily_snapshots || 0;
+                document.getElementById('alignmentRecords').textContent = status.local_data.alignment_records || 0;
+            }
+            
+            if (status.cloud_backup) {
+                document.getElementById('cloudBackups').textContent = status.cloud_backup.total_backup_files || 0;
+                
+                // Format last backup time
+                const lastBackup = status.cloud_backup.latest_backup_time;
+                if (lastBackup) {
+                    const backupDate = new Date(lastBackup);
+                    document.getElementById('lastBackupTime').textContent = backupDate.toLocaleString();
+                } else {
+                    document.getElementById('lastBackupTime').textContent = 'Never';
+                }
+                
+                // Update system status with color coding
+                const systemStatus = status.system_status;
+                const lastBackupElement = document.getElementById('lastBackupTime');
+                if (systemStatus === 'active') {
+                    lastBackupElement.className = 'stat-mini-value backup-status-active';
+                } else {
+                    lastBackupElement.className = 'stat-mini-value backup-status-inactive';
+                }
+            }
         }
-        
-        // Update system status with color coding
-        const systemStatus = status.system_status;
-        const lastBackupElement = document.getElementById('lastBackupTime');
-        if (systemStatus === 'active') {
-            lastBackupElement.className = 'stat-mini-value backup-status-active';
-        } else {
-            lastBackupElement.className = 'stat-mini-value backup-status-inactive';
-        }
-    }
-}
-}
 
         function displayBackupFiles(files) {
             const container = document.getElementById('backupFilesContent');
@@ -976,103 +973,179 @@
             listContainer.style.display = 'block';
         }
 
+        // ========== MISSING DISPLAY FUNCTIONS ==========
+
+        function updateUserAnalyticsDisplay(userAnalytics) {
+            if (!userAnalytics) return;
+            
+            // Update the user analytics cards
+            document.getElementById('totalUsersTracked').textContent = userAnalytics.total_users_tracked || 0;
+            document.getElementById('activeUsersToday').textContent = userAnalytics.active_users_today || 0;
+            document.getElementById('totalUserRequests').textContent = userAnalytics.total_requests_tracked || 0;
+            document.getElementById('topUserRequests').textContent = userAnalytics.top_users?.[0]?.total_requests || 0;
+            
+            // Update the top users list
+            updateTopUsersList(userAnalytics.top_users || []);
+        }
+
+        function updateTopUsersList(topUsers) {
+            const container = document.getElementById('topUsersList');
+            if (!container) return;
+            
+            if (!topUsers || topUsers.length === 0) {
+                container.innerHTML = '<p>No user data available yet.</p>';
+                return;
+            }
+
+            let html = '<table style="width: 100%; font-size: 0.9rem;">';
+            html += '<tr><th>User ID</th><th>Total Requests</th></tr>';
+            
+            topUsers.forEach(user => {
+                // Truncate long user IDs for display
+                const shortUserId = user.user_id.length > 20 ? 
+                    user.user_id.substring(0, 20) + '...' : user.user_id;
+                
+                html += `
+                    <tr>
+                        <td title="${user.user_id}">${shortUserId}</td>
+                        <td style="text-align: right;">${user.total_requests}</td>
+                    </tr>
+                `;
+            });
+            
+            html += '</table>';
+            container.innerHTML = html;
+        }
+
+        function updateCacheStatsDisplay(cacheStats) {
+            if (!cacheStats) return;
+            
+            // Update cache stats cards
+            document.getElementById('cacheHits').textContent = cacheStats.hits_today || 0;
+            document.getElementById('cacheMisses').textContent = cacheStats.misses_today || 0;
+            document.getElementById('cacheHitRate').textContent = cacheStats.hit_rate_today?.toFixed(1) + '%' || '0%';
+            document.getElementById('totalRequests').textContent = cacheStats.total_requests_today || 0;
+            
+            // Update cache progress bar
+            const hitRate = cacheStats.hit_rate_today || 0;
+            document.getElementById('cacheHitBar').style.width = hitRate + '%';
+            document.getElementById('cacheEfficiency').textContent = hitRate.toFixed(1) + '%';
+        }
+
+        function updateJDAlignmentDisplay(jdStats) {
+            if (!jdStats) return;
+            
+            document.getElementById('totalAlignments').textContent = jdStats.total_alignments || 0;
+            document.getElementById('avgImprovement').textContent = '+' + (jdStats.average_improvement || 0).toFixed(3);
+            document.getElementById('avgFinalScore').textContent = (jdStats.average_final_score || 0).toFixed(3);
+            document.getElementById('maxImprovement').textContent = '+' + (jdStats.max_improvement || 0).toFixed(3);
+        }
+
+        function updateCostAnalyticsDisplay(dailyStats) {
+            if (!dailyStats) return;
+            
+            document.getElementById('costPerRequest').textContent = '$' + (dailyStats.cost_per_request || 0).toFixed(6);
+            document.getElementById('tokensPerRequest').textContent = (dailyStats.tokens_per_request || 0).toFixed(1);
+        }
+
         // ========== ENHANCED STATS FUNCTIONS ==========
 
         async function refreshStats() {
-                if (!currentSession) {
+            if (!currentSession) {
                 showMessage('Please log in first', 'error');
                 return;
             }
 
-    console.log('🔄 Refreshing stats...');
+            console.log('🔄 Refreshing stats...');
 
-    // Show loading states
-    document.querySelectorAll('.stat-value').forEach(el => {
-        if (el.id !== 'serverStatus') {
-            el.textContent = '...';
-        }
-    });
-    
-    const refreshBtn = document.getElementById('refreshBtn');
-    if (refreshBtn) refreshBtn.classList.add('loading');
-    
-    const serverStatus = document.getElementById('serverStatus');
-    if (serverStatus) serverStatus.textContent = '⏳ Loading...';
+            // Show loading states
+            document.querySelectorAll('.stat-value').forEach(el => {
+                if (el.id !== 'serverStatus') {
+                    el.textContent = '...';
+                }
+            });
+            
+            const refreshBtn = document.getElementById('refreshBtn');
+            if (refreshBtn) refreshBtn.classList.add('loading');
+            
+            const serverStatus = document.getElementById('serverStatus');
+            if (serverStatus) serverStatus.textContent = '⏳ Loading...';
 
-    try {
-        // Get comprehensive stats from /stats endpoint
-        const response = await fetch(`${API_BASE_URL}/stats`, {
-            headers: {
-                'X-User-ID': currentSession.uid,
-                'Content-Type': 'application/json'
+            try {
+                // Get comprehensive stats from /stats endpoint
+                const response = await fetch(`${API_BASE_URL}/stats`, {
+                    headers: {
+                        'X-User-ID': currentSession.uid,
+                        'Content-Type': 'application/json'
+                    }
+                });
+                
+                console.log('📊 Stats response status:', response.status);
+                
+                if (!response.ok) {
+                    const errorText = await response.text();
+                    console.error('❌ Stats error response:', errorText);
+                    throw new Error(`Stats endpoint returned ${response.status}: ${errorText}`);
+                }
+                
+                const data = await response.json();
+                console.log('📊 Stats data received:', data);
+                
+                if (data.success) {
+                    updateEnhancedDashboard(data);
+                    showMessage('✅ Stats updated successfully', 'success');
+                } else {
+                    throw new Error('Stats endpoint returned unsuccessful response');
+                }
+            } catch (error) {
+                console.error('❌ Stats error:', error);
+                
+                // More specific error messages
+                if (error.message.includes('500')) {
+                    showMessage('⚠️ Server error - check server logs for details', 'error');
+                } else if (error.message.includes('403')) {
+                    showMessage('❌ Access denied - admin privileges required', 'error');
+                } else if (error.message.includes('401')) {
+                    showMessage('🔐 Authentication failed - please log in again', 'error');
+                } else {
+                    showMessage('⚠️ Could not load comprehensive stats: ' + error.message, 'error');
+                }
+                
+                // Fallback to basic info
+                loadBasicInfo();
             }
-        });
-        
-        console.log('📊 Stats response status:', response.status);
-        
-        if (!response.ok) {
-            const errorText = await response.text();
-            console.error('❌ Stats error response:', errorText);
-            throw new Error(`Stats endpoint returned ${response.status}: ${errorText}`);
-        }
-        
-        const data = await response.json();
-        console.log('📊 Stats data received:', data);
-        
-        if (data.success) {
-            updateEnhancedDashboard(data);
-            showMessage('✅ Stats updated successfully', 'success');
-        } else {
-            throw new Error('Stats endpoint returned unsuccessful response');
-        }
-    } catch (error) {
-        console.error('❌ Stats error:', error);
-        
-        // More specific error messages
-        if (error.message.includes('500')) {
-            showMessage('⚠️ Server error - check server logs for details', 'error');
-        } else if (error.message.includes('403')) {
-            showMessage('❌ Access denied - admin privileges required', 'error');
-        } else if (error.message.includes('401')) {
-            showMessage('🔐 Authentication failed - please log in again', 'error');
-        } else {
-            showMessage('⚠️ Could not load comprehensive stats: ' + error.message, 'error');
-        }
-        
-        // Fallback to basic info
-        loadBasicInfo();
-    }
 
-    // ALSO CHECK BACKUP STATUS WHEN REFRESHING
-    try {
-        await checkBackupStatus();
-    } catch (backupError) {
-        console.error('Backup status check failed:', backupError);
-    }
-    
-    checkServerHealth();
-    
-    // Final loading cleanup
-    setTimeout(() => {
-        if (refreshBtn) refreshBtn.classList.remove('loading');
-    }, 1000);
-}
+            // ALSO CHECK BACKUP STATUS WHEN REFRESHING
+            try {
+                await checkBackupStatus();
+            } catch (backupError) {
+                console.error('Backup status check failed:', backupError);
+            }
+            
+            checkServerHealth();
+            
+            // Final loading cleanup
+            setTimeout(() => {
+                if (refreshBtn) refreshBtn.classList.remove('loading');
+            }, 1000);
+        }
 
-
-        
         function updateEnhancedDashboard(stats) {
             console.log('Updating enhanced dashboard with:', stats);
             
-            // Update existing stat cards
+            // Call all the display functions
             if (stats.daily_stats) {
-                document.getElementById('dailyCost').textContent = `$${(stats.daily_stats.daily_cost || 0).toFixed(6)}`;
-                document.getElementById('totalTokens').textContent = (stats.daily_stats.daily_tokens || 0).toLocaleString();
-                document.getElementById('apiRequests').textContent = (stats.daily_stats.daily_requests || 0).toLocaleString();
+                updateCostAnalyticsDisplay(stats.daily_stats);
+                
+                // Update main stats grid
                 document.getElementById('dailyCostOverview').textContent = `$${(stats.daily_stats.daily_cost || 0).toFixed(6)}`;
                 document.getElementById('totalTokensOverview').textContent = (stats.daily_stats.daily_tokens || 0).toLocaleString();
+                document.getElementById('apiRequests').textContent = (stats.daily_stats.daily_requests || 0).toLocaleString();
+                document.getElementById('userCount').textContent = 'Calculating...';
+                document.getElementById('newUsersToday').textContent = 'Calculating...';
                 
                 // Color code based on cost
-                const costElement = document.getElementById('dailyCost');
+                const costElement = document.getElementById('dailyCostOverview');
                 if (stats.daily_stats.daily_cost > 1.0) {
                     costElement.className = 'stat-value cost-warning';
                 } else if (stats.daily_stats.daily_cost > 0.1) {
@@ -1081,13 +1154,17 @@
                     costElement.className = 'stat-value cost-good';
                 }
             }
-
-            // Update user count from user analytics
+            
             if (stats.user_analytics) {
-                document.getElementById('userCount').textContent = (stats.user_analytics.total_users_tracked || 0).toLocaleString();
-                document.getElementById('newUsersToday').textContent = (stats.user_analytics.active_users_today || 0).toLocaleString();
-                document.getElementById('totalUsersTracked').textContent = (stats.user_analytics.total_users_tracked || 0).toLocaleString();
-                document.getElementById('activeUsersToday').textContent = (stats.user_analytics.active_users_today || 0).toLocaleString();
+                updateUserAnalyticsDisplay(stats.user_analytics);
+            }
+            
+            if (stats.cache_performance) {
+                updateCacheStatsDisplay(stats.cache_performance);
+            }
+            
+            if (stats.jd_alignment_stats) {
+                updateJDAlignmentDisplay(stats.jd_alignment_stats);
             }
 
             // Update cache stats
@@ -1151,8 +1228,6 @@
             }
         }
 
-        // ... (rest of your existing functions remain the same - calculateMonthlyCost, calculateWeeklyCost, updateCostHistory, etc.)
-
         function updateRecentAlignments(alignments) {
             const container = document.getElementById('recentAlignments');
             if (!container) return;
@@ -1202,8 +1277,6 @@
                 console.error('Credits load error:', error);
             });
         }
-
-        // ... (rest of your existing functions: calculateMonthlyCost, calculateWeeklyCost, updateCostHistory, checkServerHealth, resetStats, logout, startSessionTimer, stopSessionTimer, startAutoRefresh, stopAutoRefresh, toggleAutoRefresh, exportData)
 
         function calculateMonthlyCost(costHistory) {
             if (!costHistory || costHistory.length === 0) {
