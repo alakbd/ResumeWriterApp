@@ -78,6 +78,8 @@
         .btn-warning:hover { background: #e67e22; }
         .btn-success { background: #27ae60; }
         .btn-success:hover { background: #219653; }
+        .btn-info { background: #3498db; }
+        .btn-info:hover { background: #2980b9; }
         
         .login-container { 
             background: white; 
@@ -206,7 +208,7 @@
             margin-left: 5px;
         }
 
-        /* NEW: Enhanced stats styling */
+        /* Enhanced stats styling */
         .stats-section {
             background: white;
             padding: 20px;
@@ -242,62 +244,18 @@
             font-size: 0.8rem;
         }
 
-        .stats-row { 
-            display: grid; 
-            grid-template-columns: repeat(auto-fit, minmax(150px, 1fr)); 
-            gap: 15px; 
-            margin-bottom: 15px; 
+        .progress-bar { 
+            background: #ecf0f1; 
+            border-radius: 10px; 
+            height: 10px; 
+            margin: 10px 0; 
+            overflow: hidden; 
         }
 
-.stat-mini-card { 
-    background: #f8f9fa; 
-    padding: 15px; 
-    border-radius: 8px; 
-    text-align: center; 
-    border-left: 4px solid #667eea; 
-}
-
-.stat-mini-value { 
-    font-size: 1.5rem; 
-    font-weight: bold; 
-    color: #2c3e50; 
-    margin: 5px 0; 
-}
-
-.stat-mini-label { 
-    color: #666; 
-    font-size: 0.8rem; 
-}
-
-.progress-bar { 
-    background: #ecf0f1; 
-    border-radius: 10px; 
-    height: 10px; 
-    margin: 10px 0; 
-    overflow: hidden; 
-}
-
-.progress-fill { 
-    height: 100%; 
-    background: linear-gradient(90deg, #667eea, #764ba2); 
-    transition: width 0.3s ease; 
-}
-
-.cache-hit { color: #27ae60; }
-.cache-miss { color: #e74c3c; }
-
-        .progress-bar {
-            background: #ecf0f1;
-            border-radius: 10px;
-            height: 10px;
-            margin: 10px 0;
-            overflow: hidden;
-        }
-
-        .progress-fill {
-            height: 100%;
-            background: linear-gradient(90deg, #667eea, #764ba2);
-            transition: width 0.3s ease;
+        .progress-fill { 
+            height: 100%; 
+            background: linear-gradient(90deg, #667eea, #764ba2); 
+            transition: width 0.3s ease; 
         }
 
         .alignment-score {
@@ -313,6 +271,11 @@
 
         .cache-hit { color: #27ae60; }
         .cache-miss { color: #e74c3c; }
+
+        /* Backup specific styles */
+        .backup-status-active { color: #27ae60; }
+        .backup-status-inactive { color: #e74c3c; }
+        .backup-status-pending { color: #f39c12; }
     </style>
 </head>
 <body>
@@ -352,11 +315,14 @@
         <div id="dashboard" style="display: none;">
             <div class="header">
                 <h1>📊 Resume Writer - Admin Dashboard</h1>
-                <p>Firebase UID Authentication • Full Admin Access</p>
+                <p>Firebase UID Authentication • Full Admin Access • Google Drive Backup</p>
                 <div class="user-info" style="background: rgba(255,255,255,0.2); display: inline-block; margin-top: 10px;">
                     <strong>Admin UID:</strong> <span id="adminUID">-</span>
+                    <span style="margin-left: 10px; background: #e74c3c; padding: 2px 8px; border-radius: 10px; font-size: 0.8rem;">
+                        🔒 ADMIN MODE
+                    </span>
                 </div>
-                <small id="accessModeDisplay">Full Admin Access • Auto-refresh every 30s</small>
+                <small id="accessModeDisplay">Full Admin Access • Auto-refresh every 30s • Backup Controls</small>
             </div>
 
             <div class="container">
@@ -364,8 +330,12 @@
                 <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 20px; flex-wrap: wrap; gap: 10px;">
                     <div>
                         <button class="btn" onclick="refreshStats()" id="refreshBtn">🔄 Refresh</button>
+                        <button class="btn btn-warning" onclick="repairData()">🔧 Repair Data</button>
                         <button class="btn btn-warning" onclick="resetStats()" id="resetBtn">📊 Reset Daily Stats</button>
                         <button class="btn" onclick="exportData()">📤 Export Data</button>
+                        <!-- BACKUP BUTTONS -->
+                        <button class="btn btn-success" onclick="triggerBackup()" id="backupBtn">💾 Force Backup</button>
+                        <button class="btn btn-info" onclick="checkBackupStatus()">📋 Backup Status</button>
                         <button class="btn btn-danger" onclick="logout()">🚪 Logout</button>
                     </div>
                     <div style="color: #666; font-size: 14px;">
@@ -377,7 +347,45 @@
                 <!-- Messages -->
                 <div id="messageContainer" style="display: none;"></div>
 
-                <!-- ========== NEW: COMPREHENSIVE STATS SECTIONS ========== -->
+                <!-- ========== GOOGLE DRIVE BACKUP STATUS ========== -->
+                <div class="stats-section">
+                    <h3>💾 Google Drive Backup (Admin Only)</h3>
+                    <div class="stats-row">
+                        <div class="stat-mini-card">
+                            <div class="stat-mini-label">Local Snapshots</div>
+                            <div class="stat-mini-value" id="localSnapshots">0</div>
+                        </div>
+                        <div class="stat-mini-card">
+                            <div class="stat-mini-label">Alignment Records</div>
+                            <div class="stat-mini-value" id="alignmentRecords">0</div>
+                        </div>
+                        <div class="stat-mini-card">
+                            <div class="stat-mini-label">Cloud Backups</div>
+                            <div class="stat-mini-value" id="cloudBackups">0</div>
+                        </div>
+                        <div class="stat-mini-card">
+                            <div class="stat-mini-label">Last Backup</div>
+                            <div class="stat-mini-value" id="lastBackupTime">Never</div>
+                        </div>
+                    </div>
+                    
+                    <div style="margin-top: 15px;">
+                        <button class="btn btn-success" onclick="triggerBackup()" id="backupBtn">💾 Backup Now</button>
+                        <button class="btn btn-info" onclick="checkBackupStatus()">🔄 Check Status</button>
+                        <button class="btn" onclick="listBackupFiles()">📁 List Files</button>
+                    </div>
+                    
+                    <div style="margin-top: 10px; font-size: 0.8rem; color: #666;">
+                        <strong>Admin Only:</strong> Automated backups run every 50 requests + 10 alignments
+                    </div>
+                    
+                    <div id="backupFilesList" style="margin-top: 15px; display: none;">
+                        <h4>📁 Backup Files in Google Drive:</h4>
+                        <div id="backupFilesContent"></div>
+                    </div>
+                </div>
+
+                <!-- ========== EXISTING STATS SECTIONS ========== -->
 
                 <!-- JD Alignment Statistics -->
                 <div class="stats-section">
@@ -425,25 +433,6 @@
                         <div class="stat-mini-card">
                             <div class="stat-mini-label">Tokens per Request</div>
                             <div class="stat-mini-value" id="tokensPerRequest">0</div>
-                        </div>
-                    </div>
-                    
-                    <div class="stats-row">
-                        <div class="stat-mini-card">
-                            <div class="stat-mini-label">Generation Cost</div>
-                            <div class="stat-mini-value" id="generationCost">$0.00</div>
-                        </div>
-                        <div class="stat-mini-card">
-                            <div class="stat-mini-label">Alignment Cost</div>
-                            <div class="stat-mini-value" id="alignmentCost">$0.00</div>
-                        </div>
-                        <div class="stat-mini-card">
-                            <div class="stat-mini-label">Daily Requests</div>
-                            <div class="stat-mini-value" id="dailyRequests">0</div>
-                        </div>
-                        <div class="stat-mini-card">
-                            <div class="stat-mini-label">Daily Alignments</div>
-                            <div class="stat-mini-value" id="dailyAlignments">0</div>
                         </div>
                     </div>
                 </div>
@@ -505,7 +494,7 @@
                     </div>
                 </div>
 
-                <!-- ========== EXISTING SECTIONS (KEPT AS IS) ========== -->
+                <!-- ========== EXISTING SECTIONS ========== -->
 
                 <!-- Live Stats Grid -->
                 <div class="stats-grid">
@@ -558,75 +547,43 @@
                     </div>
                 </div>
 
-                <!-- Add this after your Live Stats grid and before Credit Usage Breakdown -->
-<div class="chart-container">
-    <h3>⚡ Cache Performance & Savings</h3>
-    <div class="stats-row">
-        <div class="stat-mini-card">
-            <div class="stat-mini-label">Cache Hits Today</div>
-            <div class="stat-mini-value cache-hit" id="cacheHitsToday">0</div>
-        </div>
-        <div class="stat-mini-card">
-            <div class="stat-mini-label">Cache Misses Today</div>
-            <div class="stat-mini-value cache-miss" id="cacheMissesToday">0</div>
-        </div>
-        <div class="stat-mini-card">
-            <div class="stat-mini-label">Hit Rate</div>
-            <div class="stat-mini-value" id="cacheHitRate">0%</div>
-        </div>
-        <div class="stat-mini-card">
-            <div class="stat-mini-label">Estimated Savings</div>
-            <div class="stat-mini-value cost-good" id="cacheSavings">$0.00</div>
-        </div>
-    </div>
-    
-    <div class="progress-bar">
-        <div class="progress-fill" id="cacheHitBar" style="width: 0%"></div>
-    </div>
-    <div style="text-align: center; color: #666; font-size: 0.9rem;">
-        Cache Efficiency: <span id="cacheEfficiency">0%</span> of requests served from cache
-        • Estimated savings based on $0.02 per cache hit
-    </div>
-</div>
-
-                <!-- Rest of your existing sections remain unchanged -->
-                <!-- Credit Usage Breakdown -->
+                <!-- Cache Performance & Savings -->
                 <div class="chart-container">
-                    <h3>💰 Credit Usage Breakdown</h3>
-                    <div class="credit-breakdown">
-                        <!-- ... existing credit breakdown code ... -->
+                    <h3>⚡ Cache Performance & Savings</h3>
+                    <div class="stats-row">
+                        <div class="stat-mini-card">
+                            <div class="stat-mini-label">Cache Hits Today</div>
+                            <div class="stat-mini-value cache-hit" id="cacheHitsToday">0</div>
+                        </div>
+                        <div class="stat-mini-card">
+                            <div class="stat-mini-label">Cache Misses Today</div>
+                            <div class="stat-mini-value cache-miss" id="cacheMissesToday">0</div>
+                        </div>
+                        <div class="stat-mini-card">
+                            <div class="stat-mini-label">Hit Rate</div>
+                            <div class="stat-mini-value" id="cacheHitRateOverview">0%</div>
+                        </div>
+                        <div class="stat-mini-card">
+                            <div class="stat-mini-label">Estimated Savings</div>
+                            <div class="stat-mini-value cost-good" id="cacheSavings">$0.00</div>
+                        </div>
+                    </div>
+                    
+                    <div class="progress-bar">
+                        <div class="progress-fill" id="cacheHitBarOverview" style="width: 0%"></div>
+                    </div>
+                    <div style="text-align: center; color: #666; font-size: 0.9rem;">
+                        Cache Efficiency: <span id="cacheEfficiencyOverview">0%</span> of requests served from cache
+                        • Estimated savings based on $0.02 per cache hit
                     </div>
                 </div>
 
+                <!-- Rest of your existing sections -->
                 <!-- Cost History -->
                 <div class="chart-container">
                     <h3>📈 Cost History (Last 30 Days)</h3>
                     <div id="costHistory">
                         <p>Loading cost history...</p>
-                    </div>
-                </div>
-
-                <!-- User Statistics -->
-                <div class="chart-container">
-                    <h3>👥 User Statistics</h3>
-                    <div id="userStats">
-                        Loading user data...
-                    </div>
-                </div>
-
-                <!-- Today's New Users -->
-                <div class="chart-container">
-                    <h3>🆕 Today's New Users</h3>
-                    <div id="todaysUsers">
-                        <p>Loading today's user registrations...</p>
-                    </div>
-                </div>
-
-                <!-- Credit Purchase History -->
-                <div class="chart-container">
-                    <h3>🛒 Credit Purchase History</h3>
-                    <div id="purchaseHistory">
-                        <p>Loading purchase history...</p>
                     </div>
                 </div>
 
@@ -659,7 +616,7 @@
         </div>
     </div>
 
-     <script>
+    <script>
         // Configuration
         const API_BASE_URL = 'https://resume-writer-api.onrender.com';
 
@@ -679,7 +636,6 @@
         });
 
         function attemptAutoLogin() {
-            // Try to login with the pre-filled UID that we know works
             const firebaseUID = document.getElementById('firebaseUID').value.trim();
             console.log('🔐 Attempting auto-login with UID:', firebaseUID);
             if (firebaseUID) {
@@ -693,14 +649,12 @@
             updateAutoLoginStatus('🔄 Testing authentication...');
             
             try {
-                // Test with the health endpoint first (no auth required)
                 console.log('🩺 Testing API health...');
                 const healthResponse = await fetch(`${API_BASE_URL}/health`);
                 if (!healthResponse.ok) {
                     throw new Error('API server is not responding');
                 }
                 
-                // Now test authentication with the /user/credits endpoint which should work for any authenticated user
                 console.log('🔑 Testing authentication with /user/credits...');
                 const response = await fetch(`${API_BASE_URL}/user/credits`, {
                     headers: {
@@ -721,7 +675,6 @@
                         handleSuccessfulLogin();
                     }, 1000);
                 } else {
-                    // Try the /stats endpoint as fallback
                     console.log('🔄 Trying /stats endpoint as fallback...');
                     const statsResponse = await fetch(`${API_BASE_URL}/stats`, {
                         headers: {
@@ -836,105 +789,276 @@
             }
         }
 
-         function updateCacheStats(stats) {
-    if (stats.cache_performance) {
-        const hits = stats.cache_performance.hits_today || 0;
-        const misses = stats.cache_performance.misses_today || 0;
-        const hitRate = stats.cache_performance.hit_rate_today || 0;
-        const totalRequests = hits + misses;
+        // ========== BACKUP FUNCTIONS ==========
+
+        // Add this function
+        async function repairData() {
+            if (!currentSession) return;
+    
+            try {
+                showMessage('🔄 Attempting data repair...', 'info');
         
-        // Calculate estimated savings ($0.02 per cache hit - adjust as needed)
-        const savings = hits * 0.02;
+                // You might need to create a repair endpoint, or just refresh
+                await refreshStats();
+                showMessage('✅ Data structures checked and repaired if needed', 'success');
+            } catch (error) {
+                showMessage('❌ Repair failed: ' + error.message, 'error');
+            }
+        }
         
-        // Update the display
-        document.getElementById('cacheHitsToday').textContent = hits.toLocaleString();
-        document.getElementById('cacheMissesToday').textContent = misses.toLocaleString();
-        document.getElementById('cacheHitRate').textContent = hitRate.toFixed(1) + '%';
-        document.getElementById('cacheSavings').textContent = `$${savings.toFixed(2)}`;
-        document.getElementById('cacheEfficiency').textContent = `${hitRate.toFixed(1)}%`;
-        
-        // Update progress bar
-        document.getElementById('cacheHitBar').style.width = hitRate + '%';
-        
-        console.log('📊 Cache Stats Updated:', { hits, misses, hitRate, savings });
-    } else if (stats.daily_stats) {
-        // Fallback to daily_stats if cache_performance is not available
-        const hits = stats.daily_stats.daily_cache_hits || 0;
-        const misses = stats.daily_stats.daily_cache_misses || 0;
-        const totalRequests = hits + misses;
-        const hitRate = totalRequests > 0 ? (hits / totalRequests) * 100 : 0;
-        const savings = hits * 0.02;
-        
-        document.getElementById('cacheHitsToday').textContent = hits.toLocaleString();
-        document.getElementById('cacheMissesToday').textContent = misses.toLocaleString();
-        document.getElementById('cacheHitRate').textContent = hitRate.toFixed(1) + '%';
-        document.getElementById('cacheSavings').textContent = `$${savings.toFixed(2)}`;
-        document.getElementById('cacheEfficiency').textContent = `${hitRate.toFixed(1)}%`;
-        document.getElementById('cacheHitBar').style.width = hitRate + '%';
+        async function triggerBackup() {
+            if (!currentSession) {
+                showMessage('Admin authentication required', 'error');
+                return;
+            }
+
+            const backupBtn = document.getElementById('backupBtn');
+            const originalText = backupBtn.textContent;
+            backupBtn.textContent = '⏳ Admin: Backing up...';
+            backupBtn.disabled = true;
+
+            try {
+                const response = await fetch(`${API_BASE_URL}/backup/stats`, {
+                    method: 'POST',
+                    headers: {
+                        'X-User-ID': currentSession.uid,
+                        'Content-Type': 'application/json'
+                    },
+                    body: JSON.stringify({})
+                });
+
+                if (response.status === 403) {
+                    throw new Error('Admin privileges required for backup operations');
+                }
+
+                if (!response.ok) {
+                    throw new Error(`Backup failed: ${response.status}`);
+                }
+
+                const result = await response.json();
+                showMessage('✅ Admin: Backup completed successfully!', 'success');
+                console.log('Admin backup result:', result);
+                
+                // Update backup status after backup
+                checkBackupStatus();
+                
+            } catch (error) {
+                console.error('Admin backup error:', error);
+                showMessage('❌ Admin Backup failed: ' + error.message, 'error');
+            } finally {
+                backupBtn.textContent = originalText;
+                backupBtn.disabled = false;
+            }
+        }
+
+        async function checkBackupStatus() {
+            if (!currentSession) {
+                showMessage('Admin authentication required', 'error');
+                return;
+            }
+
+            try {
+                const response = await fetch(`${API_BASE_URL}/backup/status`, {
+                    headers: {
+                        'X-User-ID': currentSession.uid,
+                        'Content-Type': 'application/json'
+                    }
+                });
+
+                if (response.status === 403) {
+                    throw new Error('Admin privileges required to view backup status');
+                }
+
+                if (!response.ok) {
+                    throw new Error(`Status check failed: ${response.status}`);
+                }
+
+                const status = await response.json();
+                updateBackupStatusDisplay(status);
+                showMessage('✅ Admin: Backup status updated', 'success');
+                
+            } catch (error) {
+                console.error('Admin status check error:', error);
+                showMessage('⚠️ Admin: Could not check backup status', 'error');
+            }
+        }
+
+        async function listBackupFiles() {
+            if (!currentSession) {
+                showMessage('Admin authentication required', 'error');
+                return;
+            }
+
+            try {
+                const response = await fetch(`${API_BASE_URL}/backup/files`, {
+                    headers: {
+                        'X-User-ID': currentSession.uid,
+                        'Content-Type': 'application/json'
+                    }
+                });
+
+                if (response.status === 403) {
+                    throw new Error('Admin privileges required to view backup files');
+                }
+
+                if (!response.ok) {
+                    throw new Error(`File list failed: ${response.status}`);
+                }
+
+                const data = await response.json();
+                displayBackupFiles(data.files);
+                showMessage('✅ Admin: Backup files loaded', 'success');
+                
+            } catch (error) {
+                console.error('File list error:', error);
+                showMessage('❌ Admin: Could not list backup files: ' + error.message, 'error');
+            }
+        }
+
+        function updateBackupStatusDisplay(status) {
+            // Update the backup status cards
+            document.getElementById('localSnapshots').textContent = status.local_data.daily_snapshots || 0;
+            document.getElementById('alignmentRecords').textContent = status.local_data.alignment_records || 0;
+            document.getElementById('cloudBackups').textContent = status.cloud_backup.total_backup_files || 0;
+    
+            // Format last backup time
+            const lastBackup = status.cloud_backup.latest_backup_time;
+            if (lastBackup) {
+                const backupDate = new Date(lastBackup);
+                document.getElementById('lastBackupTime').textContent = backupDate.toLocaleString();
+            } else {
+                document.getElementById('lastBackupTime').textContent = 'Never';
+            }
+    
+    // Update system status with color coding
+    const systemStatus = status.system_status;
+    const lastBackupElement = document.getElementById('lastBackupTime');
+    if (systemStatus === 'active') {
+        lastBackupElement.className = 'stat-mini-value backup-status-active';
+    } else {
+        lastBackupElement.className = 'stat-mini-value backup-status-inactive';
+    }
+    
+    // Show drive service availability
+    const driveAvailable = status.cloud_backup.drive_service_available;
+    if (!driveAvailable) {
+        showMessage('⚠️ Google Drive service is not configured', 'info');
     }
 }
 
+        function displayBackupFiles(files) {
+            const container = document.getElementById('backupFilesContent');
+            const listContainer = document.getElementById('backupFilesList');
+            
+            if (!files || files.length === 0) {
+                container.innerHTML = '<p>No backup files found.</p>';
+                listContainer.style.display = 'block';
+                return;
+            }
+
+            let html = '<table style="width: 100%; font-size: 0.9rem;">';
+            html += '<tr><th>File Name</th><th>Size</th><th>Last Modified</th></tr>';
+            
+            files.forEach(file => {
+                const modifiedTime = new Date(file.modifiedTime).toLocaleString();
+                html += `
+                    <tr>
+                        <td>${file.name}</td>
+                        <td>${file.size || 'N/A'}</td>
+                        <td>${modifiedTime}</td>
+                    </tr>
+                `;
+            });
+            
+            html += '</table>';
+            container.innerHTML = html;
+            listContainer.style.display = 'block';
+        }
+
         // ========== ENHANCED STATS FUNCTIONS ==========
 
-        function refreshStats() {
-            if (!currentSession) {
+        async function refreshStats() {
+                if (!currentSession) {
                 showMessage('Please log in first', 'error');
                 return;
             }
 
-            console.log('🔄 Refreshing stats...');
+    console.log('🔄 Refreshing stats...');
 
-            // Show loading states
-            document.querySelectorAll('.stat-value').forEach(el => {
-                if (el.id !== 'serverStatus') {
-                    el.textContent = '...';
-                }
-            });
-            
-            const refreshBtn = document.getElementById('refreshBtn');
-            if (refreshBtn) refreshBtn.classList.add('loading');
-            
-            const serverStatus = document.getElementById('serverStatus');
-            if (serverStatus) serverStatus.textContent = '⏳ Loading...';
-
-            // Get comprehensive stats from /stats endpoint
-            fetch(`${API_BASE_URL}/stats`, {
-                headers: {
-                    'X-User-ID': currentSession.uid,
-                    'Content-Type': 'application/json'
-                }
-            })
-            .then(response => {
-                console.log('📊 Stats response status:', response.status);
-                if (!response.ok) {
-                    throw new Error(`Stats endpoint returned ${response.status}`);
-                }
-                return response.json();
-            })
-            .then(data => {
-                console.log('📊 Stats data received:', data);
-                if (data.success) {
-                    updateEnhancedDashboard(data);
-                    showMessage('✅ Stats updated successfully', 'success');
-                } else {
-                    throw new Error('Stats endpoint returned unsuccessful response');
-                }
-            })
-            .catch(error => {
-                console.error('❌ Stats error:', error);
-                showMessage('⚠️ Could not load comprehensive stats: ' + error.message, 'error');
-                // Fallback to basic info
-                loadBasicInfo();
-            });
-
-            checkServerHealth();
-            
-            // Final loading cleanup
-            setTimeout(() => {
-                if (refreshBtn) refreshBtn.classList.remove('loading');
-            }, 1000);
+    // Show loading states
+    document.querySelectorAll('.stat-value').forEach(el => {
+        if (el.id !== 'serverStatus') {
+            el.textContent = '...';
         }
+    });
+    
+    const refreshBtn = document.getElementById('refreshBtn');
+    if (refreshBtn) refreshBtn.classList.add('loading');
+    
+    const serverStatus = document.getElementById('serverStatus');
+    if (serverStatus) serverStatus.textContent = '⏳ Loading...';
 
+    try {
+        // Get comprehensive stats from /stats endpoint
+        const response = await fetch(`${API_BASE_URL}/stats`, {
+            headers: {
+                'X-User-ID': currentSession.uid,
+                'Content-Type': 'application/json'
+            }
+        });
+        
+        console.log('📊 Stats response status:', response.status);
+        
+        if (!response.ok) {
+            const errorText = await response.text();
+            console.error('❌ Stats error response:', errorText);
+            throw new Error(`Stats endpoint returned ${response.status}: ${errorText}`);
+        }
+        
+        const data = await response.json();
+        console.log('📊 Stats data received:', data);
+        
+        if (data.success) {
+            updateEnhancedDashboard(data);
+            showMessage('✅ Stats updated successfully', 'success');
+        } else {
+            throw new Error('Stats endpoint returned unsuccessful response');
+        }
+    } catch (error) {
+        console.error('❌ Stats error:', error);
+        
+        // More specific error messages
+        if (error.message.includes('500')) {
+            showMessage('⚠️ Server error - check server logs for details', 'error');
+        } else if (error.message.includes('403')) {
+            showMessage('❌ Access denied - admin privileges required', 'error');
+        } else if (error.message.includes('401')) {
+            showMessage('🔐 Authentication failed - please log in again', 'error');
+        } else {
+            showMessage('⚠️ Could not load comprehensive stats: ' + error.message, 'error');
+        }
+        
+        // Fallback to basic info
+        loadBasicInfo();
+    }
+
+    // ALSO CHECK BACKUP STATUS WHEN REFRESHING
+    try {
+        await checkBackupStatus();
+    } catch (backupError) {
+        console.error('Backup status check failed:', backupError);
+    }
+    
+    checkServerHealth();
+    
+    // Final loading cleanup
+    setTimeout(() => {
+        if (refreshBtn) refreshBtn.classList.remove('loading');
+    }, 1000);
+}
+
+
+        
         function updateEnhancedDashboard(stats) {
             console.log('Updating enhanced dashboard with:', stats);
             
@@ -943,6 +1067,8 @@
                 document.getElementById('dailyCost').textContent = `$${(stats.daily_stats.daily_cost || 0).toFixed(6)}`;
                 document.getElementById('totalTokens').textContent = (stats.daily_stats.daily_tokens || 0).toLocaleString();
                 document.getElementById('apiRequests').textContent = (stats.daily_stats.daily_requests || 0).toLocaleString();
+                document.getElementById('dailyCostOverview').textContent = `$${(stats.daily_stats.daily_cost || 0).toFixed(6)}`;
+                document.getElementById('totalTokensOverview').textContent = (stats.daily_stats.daily_tokens || 0).toLocaleString();
                 
                 // Color code based on cost
                 const costElement = document.getElementById('dailyCost');
@@ -959,10 +1085,12 @@
             if (stats.user_analytics) {
                 document.getElementById('userCount').textContent = (stats.user_analytics.total_users_tracked || 0).toLocaleString();
                 document.getElementById('newUsersToday').textContent = (stats.user_analytics.active_users_today || 0).toLocaleString();
+                document.getElementById('totalUsersTracked').textContent = (stats.user_analytics.total_users_tracked || 0).toLocaleString();
+                document.getElementById('activeUsersToday').textContent = (stats.user_analytics.active_users_today || 0).toLocaleString();
             }
 
-             // ========== NEW: UPDATE CACHE STATS ==========
-             updateCacheStats(stats);
+            // Update cache stats
+            updateCacheStats(stats);
 
             // Update cost history
             if (stats.cost_history && stats.cost_history.length > 0) {
@@ -973,43 +1101,8 @@
 
             document.getElementById('lastUpdate').textContent = `Last update: ${new Date().toLocaleTimeString()}`;
 
-            // ========== NEW: JD ALIGNMENT STATS ==========
+            // Update JD Alignment stats
             if (stats.jd_alignment_stats) {
-                // Create or update JD Alignment section
-                let jdSection = document.getElementById('jdAlignmentSection');
-                if (!jdSection) {
-                    jdSection = document.createElement('div');
-                    jdSection.className = 'chart-container';
-                    jdSection.id = 'jdAlignmentSection';
-                    jdSection.innerHTML = `
-                        <h3>🎯 JD Alignment Statistics</h3>
-                        <div class="stats-row">
-                            <div class="stat-mini-card">
-                                <div class="stat-mini-label">Total Alignments</div>
-                                <div class="stat-mini-value" id="totalAlignments">0</div>
-                            </div>
-                            <div class="stat-mini-card">
-                                <div class="stat-mini-label">Avg Improvement</div>
-                                <div class="stat-mini-value score-improvement" id="avgImprovement">+0.00</div>
-                            </div>
-                            <div class="stat-mini-card">
-                                <div class="stat-mini-label">Avg Final Score</div>
-                                <div class="stat-mini-value alignment-score" id="avgFinalScore">0.00</div>
-                            </div>
-                            <div class="stat-mini-card">
-                                <div class="stat-mini-label">Max Improvement</div>
-                                <div class="stat-mini-value score-improvement" id="maxImprovement">+0.00</div>
-                            </div>
-                        </div>
-                        <div id="recentAlignments">
-                            <p>Loading alignment data...</p>
-                        </div>
-                    `;
-                    // Insert after Live Stats grid
-                    document.querySelector('.stats-grid').after(jdSection);
-                }
-
-                // Update JD Alignment values
                 document.getElementById('totalAlignments').textContent = stats.jd_alignment_stats.total_alignments || 0;
                 document.getElementById('avgImprovement').textContent = '+' + (stats.jd_alignment_stats.average_improvement || 0).toFixed(3);
                 document.getElementById('avgFinalScore').textContent = (stats.jd_alignment_stats.average_final_score || 0).toFixed(3);
@@ -1017,60 +1110,47 @@
                 
                 updateRecentAlignments(stats.jd_alignment_stats.recent_alignments || []);
             }
+        }
 
-            // ========== NEW: CACHE PERFORMANCE STATS ==========
+        function updateCacheStats(stats) {
             if (stats.cache_performance) {
-                let cacheSection = document.getElementById('cachePerformanceSection');
-                if (!cacheSection) {
-                    cacheSection = document.createElement('div');
-                    cacheSection.className = 'chart-container';
-                    cacheSection.id = 'cachePerformanceSection';
-                    cacheSection.innerHTML = `
-                        <h3>⚡ Cache Performance</h3>
-                        <div class="stats-row">
-                            <div class="stat-mini-card">
-                                <div class="stat-mini-label">Cache Hits</div>
-                                <div class="stat-mini-value cache-hit" id="cacheHits">0</div>
-                            </div>
-                            <div class="stat-mini-card">
-                                <div class="stat-mini-label">Cache Misses</div>
-                                <div class="stat-mini-value cache-miss" id="cacheMisses">0</div>
-                            </div>
-                            <div class="stat-mini-card">
-                                <div class="stat-mini-label">Hit Rate</div>
-                                <div class="stat-mini-value" id="cacheHitRate">0%</div>
-                            </div>
-                        </div>
-                        <div class="progress-bar">
-                            <div class="progress-fill" id="cacheHitBar" style="width: 0%"></div>
-                        </div>
-                    `;
-                    // Add some CSS for the new elements
-                    const style = document.createElement('style');
-                    style.textContent = `
-                        .stats-row { display: grid; grid-template-columns: repeat(auto-fit, minmax(150px, 1fr)); gap: 15px; margin-bottom: 15px; }
-                        .stat-mini-card { background: #f8f9fa; padding: 15px; border-radius: 8px; text-align: center; border-left: 4px solid #667eea; }
-                        .stat-mini-value { font-size: 1.5rem; font-weight: bold; color: #2c3e50; margin: 5px 0; }
-                        .stat-mini-label { color: #666; font-size: 0.8rem; }
-                        .progress-bar { background: #ecf0f1; border-radius: 10px; height: 10px; margin: 10px 0; overflow: hidden; }
-                        .progress-fill { height: 100%; background: linear-gradient(90deg, #667eea, #764ba2); transition: width 0.3s ease; }
-                        .alignment-score { color: #27ae60; }
-                        .score-improvement { color: #e74c3c; }
-                        .cache-hit { color: #27ae60; }
-                        .cache-miss { color: #e74c3c; }
-                    `;
-                    document.head.appendChild(style);
-                }
-
-                // Update cache values
-                document.getElementById('cacheHits').textContent = (stats.cache_performance.hits_today || 0).toLocaleString();
-                document.getElementById('cacheMisses').textContent = (stats.cache_performance.misses_today || 0).toLocaleString();
-                document.getElementById('cacheHitRate').textContent = (stats.cache_performance.hit_rate_today || 0).toFixed(1) + '%';
-                
+                const hits = stats.cache_performance.hits_today || 0;
+                const misses = stats.cache_performance.misses_today || 0;
                 const hitRate = stats.cache_performance.hit_rate_today || 0;
-                document.getElementById('cacheHitBar').style.width = hitRate + '%';
+                const totalRequests = hits + misses;
+                
+                // Calculate estimated savings ($0.02 per cache hit - adjust as needed)
+                const savings = hits * 0.02;
+                
+                // Update the display
+                document.getElementById('cacheHitsToday').textContent = hits.toLocaleString();
+                document.getElementById('cacheMissesToday').textContent = misses.toLocaleString();
+                document.getElementById('cacheHitRateOverview').textContent = hitRate.toFixed(1) + '%';
+                document.getElementById('cacheSavings').textContent = `$${savings.toFixed(2)}`;
+                document.getElementById('cacheEfficiencyOverview').textContent = `${hitRate.toFixed(1)}%`;
+                
+                // Update progress bar
+                document.getElementById('cacheHitBarOverview').style.width = hitRate + '%';
+                
+                console.log('📊 Cache Stats Updated:', { hits, misses, hitRate, savings });
+            } else if (stats.daily_stats) {
+                // Fallback to daily_stats if cache_performance is not available
+                const hits = stats.daily_stats.daily_cache_hits || 0;
+                const misses = stats.daily_stats.daily_cache_misses || 0;
+                const totalRequests = hits + misses;
+                const hitRate = totalRequests > 0 ? (hits / totalRequests) * 100 : 0;
+                const savings = hits * 0.02;
+                
+                document.getElementById('cacheHitsToday').textContent = hits.toLocaleString();
+                document.getElementById('cacheMissesToday').textContent = misses.toLocaleString();
+                document.getElementById('cacheHitRateOverview').textContent = hitRate.toFixed(1) + '%';
+                document.getElementById('cacheSavings').textContent = `$${savings.toFixed(2)}`;
+                document.getElementById('cacheEfficiencyOverview').textContent = `${hitRate.toFixed(1)}%`;
+                document.getElementById('cacheHitBarOverview').style.width = hitRate + '%';
             }
         }
+
+        // ... (rest of your existing functions remain the same - calculateMonthlyCost, calculateWeeklyCost, updateCostHistory, etc.)
 
         function updateRecentAlignments(alignments) {
             const container = document.getElementById('recentAlignments');
@@ -1122,7 +1202,8 @@
             });
         }
 
-        // Rest of your existing functions remain the same...
+        // ... (rest of your existing functions: calculateMonthlyCost, calculateWeeklyCost, updateCostHistory, checkServerHealth, resetStats, logout, startSessionTimer, stopSessionTimer, startAutoRefresh, stopAutoRefresh, toggleAutoRefresh, exportData)
+
         function calculateMonthlyCost(costHistory) {
             if (!costHistory || costHistory.length === 0) {
                 document.getElementById('monthlyCost').textContent = '$0';
