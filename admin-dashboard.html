@@ -915,34 +915,79 @@
         }
 
         function updateBackupStatusDisplay(status) {
-            // Update the backup status cards
-            if (status.local_data) {
-                document.getElementById('localSnapshots').textContent = status.local_data.daily_snapshots || 0;
-                document.getElementById('alignmentRecords').textContent = status.local_data.alignment_records || 0;
+                // Update the backup status cards
+                if (status.local_data) {
+                    document.getElementById('localSnapshots').textContent = status.local_data.daily_snapshots || 0;
+                    document.getElementById('alignmentRecords').textContent = status.local_data.alignment_records || 0;
             }
-            
+    
             if (status.cloud_backup) {
                 document.getElementById('cloudBackups').textContent = status.cloud_backup.total_backup_files || 0;
+        
+        // Format last backup time
+        const lastBackup = status.cloud_backup.latest_backup_time;
+        if (lastBackup) {
+            console.log('🔍 Latest backup time raw:', lastBackup);
+            
+            // Try multiple date parsing strategies
+            let backupDate;
+            
+            // Strategy 1: Parse as timestamp (milliseconds)
+            if (!isNaN(lastBackup) && lastBackup > 1000000000000) {
+                backupDate = new Date(parseInt(lastBackup));
+            }
+            // Strategy 2: Parse as ISO string
+            else if (typeof lastBackup === 'string') {
+                backupDate = new Date(lastBackup);
                 
-                // Format last backup time
-                const lastBackup = status.cloud_backup.latest_backup_time;
-                if (lastBackup) {
-                    const backupDate = new Date(lastBackup);
-                    document.getElementById('lastBackupTime').textContent = backupDate.toLocaleString();
-                } else {
-                    document.getElementById('lastBackupTime').textContent = 'Never';
-                }
-                
-                // Update system status with color coding
-                const systemStatus = status.system_status;
-                const lastBackupElement = document.getElementById('lastBackupTime');
-                if (systemStatus === 'active') {
-                    lastBackupElement.className = 'stat-mini-value backup-status-active';
-                } else {
-                    lastBackupElement.className = 'stat-mini-value backup-status-inactive';
+                // If that fails, try parsing from filename
+                if (isNaN(backupDate.getTime()) && status.cloud_backup.latest_backup) {
+                    const filename = status.cloud_backup.latest_backup;
+                    const dateMatch = filename.match(/stats_backup_(\d{4})(\d{2})(\d{2})_(\d{2})(\d{2})/);
+                    
+                    if (dateMatch) {
+                        const year = dateMatch[1];
+                        const month = dateMatch[2];
+                        const day = dateMatch[3];
+                        const hour = dateMatch[4];
+                        const minute = dateMatch[5];
+                        
+                        backupDate = new Date(`${year}-${month}-${day}T${hour}:${minute}:00`);
+                    }
                 }
             }
+            
+            // Display the date
+            if (backupDate && !isNaN(backupDate.getTime())) {
+                document.getElementById('lastBackupTime').textContent = backupDate.toLocaleString();
+                
+                // Check if backup is recent (within 24 hours)
+                const now = new Date();
+                const hoursSinceBackup = (now - backupDate) / (1000 * 60 * 60);
+                
+                if (hoursSinceBackup < 24) {
+                    document.getElementById('lastBackupTime').className = 'stat-mini-value backup-status-active';
+                    document.getElementById('lastBackupTime').innerHTML += ' <span style="color:#27ae60;font-size:0.8em;">✓ Recent</span>';
+                } else {
+                    document.getElementById('lastBackupTime').className = 'stat-mini-value backup-status-pending';
+                    document.getElementById('lastBackupTime').innerHTML += ' <span style="color:#f39c12;font-size:0.8em;">⚠️ Old</span>';
+                }
+            } else {
+                document.getElementById('lastBackupTime').textContent = 'Date parsing error';
+            }
+        } else {
+            document.getElementById('lastBackupTime').textContent = 'Never';
         }
+        
+        // Debug output
+        console.log('📊 Backup status:', {
+            totalFiles: status.cloud_backup.total_backup_files,
+            latestFile: status.cloud_backup.latest_backup,
+            latestTime: status.cloud_backup.latest_backup_time,
+            parsedTime: backupDate ? backupDate.toISOString() : 'Failed to parse'
+        });
+    }
+}
 
         function displayBackupFiles(files) {
             const container = document.getElementById('backupFilesContent');
