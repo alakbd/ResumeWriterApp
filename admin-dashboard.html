@@ -947,7 +947,7 @@
         function displayBackupFiles(files) {
             const container = document.getElementById('backupFilesContent');
             const listContainer = document.getElementById('backupFilesList');
-            
+    
             if (!files || files.length === 0) {
                 container.innerHTML = '<p>No backup files found.</p>';
                 listContainer.style.display = 'block';
@@ -955,23 +955,93 @@
             }
 
             let html = '<table style="width: 100%; font-size: 0.9rem;">';
-            html += '<tr><th>File Name</th><th>Size</th><th>Last Modified</th></tr>';
-            
+            html += '<tr><th>File Name</th><th>Size</th><th>Last Modified</th><th>Backup Type</th></tr>';
+    
             files.forEach(file => {
-                const modifiedTime = new Date(file.modifiedTime).toLocaleString();
-                html += `
-                    <tr>
-                        <td>${file.name}</td>
-                        <td>${file.size || 'N/A'}</td>
-                        <td>${modifiedTime}</td>
-                    </tr>
-                `;
-            });
+                // Parse the date safely
+                let modifiedTime = 'Invalid Date';
+        
+                try {
+                    // Try multiple date parsing strategies
+                    const uploadTime = file.upload_time || file.modifiedTime;
             
-            html += '</table>';
-            container.innerHTML = html;
-            listContainer.style.display = 'block';
+            if (uploadTime) {
+                // Strategy 1: Try parsing as ISO string
+                const date = new Date(uploadTime);
+                
+                // Strategy 2: If that fails, try parsing from filename
+                if (isNaN(date.getTime())) {
+                    // Extract date from filename like "stats_backup_20251126_1040.json"
+                    const filename = file.name || '';
+                    const dateMatch = filename.match(/stats_backup_(\d{4})(\d{2})(\d{2})_(\d{2})(\d{2})/);
+                    
+                    if (dateMatch) {
+                        // Format: YYYYMMDD_HHMM
+                        const year = dateMatch[1];
+                        const month = dateMatch[2];
+                        const day = dateMatch[3];
+                        const hour = dateMatch[4];
+                        const minute = dateMatch[5];
+                        
+                        // Create date string in ISO format
+                        const dateStr = `${year}-${month}-${day}T${hour}:${minute}:00`;
+                        const newDate = new Date(dateStr);
+                        
+                        if (!isNaN(newDate.getTime())) {
+                            modifiedTime = newDate.toLocaleString();
+                        } else {
+                            modifiedTime = `${year}-${month}-${day} ${hour}:${minute}`;
+                        }
+                    } else {
+                        // Strategy 3: Try as timestamp number
+                        const timestamp = parseInt(uploadTime);
+                        if (!isNaN(timestamp)) {
+                            const timestampDate = new Date(timestamp);
+                            if (!isNaN(timestampDate.getTime())) {
+                                modifiedTime = timestampDate.toLocaleString();
+                            }
+                        }
+                    }
+                } else {
+                    // Original parsing worked
+                    modifiedTime = date.toLocaleString();
+                }
+            }
+        } catch (error) {
+            console.warn('Date parsing error for file:', file.name, error);
+            modifiedTime = 'Date unavailable';
         }
+        
+        // Determine backup type from filename
+        let backupType = 'Regular';
+        const filename = file.name || '';
+        if (filename.includes('stats_latest')) {
+            backupType = 'Latest Snapshot';
+        } else if (filename.includes('manual')) {
+            backupType = 'Manual';
+        } else if (filename.includes('auto')) {
+            backupType = 'Auto';
+        }
+        
+        // Format file size
+        const size = file.size || 'N/A';
+        const formattedSize = typeof size === 'number' ? 
+            `${Math.round(size / 1024)} KB` : size;
+        
+        html += `
+            <tr>
+                <td>${filename}</td>
+                <td style="text-align: center;">${formattedSize}</td>
+                <td>${modifiedTime}</td>
+                <td style="text-align: center;">${backupType}</td>
+            </tr>
+        `;
+    });
+    
+    html += '</table>';
+    container.innerHTML = html;
+    listContainer.style.display = 'block';
+}
 
         // ========== MISSING DISPLAY FUNCTIONS ==========
 
