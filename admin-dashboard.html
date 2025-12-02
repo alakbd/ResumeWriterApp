@@ -924,77 +924,123 @@
             }
         }
 
+
         function updateBackupStatusDisplay(status) {
-                // Update the backup status cards
-                if (status.local_data) {
-                    document.getElementById('localSnapshots').textContent = status.local_data.daily_snapshots || 0;
-                    document.getElementById('alignmentRecords').textContent = status.local_data.alignment_records || 0;
+            console.log('📊 Updating backup status display:', status);
+    
+            // Update the backup status cards
+            if (status.local_data) {
+                document.getElementById('localSnapshots').textContent = status.local_data.daily_snapshots || 0;
+                document.getElementById('alignmentRecords').textContent = status.local_data.alignment_records || 0;
             }
     
             if (status.cloud_backup) {
                 document.getElementById('cloudBackups').textContent = status.cloud_backup.total_backup_files || 0;
         
-        // Format last backup time
-        const lastBackup = status.cloud_backup.latest_backup_time;
-        if (lastBackup) {
-            console.log('🔍 Latest backup time raw:', lastBackup);
+            // Format last backup time
+                const lastBackup = status.cloud_backup.latest_backup_time;
+                const lastBackupElement = document.getElementById('lastBackupTime');
+        
+            if (lastBackup) {
+                console.log('🔍 Latest backup time raw:', lastBackup, 'Type:', typeof lastBackup);
             
-            // Try multiple date parsing strategies
-            let backupDate;
+                let backupDate;
+                let parseError = null;
             
-            // Strategy 1: Parse as timestamp (milliseconds)
-            if (!isNaN(lastBackup) && lastBackup > 1000000000000) {
-                backupDate = new Date(parseInt(lastBackup));
+            // STRATEGY 1: Handle number (timestamp)
+                if (typeof lastBackup === 'number') {
+                    console.log('🔢 Processing as number timestamp:', lastBackup);
+                
+                // Check if it's milliseconds or seconds
+                if (lastBackup > 1000000000000) {
+                    // It's milliseconds (e.g., 1733085608000)
+                    backupDate = new Date(lastBackup);
+                } else if (lastBackup > 1000000000) {
+                    // It's seconds (e.g., 1733085608)
+                    backupDate = new Date(lastBackup * 1000);
+                } else {
+                    parseError = 'Timestamp too small - unknown format';
+                }
             }
-            // Strategy 2: Parse as ISO string
+            // STRATEGY 2: Handle string
             else if (typeof lastBackup === 'string') {
+                console.log('🔤 Processing as string:', lastBackup);
+                
+                // Try direct parsing first
                 backupDate = new Date(lastBackup);
                 
-                // If that fails, try parsing from filename
-                if (isNaN(backupDate.getTime()) && status.cloud_backup.latest_backup) {
-                    const filename = status.cloud_backup.latest_backup;
-                    const dateMatch = filename.match(/stats_backup_(\d{4})(\d{2})(\d{2})_(\d{2})(\d{2})/);
+                // If that fails, check for special cases
+                if (isNaN(backupDate.getTime())) {
+                    // Try removing quotes if present
+                    const cleanStr = lastBackup.replace(/['"]/g, '');
+                    backupDate = new Date(cleanStr);
                     
-                    if (dateMatch) {
-                        const year = dateMatch[1];
-                        const month = dateMatch[2];
-                        const day = dateMatch[3];
-                        const hour = dateMatch[4];
-                        const minute = dateMatch[5];
+                    // If still failing, try parsing from filename
+                    if (isNaN(backupDate.getTime()) && status.cloud_backup.latest_backup) {
+                        const filename = status.cloud_backup.latest_backup;
+                        console.log('📁 Falling back to filename parsing:', filename);
+                        const dateMatch = filename.match(/stats_backup_(\d{4})(\d{2})(\d{2})_(\d{2})(\d{2})/);
                         
-                        backupDate = new Date(`${year}-${month}-${day}T${hour}:${minute}:00`);
+                        if (dateMatch) {
+                            const year = dateMatch[1];
+                            const month = dateMatch[2];
+                            const day = dateMatch[3];
+                            const hour = dateMatch[4];
+                            const minute = dateMatch[5];
+                            const dateStr = `${year}-${month}-${day}T${hour}:${minute}:00Z`;
+                            backupDate = new Date(dateStr);
+                        } else {
+                            parseError = 'String date parsing failed';
+                        }
                     }
                 }
+            }
+            // STRATEGY 3: Unknown type
+            else {
+                console.log('❓ Unknown timestamp type:', typeof lastBackup, lastBackup);
+                parseError = 'Unknown timestamp type: ' + typeof lastBackup;
             }
             
             // Display the date
             if (backupDate && !isNaN(backupDate.getTime())) {
-                document.getElementById('lastBackupTime').textContent = backupDate.toLocaleString();
+                const displayText = backupDate.toLocaleString();
+                lastBackupElement.textContent = displayText;
                 
                 // Check if backup is recent (within 24 hours)
                 const now = new Date();
                 const hoursSinceBackup = (now - backupDate) / (1000 * 60 * 60);
                 
                 if (hoursSinceBackup < 24) {
-                    document.getElementById('lastBackupTime').className = 'stat-mini-value backup-status-active';
-                    document.getElementById('lastBackupTime').innerHTML += ' <span style="color:#27ae60;font-size:0.8em;">✓ Recent</span>';
+                    lastBackupElement.className = 'stat-mini-value backup-status-active';
+                    lastBackupElement.innerHTML += ' <span style="color:#27ae60;font-size:0.8em;">✓ Recent</span>';
                 } else {
-                    document.getElementById('lastBackupTime').className = 'stat-mini-value backup-status-pending';
-                    document.getElementById('lastBackupTime').innerHTML += ' <span style="color:#f39c12;font-size:0.8em;">⚠️ Old</span>';
+                    lastBackupElement.className = 'stat-mini-value backup-status-pending';
+                    lastBackupElement.innerHTML += ' <span style="color:#f39c12;font-size:0.8em;">⚠️ Old</span>';
                 }
+                
+                console.log('✅ Date parsed successfully:', {
+                    raw: lastBackup,
+                    parsed: backupDate.toISOString(),
+                    display: displayText,
+                    hoursSince: hoursSinceBackup.toFixed(1)
+                });
             } else {
-                document.getElementById('lastBackupTime').textContent = 'Date parsing error';
+                lastBackupElement.textContent = 'Date parsing error';
+                lastBackupElement.className = 'stat-mini-value backup-status-inactive';
+                console.error('❌ Could not parse date:', lastBackup, 'Error:', parseError);
             }
         } else {
-            document.getElementById('lastBackupTime').textContent = 'Never';
+            lastBackupElement.textContent = 'Never';
+            lastBackupElement.className = 'stat-mini-value backup-status-inactive';
+            console.log('📭 No backup time available');
         }
         
         // Debug output
-        console.log('📊 Backup status:', {
+        console.log('📊 Backup status summary:', {
             totalFiles: status.cloud_backup.total_backup_files,
-            latestFile: status.cloud_backup.latest_backup,
+            latestFile: status.cloud_backup.latest_backbackup,
             latestTime: status.cloud_backup.latest_backup_time,
-            parsedTime: backupDate ? backupDate.toISOString() : 'Failed to parse'
+            parsedSuccessfully: backupDate && !isNaN(backupDate.getTime())
         });
     }
 }
