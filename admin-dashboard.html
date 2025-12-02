@@ -934,28 +934,28 @@
         function updateBackupStatusDisplay(status) {
             console.log('📊 Updating backup status display:', status);
     
-            // Update the backup status cards
-            if (status.local_data) {
-                document.getElementById('localSnapshots').textContent = status.local_data.daily_snapshots || 0;
-                document.getElementById('alignmentRecords').textContent = status.local_data.alignment_records || 0;
-            }
+    // Update the backup status cards
+    if (status.local_data) {
+        document.getElementById('localSnapshots').textContent = status.local_data.daily_snapshots || 0;
+        document.getElementById('alignmentRecords').textContent = status.local_data.alignment_records || 0;
+    }
     
-            if (status.cloud_backup) {
-                document.getElementById('cloudBackups').textContent = status.cloud_backup.total_backup_files || 0;
+    if (status.cloud_backup) {
+        document.getElementById('cloudBackups').textContent = status.cloud_backup.total_backup_files || 0;
         
-            // Format last backup time
-                const lastBackup = status.cloud_backup.latest_backup_time;
-                const lastBackupElement = document.getElementById('lastBackupTime');
+        // Format last backup time
+        const lastBackup = status.cloud_backup.latest_backup_time;
+        const lastBackupElement = document.getElementById('lastBackupTime');
         
-            if (lastBackup) {
-                console.log('🔍 Latest backup time raw:', lastBackup, 'Type:', typeof lastBackup);
-            
-                let backupDate;
-                let parseError = null;
+        // 🔥 FIX: Declare backupDate at the function level so it's available everywhere
+        let backupDate = null;
+        
+        if (lastBackup) {
+            console.log('🔍 Latest backup time raw:', lastBackup, 'Type:', typeof lastBackup);
             
             // STRATEGY 1: Handle number (timestamp)
-                if (typeof lastBackup === 'number') {
-                    console.log('🔢 Processing as number timestamp:', lastBackup);
+            if (typeof lastBackup === 'number') {
+                console.log('🔢 Processing as number timestamp:', lastBackup);
                 
                 // Check if it's milliseconds or seconds
                 if (lastBackup > 1000000000000) {
@@ -965,7 +965,7 @@
                     // It's seconds (e.g., 1733085608)
                     backupDate = new Date(lastBackup * 1000);
                 } else {
-                    parseError = 'Timestamp too small - unknown format';
+                    console.error('❌ Timestamp too small - unknown format:', lastBackup);
                 }
             }
             // STRATEGY 2: Handle string
@@ -996,15 +996,14 @@
                             const dateStr = `${year}-${month}-${day}T${hour}:${minute}:00Z`;
                             backupDate = new Date(dateStr);
                         } else {
-                            parseError = 'String date parsing failed';
+                            console.error('❌ String date parsing failed:', lastBackup);
                         }
                     }
                 }
             }
             // STRATEGY 3: Unknown type
             else {
-                console.log('❓ Unknown timestamp type:', typeof lastBackup, lastBackup);
-                parseError = 'Unknown timestamp type: ' + typeof lastBackup;
+                console.error('❓ Unknown timestamp type:', typeof lastBackup, lastBackup);
             }
             
             // Display the date
@@ -1033,7 +1032,7 @@
             } else {
                 lastBackupElement.textContent = 'Date parsing error';
                 lastBackupElement.className = 'stat-mini-value backup-status-inactive';
-                console.error('❌ Could not parse date:', lastBackup, 'Error:', parseError);
+                console.error('❌ Could not parse date:', lastBackup);
             }
         } else {
             lastBackupElement.textContent = 'Never';
@@ -1041,10 +1040,10 @@
             console.log('📭 No backup time available');
         }
         
-        // Debug output
+        // 🔥 FIX: Now backupDate is defined and can be used here
         console.log('📊 Backup status summary:', {
             totalFiles: status.cloud_backup.total_backup_files,
-            latestFile: status.cloud_backup.latest_backbackup,
+            latestFile: status.cloud_backup.latest_backup,
             latestTime: status.cloud_backup.latest_backup_time,
             parsedSuccessfully: backupDate && !isNaN(backupDate.getTime())
         });
