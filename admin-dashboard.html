@@ -852,45 +852,51 @@
 
         async function checkBackupStatus() {
             if (!currentSession) {
-            showMessage('Admin authentication required', 'error');
-            return;
-         }
-
-    try {
-        console.log('🔍 Checking backup status...');
-        const response = await fetch(`${API_BASE_URL}/backup/status`, {
-            headers: {
-                'X-User-ID': currentSession.uid,
-                'Content-Type': 'application/json'
+                showMessage('Admin authentication required', 'error');
+                return;
             }
-        });
 
-        console.log('📊 Backup status response:', response.status);
+            try {
+                showMessage('🔄 Checking backup status...', 'info');
+                console.log('🔍 Checking backup status with UID:', currentSession.uid);
         
-        if (response.status === 403) {
-            throw new Error('Admin privileges required to view backup status');
+                const response = await fetch(`${API_BASE_URL}/backup/status`, {
+                    headers: {
+                        'X-User-ID': currentSession.uid,
+                        'Content-Type': 'application/json'
+                    }
+                });
+
+                console.log('📊 Backup status response status:', response.status);
+        
+                if (response.status === 403) {
+                    const errorData = await response.json();
+                    throw new Error(`Admin privileges required: ${errorData.detail || 'No detail'}`);
+                }
+
+                if (!response.ok) {
+                    // Try to get error message from response
+                    let errorText = 'Unknown error';
+                    try {
+                        const errorData = await response.json();
+                        errorText = errorData.detail || JSON.stringify(errorData);
+                    } catch (e) {
+                        errorText = await response.text();
+                    }
+                    throw new Error(`HTTP ${response.status}: ${errorText}`);
+                }
+
+                const status = await response.json();
+                console.log('✅ Backup status data received:', status);
+                updateBackupStatusDisplay(status);
+                showMessage('✅ Backup status updated', 'success');
+        
+            } catch (error) {
+                console.error('❌ Admin status check error:', error);
+                console.error('Error stack:', error.stack);
+                showMessage('⚠️ Could not check backup status: ' + error.message, 'error');
+            }
         }
-
-        if (!response.ok) {
-            throw new Error(`Status check failed: ${response.status}`);
-        }
-
-        const status = await response.json();
-        console.log('📊 Backup status data received:', status);
-        updateBackupStatusDisplay(status);
-        showMessage('✅ Admin: Backup status updated', 'success');
-        
-    } catch (error) {
-        console.error('❌ Admin status check error:', error);
-        showMessage('⚠️ Admin: Could not check backup status', 'error');
-        
-        // Debug: Log the full error
-        console.error('Full error details:', {
-            message: error.message,
-            stack: error.stack
-        });
-    }
-}
 
         async function listBackupFiles() {
             if (!currentSession) {
