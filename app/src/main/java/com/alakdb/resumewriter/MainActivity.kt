@@ -284,8 +284,8 @@ class MainActivity : AppCompatActivity() {
         
         // Example 3: Show announcements (remove after some time)
         showInstructions("✨ New Feature: ATS-friendly templates now available!\n" +
-                                         "Now you can generate CV file to Text CV\n" +
-                                         "Upload your CV and paste Job Description")
+                                         "✨ Upload both files using the file-to-file option or\n" +
+                                         "🔥 Upload your CV and paste the job description")
                          
                         
     }
