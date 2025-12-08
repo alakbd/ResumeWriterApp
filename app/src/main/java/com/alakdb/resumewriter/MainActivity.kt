@@ -283,7 +283,11 @@ class MainActivity : AppCompatActivity() {
             //hideInstructions()
         
         // Example 3: Show announcements (remove after some time)
-        showInstructions("🚀 New Feature: ATS-friendly templates now available!")
+        showInstructions("✨ New Feature: ATS-friendly templates now available!\n" +
+                                         "Now you can generate CV file to Text CV\n" +
+                                         "Upload your CV and paste Job Description")
+                         
+                        
     }
 
     // Examples of usage:
