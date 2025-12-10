@@ -1431,7 +1431,7 @@
 
             try {
                 const streamUrl = `${API_BASE_URL}/admin/errors/stream`;
-                errorEventSource = new EventSource(streamUrl + `?uid=${encodeURIComponent(currentSession.uid)}`);
+                errorEventSource = new EventSource(streamUrl + `?user_id=${encodeURIComponent(currentSession.uid)}`);
         
                 errorEventSource.onopen = function() {
                     console.log('✅ Error stream connected');
