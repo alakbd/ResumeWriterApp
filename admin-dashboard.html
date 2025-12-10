@@ -2535,8 +2535,8 @@ ${error.extra_data ? `Extra Data: ${JSON.stringify(error.extra_data, null, 2)}` 
 
         function startAutoRefresh() {
             if (autoRefreshEnabled) {
-                refreshInterval = setInterval(refreshStats, 30000);
-                document.getElementById('autoRefreshStatus').textContent = 'On (30s)';
+                refreshInterval = setInterval(refreshStats, 60000);
+                document.getElementById('autoRefreshStatus').textContent = 'On (60s)';
             }
         }
         
