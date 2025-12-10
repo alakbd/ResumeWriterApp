@@ -1421,105 +1421,98 @@
 
         function startErrorStream() {
             if (!currentSession) {
-                showMessage('Please log in first', 'error');
-                return;
-            }
+            showMessage('Please log in first', 'error');
+            return;
+        }
 
-            if (errorEventSource) {
-                stopErrorStream();
-            }
+        if (errorEventSource) {
+            stopErrorStream();
+        }
 
-            try {
-                const streamUrl = `${API_BASE_URL}/admin/errors/stream`;
-                errorEventSource = new EventSource(streamUrl + `?uid=${encodeURIComponent(currentSession.uid)}`);
+        try {
+            const streamUrl = `${API_BASE_URL}/admin/errors/stream`;
+            errorEventSource = new EventSource(streamUrl + `?uid=${encodeURIComponent(currentSession.uid)}`);
 
-                errorEventSource.onopen = function() {
-                    console.log('✅ Error stream connected');
-                    isStreaming = true;
-                    updateStreamStatus(true);
-                    showMessage('✅ Connected to error stream. Waiting for errors...', 'success');
-                };
+            errorEventSource.onopen = function() {
+                console.log('✅ Error stream connected');
+                isStreaming = true;
+                updateStreamStatus(true);
+                showMessage('✅ Connected to error stream. Waiting for errors...', 'success');
+            };
 
             errorEventSource.onmessage = function(event) {
                 // Skip keep-alive comments (lines starting with :)
-                if (event.data.startsWith(':')) {
-                    return;
-                }
-        
+                if (event.data.startsWith(':')) return;
+
                 try {
                     const data = JSON.parse(event.data);
-            
                     console.log('📨 SSE message received:', data.type);
-            
-                 // Handle different message types
+
                     switch(data.type) {
                         case 'connected':
                             console.log('🔗 ' + data.message);
                             showMessage(data.message, 'info');
                             break;
-                    
+
                         case 'new_error':
                             console.log('🚨 New error:', data);
-                    
-                            // Format the timestamp for display
                             const displayTime = data.timestamp ? 
                                 new Date(data.timestamp).toLocaleString() : 
                                 new Date().toLocaleString();
-                    
-                         // Add the error to your UI table
-                        addErrorToTable({
-                            timestamp: displayTime,
-                            userId: data.user_id || 'unknown',
-                            endpoint: data.endpoint || 'unknown',
-                            errorType: data.error_type || 'unknown',
-                            severity: data.severity || 'info',
-                            message: data.message || 'No message',
-                            id: data.id,
-                            rawData: data  // Keep original data for details
-                        });
-                        break;
-                    
-                case 'stream_error':
-                    console.warn('⚠️ Stream error:', data.message);
-                    showMessage('Stream error: ' + data.message, 'warning');
-                    break;
-                    
-                case 'stream_closed':
-                    console.log('🔒 Stream closed');
-                    isStreaming = false;
-                    updateStreamStatus(false);
-                    showMessage('Error stream closed', 'info');
-                    break;
-                    
-                default:
-                    console.log('📦 Unknown message type:', data.type);
-            }
-        } catch (e) {
-            // If it's not JSON, it might be a keep-alive or other message
-            if (event.data.trim() !== '') {
-                console.log('📝 Non-JSON message:', event.data);
-            }
-        }
-    };
 
-    errorEventSource.onerror = function(error) {
-        console.error('❌ Error stream connection error:', error);
-        isStreaming = false;
-        updateStreamStatus(false);
-        showMessage('❌ Error stream disconnected', 'error');
-        
-        // Try to reconnect after 10 seconds
-        setTimeout(() => {
-            if (!isStreaming) {
-                console.log('🔄 Attempting to reconnect error stream...');
-                connectErrorStream();
-            }
-        }, 10000);
-    };
-} catch (error) {
-    console.error('❌ Failed to connect error stream:', error);
-    showMessage('❌ Failed to connect error stream', 'error');
-}
+                            addErrorToTable({
+                                timestamp: displayTime,
+                                userId: data.user_id || 'unknown',
+                                endpoint: data.endpoint || 'unknown',
+                                errorType: data.error_type || 'unknown',
+                                severity: data.severity || 'info',
+                                message: data.message || 'No message',
+                                id: data.id,
+                                rawData: data
+                            });
+                            break;
+
+                        case 'stream_error':
+                            console.warn('⚠️ Stream error:', data.message);
+                            showMessage('Stream error: ' + data.message, 'warning');
+                            break;
+
+                        case 'stream_closed':
+                            console.log('🔒 Stream closed');
+                            isStreaming = false;
+                            updateStreamStatus(false);
+                            showMessage('Error stream closed', 'info');
+                            break;
+
+                        default:
+                            console.log('📦 Unknown message type:', data.type);
+                    }
+                } catch (e) {
+                    if (event.data.trim() !== '') {
+                        console.log('📝 Non-JSON message:', event.data);
+                    }
+                }
+            };
+
+            errorEventSource.onerror = function(error) {
+                console.error('❌ Error stream connection error:', error);
+                isStreaming = false;
+                updateStreamStatus(false);
+                showMessage('❌ Error stream disconnected', 'error');
+
+                setTimeout(() => {
+                    if (!isStreaming) {
+                        console.log('🔄 Attempting to reconnect error stream...');
+                        connectErrorStream();
+                    }
+                }, 10000);
+            };
+
+        } catch (error) {
+            console.error('❌ Failed to connect error stream:', error);
+            showMessage('❌ Failed to connect error stream', 'error');
+        }
+    }
 
         function stopErrorStream() {
             if (errorEventSource) {
