@@ -347,9 +347,9 @@
                 <!-- Messages -->
                 <div id="messageContainer" style="display: none;"></div>
 
-                <!-- ========== GOOGLE DRIVE BACKUP STATUS ========== -->
+                <!-- ========== B2 BLAZE DRIVE BACKUP STATUS ========== -->
                 <div class="stats-section">
-                    <h3>💾 Google Drive Backup (Admin Only)</h3>
+                    <h3>💾 B2 BLAZE Drive Backup (Admin Only)</h3>
                     <div class="stats-row">
                         <div class="stat-mini-card">
                             <div class="stat-mini-label">Local Snapshots</div>
@@ -469,28 +469,28 @@
 
                 <!-- User Analytics -->
                 <div class="stats-section">
-                    <h3>👥 User Analytics</h3>
+                    <h3>👥 User Activity Analytics</h3>  <!-- Changed from "User Analytics" -->
                     <div class="stats-row">
                         <div class="stat-mini-card">
-                            <div class="stat-mini-label">Total Users Tracked</div>
+                            <div class="stat-mini-label">Users with Activity</div>  <!-- Changed -->
                             <div class="stat-mini-value" id="totalUsersTracked">0</div>
-                        </div>
-                        <div class="stat-mini-card">
-                            <div class="stat-mini-label">Active Today</div>
-                            <div class="stat-mini-value" id="activeUsersToday">0</div>
-                        </div>
-                        <div class="stat-mini-card">
-                            <div class="stat-mini-label">Total Requests</div>
-                            <div class="stat-mini-value" id="totalUserRequests">0</div>
-                        </div>
-                        <div class="stat-mini-card">
-                            <div class="stat-mini-label">Top User Requests</div>
-                            <div class="stat-mini-value" id="topUserRequests">0</div>
-                        </div>
                     </div>
-                    
-                    <div id="topUsersList">
-                        <p>Loading user analytics...</p>
+                    <div class="stat-mini-card">
+                        <div class="stat-mini-label">Active Today</div>
+                        <div class="stat-mini-value" id="activeUsersToday">0</div>
+                    </div>
+                    <div class="stat-mini-card">
+                        <div class="stat-mini-label">Total Requests</div>
+                        <div class="stat-mini-value" id="totalUserRequests">0</div>
+                    </div>
+                    <div class="stat-mini-card">
+                        <div class="stat-mini-label">Top User Activity</div>  <!-- Changed -->
+                        <div class="stat-mini-value" id="topUserRequests">0</div>
+                    </div>
+                </div>
+    
+                <div id="topUsersList">
+                    <p>No user activity recorded yet. Users will appear here after making requests.</p>
                     </div>
                 </div>
 
@@ -857,6 +857,9 @@
             }
 
             try {
+                showMessage('🔄 Checking backup status...', 'info');
+                console.log('🔍 Checking backup status with UID:', currentSession.uid);
+        
                 const response = await fetch(`${API_BASE_URL}/backup/status`, {
                     headers: {
                         'X-User-ID': currentSession.uid,
@@ -864,21 +867,34 @@
                     }
                 });
 
+                console.log('📊 Backup status response status:', response.status);
+        
                 if (response.status === 403) {
-                    throw new Error('Admin privileges required to view backup status');
+                    const errorData = await response.json();
+                    throw new Error(`Admin privileges required: ${errorData.detail || 'No detail'}`);
                 }
 
                 if (!response.ok) {
-                    throw new Error(`Status check failed: ${response.status}`);
+                    // Try to get error message from response
+                    let errorText = 'Unknown error';
+                    try {
+                        const errorData = await response.json();
+                        errorText = errorData.detail || JSON.stringify(errorData);
+                    } catch (e) {
+                        errorText = await response.text();
+                    }
+                    throw new Error(`HTTP ${response.status}: ${errorText}`);
                 }
 
                 const status = await response.json();
+                console.log('✅ Backup status data received:', status);
                 updateBackupStatusDisplay(status);
-                showMessage('✅ Admin: Backup status updated', 'success');
-                
+                showMessage('✅ Backup status updated', 'success');
+        
             } catch (error) {
-                console.error('Admin status check error:', error);
-                showMessage('⚠️ Admin: Could not check backup status', 'error');
+                console.error('❌ Admin status check error:', error);
+                console.error('Error stack:', error.stack);
+                showMessage('⚠️ Could not check backup status: ' + error.message, 'error');
             }
         }
 
@@ -914,40 +930,130 @@
             }
         }
 
+
         function updateBackupStatusDisplay(status) {
-            // Update the backup status cards
-            if (status.local_data) {
-                document.getElementById('localSnapshots').textContent = status.local_data.daily_snapshots || 0;
-                document.getElementById('alignmentRecords').textContent = status.local_data.alignment_records || 0;
+            console.log('📊 Updating backup status display:', status);
+    
+    // Update the backup status cards
+    if (status.local_data) {
+        document.getElementById('localSnapshots').textContent = status.local_data.daily_snapshots || 0;
+        document.getElementById('alignmentRecords').textContent = status.local_data.alignment_records || 0;
+    }
+    
+    if (status.cloud_backup) {
+        document.getElementById('cloudBackups').textContent = status.cloud_backup.total_backup_files || 0;
+        
+        // Format last backup time
+        const lastBackup = status.cloud_backup.latest_backup_time;
+        const lastBackupElement = document.getElementById('lastBackupTime');
+        
+        // 🔥 FIX: Declare backupDate at the function level so it's available everywhere
+        let backupDate = null;
+        
+        if (lastBackup) {
+            console.log('🔍 Latest backup time raw:', lastBackup, 'Type:', typeof lastBackup);
+            
+            // STRATEGY 1: Handle number (timestamp)
+            if (typeof lastBackup === 'number') {
+                console.log('🔢 Processing as number timestamp:', lastBackup);
+                
+                // Check if it's milliseconds or seconds
+                if (lastBackup > 1000000000000) {
+                    // It's milliseconds (e.g., 1733085608000)
+                    backupDate = new Date(lastBackup);
+                } else if (lastBackup > 1000000000) {
+                    // It's seconds (e.g., 1733085608)
+                    backupDate = new Date(lastBackup * 1000);
+                } else {
+                    console.error('❌ Timestamp too small - unknown format:', lastBackup);
+                }
+            }
+            // STRATEGY 2: Handle string
+            else if (typeof lastBackup === 'string') {
+                console.log('🔤 Processing as string:', lastBackup);
+                
+                // Try direct parsing first
+                backupDate = new Date(lastBackup);
+                
+                // If that fails, check for special cases
+                if (isNaN(backupDate.getTime())) {
+                    // Try removing quotes if present
+                    const cleanStr = lastBackup.replace(/['"]/g, '');
+                    backupDate = new Date(cleanStr);
+                    
+                    // If still failing, try parsing from filename
+                    if (isNaN(backupDate.getTime()) && status.cloud_backup.latest_backup) {
+                        const filename = status.cloud_backup.latest_backup;
+                        console.log('📁 Falling back to filename parsing:', filename);
+                        const dateMatch = filename.match(/stats_backup_(\d{4})(\d{2})(\d{2})_(\d{2})(\d{2})/);
+                        
+                        if (dateMatch) {
+                            const year = dateMatch[1];
+                            const month = dateMatch[2];
+                            const day = dateMatch[3];
+                            const hour = dateMatch[4];
+                            const minute = dateMatch[5];
+                            const dateStr = `${year}-${month}-${day}T${hour}:${minute}:00Z`;
+                            backupDate = new Date(dateStr);
+                        } else {
+                            console.error('❌ String date parsing failed:', lastBackup);
+                        }
+                    }
+                }
+            }
+            // STRATEGY 3: Unknown type
+            else {
+                console.error('❓ Unknown timestamp type:', typeof lastBackup, lastBackup);
             }
             
-            if (status.cloud_backup) {
-                document.getElementById('cloudBackups').textContent = status.cloud_backup.total_backup_files || 0;
+            // Display the date
+            if (backupDate && !isNaN(backupDate.getTime())) {
+                const displayText = backupDate.toLocaleString();
+                lastBackupElement.textContent = displayText;
                 
-                // Format last backup time
-                const lastBackup = status.cloud_backup.latest_backup_time;
-                if (lastBackup) {
-                    const backupDate = new Date(lastBackup);
-                    document.getElementById('lastBackupTime').textContent = backupDate.toLocaleString();
-                } else {
-                    document.getElementById('lastBackupTime').textContent = 'Never';
-                }
+                // Check if backup is recent (within 24 hours)
+                const now = new Date();
+                const hoursSinceBackup = (now - backupDate) / (1000 * 60 * 60);
                 
-                // Update system status with color coding
-                const systemStatus = status.system_status;
-                const lastBackupElement = document.getElementById('lastBackupTime');
-                if (systemStatus === 'active') {
+                if (hoursSinceBackup < 24) {
                     lastBackupElement.className = 'stat-mini-value backup-status-active';
+                    lastBackupElement.innerHTML += ' <span style="color:#27ae60;font-size:0.8em;">✓ Recent</span>';
                 } else {
-                    lastBackupElement.className = 'stat-mini-value backup-status-inactive';
+                    lastBackupElement.className = 'stat-mini-value backup-status-pending';
+                    lastBackupElement.innerHTML += ' <span style="color:#f39c12;font-size:0.8em;">⚠️ Old</span>';
                 }
+                
+                console.log('✅ Date parsed successfully:', {
+                    raw: lastBackup,
+                    parsed: backupDate.toISOString(),
+                    display: displayText,
+                    hoursSince: hoursSinceBackup.toFixed(1)
+                });
+            } else {
+                lastBackupElement.textContent = 'Date parsing error';
+                lastBackupElement.className = 'stat-mini-value backup-status-inactive';
+                console.error('❌ Could not parse date:', lastBackup);
             }
+        } else {
+            lastBackupElement.textContent = 'Never';
+            lastBackupElement.className = 'stat-mini-value backup-status-inactive';
+            console.log('📭 No backup time available');
         }
+        
+        // 🔥 FIX: Now backupDate is defined and can be used here
+        console.log('📊 Backup status summary:', {
+            totalFiles: status.cloud_backup.total_backup_files,
+            latestFile: status.cloud_backup.latest_backup,
+            latestTime: status.cloud_backup.latest_backup_time,
+            parsedSuccessfully: backupDate && !isNaN(backupDate.getTime())
+        });
+    }
+}
 
         function displayBackupFiles(files) {
             const container = document.getElementById('backupFilesContent');
             const listContainer = document.getElementById('backupFilesList');
-            
+    
             if (!files || files.length === 0) {
                 container.innerHTML = '<p>No backup files found.</p>';
                 listContainer.style.display = 'block';
@@ -955,23 +1061,93 @@
             }
 
             let html = '<table style="width: 100%; font-size: 0.9rem;">';
-            html += '<tr><th>File Name</th><th>Size</th><th>Last Modified</th></tr>';
-            
+            html += '<tr><th>File Name</th><th>Size</th><th>Last Modified</th><th>Backup Type</th></tr>';
+    
             files.forEach(file => {
-                const modifiedTime = new Date(file.modifiedTime).toLocaleString();
-                html += `
-                    <tr>
-                        <td>${file.name}</td>
-                        <td>${file.size || 'N/A'}</td>
-                        <td>${modifiedTime}</td>
-                    </tr>
-                `;
-            });
+                // Parse the date safely
+                let modifiedTime = 'Invalid Date';
+        
+                try {
+                    // Try multiple date parsing strategies
+                    const uploadTime = file.upload_time || file.modifiedTime;
             
-            html += '</table>';
-            container.innerHTML = html;
-            listContainer.style.display = 'block';
+            if (uploadTime) {
+                // Strategy 1: Try parsing as ISO string
+                const date = new Date(uploadTime);
+                
+                // Strategy 2: If that fails, try parsing from filename
+                if (isNaN(date.getTime())) {
+                    // Extract date from filename like "stats_backup_20251126_1040.json"
+                    const filename = file.name || '';
+                    const dateMatch = filename.match(/stats_backup_(\d{4})(\d{2})(\d{2})_(\d{2})(\d{2})/);
+                    
+                    if (dateMatch) {
+                        // Format: YYYYMMDD_HHMM
+                        const year = dateMatch[1];
+                        const month = dateMatch[2];
+                        const day = dateMatch[3];
+                        const hour = dateMatch[4];
+                        const minute = dateMatch[5];
+                        
+                        // Create date string in ISO format
+                        const dateStr = `${year}-${month}-${day}T${hour}:${minute}:00`;
+                        const newDate = new Date(dateStr);
+                        
+                        if (!isNaN(newDate.getTime())) {
+                            modifiedTime = newDate.toLocaleString();
+                        } else {
+                            modifiedTime = `${year}-${month}-${day} ${hour}:${minute}`;
+                        }
+                    } else {
+                        // Strategy 3: Try as timestamp number
+                        const timestamp = parseInt(uploadTime);
+                        if (!isNaN(timestamp)) {
+                            const timestampDate = new Date(timestamp);
+                            if (!isNaN(timestampDate.getTime())) {
+                                modifiedTime = timestampDate.toLocaleString();
+                            }
+                        }
+                    }
+                } else {
+                    // Original parsing worked
+                    modifiedTime = date.toLocaleString();
+                }
+            }
+        } catch (error) {
+            console.warn('Date parsing error for file:', file.name, error);
+            modifiedTime = 'Date unavailable';
         }
+        
+        // Determine backup type from filename
+        let backupType = 'Regular';
+        const filename = file.name || '';
+        if (filename.includes('stats_latest')) {
+            backupType = 'Latest Snapshot';
+        } else if (filename.includes('manual')) {
+            backupType = 'Manual';
+        } else if (filename.includes('auto')) {
+            backupType = 'Auto';
+        }
+        
+        // Format file size
+        const size = file.size || 'N/A';
+        const formattedSize = typeof size === 'number' ? 
+            `${Math.round(size / 1024)} KB` : size;
+        
+        html += `
+            <tr>
+                <td>${filename}</td>
+                <td style="text-align: center;">${formattedSize}</td>
+                <td>${modifiedTime}</td>
+                <td style="text-align: center;">${backupType}</td>
+            </tr>
+        `;
+    });
+    
+    html += '</table>';
+    container.innerHTML = html;
+    listContainer.style.display = 'block';
+}
 
         // ========== MISSING DISPLAY FUNCTIONS ==========
 
@@ -1131,64 +1307,93 @@
         }
 
         function updateEnhancedDashboard(stats) {
-            console.log('Updating enhanced dashboard with:', stats);
-            
+            console.log('📊 Updating enhanced dashboard with:', stats);
+    
             // Call all the display functions
             if (stats.daily_stats) {
                 updateCostAnalyticsDisplay(stats.daily_stats);
-                
-                // Update main stats grid
-                document.getElementById('dailyCostOverview').textContent = `$${(stats.daily_stats.daily_cost || 0).toFixed(6)}`;
-                document.getElementById('totalTokensOverview').textContent = (stats.daily_stats.daily_tokens || 0).toLocaleString();
-                document.getElementById('apiRequests').textContent = (stats.daily_stats.daily_requests || 0).toLocaleString();
-                document.getElementById('userCount').textContent = 'Calculating...';
-                document.getElementById('newUsersToday').textContent = 'Calculating...';
-                
-                // Color code based on cost
-                const costElement = document.getElementById('dailyCostOverview');
-                if (stats.daily_stats.daily_cost > 1.0) {
-                    costElement.className = 'stat-value cost-warning';
-                } else if (stats.daily_stats.daily_cost > 0.1) {
-                    costElement.className = 'stat-value';
-                } else {
-                    costElement.className = 'stat-value cost-good';
-                }
-            }
-            
-            if (stats.user_analytics) {
-                updateUserAnalyticsDisplay(stats.user_analytics);
-            }
-            
-            if (stats.cache_performance) {
-                updateCacheStatsDisplay(stats.cache_performance);
-            }
-            
-            if (stats.jd_alignment_stats) {
-                updateJDAlignmentDisplay(stats.jd_alignment_stats);
-            }
-
-            // Update cache stats
-            updateCacheStats(stats);
-
-            // Update cost history
-            if (stats.cost_history && stats.cost_history.length > 0) {
-                updateCostHistory(stats.cost_history);
-                calculateMonthlyCost(stats.cost_history);
-                calculateWeeklyCost(stats.cost_history);
-            }
-
-            document.getElementById('lastUpdate').textContent = `Last update: ${new Date().toLocaleTimeString()}`;
-
-            // Update JD Alignment stats
-            if (stats.jd_alignment_stats) {
-                document.getElementById('totalAlignments').textContent = stats.jd_alignment_stats.total_alignments || 0;
-                document.getElementById('avgImprovement').textContent = '+' + (stats.jd_alignment_stats.average_improvement || 0).toFixed(3);
-                document.getElementById('avgFinalScore').textContent = (stats.jd_alignment_stats.average_final_score || 0).toFixed(3);
-                document.getElementById('maxImprovement').textContent = '+' + (stats.jd_alignment_stats.max_improvement || 0).toFixed(3);
-                
-                updateRecentAlignments(stats.jd_alignment_stats.recent_alignments || []);
-            }
+        
+        // Update main stats grid
+        document.getElementById('dailyCostOverview').textContent = `$${(stats.daily_stats.daily_cost || 0).toFixed(6)}`;
+        document.getElementById('totalTokensOverview').textContent = (stats.daily_stats.daily_tokens || 0).toLocaleString();
+        document.getElementById('apiRequests').textContent = (stats.daily_stats.daily_requests || 0).toLocaleString();
+        
+        // 🔥 FIXED: Get user counts from daily_stats
+        const userCount = stats.daily_stats.user_count || 0;
+        const newUsersToday = stats.daily_stats.new_users_today || 0;
+        const emailVerifiedCount = stats.daily_stats.email_verified_count || 0;
+        
+        document.getElementById('userCount').textContent = userCount;
+        document.getElementById('newUsersToday').textContent = newUsersToday;
+        
+        const verifiedElement = document.getElementById('newUsersVerified');
+        if (verifiedElement) {
+            verifiedElement.textContent = `Email Verified: ${emailVerifiedCount}`;
         }
+        
+        console.log('👤 User counts extracted:', {
+            total: userCount,
+            today: newUsersToday,
+            verified: emailVerifiedCount
+        });
+        
+        // Color code based on cost
+        const costElement = document.getElementById('dailyCostOverview');
+        if (stats.daily_stats.daily_cost > 1.0) {
+            costElement.className = 'stat-value cost-warning';
+        } else if (stats.daily_stats.daily_cost > 0.1) {
+            costElement.className = 'stat-value';
+        } else {
+            costElement.className = 'stat-value cost-good';
+        }
+    } else {
+        // Fallback if no daily_stats
+        document.getElementById('userCount').textContent = 'No Data';
+        document.getElementById('newUsersToday').textContent = 'No Data';
+        document.getElementById('newUsersVerified').textContent = 'Email Verified: No Data';
+    }
+    
+    if (stats.user_analytics) {
+        updateUserAnalyticsDisplay(stats.user_analytics);
+    }
+    
+    if (stats.cache_performance) {
+        updateCacheStatsDisplay(stats.cache_performance);
+    }
+    
+    if (stats.jd_alignment_stats) {
+        updateJDAlignmentDisplay(stats.jd_alignment_stats);
+    }
+
+    // Update cache stats
+    updateCacheStats(stats);
+
+    // Update cost history
+    if (stats.cost_history && stats.cost_history.length > 0) {
+        updateCostHistory(stats.cost_history);
+        calculateMonthlyCost(stats.cost_history);
+        calculateWeeklyCost(stats.cost_history);
+    }
+
+    document.getElementById('lastUpdate').textContent = `Last update: ${new Date().toLocaleTimeString()}`;
+
+    // Update JD Alignment stats
+    if (stats.jd_alignment_stats) {
+        document.getElementById('totalAlignments').textContent = stats.jd_alignment_stats.total_alignments || 0;
+        document.getElementById('avgImprovement').textContent = '+' + (stats.jd_alignment_stats.average_improvement || 0).toFixed(3);
+        document.getElementById('avgFinalScore').textContent = (stats.jd_alignment_stats.average_final_score || 0).toFixed(3);
+        document.getElementById('maxImprovement').textContent = '+' + (stats.jd_alignment_stats.max_improvement || 0).toFixed(3);
+        
+        updateRecentAlignments(stats.jd_alignment_stats.recent_alignments || []);
+    }
+    
+    // 🔥 NEW: Debug output to console for verification
+    console.log('✅ Dashboard update complete with:', {
+        userCount: stats.daily_stats?.user_count || 'Not found',
+        newUsersToday: stats.daily_stats?.new_users_today || 'Not found',
+        emailVerified: stats.daily_stats?.email_verified_count || 'Not found'
+    });
+}
 
         function updateCacheStats(stats) {
             if (stats.cache_performance) {
