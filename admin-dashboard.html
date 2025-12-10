@@ -16,7 +16,7 @@
         }
         
         .container { 
-            max-width: 1200px; 
+            max-width: 1400px; 
             margin: 0 auto; 
             padding: 20px; 
         }
@@ -276,6 +276,270 @@
         .backup-status-active { color: #27ae60; }
         .backup-status-inactive { color: #e74c3c; }
         .backup-status-pending { color: #f39c12; }
+
+        /* ========== ERROR TRACKING STYLES ========== */
+        .error-section {
+            background: white;
+            padding: 20px;
+            border-radius: 10px;
+            box-shadow: 0 2px 10px rgba(0,0,0,0.1);
+            margin-bottom: 20px;
+            border-left: 4px solid #e74c3c;
+        }
+
+        .error-filter-controls {
+            background: #f8f9fa;
+            padding: 15px;
+            border-radius: 8px;
+            margin-bottom: 15px;
+        }
+
+        .error-filters {
+            display: flex;
+            flex-wrap: wrap;
+            gap: 10px;
+            margin-bottom: 15px;
+        }
+
+        .filter-group {
+            flex: 1;
+            min-width: 150px;
+        }
+
+        .filter-group label {
+            display: block;
+            margin-bottom: 5px;
+            font-size: 12px;
+            color: #666;
+            font-weight: 600;
+        }
+
+        .filter-group select,
+        .filter-group input {
+            width: 100%;
+            padding: 8px;
+            border: 1px solid #ddd;
+            border-radius: 4px;
+            font-size: 14px;
+        }
+
+        .error-severity-badge {
+            padding: 3px 8px;
+            border-radius: 12px;
+            font-size: 11px;
+            font-weight: 600;
+            text-transform: uppercase;
+        }
+
+        .severity-high { background: #e74c3c; color: white; }
+        .severity-medium { background: #f39c12; color: #212529; }
+        .severity-low { background: #3498db; color: white; }
+        .severity-info { background: #2ecc71; color: white; }
+
+        .error-row {
+            border-left: 4px solid #ddd;
+            margin: 5px 0;
+            padding: 10px;
+            background: #f9f9f9;
+            border-radius: 4px;
+        }
+
+        .error-row.high { border-left-color: #e74c3c; background: #fee; }
+        .error-row.medium { border-left-color: #f39c12; background: #fef7e6; }
+        .error-row.low { border-left-color: #3498db; background: #e8f4fd; }
+
+        .error-timestamp {
+            font-size: 11px;
+            color: #666;
+            font-family: monospace;
+        }
+
+        .error-message-text {
+            font-family: 'Courier New', monospace;
+            font-size: 12px;
+            color: #333;
+            white-space: pre-wrap;
+            word-break: break-all;
+        }
+
+        .error-stack-trace {
+            font-family: 'Courier New', monospace;
+            font-size: 11px;
+            color: #666;
+            white-space: pre-wrap;
+            background: #f5f5f5;
+            padding: 8px;
+            border-radius: 4px;
+            margin-top: 5px;
+            display: none;
+        }
+
+        .error-stack-trace.expanded {
+            display: block;
+        }
+
+        .error-details {
+            font-size: 12px;
+            color: #666;
+            margin-top: 5px;
+        }
+
+        .error-user-id {
+            font-family: monospace;
+            background: #e8f4fd;
+            padding: 2px 6px;
+            border-radius: 3px;
+            font-size: 11px;
+        }
+
+        .error-endpoint {
+            color: #3498db;
+            font-weight: 500;
+        }
+
+        .error-actions {
+            display: flex;
+            gap: 5px;
+            margin-top: 10px;
+        }
+
+        .error-table {
+            width: 100%;
+            border-collapse: collapse;
+            margin-top: 10px;
+            font-size: 13px;
+        }
+
+        .error-table th {
+            background: #f8f9fa;
+            padding: 10px;
+            text-align: left;
+            font-weight: 600;
+            border-bottom: 2px solid #dee2e6;
+        }
+
+        .error-table td {
+            padding: 10px;
+            border-bottom: 1px solid #eee;
+        }
+
+        .error-table tr:hover {
+            background: #f8f9fa;
+        }
+
+        .error-summary-cards {
+            display: grid;
+            grid-template-columns: repeat(auto-fit, minmax(150px, 1fr));
+            gap: 15px;
+            margin-bottom: 20px;
+        }
+
+        .error-summary-card {
+            background: #f8f9fa;
+            padding: 15px;
+            border-radius: 8px;
+            text-align: center;
+        }
+
+        .error-summary-value {
+            font-size: 1.8rem;
+            font-weight: bold;
+            margin: 5px 0;
+        }
+
+        .error-summary-label {
+            color: #666;
+            font-size: 0.8rem;
+        }
+
+        .realtime-error-indicator {
+            display: inline-block;
+            width: 8px;
+            height: 8px;
+            background: #27ae60;
+            border-radius: 50%;
+            margin-left: 5px;
+            animation: pulse 2s infinite;
+        }
+
+        @keyframes pulse {
+            0% { opacity: 1; }
+            50% { opacity: 0.5; }
+            100% { opacity: 1; }
+        }
+
+        /* Stream controls */
+        .stream-controls {
+            background: #2c3e50;
+            color: white;
+            padding: 10px;
+            border-radius: 5px;
+            margin-bottom: 10px;
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+        }
+
+        .stream-status {
+            display: flex;
+            align-items: center;
+            gap: 10px;
+        }
+
+        .stream-status-dot {
+            width: 8px;
+            height: 8px;
+            border-radius: 50%;
+            background: #e74c3c;
+        }
+
+        .stream-status-dot.connected {
+            background: #27ae60;
+            animation: pulse 2s infinite;
+        }
+
+        .stream-actions {
+            display: flex;
+            gap: 5px;
+        }
+
+        /* Error details modal */
+        .error-details-modal {
+            display: none;
+            position: fixed;
+            top: 0;
+            left: 0;
+            width: 100%;
+            height: 100%;
+            background: rgba(0,0,0,0.5);
+            z-index: 1000;
+            justify-content: center;
+            align-items: center;
+        }
+
+        .error-details-content {
+            background: white;
+            padding: 25px;
+            border-radius: 10px;
+            max-width: 800px;
+            max-height: 80vh;
+            overflow-y: auto;
+            width: 90%;
+        }
+
+        .close-modal {
+            float: right;
+            background: none;
+            border: none;
+            font-size: 24px;
+            cursor: pointer;
+            color: #666;
+        }
+
+        .error-details-title {
+            margin: 0 0 20px 0;
+            color: #e74c3c;
+        }
     </style>
 </head>
 <body>
@@ -315,14 +579,14 @@
         <div id="dashboard" style="display: none;">
             <div class="header">
                 <h1>📊 Resume Writer - Admin Dashboard</h1>
-                <p>Firebase UID Authentication • Full Admin Access • Google Drive Backup</p>
+                <p>Firebase UID Authentication • Full Admin Access • Comprehensive Monitoring</p>
                 <div class="user-info" style="background: rgba(255,255,255,0.2); display: inline-block; margin-top: 10px;">
                     <strong>Admin UID:</strong> <span id="adminUID">-</span>
                     <span style="margin-left: 10px; background: #e74c3c; padding: 2px 8px; border-radius: 10px; font-size: 0.8rem;">
                         🔒 ADMIN MODE
                     </span>
                 </div>
-                <small id="accessModeDisplay">Full Admin Access • Auto-refresh every 30s • Backup Controls</small>
+                <small id="accessModeDisplay">Full Admin Access • Auto-refresh every 30s • Real-time Error Tracking</small>
             </div>
 
             <div class="container">
@@ -333,7 +597,6 @@
                         <button class="btn btn-warning" onclick="repairData()">🔧 Repair Data</button>
                         <button class="btn btn-warning" onclick="resetStats()" id="resetBtn">📊 Reset Daily Stats</button>
                         <button class="btn" onclick="exportData()">📤 Export Data</button>
-                        <!-- BACKUP BUTTONS -->
                         <button class="btn btn-success" onclick="triggerBackup()" id="backupBtn">💾 Force Backup</button>
                         <button class="btn btn-info" onclick="checkBackupStatus()">📋 Backup Status</button>
                         <button class="btn btn-danger" onclick="logout()">🚪 Logout</button>
@@ -346,6 +609,129 @@
 
                 <!-- Messages -->
                 <div id="messageContainer" style="display: none;"></div>
+
+                <!-- ========== ERROR TRACKING SECTION ========== -->
+                <div class="error-section">
+                    <h3>🚨 Error Tracking & Monitoring</h3>
+                    
+                    <!-- Error Summary -->
+                    <div class="error-summary-cards">
+                        <div class="error-summary-card">
+                            <div class="error-summary-label">Total Errors</div>
+                            <div class="error-summary-value" id="totalErrors">0</div>
+                        </div>
+                        <div class="error-summary-card">
+                            <div class="error-summary-label">High Severity</div>
+                            <div class="error-summary-value" id="highErrors" style="color: #e74c3c;">0</div>
+                        </div>
+                        <div class="error-summary-card">
+                            <div class="error-summary-label">By Users</div>
+                            <div class="error-summary-value" id="usersWithErrors">0</div>
+                        </div>
+                        <div class="error-summary-card">
+                            <div class="error-summary-label">By Endpoints</div>
+                            <div class="error-summary-value" id="endpointsWithErrors">0</div>
+                        </div>
+                    </div>
+
+                    <!-- Error Filter Controls -->
+                    <div class="error-filter-controls">
+                        <div class="stream-controls">
+                            <div class="stream-status">
+                                <div class="stream-status-dot" id="streamStatusDot"></div>
+                                <span id="streamStatusText">Real-time stream: Disconnected</span>
+                            </div>
+                            <div class="stream-actions">
+                                <button class="btn btn-success" onclick="startErrorStream()" id="startStreamBtn">
+                                    ▶ Start Stream
+                                </button>
+                                <button class="btn btn-danger" onclick="stopErrorStream()" id="stopStreamBtn" style="display: none;">
+                                    ⏹ Stop Stream
+                                </button>
+                                <button class="btn btn-warning" onclick="clearOldErrors()">
+                                    🗑️ Clear Old Errors
+                                </button>
+                            </div>
+                        </div>
+
+                        <div class="error-filters">
+                            <div class="filter-group">
+                                <label>Search User ID</label>
+                                <input type="text" id="errorUserIdFilter" placeholder="Filter by User ID" 
+                                       onkeyup="filterErrors()">
+                            </div>
+                            <div class="filter-group">
+                                <label>Search Endpoint</label>
+                                <input type="text" id="errorEndpointFilter" placeholder="Filter by endpoint" 
+                                       onkeyup="filterErrors()">
+                            </div>
+                            <div class="filter-group">
+                                <label>Search Error Type</label>
+                                <input type="text" id="errorTypeFilter" placeholder="Filter by error type" 
+                                       onkeyup="filterErrors()">
+                            </div>
+                            <div class="filter-group">
+                                <label>Severity</label>
+                                <select id="errorSeverityFilter" onchange="filterErrors()">
+                                    <option value="all">All Severities</option>
+                                    <option value="high">High</option>
+                                    <option value="medium">Medium</option>
+                                    <option value="low">Low</option>
+                                    <option value="info">Info</option>
+                                </select>
+                            </div>
+                            <div class="filter-group">
+                                <label>Time Range</label>
+                                <select id="errorTimeFilter" onchange="filterErrors()">
+                                    <option value="all">All Time</option>
+                                    <option value="today">Today</option>
+                                    <option value="week">Last 7 Days</option>
+                                    <option value="month">Last 30 Days</option>
+                                </select>
+                            </div>
+                            <div class="filter-group">
+                                <label>Limit</label>
+                                <select id="errorLimitFilter" onchange="filterErrors()">
+                                    <option value="50">Last 50 Errors</option>
+                                    <option value="100">Last 100</option>
+                                    <option value="200">Last 200</option>
+                                    <option value="500">Last 500</option>
+                                    <option value="all">All Errors</option>
+                                </select>
+                            </div>
+                        </div>
+                        
+                        <div style="display: flex; gap: 10px; margin-top: 10px;">
+                            <button class="btn btn-info" onclick="loadUserErrors()">
+                                👤 Load Errors by User
+                            </button>
+                            <button class="btn" onclick="loadAllErrors()">
+                                🔄 Refresh Error List
+                            </button>
+                            <button class="btn btn-danger" onclick="clearAllErrors()">
+                                🗑️ Clear All Errors
+                            </button>
+                        </div>
+                    </div>
+
+                    <!-- Error List -->
+                    <div id="errorListContainer">
+                        <div id="errorList">
+                            <p>No errors to display. Errors will appear here when they occur.</p>
+                        </div>
+                    </div>
+
+                    <!-- Error Details Modal -->
+                    <div class="error-details-modal" id="errorDetailsModal">
+                        <div class="error-details-content">
+                            <button class="close-modal" onclick="closeErrorDetails()">&times;</button>
+                            <h3 class="error-details-title" id="errorModalTitle">Error Details</h3>
+                            <div id="errorModalContent">
+                                <!-- Error details will be populated here -->
+                            </div>
+                        </div>
+                    </div>
+                </div>
 
                 <!-- ========== B2 BLAZE DRIVE BACKUP STATUS ========== -->
                 <div class="stats-section">
@@ -385,9 +771,7 @@
                     </div>
                 </div>
 
-                <!-- ========== EXISTING STATS SECTIONS ========== -->
-
-                <!-- JD Alignment Statistics -->
+                <!-- ========== JD ALIGNMENT STATISTICS ========== -->
                 <div class="stats-section">
                     <h3>🎯 JD Alignment Statistics</h3>
                     <div class="stats-row">
@@ -414,7 +798,7 @@
                     </div>
                 </div>
 
-                <!-- Cost & Token Analytics -->
+                <!-- ========== COST & TOKEN ANALYTICS ========== -->
                 <div class="stats-section">
                     <h3>💰 Cost & Token Analytics</h3>
                     <div class="stats-row">
@@ -437,7 +821,7 @@
                     </div>
                 </div>
 
-                <!-- Cache Performance -->
+                <!-- ========== CACHE PERFORMANCE ========== -->
                 <div class="stats-section">
                     <h3>⚡ Cache Performance</h3>
                     <div class="stats-row">
@@ -467,12 +851,12 @@
                     </div>
                 </div>
 
-                <!-- User Analytics -->
+                <!-- ========== USER ACTIVITY ANALYTICS ========== -->
                 <div class="stats-section">
-                    <h3>👥 User Activity Analytics</h3>  <!-- Changed from "User Analytics" -->
+                    <h3>👥 User Activity Analytics</h3>
                     <div class="stats-row">
                         <div class="stat-mini-card">
-                            <div class="stat-mini-label">Users with Activity</div>  <!-- Changed -->
+                            <div class="stat-mini-label">Users with Activity</div>
                             <div class="stat-mini-value" id="totalUsersTracked">0</div>
                     </div>
                     <div class="stat-mini-card">
@@ -484,7 +868,7 @@
                         <div class="stat-mini-value" id="totalUserRequests">0</div>
                     </div>
                     <div class="stat-mini-card">
-                        <div class="stat-mini-label">Top User Activity</div>  <!-- Changed -->
+                        <div class="stat-mini-label">Top User Activity</div>
                         <div class="stat-mini-value" id="topUserRequests">0</div>
                     </div>
                 </div>
@@ -494,9 +878,7 @@
                     </div>
                 </div>
 
-                <!-- ========== EXISTING SECTIONS ========== -->
-
-                <!-- Live Stats Grid -->
+                <!-- ========== LIVE STATS GRID ========== -->
                 <div class="stats-grid">
                     <div class="stat-card">
                         <div class="stat-label">Daily Cost</div>
@@ -547,7 +929,7 @@
                     </div>
                 </div>
 
-                <!-- Cache Performance & Savings -->
+                <!-- ========== CACHE PERFORMANCE & SAVINGS ========== -->
                 <div class="chart-container">
                     <h3>⚡ Cache Performance & Savings</h3>
                     <div class="stats-row">
@@ -578,8 +960,7 @@
                     </div>
                 </div>
 
-                <!-- Rest of your existing sections -->
-                <!-- Cost History -->
+                <!-- ========== COST HISTORY ========== -->
                 <div class="chart-container">
                     <h3>📈 Cost History (Last 30 Days)</h3>
                     <div id="costHistory">
@@ -587,7 +968,7 @@
                     </div>
                 </div>
 
-                <!-- System Info -->
+                <!-- ========== SYSTEM INFORMATION ========== -->
                 <div class="chart-container">
                     <h3>⚙️ System Information</h3>
                     <div style="display: grid; grid-template-columns: repeat(auto-fit, minmax(200px, 1fr)); gap: 15px;">
@@ -625,6 +1006,11 @@
         let sessionTimerInterval;
         let sessionStartTime;
         let autoRefreshEnabled = true;
+        
+        // Error tracking variables
+        let errorEventSource = null;
+        let currentErrorData = [];
+        let isStreaming = false;
 
         document.addEventListener('DOMContentLoaded', function() {
             console.log('🚀 Dashboard loading...');
@@ -634,6 +1020,8 @@
                 attemptAutoLogin();
             }, 1000);
         });
+
+        // ========== AUTHENTICATION FUNCTIONS ==========
 
         function attemptAutoLogin() {
             const firebaseUID = document.getElementById('firebaseUID').value.trim();
@@ -735,6 +1123,9 @@
             refreshStats();
             startAutoRefresh();
             startSessionTimer();
+            
+            // Initialize error tracking
+            initializeErrorTracking();
         }
 
         async function login(event) {
@@ -787,6 +1178,526 @@
                     container.style.display = 'none';
                 }, 5000);
             }
+        }
+
+        // ========== ERROR TRACKING FUNCTIONS ==========
+
+        async function initializeErrorTracking() {
+            if (!currentSession) return;
+            
+            // Load initial error data
+            await loadAllErrors();
+            
+            // Auto-start stream if there are recent errors
+            if (currentErrorData.length > 0) {
+                startErrorStream();
+            }
+        }
+
+        async function loadAllErrors() {
+            if (!currentSession) {
+                showMessage('Please log in first', 'error');
+                return;
+            }
+
+            try {
+                showMessage('🔄 Loading error data...', 'info');
+                
+                const response = await fetch(`${API_BASE_URL}/admin/errors/all`, {
+                    headers: {
+                        'X-User-ID': currentSession.uid,
+                        'Content-Type': 'application/json'
+                    }
+                });
+
+                if (response.status === 403) {
+                    throw new Error('Admin privileges required for error tracking');
+                }
+
+                if (!response.ok) {
+                    throw new Error(`Failed to load errors: ${response.status}`);
+                }
+
+                const errors = await response.json();
+                currentErrorData = errors;
+                displayErrors(errors);
+                
+                // Load error statistics
+                loadErrorStats();
+                
+                showMessage('✅ Error data loaded', 'success');
+            } catch (error) {
+                console.error('Error loading errors:', error);
+                showMessage('❌ Could not load errors: ' + error.message, 'error');
+            }
+        }
+
+        async function loadErrorStats() {
+            if (!currentSession) return;
+
+            try {
+                const response = await fetch(`${API_BASE_URL}/admin/errors/stats`, {
+                    headers: {
+                        'X-User-ID': currentSession.uid,
+                        'Content-Type': 'application/json'
+                    }
+                });
+
+                if (response.ok) {
+                    const stats = await response.json();
+                    updateErrorStats(stats);
+                }
+            } catch (error) {
+                console.error('Error loading stats:', error);
+            }
+        }
+
+        function updateErrorStats(stats) {
+            document.getElementById('totalErrors').textContent = stats.total_errors || 0;
+            document.getElementById('highErrors').textContent = stats.by_severity?.high || 0;
+            
+            const userCount = Object.keys(stats.by_user || {}).length;
+            document.getElementById('usersWithErrors').textContent = userCount;
+            
+            const endpointCount = Object.keys(stats.by_endpoint || {}).length;
+            document.getElementById('endpointsWithErrors').textContent = endpointCount;
+        }
+
+        function displayErrors(errors) {
+            const container = document.getElementById('errorList');
+            
+            if (!errors || errors.length === 0) {
+                container.innerHTML = '<p>No errors to display.</p>';
+                return;
+            }
+
+            let html = `
+                <table class="error-table">
+                    <thead>
+                        <tr>
+                            <th>Timestamp</th>
+                            <th>User ID</th>
+                            <th>Endpoint</th>
+                            <th>Error Type</th>
+                            <th>Severity</th>
+                            <th>Message</th>
+                            <th>Actions</th>
+                        </tr>
+                    </thead>
+                    <tbody>
+            `;
+
+            errors.forEach(error => {
+                const timestamp = new Date(error.timestamp).toLocaleString();
+                const shortUserId = error.user_id?.substring(0, 10) + '...' || 'unknown';
+                const shortMessage = error.error_message?.substring(0, 50) + 
+                                   (error.error_message?.length > 50 ? '...' : '');
+                
+                const severityClass = `severity-${error.severity?.toLowerCase() || 'info'}`;
+                const severityText = error.severity?.charAt(0).toUpperCase() + 
+                                   error.severity?.slice(1).toLowerCase() || 'Info';
+                
+                html += `
+                    <tr class="error-row ${error.severity?.toLowerCase() || ''}">
+                        <td class="error-timestamp">${timestamp}</td>
+                        <td><span class="error-user-id" title="${error.user_id}">${shortUserId}</span></td>
+                        <td class="error-endpoint">${error.endpoint || 'Unknown'}</td>
+                        <td>${error.error_type || 'Unknown'}</td>
+                        <td><span class="error-severity-badge ${severityClass}">${severityText}</span></td>
+                        <td class="error-message-text">${shortMessage}</td>
+                        <td>
+                            <button class="btn" style="font-size: 12px; padding: 3px 8px;" 
+                                    onclick="showErrorDetails('${error.id}')">
+                                🔍 Details
+                            </button>
+                        </td>
+                    </tr>
+                `;
+            });
+
+            html += '</tbody></table>';
+            container.innerHTML = html;
+        }
+
+        function filterErrors() {
+            if (currentErrorData.length === 0) return;
+            
+            const userId = document.getElementById('errorUserIdFilter').value.toLowerCase();
+            const endpoint = document.getElementById('errorEndpointFilter').value.toLowerCase();
+            const errorType = document.getElementById('errorTypeFilter').value.toLowerCase();
+            const severity = document.getElementById('errorSeverityFilter').value;
+            const timeFilter = document.getElementById('errorTimeFilter').value;
+            const limit = document.getElementById('errorLimitFilter').value;
+            
+            let filtered = [...currentErrorData];
+            
+            // Apply filters
+            if (userId) {
+                filtered = filtered.filter(error => 
+                    error.user_id?.toLowerCase().includes(userId)
+                );
+            }
+            
+            if (endpoint) {
+                filtered = filtered.filter(error => 
+                    error.endpoint?.toLowerCase().includes(endpoint)
+                );
+            }
+            
+            if (errorType) {
+                filtered = filtered.filter(error => 
+                    error.error_type?.toLowerCase().includes(errorType)
+                );
+            }
+            
+            if (severity !== 'all') {
+                filtered = filtered.filter(error => 
+                    error.severity?.toLowerCase() === severity
+                );
+            }
+            
+            // Apply time filter
+            if (timeFilter !== 'all') {
+                const now = new Date();
+                let cutoffDate = new Date();
+                
+                switch(timeFilter) {
+                    case 'today':
+                        cutoffDate.setHours(0, 0, 0, 0);
+                        break;
+                    case 'week':
+                        cutoffDate.setDate(now.getDate() - 7);
+                        break;
+                    case 'month':
+                        cutoffDate.setDate(now.getDate() - 30);
+                        break;
+                }
+                
+                filtered = filtered.filter(error => {
+                    const errorDate = new Date(error.timestamp);
+                    return errorDate >= cutoffDate;
+                });
+            }
+            
+            // Apply limit
+            if (limit !== 'all') {
+                filtered = filtered.slice(-parseInt(limit));
+            }
+            
+            displayErrors(filtered);
+        }
+
+        async function loadUserErrors() {
+            const userId = prompt('Enter User ID to view errors:', '');
+            if (!userId) return;
+            
+            try {
+                showMessage(`🔄 Loading errors for user ${userId.substring(0, 10)}...`, 'info');
+                
+                const response = await fetch(`${API_BASE_URL}/admin/errors/user/${userId}`, {
+                    headers: {
+                        'X-User-ID': currentSession.uid,
+                        'Content-Type': 'application/json'
+                    }
+                });
+
+                if (!response.ok) {
+                    throw new Error(`Failed to load user errors: ${response.status}`);
+                }
+
+                const errors = await response.json();
+                currentErrorData = errors;
+                
+                // Set filter to this user
+                document.getElementById('errorUserIdFilter').value = userId;
+                filterErrors();
+                
+                showMessage(`✅ Loaded ${errors.length} errors for user`, 'success');
+            } catch (error) {
+                console.error('Error loading user errors:', error);
+                showMessage('❌ Could not load user errors: ' + error.message, 'error');
+            }
+        }
+
+        function startErrorStream() {
+            if (!currentSession) {
+                showMessage('Please log in first', 'error');
+                return;
+            }
+
+            if (errorEventSource) {
+                stopErrorStream();
+            }
+
+            try {
+                const streamUrl = `${API_BASE_URL}/admin/errors/stream`;
+                errorEventSource = new EventSource(streamUrl + `?x-user-id=${encodeURIComponent(currentSession.uid)}`);
+                
+                errorEventSource.onopen = function() {
+                    console.log('✅ Error stream connected');
+                    isStreaming = true;
+                    updateStreamStatus(true);
+                    showMessage('✅ Real-time error stream connected', 'success');
+                };
+
+                errorEventSource.onmessage = function(event) {
+                    try {
+                        const data = JSON.parse(event.data);
+                        
+                        if (data.ping) {
+                            // Keep-alive ping, ignore
+                            return;
+                        }
+                        
+                        // New error received
+                        console.log('🚨 New error via stream:', data);
+                        
+                        // Add to current data
+                        currentErrorData.unshift(data);
+                        
+                        // Update display
+                        filterErrors();
+                        
+                        // Update statistics
+                        loadErrorStats();
+                        
+                        // Show notification
+                        showErrorNotification(data);
+                        
+                    } catch (error) {
+                        console.error('Error parsing stream data:', error);
+                    }
+                };
+
+                errorEventSource.onerror = function(error) {
+                    console.error('❌ Error stream error:', error);
+                    isStreaming = false;
+                    updateStreamStatus(false);
+                    
+                    if (errorEventSource) {
+                        errorEventSource.close();
+                        errorEventSource = null;
+                    }
+                    
+                    setTimeout(() => {
+                        if (confirm('Error stream disconnected. Reconnect?')) {
+                            startErrorStream();
+                        }
+                    }, 1000);
+                };
+
+            } catch (error) {
+                console.error('Failed to start error stream:', error);
+                showMessage('❌ Could not start error stream: ' + error.message, 'error');
+            }
+        }
+
+        function stopErrorStream() {
+            if (errorEventSource) {
+                errorEventSource.close();
+                errorEventSource = null;
+            }
+            
+            isStreaming = false;
+            updateStreamStatus(false);
+            showMessage('⏹ Error stream stopped', 'info');
+        }
+
+        function updateStreamStatus(connected) {
+            const statusDot = document.getElementById('streamStatusDot');
+            const statusText = document.getElementById('streamStatusText');
+            const startBtn = document.getElementById('startStreamBtn');
+            const stopBtn = document.getElementById('stopStreamBtn');
+            
+            if (connected) {
+                statusDot.className = 'stream-status-dot connected';
+                statusText.textContent = 'Real-time stream: Connected';
+                startBtn.style.display = 'none';
+                stopBtn.style.display = 'inline-block';
+            } else {
+                statusDot.className = 'stream-status-dot';
+                statusText.textContent = 'Real-time stream: Disconnected';
+                startBtn.style.display = 'inline-block';
+                stopBtn.style.display = 'none';
+            }
+        }
+
+        function showErrorNotification(error) {
+            const severity = error.severity?.toLowerCase() || 'info';
+            const title = `🚨 New ${severity} severity error`;
+            const message = `${error.error_type} on ${error.endpoint}`;
+            
+            // Create notification
+            const notification = document.createElement('div');
+            notification.className = `error-message ${severity === 'high' ? 'error-message' : 'info-message'}`;
+            notification.innerHTML = `
+                <strong>${title}</strong><br>
+                ${message}<br>
+                <small>User: ${error.user_id?.substring(0, 15)}...</small>
+                <button onclick="this.parentElement.remove()" 
+                        style="float: right; background: none; border: none; cursor: pointer;">
+                    ×
+                </button>
+            `;
+            
+            // Add to message container
+            const container = document.getElementById('messageContainer');
+            if (container) {
+                container.insertBefore(notification, container.firstChild);
+                
+                // Auto-remove after 10 seconds
+                setTimeout(() => {
+                    if (notification.parentElement) {
+                        notification.remove();
+                    }
+                }, 10000);
+            }
+        }
+
+        function showErrorDetails(errorId) {
+            const error = currentErrorData.find(e => e.id === errorId);
+            if (!error) return;
+            
+            const modal = document.getElementById('errorDetailsModal');
+            const title = document.getElementById('errorModalTitle');
+            const content = document.getElementById('errorModalContent');
+            
+            title.textContent = `Error Details: ${error.error_type}`;
+            
+            const timestamp = new Date(error.timestamp).toLocaleString();
+            const severityClass = `severity-${error.severity?.toLowerCase() || 'info'}`;
+            const severityText = error.severity?.charAt(0).toUpperCase() + 
+                                error.severity?.slice(1).toLowerCase() || 'Info';
+            
+            content.innerHTML = `
+                <div style="margin-bottom: 20px;">
+                    <div><strong>Timestamp:</strong> ${timestamp}</div>
+                    <div><strong>User ID:</strong> <code>${error.user_id}</code></div>
+                    <div><strong>Endpoint:</strong> ${error.endpoint}</div>
+                    <div><strong>Error Type:</strong> ${error.error_type}</div>
+                    <div><strong>Severity:</strong> <span class="error-severity-badge ${severityClass}">${severityText}</span></div>
+                </div>
+                
+                <div style="margin-bottom: 20px;">
+                    <h4>Error Message</h4>
+                    <div class="error-message-text" style="background: #f5f5f5; padding: 10px; border-radius: 5px;">
+                        ${escapeHtml(error.error_message || 'No message')}
+                    </div>
+                </div>
+                
+                ${error.extra_data ? `
+                    <div style="margin-bottom: 20px;">
+                        <h4>Additional Data</h4>
+                        <pre style="background: #f5f5f5; padding: 10px; border-radius: 5px; overflow-x: auto;">
+${JSON.stringify(error.extra_data, null, 2)}
+                        </pre>
+                    </div>
+                ` : ''}
+                
+                <div style="margin-top: 20px; text-align: center;">
+                    <button class="btn" onclick="copyErrorDetails('${errorId}')">
+                        📋 Copy Error Details
+                    </button>
+                    <button class="btn btn-info" onclick="sendErrorToSlack('${errorId}')">
+                        💬 Send to Slack
+                    </button>
+                </div>
+            `;
+            
+            modal.style.display = 'flex';
+        }
+
+        function closeErrorDetails() {
+            document.getElementById('errorDetailsModal').style.display = 'none';
+        }
+
+        async function copyErrorDetails(errorId) {
+            const error = currentErrorData.find(e => e.id === errorId);
+            if (!error) return;
+            
+            const text = `Error Details:
+Timestamp: ${new Date(error.timestamp).toLocaleString()}
+User ID: ${error.user_id}
+Endpoint: ${error.endpoint}
+Error Type: ${error.error_type}
+Severity: ${error.severity}
+Message: ${error.error_message}
+${error.extra_data ? `Extra Data: ${JSON.stringify(error.extra_data, null, 2)}` : ''}`;
+            
+            try {
+                await navigator.clipboard.writeText(text);
+                showMessage('✅ Error details copied to clipboard', 'success');
+            } catch (error) {
+                console.error('Copy failed:', error);
+                showMessage('❌ Failed to copy to clipboard', 'error');
+            }
+        }
+
+        async function sendErrorToSlack(errorId) {
+            showMessage('⏳ This feature would send error to Slack webhook', 'info');
+        }
+
+        async function clearOldErrors() {
+            const days = prompt('Clear errors older than how many days? (Enter 0 for all)', '7');
+            if (days === null) return;
+            
+            try {
+                const response = await fetch(`${API_BASE_URL}/admin/errors/clear?days=${days}`, {
+                    method: 'DELETE',
+                    headers: {
+                        'X-User-ID': currentSession.uid,
+                        'Content-Type': 'application/json'
+                    }
+                });
+
+                if (!response.ok) {
+                    throw new Error(`Clear failed: ${response.status}`);
+                }
+
+                const result = await response.json();
+                showMessage(`✅ Cleared errors. ${result.remaining_errors} errors remaining`, 'success');
+                
+                // Refresh error list
+                loadAllErrors();
+            } catch (error) {
+                console.error('Clear errors error:', error);
+                showMessage('❌ Could not clear errors: ' + error.message, 'error');
+            }
+        }
+
+        async function clearAllErrors() {
+            if (!confirm('Are you sure you want to clear ALL error logs? This cannot be undone.')) {
+                return;
+            }
+            
+            try {
+                const response = await fetch(`${API_BASE_URL}/admin/errors/clear`, {
+                    method: 'DELETE',
+                    headers: {
+                        'X-User-ID': currentSession.uid,
+                        'Content-Type': 'application/json'
+                    }
+                });
+
+                if (!response.ok) {
+                    throw new Error(`Clear failed: ${response.status}`);
+                }
+
+                showMessage('✅ All errors cleared', 'success');
+                
+                // Clear current data and refresh
+                currentErrorData = [];
+                loadAllErrors();
+            } catch (error) {
+                console.error('Clear all errors error:', error);
+                showMessage('❌ Could not clear errors: ' + error.message, 'error');
+            }
+        }
+
+        function escapeHtml(text) {
+            const div = document.createElement('div');
+            div.textContent = text;
+            return div.innerHTML;
         }
 
         // ========== BACKUP FUNCTIONS ==========
@@ -1149,7 +2060,7 @@
     listContainer.style.display = 'block';
 }
 
-        // ========== MISSING DISPLAY FUNCTIONS ==========
+        // ========== STATS DISPLAY FUNCTIONS ==========
 
         function updateUserAnalyticsDisplay(userAnalytics) {
             if (!userAnalytics) return;
@@ -1387,12 +2298,12 @@
         updateRecentAlignments(stats.jd_alignment_stats.recent_alignments || []);
     }
     
-    // 🔥 NEW: Debug output to console for verification
-    console.log('✅ Dashboard update complete with:', {
-        userCount: stats.daily_stats?.user_count || 'Not found',
-        newUsersToday: stats.daily_stats?.new_users_today || 'Not found',
-        emailVerified: stats.daily_stats?.email_verified_count || 'Not found'
-    });
+    // Update error statistics if available
+    if (stats.error_statistics) {
+        updateErrorStats(stats.error_statistics);
+    }
+    
+    console.log('✅ Dashboard update complete');
 }
 
         function updateCacheStats(stats) {
@@ -1597,7 +2508,19 @@
             }
         }
 
+        function exportData() {
+            showMessage('Export feature would generate CSV reports', 'info');
+        }
+
         function logout() {
+            // Stop error streaming
+            stopErrorStream();
+            
+            // Clear error data
+            currentErrorData = [];
+            errorEventSource = null;
+            isStreaming = false;
+            
             currentSession = null;
             stopAutoRefresh();
             stopSessionTimer();
@@ -1642,10 +2565,6 @@
             } else {
                 stopAutoRefresh();
             }
-        }
-
-        function exportData() {
-            showMessage('Export feature would generate CSV reports', 'info');
         }
 
     </script>
