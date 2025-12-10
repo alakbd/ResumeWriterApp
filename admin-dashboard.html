@@ -1431,8 +1431,8 @@
 
             try {
                 const streamUrl = `${API_BASE_URL}/admin/errors/stream`;
-                new EventSource(streamUrl + `?uid=${encodeURIComponent(currentSession.uid)}`);
-                
+                errorEventSource = new EventSource(streamUrl + `?uid=${encodeURIComponent(currentSession.uid)}`);
+        
                 errorEventSource.onopen = function() {
                     console.log('✅ Error stream connected');
                     isStreaming = true;
@@ -1443,54 +1443,42 @@
                 errorEventSource.onmessage = function(event) {
                     try {
                         const data = JSON.parse(event.data);
-                        
-                        if (data.ping) {
-                            // Keep-alive ping, ignore
-                            return;
-                        }
-                        
-                        // New error received
+                
+                        if (data.ping) return;
+
                         console.log('🚨 New error via stream:', data);
-                        
-                        // Add to current data
                         currentErrorData.unshift(data);
-                        
-                        // Update display
                         filterErrors();
-                        
-                        // Update statistics
                         loadErrorStats();
-                        
-                        // Show notification
                         showErrorNotification(data);
-                        
+                
                     } catch (error) {
                         console.error('Error parsing stream data:', error);
-                    }
-                };
+                }
+            };
 
-                errorEventSource.onerror = function(error) {
-                    console.error('❌ Error stream error:', error);
-                    isStreaming = false;
-                    updateStreamStatus(false);
-                    
-                    if (errorEventSource) {
-                        errorEventSource.close();
-                        errorEventSource = null;
+            errorEventSource.onerror = function(error) {
+                console.error('❌ Error stream error:', error);
+                isStreaming = false;
+                updateStreamStatus(false);
+            
+                if (errorEventSource) {
+                    errorEventSource.close();
+                    errorEventSource = null;
+                }
+            
+                setTimeout(() => {
+                    if (confirm('Error stream disconnected. Reconnect?')) {
+                        startErrorStream();
                     }
-                    
-                    setTimeout(() => {
-                        if (confirm('Error stream disconnected. Reconnect?')) {
-                            startErrorStream();
-                        }
-                    }, 1000);
-                };
+                }, 1000);
+            };
 
-            } catch (error) {
-                console.error('Failed to start error stream:', error);
-                showMessage('❌ Could not start error stream: ' + error.message, 'error');
-            }
+        } catch (error) {
+            console.error('Failed to start error stream:', error);
+            showMessage('❌ Could not start error stream: ' + error.message, 'error');
         }
+    }
 
         function stopErrorStream() {
             if (errorEventSource) {
