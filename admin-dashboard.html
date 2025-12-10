@@ -1444,7 +1444,8 @@
                     try {
                         const data = JSON.parse(event.data);
                 
-                        if (data.ping) return;
+                        // Ignore keep-alives and empty objects
+                        if (data.ping || Object.keys(data).length === 0) return;
 
                         console.log('🚨 New error via stream:', data);
                         currentErrorData.unshift(data);
