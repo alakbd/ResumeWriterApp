@@ -2405,15 +2405,12 @@ function updateEnhancedDashboard(stats) {
         }
 
         // Update auto-refresh to be less aggressive
+        // Update auto-refresh to be less aggressive
         function startAutoRefresh() {
             if (autoRefreshEnabled) {
-                refreshInterval = setInterval(refreshStats, 30000);
-                const autoRefreshStatus = document.getElementById('autoRefreshStatus');
-            if (autoRefreshStatus) {
-                autoRefreshStatus.textContent = 'On (30s)';
-            } else {
-                console.warn('⚠️ Element not found: autoRefreshStatus');
-            }
+                // Increase from 30s to 45s to reduce load
+                refreshInterval = setInterval(refreshStats, 45000);
+                document.getElementById('autoRefreshStatus').textContent = 'On (45s)';
         }
     }
         function stopAutoRefresh() {
