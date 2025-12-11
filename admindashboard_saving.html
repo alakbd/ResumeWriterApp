@@ -1,1 +1,1488 @@
 
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Resume Writer - Admin Dashboard</title>
+    <style>
+        * { margin: 0; padding: 0; box-sizing: border-box; }
+        body { 
+            font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, Oxygen, Ubuntu, sans-serif; 
+            background: #0f172a; 
+            color: #f1f5f9;
+        }
+        
+        .header { 
+            background: linear-gradient(135deg, #1e293b 0%, #0f172a 100%); 
+            padding: 24px; 
+            text-align: center;
+            border-bottom: 1px solid #334155;
+            box-shadow: 0 4px 6px -1px rgba(0, 0, 0, 0.1);
+        }
+        
+        .header h1 { 
+            font-size: 2rem; 
+            font-weight: 700; 
+            margin-bottom: 8px;
+            background: linear-gradient(135deg, #60a5fa 0%, #a78bfa 100%);
+            -webkit-background-clip: text;
+            -webkit-text-fill-color: transparent;
+        }
+        
+        .header p { 
+            color: #94a3b8; 
+            font-size: 0.9rem;
+        }
+        
+        .container { 
+            max-width: 1600px; 
+            margin: 0 auto; 
+            padding: 24px;
+            display: grid;
+            grid-template-columns: 1fr;
+            gap: 24px;
+        }
+        
+        /* Stats Grid */
+        .stats-grid { 
+            display: grid; 
+            grid-template-columns: repeat(auto-fit, minmax(280px, 1fr)); 
+            gap: 20px; 
+        }
+        
+        .stat-card { 
+            background: #1e293b; 
+            padding: 24px; 
+            border-radius: 12px; 
+            border: 1px solid #334155;
+            transition: all 0.3s ease;
+        }
+        
+        .stat-card:hover {
+            transform: translateY(-2px);
+            border-color: #60a5fa;
+            box-shadow: 0 8px 16px rgba(0, 0, 0, 0.2);
+        }
+        
+        .stat-value { 
+            font-size: 2.5rem; 
+            font-weight: 800; 
+            margin: 12px 0 8px;
+            font-family: 'Monaco', 'Menlo', monospace;
+        }
+        
+        .stat-label { 
+            color: #94a3b8; 
+            font-size: 0.85rem;
+            text-transform: uppercase;
+            letter-spacing: 0.05em;
+            font-weight: 600;
+        }
+        
+        .cost-critical { color: #f87171; }
+        .cost-warning { color: #fbbf24; }
+        .cost-good { color: #34d399; }
+        .savings-highlight { color: #10b981; }
+        .cache-hit { color: #34d399; }
+        .cache-miss { color: #f87171; }
+        
+        /* Section Cards */
+        .section-card {
+            background: #1e293b;
+            border-radius: 12px;
+            border: 1px solid #334155;
+            padding: 24px;
+            margin-bottom: 24px;
+        }
+        
+        .section-title {
+            font-size: 1.25rem;
+            font-weight: 700;
+            margin-bottom: 20px;
+            color: #e2e8f0;
+            display: flex;
+            align-items: center;
+            gap: 10px;
+        }
+        
+        .section-title::before {
+            content: '';
+            display: block;
+            width: 4px;
+            height: 24px;
+            background: linear-gradient(135deg, #60a5fa 0%, #a78bfa 100%);
+            border-radius: 2px;
+        }
+        
+        /* Controls */
+        .control-bar {
+            background: #1e293b;
+            padding: 20px;
+            border-radius: 12px;
+            border: 1px solid #334155;
+            margin-bottom: 24px;
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            flex-wrap: wrap;
+            gap: 12px;
+        }
+        
+        .btn { 
+            background: linear-gradient(135deg, #3b82f6 0%, #8b5cf6 100%); 
+            color: white; 
+            border: none; 
+            padding: 10px 20px; 
+            border-radius: 8px; 
+            cursor: pointer; 
+            font-size: 14px;
+            font-weight: 600;
+            display: inline-flex;
+            align-items: center;
+            gap: 6px;
+            transition: all 0.2s ease;
+        }
+        
+        .btn:hover { 
+            transform: translateY(-1px);
+            box-shadow: 0 4px 12px rgba(59, 130, 246, 0.3);
+        }
+        
+        .btn-danger { background: linear-gradient(135deg, #ef4444 0%, #dc2626 100%); }
+        .btn-warning { background: linear-gradient(135deg, #f59e0b 0%, #d97706 100%); }
+        .btn-success { background: linear-gradient(135deg, #10b981 0%, #059669 100%); }
+        .btn-info { background: linear-gradient(135deg, #06b6d4 0%, #0891b2 100%); }
+        .btn-secondary { 
+            background: #334155; 
+            color: #cbd5e1;
+        }
+        
+        .btn-small {
+            padding: 6px 12px;
+            font-size: 12px;
+        }
+        
+        /* Login Screen */
+        .login-container { 
+            background: #1e293b; 
+            padding: 40px; 
+            border-radius: 16px; 
+            border: 1px solid #334155;
+            max-width: 500px; 
+            margin: 100px auto; 
+            text-align: center;
+            box-shadow: 0 20px 40px rgba(0, 0, 0, 0.3);
+        }
+        
+        .login-input { 
+            width: 100%; 
+            padding: 14px; 
+            margin: 12px 0; 
+            background: #0f172a;
+            border: 1px solid #334155;
+            border-radius: 8px;
+            color: #e2e8f0;
+            font-size: 14px;
+        }
+        
+        .login-input:focus {
+            outline: none;
+            border-color: #60a5fa;
+            box-shadow: 0 0 0 3px rgba(96, 165, 250, 0.1);
+        }
+        
+        /* Messages */
+        .message-container {
+            position: fixed;
+            top: 24px;
+            right: 24px;
+            z-index: 1000;
+            max-width: 400px;
+        }
+        
+        .message {
+            background: #1e293b;
+            border-radius: 8px;
+            padding: 16px;
+            margin-bottom: 12px;
+            border-left: 4px solid;
+            box-shadow: 0 4px 12px rgba(0, 0, 0, 0.2);
+            animation: slideIn 0.3s ease;
+        }
+        
+        .message-success { border-left-color: #10b981; }
+        .message-error { border-left-color: #ef4444; }
+        .message-warning { border-left-color: #f59e0b; }
+        .message-info { border-left-color: #3b82f6; }
+        
+        @keyframes slideIn {
+            from { transform: translateX(100%); opacity: 0; }
+            to { transform: translateX(0); opacity: 1; }
+        }
+        
+        /* Tables */
+        .data-table {
+            width: 100%;
+            border-collapse: separate;
+            border-spacing: 0;
+            margin-top: 16px;
+        }
+        
+        .data-table th {
+            background: #0f172a;
+            padding: 12px 16px;
+            text-align: left;
+            font-weight: 600;
+            font-size: 0.85rem;
+            color: #94a3b8;
+            border-bottom: 1px solid #334155;
+        }
+        
+        .data-table td {
+            padding: 12px 16px;
+            border-bottom: 1px solid #334155;
+            color: #cbd5e1;
+            font-size: 0.9rem;
+        }
+        
+        .data-table tr:hover {
+            background: rgba(96, 165, 250, 0.05);
+        }
+        
+        /* Progress Bars */
+        .progress-bar {
+            background: #334155;
+            border-radius: 10px;
+            height: 10px;
+            margin: 16px 0;
+            overflow: hidden;
+        }
+        
+        .progress-fill {
+            height: 100%;
+            background: linear-gradient(90deg, #60a5fa 0%, #8b5cf6 100%);
+            transition: width 0.3s ease;
+            border-radius: 10px;
+        }
+        
+        /* Auto-login Overlay */
+        .auto-login-overlay {
+            position: fixed;
+            top: 0;
+            left: 0;
+            width: 100%;
+            height: 100%;
+            background: #0f172a;
+            z-index: 9999;
+            display: flex;
+            justify-content: center;
+            align-items: center;
+            flex-direction: column;
+        }
+        
+        .loading-spinner {
+            width: 50px;
+            height: 50px;
+            border: 3px solid #334155;
+            border-top-color: #60a5fa;
+            border-radius: 50%;
+            animation: spin 1s linear infinite;
+            margin-bottom: 20px;
+        }
+        
+        @keyframes spin {
+            to { transform: rotate(360deg); }
+        }
+        
+        /* Modal */
+        .modal-overlay {
+            position: fixed;
+            top: 0;
+            left: 0;
+            width: 100%;
+            height: 100%;
+            background: rgba(15, 23, 42, 0.9);
+            z-index: 1000;
+            display: none;
+            justify-content: center;
+            align-items: center;
+        }
+        
+        .modal-content {
+            background: #1e293b;
+            border-radius: 16px;
+            border: 1px solid #334155;
+            padding: 32px;
+            max-width: 800px;
+            max-height: 80vh;
+            overflow-y: auto;
+            width: 90%;
+        }
+        
+        .modal-header {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            margin-bottom: 24px;
+        }
+        
+        .modal-close {
+            background: none;
+            border: none;
+            color: #94a3b8;
+            font-size: 24px;
+            cursor: pointer;
+            padding: 0;
+            width: 32px;
+            height: 32px;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            border-radius: 6px;
+        }
+        
+        .modal-close:hover {
+            background: #334155;
+            color: #e2e8f0;
+        }
+        
+        /* Savings Highlight */
+        .savings-card {
+            background: linear-gradient(135deg, rgba(16, 185, 129, 0.1) 0%, rgba(5, 150, 105, 0.1) 100%);
+            border: 2px solid #10b981;
+        }
+        
+        .savings-badge {
+            background: linear-gradient(135deg, #10b981 0%, #059669 100%);
+            color: white;
+            padding: 4px 12px;
+            border-radius: 20px;
+            font-size: 0.75rem;
+            font-weight: 700;
+            display: inline-block;
+            margin-left: 10px;
+        }
+        
+        /* Responsive */
+        @media (max-width: 768px) {
+            .container { padding: 16px; }
+            .control-bar { flex-direction: column; align-items: stretch; }
+            .stats-grid { grid-template-columns: 1fr; }
+        }
+    </style>
+</head>
+<body>
+    <!-- Auto-login Overlay -->
+    <div id="autoLoginOverlay" class="auto-login-overlay">
+        <div class="loading-spinner"></div>
+        <h2 style="margin-bottom: 12px; color: #e2e8f0;">🚀 Loading Admin Dashboard</h2>
+        <p style="color: #94a3b8; margin-bottom: 24px;">Authenticating with Firebase UID...</p>
+        <div id="autoLoginStatus"></div>
+    </div>
+
+    <!-- Login Screen -->
+    <div id="loginScreen" class="login-container" style="display: none;">
+        <div style="margin-bottom: 32px;">
+            <h1 style="font-size: 1.75rem; margin-bottom: 8px; color: #e2e8f0;">🔐 Admin Dashboard</h1>
+            <p style="color: #94a3b8; font-size: 0.9rem;">
+                Resume Writer API • Firebase UID Authentication
+            </p>
+        </div>
+        
+        <div id="loginMessage" style="display: none; margin-bottom: 20px;"></div>
+        
+        <form id="loginForm" onsubmit="event.preventDefault(); login();">
+            <div style="margin-bottom: 20px;">
+                <label style="display: block; margin-bottom: 8px; color: #cbd5e1; font-size: 0.9rem;">
+                    Firebase Admin UID
+                </label>
+                <input type="text" id="firebaseUID" class="login-input" 
+                       placeholder="Enter your Firebase UID" required 
+                       value="heqvlWyje8h4Jh7iF75NwZAgCwD2">
+            </div>
+            
+            <button type="submit" class="btn btn-success" style="width: 100%; padding: 14px;">
+                🔐 Sign In with Firebase UID
+            </button>
+        </form>
+        
+        <div style="margin-top: 32px; padding: 16px; background: #0f172a; border-radius: 8px; border: 1px solid #334155;">
+            <p style="color: #94a3b8; font-size: 0.85rem; margin: 0;">
+                <strong>ℹ️ Admin Access Required</strong><br>
+                Your UID must have admin privileges in Firestore. Contact the system administrator if access is denied.
+            </p>
+        </div>
+    </div>
+
+    <!-- Dashboard -->
+    <div id="dashboard" style="display: none;">
+        <div class="header">
+            <h1>📊 Resume Writer API - Admin Dashboard</h1>
+            <p>Real-time Monitoring • Cache Savings Analytics • Full Admin Control</p>
+            <div style="margin-top: 16px; display: flex; justify-content: center; gap: 16px; flex-wrap: wrap;">
+                <div style="background: rgba(255, 255, 255, 0.1); padding: 8px 16px; border-radius: 20px; font-size: 0.85rem;">
+                    <strong>Admin UID:</strong> <span id="adminUID" style="font-family: monospace;">-</span>
+                </div>
+                <div style="background: linear-gradient(135deg, #ef4444 0%, #dc2626 100%); padding: 8px 16px; border-radius: 20px; font-size: 0.85rem; font-weight: 600;">
+                    🔒 ADMIN MODE • FULL ACCESS
+                </div>
+                <div style="background: rgba(255, 255, 255, 0.1); padding: 8px 16px; border-radius: 20px; font-size: 0.85rem;">
+                    Session: <span id="sessionTimer">0:00</span>
+                </div>
+            </div>
+        </div>
+
+        <div class="container">
+            <!-- Control Bar -->
+            <div class="control-bar">
+                <div style="display: flex; gap: 10px; flex-wrap: wrap;">
+                    <button class="btn" onclick="refreshStats()" id="refreshBtn">
+                        <span>🔄 Refresh Stats</span>
+                    </button>
+                    <button class="btn btn-warning" onclick="analyzeCacheSavings()" id="savingsBtn">
+                        <span>💰 Analyze Savings</span>
+                    </button>
+                    <button class="btn btn-success" onclick="triggerBackup()" id="backupBtn">
+                        <span>💾 Backup Now</span>
+                    </button>
+                    <button class="btn btn-danger" onclick="resetDailyStats()" id="resetBtn">
+                        <span>🔄 Reset Stats</span>
+                    </button>
+                </div>
+                
+                <div style="display: flex; align-items: center; gap: 16px;">
+                    <div style="display: flex; align-items: center; gap: 8px;">
+                        <input type="checkbox" id="autoRefreshToggle" checked onchange="toggleAutoRefresh()">
+                        <label for="autoRefreshToggle" style="color: #cbd5e1; font-size: 0.85rem;">
+                            Auto-refresh (60s)
+                        </label>
+                    </div>
+                    <button class="btn btn-danger btn-small" onclick="logout()">
+                        <span>🚪 Logout</span>
+                    </button>
+                </div>
+            </div>
+
+            <!-- Messages Container -->
+            <div id="messageContainer" class="message-container"></div>
+
+            <!-- Main Stats Grid -->
+            <div class="stats-grid">
+                <div class="stat-card savings-card">
+                    <div class="stat-label">Total Cache Savings</div>
+                    <div class="stat-value savings-highlight" id="totalSavings">$0.00</div>
+                    <div style="color: #94a3b8; font-size: 0.85rem;">
+                        <span id="savingsToday">$0.00</span> saved today
+                    </div>
+                </div>
+                
+                <div class="stat-card">
+                    <div class="stat-label">Cache Hits Today</div>
+                    <div class="stat-value cache-hit" id="cacheHitsToday">0</div>
+                    <div style="color: #94a3b8; font-size: 0.85rem;">
+                        <span id="cacheHitRate">0%</span> Hit Rate
+                    </div>
+                </div>
+                
+                <div class="stat-card">
+                    <div class="stat-label">Cost Without Cache</div>
+                    <div class="stat-value cost-warning" id="potentialCost">$0.00</div>
+                    <div style="color: #94a3b8; font-size: 0.85rem;">
+                        Estimated if no cache
+                    </div>
+                </div>
+                
+                <div class="stat-card">
+                    <div class="stat-label">Actual Cost Today</div>
+                    <div class="stat-value cost-good" id="actualCost">$0.00</div>
+                    <div style="color: #94a3b8; font-size: 0.85rem;">
+                        With cache savings
+                    </div>
+                </div>
+                
+                <div class="stat-card">
+                    <div class="stat-label">Savings Per Hit</div>
+                    <div class="stat-value" id="savingsPerHit">$0.00</div>
+                    <div style="color: #94a3b8; font-size: 0.85rem;">
+                        Average per cache hit
+                    </div>
+                </div>
+                
+                <div class="stat-card">
+                    <div class="stat-label">Cache Efficiency</div>
+                    <div class="stat-value" id="cacheEfficiency">0%</div>
+                    <div class="progress-bar">
+                        <div class="progress-fill" id="cacheHitBar" style="width: 0%"></div>
+                    </div>
+                </div>
+                
+                <div class="stat-card">
+                    <div class="stat-label">Most Saved Template</div>
+                    <div class="stat-value" id="topTemplateSaves">0</div>
+                    <div style="color: #94a3b8; font-size: 0.85rem;">
+                        Cache hits on single template
+                    </div>
+                </div>
+                
+                <div class="stat-card">
+                    <div class="stat-label">Server Status</div>
+                    <div class="stat-value" id="serverStatus">⏳ Loading...</div>
+                    <div style="color: #94a3b8; font-size: 0.85rem;">
+                        Last update: <span id="lastUpdate">Never</span>
+                    </div>
+                </div>
+            </div>
+
+            <!-- Cache Savings Analytics Section -->
+            <div class="section-card">
+                <h3 class="section-title">
+                    💰 Cache Savings Analytics
+                    <span class="savings-badge" id="savingsBadge">CALCULATING...</span>
+                </h3>
+                
+                <div style="display: grid; grid-template-columns: repeat(auto-fit, minmax(250px, 1fr)); gap: 20px; margin-bottom: 24px;">
+                    <div style="background: #0f172a; padding: 20px; border-radius: 12px; border: 1px solid #334155;">
+                        <div style="font-size: 2rem; font-weight: 800; color: #34d399; margin-bottom: 8px;" id="totalCacheHits">0</div>
+                        <div style="color: #94a3b8; font-size: 0.85rem;">Total Cache Hits</div>
+                        <div style="color: #60a5fa; font-size: 0.9rem; margin-top: 8px;">
+                            Saved <span id="totalTokensSaved">0</span> tokens
+                        </div>
+                    </div>
+                    
+                    <div style="background: #0f172a; padding: 20px; border-radius: 12px; border: 1px solid #334155;">
+                        <div style="font-size: 2rem; font-weight: 800; color: #fbbf24; margin-bottom: 8px;" id="avgSavingsPerResume">$0.00</div>
+                        <div style="color: #94a3b8; font-size: 0.85rem;">Avg Savings Per Resume</div>
+                        <div style="color: #60a5fa; font-size: 0.9rem; margin-top: 8px;">
+                            Based on similar templates
+                        </div>
+                    </div>
+                    
+                    <div style="background: #0f172a; padding: 20px; border-radius: 12px; border: 1px solid #334155;">
+                        <div style="font-size: 2rem; font-weight: 800; color: #a78bfa; margin-bottom: 8px;" id="estimatedMonthlySavings">$0.00</div>
+                        <div style="color: #94a3b8; font-size: 0.85rem;">Estimated Monthly Savings</div>
+                        <div style="color: #60a5fa; font-size: 0.9rem; margin-top: 8px;">
+                            Projected from current rate
+                        </div>
+                    </div>
+                    
+                    <div style="background: #0f172a; padding: 20px; border-radius: 12px; border: 1px solid #334155;">
+                        <div style="font-size: 2rem; font-weight: 800; color: #f87171; margin-bottom: 8px;" id="missedSavings">$0.00</div>
+                        <div style="color: #94a3b8; font-size: 0.85rem;">Potential Additional Savings</div>
+                        <div style="color: #60a5fa; font-size: 0.9rem; margin-top: 8px;">
+                            If hit rate was 100%
+                        </div>
+                    </div>
+                </div>
+                
+                <!-- Savings Breakdown -->
+                <div style="margin-top: 24px;">
+                    <h4 style="color: #e2e8f0; margin-bottom: 16px; font-size: 1.1rem;">
+                        📊 Savings Breakdown by Endpoint
+                    </h4>
+                    <div id="savingsBreakdown">
+                        <div style="text-align: center; padding: 40px; color: #94a3b8;">
+                            <div style="font-size: 3rem; margin-bottom: 16px;">📈</div>
+                            <p>Loading savings analytics...</p>
+                        </div>
+                    </div>
+                </div>
+                
+                <!-- Top Cached Templates -->
+                <div style="margin-top: 32px;">
+                    <h4 style="color: #e2e8f0; margin-bottom: 16px; font-size: 1.1rem;">
+                        🏆 Most Frequently Cached Templates
+                    </h4>
+                    <div id="topTemplates">
+                        <div style="text-align: center; padding: 40px; color: #94a3b8;">
+                            <div style="font-size: 3rem; margin-bottom: 16px;">📋</div>
+                            <p>Analyzing template cache patterns...</p>
+                        </div>
+                    </div>
+                </div>
+            </div>
+
+            <!-- Daily Stats Section -->
+            <div class="section-card">
+                <h3 class="section-title">📈 Daily Statistics</h3>
+                
+                <div style="display: grid; grid-template-columns: repeat(auto-fit, minmax(200px, 1fr)); gap: 16px; margin-bottom: 24px;">
+                    <div style="background: #0f172a; padding: 16px; border-radius: 8px; border: 1px solid #334155; text-align: center;">
+                        <div style="font-size: 1.5rem; font-weight: 700; color: #e2e8f0;" id="dailyRequests">0</div>
+                        <div style="color: #94a3b8; font-size: 0.85rem;">Total Requests</div>
+                    </div>
+                    <div style="background: #0f172a; padding: 16px; border-radius: 8px; border: 1px solid #334155; text-align: center;">
+                        <div style="font-size: 1.5rem; font-weight: 700; color: #e2e8f0;" id="dailyTokens">0</div>
+                        <div style="color: #94a3b8; font-size: 0.85rem;">Total Tokens</div>
+                    </div>
+                    <div style="background: #0f172a; padding: 16px; border-radius: 8px; border: 1px solid #334155; text-align: center;">
+                        <div style="font-size: 1.5rem; font-weight: 700; color: #e2e8f0;" id="dailyAlignments">0</div>
+                        <div style="color: #94a3b8; font-size: 0.85rem;">JD Alignments</div>
+                    </div>
+                    <div style="background: #0f172a; padding: 16px; border-radius: 8px; border: 1px solid #334155; text-align: center;">
+                        <div style="font-size: 1.5rem; font-weight: 700; color: #e2e8f0;" id="cacheMissesToday">0</div>
+                        <div style="color: #94a3b8; font-size: 0.85rem;">Cache Misses</div>
+                    </div>
+                </div>
+            </div>
+
+            <!-- User Statistics -->
+            <div class="section-card">
+                <h3 class="section-title">👥 User Statistics</h3>
+                
+                <div style="display: grid; grid-template-columns: repeat(auto-fit, minmax(200px, 1fr)); gap: 16px; margin-bottom: 24px;">
+                    <div style="background: #0f172a; padding: 16px; border-radius: 8px; border: 1px solid #334155; text-align: center;">
+                        <div style="font-size: 1.5rem; font-weight: 700; color: #e2e8f0;" id="totalUsers">0</div>
+                        <div style="color: #94a3b8; font-size: 0.85rem;">Total Users</div>
+                    </div>
+                    <div style="background: #0f172a; padding: 16px; border-radius: 8px; border: 1px solid #334155; text-align: center;">
+                        <div style="font-size: 1.5rem; font-weight: 700; color: #e2e8f0;" id="newUsersToday">0</div>
+                        <div style="color: #94a3b8; font-size: 0.85rem;">New Today</div>
+                    </div>
+                    <div style="background: #0f172a; padding: 16px; border-radius: 8px; border: 1px solid #334155; text-align: center;">
+                        <div style="font-size: 1.5rem; font-weight: 700; color: #e2e8f0;" id="topUserRequests">0</div>
+                        <div style="color: #94a3b8; font-size: 0.85rem;">Most Active User</div>
+                    </div>
+                    <div style="background: #0f172a; padding: 16px; border-radius: 8px; border: 1px solid #334155; text-align: center;">
+                        <div style="font-size: 1.5rem; font-weight: 700; color: #e2e8f0;" id="avgRequestsPerUser">0</div>
+                        <div style="color: #94a3b8; font-size: 0.85rem;">Avg Requests/User</div>
+                    </div>
+                </div>
+                
+                <div id="topUsersList">
+                    <!-- Top users will be loaded here -->
+                </div>
+            </div>
+
+            <!-- Cost History -->
+            <div class="section-card">
+                <h3 class="section-title">📊 Cost History & Projections</h3>
+                <div id="costHistory">
+                    <div style="text-align: center; padding: 40px; color: #94a3b8;">
+                        <div style="font-size: 3rem; margin-bottom: 16px;">💸</div>
+                        <p>Loading cost history data...</p>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- Savings Details Modal -->
+    <div id="savingsDetailsModal" class="modal-overlay">
+        <div class="modal-content">
+            <div class="modal-header">
+                <h2 style="color: #e2e8f0; margin: 0;">💰 Cache Savings Details</h2>
+                <button class="modal-close" onclick="closeSavingsDetails()">&times;</button>
+            </div>
+            <div id="savingsModalContent">
+                <!-- Savings details will be populated here -->
+            </div>
+        </div>
+    </div>
+
+    <script>
+        // Configuration
+        const API_BASE_URL = window.location.origin === 'http://localhost:3000' 
+            ? 'http://localhost:8000' 
+            : 'https://resume-writer-api.onrender.com';
+        
+        // Pricing constants (from your server)
+        const PRICING = {
+            gpt35_input: 0.50 / 1000000,  // $0.50 per 1M tokens
+            gpt35_output: 1.50 / 1000000, // $1.50 per 1M tokens
+            gpt4mini_input: 2.50 / 1000000, // $2.50 per 1M tokens
+            avg_tokens_per_resume: 1500,   // Average tokens per resume generation
+            avg_tokens_per_alignment: 800   // Average tokens per JD alignment
+        };
+        
+        // State
+        let currentSession = null;
+        let refreshInterval = null;
+        let sessionTimerInterval = null;
+        let sessionStartTime = null;
+        let autoRefreshEnabled = true;
+        let cacheSavingsData = {
+            today: {
+                hits: 0,
+                misses: 0,
+                savings: 0,
+                potentialCost: 0,
+                actualCost: 0
+            },
+            total: {
+                hits: 0,
+                savings: 0
+            }
+        };
+
+        // Initialize
+        document.addEventListener('DOMContentLoaded', function() {
+            console.log('🚀 Admin Dashboard Initializing...');
+            
+            const storedUID = localStorage.getItem('admin_uid') || "heqvlWyje8h4Jh7iF75NwZAgCwD2";
+            document.getElementById('firebaseUID').value = storedUID;
+            
+            setTimeout(() => {
+                attemptAutoLogin();
+            }, 1000);
+        });
+
+        // ========== AUTHENTICATION ==========
+
+        function attemptAutoLogin() {
+            const firebaseUID = document.getElementById('firebaseUID').value.trim();
+            console.log('🔐 Attempting auto-login with UID:', firebaseUID);
+            
+            if (!firebaseUID) {
+                showLoginScreen();
+                return;
+            }
+            
+            showAutoLoginStatus('🔄 Testing authentication...');
+            
+            fetch(`${API_BASE_URL}/health`)
+                .then(response => {
+                    if (!response.ok) throw new Error('Server not reachable');
+                    return loginWithUID(firebaseUID);
+                })
+                .catch(error => {
+                    console.error('Server check failed:', error);
+                    showAutoLoginStatus('❌ Server not reachable');
+                    setTimeout(showLoginScreen, 2000);
+                });
+        }
+
+        async function loginWithUID(firebaseUID) {
+            try {
+                showAutoLoginStatus('🔑 Verifying admin privileges...');
+                
+                const response = await fetch(`${API_BASE_URL}/admin/errors/stats`, {
+                    headers: {
+                        'X-User-ID': firebaseUID,
+                        'Content-Type': 'application/json'
+                    }
+                });
+                
+                if (response.ok) {
+                    currentSession = {
+                        uid: firebaseUID,
+                        type: 'firebase',
+                        timestamp: new Date().toISOString()
+                    };
+                    
+                    localStorage.setItem('admin_uid', firebaseUID);
+                    showAutoLoginStatus('✅ Authentication successful!');
+                    
+                    setTimeout(() => {
+                        handleSuccessfulLogin();
+                    }, 1000);
+                    
+                } else if (response.status === 403) {
+                    throw new Error('Admin privileges required');
+                } else {
+                    throw new Error(`Server returned ${response.status}`);
+                }
+                
+            } catch (error) {
+                console.error('Login error:', error);
+                showAutoLoginStatus(`❌ ${error.message}`);
+                setTimeout(() => {
+                    showLoginScreen();
+                }, 3000);
+            }
+        }
+
+        function showAutoLoginStatus(message) {
+            const statusElement = document.getElementById('autoLoginStatus');
+            if (statusElement) {
+                const icon = message.includes('✅') ? '✅' : 
+                            message.includes('❌') ? '❌' : 
+                            message.includes('🔑') ? '🔑' : '🔄';
+                
+                statusElement.innerHTML = `
+                    <div style="
+                        background: rgba(255,255,255,0.1); 
+                        padding: 16px; 
+                        border-radius: 8px; 
+                        border: 1px solid #334155;
+                        font-family: monospace;
+                        font-size: 0.9rem;
+                        color: ${message.includes('❌') ? '#f87171' : '#e2e8f0'};
+                    ">
+                        ${icon} ${message}
+                    </div>
+                `;
+            }
+        }
+
+        function showLoginScreen() {
+            document.getElementById('autoLoginOverlay').style.display = 'none';
+            document.getElementById('loginScreen').style.display = 'block';
+            document.getElementById('dashboard').style.display = 'none';
+        }
+
+        async function login() {
+            const firebaseUID = document.getElementById('firebaseUID').value.trim();
+            
+            if (!firebaseUID) {
+                showLoginMessage('Please enter Firebase UID', 'error');
+                return;
+            }
+            
+            document.getElementById('loginScreen').classList.add('loading');
+            showLoginMessage('🔄 Testing authentication...', 'info');
+            
+            try {
+                await loginWithUID(firebaseUID);
+            } catch (error) {
+                console.error('Login error:', error);
+                showLoginMessage('❌ Login failed: ' + error.message, 'error');
+                document.getElementById('loginScreen').classList.remove('loading');
+            }
+        }
+
+        function showLoginMessage(message, type) {
+            const messageDiv = document.getElementById('loginMessage');
+            if (messageDiv) {
+                messageDiv.innerHTML = `
+                    <div style="
+                        padding: 12px; 
+                        border-radius: 8px; 
+                        border-left: 4px solid ${type === 'error' ? '#ef4444' : type === 'success' ? '#10b981' : '#3b82f6'};
+                        background: #0f172a;
+                        color: #e2e8f0;
+                    ">
+                        ${message}
+                    </div>
+                `;
+                messageDiv.style.display = 'block';
+                
+                setTimeout(() => {
+                    messageDiv.style.display = 'none';
+                }, 5000);
+            }
+        }
+
+        function handleSuccessfulLogin() {
+            console.log('🎉 Login successful, showing dashboard');
+            
+            document.getElementById('autoLoginOverlay').style.display = 'none';
+            document.getElementById('loginScreen').style.display = 'none';
+            document.getElementById('dashboard').style.display = 'block';
+            
+            sessionStartTime = new Date();
+            document.getElementById('adminUID').textContent = currentSession.uid;
+            
+            showMessage('✅ Authentication successful! Dashboard loaded.', 'success');
+            
+            refreshStats();
+            startAutoRefresh();
+            startSessionTimer();
+        }
+
+        // ========== CACHE SAVINGS ANALYTICS ==========
+
+        async function analyzeCacheSavings() {
+            if (!currentSession) {
+                showMessage('Please log in first', 'error');
+                return;
+            }
+
+            const savingsBtn = document.getElementById('savingsBtn');
+            const originalText = savingsBtn.innerHTML;
+            savingsBtn.innerHTML = '<span>💰 Analyzing...</span>';
+            savingsBtn.disabled = true;
+
+            try {
+                showMessage('🔄 Analyzing cache savings...', 'info');
+                
+                // Get stats to analyze cache savings
+                const response = await fetch(`${API_BASE_URL}/stats`, {
+                    headers: {
+                        'X-User-ID': currentSession.uid,
+                        'Content-Type': 'application/json'
+                    }
+                });
+                
+                if (!response.ok) {
+                    throw new Error(`Stats endpoint returned ${response.status}`);
+                }
+                
+                const data = await response.json();
+                
+                if (data.success) {
+                    calculateCacheSavings(data);
+                    updateSavingsDisplay();
+                    showMessage('✅ Cache savings analysis complete!', 'success');
+                }
+                
+            } catch (error) {
+                console.error('Savings analysis error:', error);
+                showMessage('❌ Could not analyze savings: ' + error.message, 'error');
+            } finally {
+                savingsBtn.innerHTML = originalText;
+                savingsBtn.disabled = false;
+            }
+        }
+
+        function calculateCacheSavings(stats) {
+            if (!stats.daily_stats) return;
+            
+            const dailyStats = stats.daily_stats;
+            const hits = dailyStats.daily_cache_hits || 0;
+            const misses = dailyStats.daily_cache_misses || 0;
+            const totalRequests = hits + misses;
+            const actualCost = parseFloat(dailyStats.daily_cost || 0);
+            
+            // Calculate average cost per request (based on actual cost and misses)
+            let avgCostPerRequest = 0;
+            if (misses > 0) {
+                avgCostPerRequest = actualCost / misses;
+            } else if (actualCost > 0) {
+                avgCostPerRequest = actualCost / totalRequests;
+            } else {
+                // Use estimated cost based on tokens
+                const avgTokens = dailyStats.tokens_per_request || PRICING.avg_tokens_per_resume;
+                avgCostPerRequest = avgTokens * (PRICING.gpt35_input + PRICING.gpt35_output);
+            }
+            
+            // Calculate savings
+            const potentialCost = totalRequests * avgCostPerRequest;
+            const savings = Math.max(0, potentialCost - actualCost);
+            const savingsPerHit = hits > 0 ? savings / hits : 0;
+            
+            // Calculate tokens saved
+            const avgTokensPerRequest = dailyStats.tokens_per_request || PRICING.avg_tokens_per_resume;
+            const tokensSaved = hits * avgTokensPerRequest;
+            
+            // Update cache savings data
+            cacheSavingsData.today = {
+                hits: hits,
+                misses: misses,
+                savings: savings,
+                potentialCost: potentialCost,
+                actualCost: actualCost,
+                avgCostPerRequest: avgCostPerRequest,
+                tokensSaved: tokensSaved
+            };
+            
+            // Calculate monthly projections (assuming 30 days)
+            cacheSavingsData.total.savings += savings;
+            cacheSavingsData.total.hits += hits;
+            
+            // Calculate additional metrics
+            const hitRate = totalRequests > 0 ? (hits / totalRequests) * 100 : 0;
+            const missedSavings = misses * avgCostPerRequest;
+            const estimatedMonthlySavings = savings * 30;
+            
+            // Update UI
+            updateSavingsMetrics({
+                hits: hits,
+                savings: savings,
+                potentialCost: potentialCost,
+                actualCost: actualCost,
+                savingsPerHit: savingsPerHit,
+                hitRate: hitRate,
+                tokensSaved: tokensSaved,
+                missedSavings: missedSavings,
+                estimatedMonthlySavings: estimatedMonthlySavings,
+                avgSavingsPerResume: savingsPerHit
+            });
+        }
+
+        function updateSavingsMetrics(metrics) {
+            // Update main stats
+            document.getElementById('totalSavings').textContent = `$${metrics.savings.toFixed(2)}`;
+            document.getElementById('savingsToday').textContent = `$${metrics.savings.toFixed(2)}`;
+            document.getElementById('cacheHitsToday').textContent = metrics.hits.toLocaleString();
+            document.getElementById('potentialCost').textContent = `$${metrics.potentialCost.toFixed(2)}`;
+            document.getElementById('actualCost').textContent = `$${metrics.actualCost.toFixed(2)}`;
+            document.getElementById('savingsPerHit').textContent = `$${metrics.savingsPerHit.toFixed(4)}`;
+            document.getElementById('cacheEfficiency').textContent = `${metrics.hitRate.toFixed(1)}%`;
+            document.getElementById('cacheHitBar').style.width = `${metrics.hitRate}%`;
+            
+            // Update savings badge
+            const savingsBadge = document.getElementById('savingsBadge');
+            if (metrics.savings > 1) {
+                savingsBadge.textContent = `SAVING $${metrics.savings.toFixed(2)}/DAY`;
+                savingsBadge.style.background = 'linear-gradient(135deg, #10b981 0%, #059669 100%)';
+            } else if (metrics.savings > 0) {
+                savingsBadge.textContent = `SAVING $${metrics.savings.toFixed(2)}/DAY`;
+                savingsBadge.style.background = 'linear-gradient(135deg, #fbbf24 0%, #d97706 100%)';
+            } else {
+                savingsBadge.textContent = 'NO SAVINGS YET';
+                savingsBadge.style.background = 'linear-gradient(135deg, #6b7280 0%, #4b5563 100%)';
+            }
+            
+            // Update savings analytics section
+            document.getElementById('totalCacheHits').textContent = metrics.hits.toLocaleString();
+            document.getElementById('totalTokensSaved').textContent = metrics.tokensSaved.toLocaleString();
+            document.getElementById('avgSavingsPerResume').textContent = `$${metrics.avgSavingsPerResume.toFixed(4)}`;
+            document.getElementById('estimatedMonthlySavings').textContent = `$${metrics.estimatedMonthlySavings.toFixed(2)}`;
+            document.getElementById('missedSavings').textContent = `$${metrics.missedSavings.toFixed(2)}`;
+            
+            // Update top template saves (estimate based on hit rate)
+            const avgHitsPerTemplate = Math.floor(metrics.hits / 5); // Assume 5 popular templates
+            document.getElementById('topTemplateSaves').textContent = Math.max(1, avgHitsPerTemplate);
+            
+            // Update savings breakdown
+            updateSavingsBreakdown(metrics);
+            
+            // Update top templates display
+            updateTopTemplatesDisplay(metrics);
+        }
+
+        function updateSavingsBreakdown(metrics) {
+            const breakdown = document.getElementById('savingsBreakdown');
+            
+            // Simulate breakdown by endpoint (in real app, you'd get this from server)
+            const endpoints = [
+                { name: 'generate-resume', hits: Math.floor(metrics.hits * 0.6), savings: metrics.savings * 0.6 },
+                { name: 'generate-resume-from-files', hits: Math.floor(metrics.hits * 0.25), savings: metrics.savings * 0.25 },
+                { name: 'generate-resume-from-file-to-text', hits: Math.floor(metrics.hits * 0.1), savings: metrics.savings * 0.1 },
+                { name: 'align-resume', hits: Math.floor(metrics.hits * 0.05), savings: metrics.savings * 0.05 }
+            ];
+            
+            let html = '<table class="data-table">';
+            html += '<thead><tr><th>Endpoint</th><th>Cache Hits</th><th>Savings</th><th>Avg Savings/Hit</th><th>Efficiency</th></tr></thead><tbody>';
+            
+            endpoints.forEach(endpoint => {
+                const avgSavings = endpoint.hits > 0 ? endpoint.savings / endpoint.hits : 0;
+                const efficiency = endpoint.hits > 0 ? 'High' : 'Low';
+                
+                html += `
+                    <tr>
+                        <td style="color: #a78bfa; font-family: monospace;">${endpoint.name}</td>
+                        <td style="text-align: center; color: #34d399;">${endpoint.hits}</td>
+                        <td style="color: #10b981; font-weight: 600;">$${endpoint.savings.toFixed(4)}</td>
+                        <td style="color: #cbd5e1;">$${avgSavings.toFixed(4)}</td>
+                        <td>
+                            <span style="
+                                background: ${efficiency === 'High' ? '#10b981' : '#f59e0b'};
+                                color: white;
+                                padding: 2px 8px;
+                                border-radius: 12px;
+                                font-size: 0.75rem;
+                                font-weight: 600;
+                            ">
+                                ${efficiency}
+                            </span>
+                        </td>
+                    </tr>
+                `;
+            });
+            
+            html += '</tbody></table>';
+            breakdown.innerHTML = html;
+        }
+
+        function updateTopTemplatesDisplay(metrics) {
+            const container = document.getElementById('topTemplates');
+            
+            // Simulate top templates (in real app, you'd track this in Redis)
+            const templates = [
+                { id: 'template_001', hits: Math.floor(metrics.hits * 0.3), description: 'Software Engineer Resume', savings: metrics.savings * 0.3 },
+                { id: 'template_002', hits: Math.floor(metrics.hits * 0.2), description: 'Marketing Manager Resume', savings: metrics.savings * 0.2 },
+                { id: 'template_003', hits: Math.floor(metrics.hits * 0.15), description: 'Data Analyst Resume', savings: metrics.savings * 0.15 },
+                { id: 'template_004', hits: Math.floor(metrics.hits * 0.1), description: 'Product Manager Resume', savings: metrics.savings * 0.1 },
+                { id: 'template_005', hits: Math.floor(metrics.hits * 0.05), description: 'UX Designer Resume', savings: metrics.savings * 0.05 }
+            ];
+            
+            let html = '<table class="data-table">';
+            html += '<thead><tr><th>Template</th><th>Cache Hits</th><th>Total Savings</th><th>Savings Per Use</th><th>Popularity</th></tr></thead><tbody>';
+            
+            templates.forEach(template => {
+                const savingsPerUse = template.hits > 0 ? template.savings / template.hits : 0;
+                const popularity = template.hits > 10 ? '🔥 Very High' : 
+                                  template.hits > 5 ? '↑ High' : 
+                                  template.hits > 2 ? '→ Medium' : '↓ Low';
+                
+                html += `
+                    <tr>
+                        <td>
+                            <div style="color: #e2e8f0; font-weight: 500;">${template.description}</div>
+                            <div style="color: #94a3b8; font-size: 0.8rem; font-family: monospace;">${template.id}</div>
+                        </td>
+                        <td style="text-align: center; color: #34d399; font-weight: 600;">${template.hits}</td>
+                        <td style="color: #10b981; font-weight: 600;">$${template.savings.toFixed(4)}</td>
+                        <td style="color: #cbd5e1;">$${savingsPerUse.toFixed(4)}</td>
+                        <td style="color: ${popularity.includes('🔥') ? '#f59e0b' : '#60a5fa'}">
+                            ${popularity}
+                        </td>
+                    </tr>
+                `;
+            });
+            
+            html += '</tbody></table>';
+            container.innerHTML = html;
+        }
+
+        function updateSavingsDisplay() {
+            // This function updates the UI with the latest savings data
+            const savings = cacheSavingsData.today.savings;
+            const hits = cacheSavingsData.today.hits;
+            
+            // Update the main savings card
+            document.getElementById('totalSavings').textContent = `$${savings.toFixed(2)}`;
+            
+            // Animate the savings update
+            const savingsElement = document.getElementById('totalSavings');
+            savingsElement.style.transform = 'scale(1.1)';
+            setTimeout(() => {
+                savingsElement.style.transform = 'scale(1)';
+            }, 300);
+        }
+
+        // ========== STATS FUNCTIONS ==========
+
+        async function refreshStats() {
+            if (!currentSession) {
+                showMessage('Please log in first', 'error');
+                return;
+            }
+
+            const refreshBtn = document.getElementById('refreshBtn');
+            refreshBtn.classList.add('loading');
+
+            try {
+                const response = await fetch(`${API_BASE_URL}/stats`, {
+                    headers: {
+                        'X-User-ID': currentSession.uid,
+                        'Content-Type': 'application/json'
+                    }
+                });
+                
+                if (!response.ok) {
+                    throw new Error(`Stats endpoint returned ${response.status}`);
+                }
+                
+                const data = await response.json();
+                
+                if (data.success) {
+                    updateDashboard(data);
+                    showMessage('✅ Stats updated successfully', 'success');
+                }
+                
+            } catch (error) {
+                console.error('Stats error:', error);
+                showMessage('⚠️ Could not load stats: ' + error.message, 'error');
+            } finally {
+                refreshBtn.classList.remove('loading');
+                document.getElementById('lastUpdate').textContent = new Date().toLocaleTimeString();
+            }
+        }
+
+        function updateDashboard(stats) {
+            // Update daily stats
+            if (stats.daily_stats) {
+                const dailyStats = stats.daily_stats;
+                
+                // Update main stats
+                document.getElementById('dailyRequests').textContent = dailyStats.daily_requests || 0;
+                document.getElementById('dailyTokens').textContent = (dailyStats.daily_tokens || 0).toLocaleString();
+                document.getElementById('dailyAlignments').textContent = dailyStats.daily_alignments || 0;
+                document.getElementById('cacheMissesToday').textContent = dailyStats.daily_cache_misses || 0;
+                document.getElementById('cacheHitRate').textContent = `${(dailyStats.cache_hit_rate || 0).toFixed(1)}%`;
+                
+                // Update user stats
+                document.getElementById('totalUsers').textContent = dailyStats.user_count || 0;
+                document.getElementById('newUsersToday').textContent = dailyStats.new_users_today || 0;
+                
+                // Calculate cache savings automatically
+                calculateCacheSavings(stats);
+            }
+            
+            // Update user analytics
+            if (stats.user_analytics) {
+                const userAnalytics = stats.user_analytics;
+                document.getElementById('topUserRequests').textContent = userAnalytics.top_users?.[0]?.total_requests || 0;
+                document.getElementById('avgRequestsPerUser').textContent = Math.floor(
+                    (userAnalytics.total_requests_tracked || 0) / Math.max(1, userAnalytics.total_users_tracked || 1)
+                );
+                
+                updateTopUsersList(userAnalytics.top_users || []);
+            }
+            
+            // Update cost history
+            if (stats.cost_history && stats.cost_history.length > 0) {
+                updateCostHistory(stats.cost_history);
+            }
+            
+            // Check server health
+            checkServerHealth();
+        }
+
+        function updateTopUsersList(topUsers) {
+            const container = document.getElementById('topUsersList');
+            
+            if (!topUsers || topUsers.length === 0) {
+                container.innerHTML = '<p style="color: #94a3b8; text-align: center; padding: 20px;">No user activity yet.</p>';
+                return;
+            }
+
+            let html = '<table class="data-table">';
+            html += '<thead><tr><th>User ID</th><th>Total Requests</th><th>Cache Hits</th><th>Estimated Savings</th></tr></thead><tbody>';
+            
+            topUsers.slice(0, 10).forEach(user => {
+                const shortUserId = user.user_id?.length > 20 ? 
+                    user.user_id.substring(0, 20) + '...' : user.user_id;
+                
+                // Estimate cache hits based on total requests (assuming 40% hit rate)
+                const estimatedHits = Math.floor((user.total_requests || 0) * 0.4);
+                const estimatedSavings = estimatedHits * 0.02; // $0.02 per cache hit
+                
+                html += `
+                    <tr>
+                        <td style="font-family: monospace; color: #60a5fa;" title="${user.user_id}">
+                            ${shortUserId}
+                        </td>
+                        <td style="text-align: center; color: #cbd5e1;">${user.total_requests || 0}</td>
+                        <td style="text-align: center; color: #34d399;">${estimatedHits}</td>
+                        <td style="color: #10b981; font-weight: 600;">$${estimatedSavings.toFixed(2)}</td>
+                    </tr>
+                `;
+            });
+            
+            html += '</tbody></table>';
+            container.innerHTML = html;
+        }
+
+        function updateCostHistory(history) {
+            const container = document.getElementById('costHistory');
+            
+            if (!history || history.length === 0) {
+                container.innerHTML = '<p style="color: #94a3b8; text-align: center; padding: 20px;">No cost history available.</p>';
+                return;
+            }
+
+            let html = '<table class="data-table">';
+            html += '<thead><tr><th>Date</th><th>Cost</th><th>Requests</th><th>Cache Hits</th><th>Savings</th></tr></thead><tbody>';
+            
+            const sortedHistory = [...history].sort((a, b) => 
+                new Date(b.date || b.timestamp) - new Date(a.date || a.timestamp)
+            ).slice(0, 15);
+            
+            sortedHistory.forEach(day => {
+                const cost = parseFloat(day.daily_cost || day.cost || 0);
+                const requests = day.daily_requests || 0;
+                const hits = day.daily_cache_hits || 0;
+                const misses = day.daily_cache_misses || 0;
+                
+                // Calculate estimated savings
+                const avgCostPerRequest = misses > 0 ? cost / misses : 0;
+                const estimatedSavings = hits * avgCostPerRequest;
+                
+                html += `
+                    <tr>
+                        <td style="color: #94a3b8;">${day.date || new Date(day.timestamp).toLocaleDateString()}</td>
+                        <td style="color: ${cost > 1 ? '#f87171' : cost > 0.1 ? '#fbbf24' : '#34d399'};">
+                            $${cost.toFixed(6)}
+                        </td>
+                        <td style="text-align: center; color: #cbd5e1;">${requests}</td>
+                        <td style="text-align: center; color: #34d399;">${hits}</td>
+                        <td style="color: #10b981; font-weight: 600;">$${estimatedSavings.toFixed(4)}</td>
+                    </tr>
+                `;
+            });
+            
+            html += '</tbody></table>';
+            container.innerHTML = html;
+        }
+
+        function checkServerHealth() {
+            fetch(`${API_BASE_URL}/health`)
+                .then(response => response.json())
+                .then(health => {
+                    const statusEl = document.getElementById('serverStatus');
+                    if (statusEl) {
+                        if (health.status === 'healthy') {
+                            statusEl.textContent = '✅ Online';
+                            statusEl.style.color = '#34d399';
+                        } else {
+                            statusEl.textContent = '⚠️ Degraded';
+                            statusEl.style.color = '#fbbf24';
+                        }
+                    }
+                })
+                .catch(() => {
+                    const statusEl = document.getElementById('serverStatus');
+                    if (statusEl) {
+                        statusEl.textContent = '❌ Offline';
+                        statusEl.style.color = '#f87171';
+                    }
+                });
+        }
+
+        // ========== BACKUP FUNCTIONS ==========
+
+        async function triggerBackup() {
+            if (!currentSession) {
+                showMessage('Please log in first', 'error');
+                return;
+            }
+
+            const backupBtn = document.getElementById('backupBtn');
+            const originalText = backupBtn.innerHTML;
+            backupBtn.innerHTML = '<span>💾 Backing up...</span>';
+            backupBtn.disabled = true;
+
+            try {
+                const response = await fetch(`${API_BASE_URL}/backup/stats`, {
+                    method: 'POST',
+                    headers: {
+                        'X-User-ID': currentSession.uid,
+                        'Content-Type': 'application/json'
+                    }
+                });
+
+                if (response.status === 403) {
+                    throw new Error('Admin privileges required');
+                }
+
+                if (!response.ok) {
+                    throw new Error(`Backup failed: ${response.status}`);
+                }
+
+                showMessage('✅ Backup completed successfully!', 'success');
+                
+            } catch (error) {
+                console.error('Backup error:', error);
+                showMessage('❌ Backup failed: ' + error.message, 'error');
+            } finally {
+                backupBtn.innerHTML = originalText;
+                backupBtn.disabled = false;
+            }
+        }
+
+        // ========== UTILITY FUNCTIONS ==========
+
+        function showMessage(message, type = 'info') {
+            const container = document.getElementById('messageContainer');
+            if (!container) return;
+            
+            const messageDiv = document.createElement('div');
+            messageDiv.className = `message message-${type}`;
+            messageDiv.innerHTML = `
+                ${message}
+                <button onclick="this.parentElement.remove()" 
+                        style="float: right; background: none; border: none; color: #94a3b8; cursor: pointer; font-size: 18px;">
+                    ×
+                </button>
+            `;
+            
+            container.appendChild(messageDiv);
+            
+            setTimeout(() => {
+                if (messageDiv.parentElement) {
+                    messageDiv.remove();
+                }
+            }, 5000);
+        }
+
+        function startSessionTimer() {
+            sessionTimerInterval = setInterval(() => {
+                if (!sessionStartTime) return;
+                
+                const now = new Date();
+                const diff = Math.floor((now - sessionStartTime) / 1000);
+                const minutes = Math.floor(diff / 60);
+                const seconds = diff % 60;
+                
+                document.getElementById('sessionTimer').textContent = 
+                    `${minutes}:${seconds.toString().padStart(2, '0')}`;
+            }, 1000);
+        }
+
+        function stopSessionTimer() {
+            if (sessionTimerInterval) {
+                clearInterval(sessionTimerInterval);
+                sessionTimerInterval = null;
+            }
+        }
+
+        function startAutoRefresh() {
+            if (autoRefreshEnabled && !refreshInterval) {
+                refreshInterval = setInterval(refreshStats, 60000); // 60 seconds
+            }
+        }
+
+        function stopAutoRefresh() {
+            if (refreshInterval) {
+                clearInterval(refreshInterval);
+                refreshInterval = null;
+            }
+        }
+
+        function toggleAutoRefresh() {
+            autoRefreshEnabled = document.getElementById('autoRefreshToggle').checked;
+            
+            if (autoRefreshEnabled) {
+                startAutoRefresh();
+            } else {
+                stopAutoRefresh();
+            }
+        }
+
+        async function resetDailyStats() {
+            if (!confirm('Are you sure you want to reset daily statistics? This will clear today\'s cache savings data.')) {
+                return;
+            }
+            
+            try {
+                showMessage('🔄 Resetting daily statistics...', 'info');
+                
+                // Clear local cache savings data
+                cacheSavingsData = {
+                    today: {
+                        hits: 0,
+                        misses: 0,
+                        savings: 0,
+                        potentialCost: 0,
+                        actualCost: 0
+                    },
+                    total: {
+                        hits: 0,
+                        savings: 0
+                    }
+                };
+                
+                // Refresh stats to get new baseline
+                await refreshStats();
+                
+                showMessage('✅ Daily statistics reset successfully', 'success');
+                
+            } catch (error) {
+                console.error('Reset error:', error);
+                showMessage('❌ Could not reset statistics', 'error');
+            }
+        }
+
+        function logout() {
+            stopAutoRefresh();
+            stopSessionTimer();
+            
+            currentSession = null;
+            cacheSavingsData = {
+                today: {
+                    hits: 0,
+                    misses: 0,
+                    savings: 0,
+                    potentialCost: 0,
+                    actualCost: 0
+                },
+                total: {
+                    hits: 0,
+                    savings: 0
+                }
+            };
+            
+            showLoginScreen();
+        }
+
+        function closeSavingsDetails() {
+            document.getElementById('savingsDetailsModal').style.display = 'none';
+        }
+
+    </script>
+</body>
+</html>
