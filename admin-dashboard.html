@@ -1753,44 +1753,83 @@ ${error.extra_data ? `Extra Data: ${JSON.stringify(error.extra_data, null, 2)}` 
 
         // ========== STATS FUNCTIONS ==========
 
+        let lastRefreshTime = 0;
+        const MIN_REFRESH_INTERVAL = 2000; // 2 seconds between refreshes
+
         async function refreshStats() {
-            if (!currentSession || isRefreshing) return;
-            
-            isRefreshing = true;
-            const refreshBtn = document.getElementById('refreshBtn');
-            if (refreshBtn) refreshBtn.classList.add('loading');
-            
-            try {
-                // Get comprehensive stats from /stats endpoint
-                const response = await fetch(`${API_BASE_URL}/stats`, {
-                    headers: {
+            const now = Date.now();
+            if (now - lastRefreshTime < MIN_REFRESH_INTERVAL) {
+                console.log('⏳ Skipping refresh - too soon');
+                return;
+            }
+    
+            lastRefreshTime = now;
+    
+            if (!currentSession) {
+                showMessage('Please log in first', 'error');
+                return;
+                }
+
+                console.log('🔄 Refreshing stats...');
+    
+                // Show loading states
+                const refreshBtn = document.getElementById('refreshBtn');
+                if (refreshBtn) refreshBtn.classList.add('loading');
+    
+                const serverStatus = document.getElementById('serverStatus');
+                if (serverStatus) serverStatus.textContent = '⏳ Loading...';
+
+                try {
+                    // Get comprehensive stats from /stats endpoint
+                    const response = await fetch(`${API_BASE_URL}/stats`, {
+                        headers: {
                         'X-User-ID': currentSession.uid,
                         'Content-Type': 'application/json'
                     }
                 });
-                
+        
+                console.log('📊 Stats response status:', response.status);
+        
                 if (!response.ok) {
-                    throw new Error(`Stats endpoint returned ${response.status}`);
+                    if (response.status === 429) {
+                        showMessage('⚠️ Rate limit reached. Please wait before refreshing again.', 'error');
+                        return;
+                    }
+                    const errorText = await response.text();
+                    console.error('❌ Stats error response:', errorText);
+                    throw new Error(`Stats endpoint returned ${response.status}: ${errorText}`);
                 }
-                
+        
                 const data = await response.json();
-                
+                console.log('📊 Stats data received:', data);
+        
                 if (data.success) {
-                    updateDashboard(data);
+                    updateEnhancedDashboard(data);
                     showMessage('✅ Stats updated successfully', 'success');
+                } else {
+                    throw new Error('Stats endpoint returned unsuccessful response');
                 }
-                
             } catch (error) {
-                console.error('Stats error:', error);
-                showMessage('⚠️ Could not load stats: ' + error.message, 'error');
-                
-                // Fallback to basic health check
-                checkServerHealth();
-            } finally {
-                isRefreshing = false;
-                if (refreshBtn) refreshBtn.classList.remove('loading');
-                document.getElementById('lastUpdate').textContent = new Date().toLocaleTimeString();
+                console.error('❌ Stats error:', error);
+        
+                // More specific error messages
+                if (error.message.includes('429')) {
+                showMessage('⚠️ Rate limit exceeded. Please wait 60 seconds.', 'error');
+                } else if (error.message.includes('500')) {
+                showMessage('⚠️ Server error - check server logs for details', 'error');
+                } else if (error.message.includes('403')) {
+                showMessage('❌ Access denied - admin privileges required', 'error');
+                } else if (error.message.includes('401')) {
+                showMessage('🔐 Authentication failed - please log in again', 'error');
+                } else {
+                    showMessage('⚠️ Could not load comprehensive stats: ' + error.message, 'error');
+                }
             }
+
+            // Final loading cleanup
+            setTimeout(() => {
+                if (refreshBtn) refreshBtn.classList.remove('loading');
+            }, 1000);
         }
 
         function updateDashboard(stats) {
@@ -2070,11 +2109,14 @@ ${error.extra_data ? `Extra Data: ${JSON.stringify(error.extra_data, null, 2)}` 
             }
         }
 
+        // Update auto-refresh to be less aggressive
         function startAutoRefresh() {
-            if (autoRefreshEnabled && !refreshInterval) {
-                refreshInterval = setInterval(refreshStats, 60000); // 60 seconds
-            }
+            if (autoRefreshEnabled) {
+                // Increase from 30s to 45s to reduce load
+                refreshInterval = setInterval(refreshStats, 45000);
+                document.getElementById('autoRefreshStatus').textContent = 'On (45s)';
         }
+    }
 
         function stopAutoRefresh() {
             if (refreshInterval) {
