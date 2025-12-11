@@ -1752,7 +1752,173 @@ ${error.extra_data ? `Extra Data: ${JSON.stringify(error.extra_data, null, 2)}` 
         }
 
         // ========== STATS FUNCTIONS ==========
+        
+        function calculateMonthlyCost(costHistory) {
+            if (!costHistory || costHistory.length === 0) {
+                const monthlyCostElement = document.getElementById('monthlyCost');
+                if (monthlyCostElement) {
+                    monthlyCostElement.textContent = '$0';
+                }
+                return;
+            }
 
+    const monthlyTotal = costHistory.reduce((sum, day) => sum + (day.daily_cost || day.cost || 0), 0);
+    const monthlyCostElement = document.getElementById('monthlyCost');
+    if (monthlyCostElement) {
+        monthlyCostElement.textContent = `$${monthlyTotal.toFixed(2)}`;
+    }
+    
+    const now = new Date();
+    const monthName = now.toLocaleString('default', { month: 'long' });
+    const monthlyPeriodElement = document.getElementById('monthlyPeriod');
+    if (monthlyPeriodElement) {
+        monthlyPeriodElement.textContent = `${monthName} ${now.getFullYear()}`;
+    }
+    
+    if (monthlyCostElement) {
+        if (monthlyTotal > 50) {
+            monthlyCostElement.className = 'stat-value cost-warning';
+        } else if (monthlyTotal > 10) {
+            monthlyCostElement.className = 'stat-value';
+        } else {
+            monthlyCostElement.className = 'stat-value cost-good';
+        }
+    }
+}
+
+function calculateWeeklyCost(costHistory) {
+    if (!costHistory || costHistory.length === 0) {
+        const weeklyCostElement = document.getElementById('weeklyCost');
+        if (weeklyCostElement) {
+            weeklyCostElement.textContent = '$0';
+        }
+        return;
+    }
+
+    const weeklyTotal = costHistory.slice(-7).reduce((sum, day) => sum + (day.daily_cost || day.cost || 0), 0);
+    const weeklyCostElement = document.getElementById('weeklyCost');
+    if (weeklyCostElement) {
+        weeklyCostElement.textContent = `$${weeklyTotal.toFixed(2)}`;
+    }
+    
+    const now = new Date();
+    const weekAgo = new Date(now.getTime() - 7 * 24 * 60 * 60 * 1000);
+    const weeklyPeriodElement = document.getElementById('weeklyPeriod');
+    if (weeklyPeriodElement) {
+        weeklyPeriodElement.textContent = `${weekAgo.toLocaleDateString()} - ${now.toLocaleDateString()}`;
+    }
+    
+    if (weeklyCostElement) {
+        if (weeklyTotal > 10) {
+            weeklyCostElement.className = 'stat-value cost-warning';
+        } else if (weeklyTotal > 2) {
+            weeklyCostElement.className = 'stat-value';
+        } else {
+            weeklyCostElement.className = 'stat-value cost-good';
+        }
+    }
+}
+
+function updateCostHistory(history) {
+    const historyDiv = document.getElementById('costHistory');
+    if (!historyDiv) return;
+    
+    if (!history || history.length === 0) {
+        historyDiv.innerHTML = '<p>No cost history available yet.</p>';
+        return;
+    }
+
+    let html = '<table>';
+    html += '<tr><th>Date</th><th style="text-align: right;">Cost</th><th style="text-align: right;">Tokens</th><th style="text-align: right;">Requests</th></tr>';
+    
+    const recentHistory = history.slice(-30);
+    recentHistory.forEach(day => {
+        const cost = day.daily_cost || day.cost || 0;
+        const tokens = day.daily_tokens || day.tokens || 0;
+        const requests = day.daily_requests || day.requests || 0;
+        
+        const costColor = cost > 1.0 ? 'cost-warning' : (cost > 0.1 ? '' : 'cost-good');
+        html += `<tr>`;
+        html += `<td>${day.date || 'Unknown'}</td>`;
+        html += `<td style="text-align: right;" class="${costColor}">$${cost.toFixed(6)}</td>`;
+        html += `<td style="text-align: right;">${tokens.toLocaleString()}</td>`;
+        html += `<td style="text-align: right;">${requests.toLocaleString()}</td>`;
+        html += `</tr>`;
+    });
+    
+    const monthlyTotal = recentHistory.reduce((sum, day) => sum + (day.daily_cost || day.cost || 0), 0);
+    html += `<tr style="background: #f8f9fa; font-weight: bold;">`;
+    html += `<td>Monthly Total</td>`;
+    html += `<td style="text-align: right;">$${monthlyTotal.toFixed(2)}</td>`;
+    html += `<td style="text-align: right;">${recentHistory.reduce((sum, day) => sum + (day.daily_tokens || day.tokens || 0), 0).toLocaleString()}</td>`;
+    html += `<td style="text-align: right;">${recentHistory.reduce((sum, day) => sum + (day.daily_requests || day.requests || 0), 0).toLocaleString()}</td>`;
+    html += `</tr>`;
+    
+    html += '</table>';
+    historyDiv.innerHTML = html;
+}
+
+function updateRecentAlignments(alignments) {
+    const container = document.getElementById('recentAlignments');
+    if (!container) return;
+    
+    if (!alignments || alignments.length === 0) {
+        container.innerHTML = '<p>No recent alignment data available.</p>';
+        return;
+    }
+
+    let html = '<table>';
+    html += '<tr><th>Timestamp</th><th>Initial</th><th>Final</th><th>Improvement</th><th>Keywords</th></tr>';
+    
+    alignments.forEach(align => {
+        const improvementPercent = align.improvement_percentage ? align.improvement_percentage.toFixed(1) + '%' : 'N/A';
+        html += `
+            <tr>
+                <td>${new Date(align.timestamp).toLocaleTimeString()}</td>
+                <td>${align.initial_score.toFixed(3)}</td>
+                <td>${align.final_score.toFixed(3)}</td>
+                <td style="color: ${align.improvement > 0 ? '#27ae60' : '#e74c3c'}">
+                    +${align.improvement.toFixed(3)} (${improvementPercent})
+                </td>
+                <td>${align.keywords_found || 0}</td>
+            </tr>
+        `;
+    });
+    
+    html += '</table>';
+    container.innerHTML = html;
+}
+
+function updateUserAnalyticsDisplay(userAnalytics) {
+    if (!userAnalytics) return;
+    
+    // Update the user analytics cards if they exist
+    const totalUsersTrackedElement = document.getElementById('totalUsersTracked');
+    if (totalUsersTrackedElement) {
+        totalUsersTrackedElement.textContent = userAnalytics.total_users_tracked || 0;
+    }
+    
+    const activeUsersTodayElement = document.getElementById('activeUsersToday');
+    if (activeUsersTodayElement) {
+        activeUsersTodayElement.textContent = userAnalytics.active_users_today || 0;
+    }
+    
+    const totalUserRequestsElement = document.getElementById('totalUserRequests');
+    if (totalUserRequestsElement) {
+        totalUserRequestsElement.textContent = userAnalytics.total_requests_tracked || 0;
+    }
+    
+    const topUserRequestsElement = document.getElementById('topUserRequests');
+    if (topUserRequestsElement) {
+        topUserRequestsElement.textContent = userAnalytics.top_users?.[0]?.total_requests || 0;
+    }
+    
+    // Update the top users list
+    if (typeof updateTopUsersList === 'function') {
+        updateTopUsersList(userAnalytics.top_users || []);
+    }
+}
+        
 function updateEnhancedDashboard(stats) {
     console.log('📊 Updating enhanced dashboard with:', stats);
 
@@ -1767,12 +1933,16 @@ function updateEnhancedDashboard(stats) {
             }
             return true;
         }
-        console.warn(`⚠️ Element not found: ${id}`);
+        // Only log warning if we expect this element to exist
+        if (['dailyCost', 'totalTokens', 'apiRequests', 'userCount', 'newUsersToday'].includes(id)) {
+            console.warn(`⚠️ Element not found: ${id}`);
+        }
         return false;
     }
 
-    // Update main stats grid
+    // Update main stats grid - using IDs that exist in your HTML
     if (stats.daily_stats) {
+        // These are the main stat cards in your Live Stats Grid
         safeUpdate('dailyCostOverview', `$${(stats.daily_stats.daily_cost || 0).toFixed(6)}`);
         safeUpdate('totalTokensOverview', (stats.daily_stats.daily_tokens || 0).toLocaleString());
         safeUpdate('apiRequests', (stats.daily_stats.daily_requests || 0).toLocaleString());
@@ -1784,7 +1954,12 @@ function updateEnhancedDashboard(stats) {
         
         safeUpdate('userCount', userCount);
         safeUpdate('newUsersToday', newUsersToday);
-        safeUpdate('newUsersVerified', `Email Verified: ${emailVerifiedCount}`);
+        
+        // Update verified users display
+        const verifiedElement = document.getElementById('newUsersVerified');
+        if (verifiedElement) {
+            verifiedElement.textContent = `Email Verified: ${emailVerifiedCount}`;
+        }
         
         console.log('👤 User counts extracted:', {
             total: userCount,
@@ -1803,29 +1978,39 @@ function updateEnhancedDashboard(stats) {
                 costElement.className = 'stat-value cost-good';
             }
         }
-    } else {
-        // Fallback if no daily_stats
-        safeUpdate('userCount', 'No Data');
-        safeUpdate('newUsersToday', 'No Data');
-        safeUpdate('newUsersVerified', 'Email Verified: No Data');
     }
     
-    // Update cache stats
+    // Update JD Alignment stats section
+    if (stats.jd_alignment_stats) {
+        safeUpdate('totalAlignments', stats.jd_alignment_stats.total_alignments || 0);
+        safeUpdate('avgImprovement', '+' + (stats.jd_alignment_stats.average_improvement || 0).toFixed(3));
+        safeUpdate('avgFinalScore', (stats.jd_alignment_stats.average_final_score || 0).toFixed(3));
+        safeUpdate('maxImprovement', '+' + (stats.jd_alignment_stats.max_improvement || 0).toFixed(3));
+        
+        if (typeof updateRecentAlignments === 'function') {
+            updateRecentAlignments(stats.jd_alignment_stats.recent_alignments || []);
+        }
+    }
+    
+    // Update Cache Performance section
     if (stats.cache_performance) {
         const hits = stats.cache_performance.hits_today || 0;
         const misses = stats.cache_performance.misses_today || 0;
         const hitRate = stats.cache_performance.hit_rate_today || 0;
-        const totalRequests = hits + misses;
         
         // Calculate estimated savings ($0.02 per cache hit)
         const savings = hits * 0.02;
         
-        // Update the display
-        safeUpdate('cacheHitsToday', hits.toLocaleString());
-        safeUpdate('cacheMissesToday', misses.toLocaleString());
-        safeUpdate('cacheHitRateOverview', hitRate.toFixed(1) + '%');
-        safeUpdate('cacheSavings', `$${savings.toFixed(2)}`);
-        safeUpdate('cacheEfficiencyOverview', `${hitRate.toFixed(1)}%`);
+        // Update the display in Cache Performance & Savings section
+        const cacheHitsElement = document.getElementById('cacheHitsToday');
+        const cacheMissesElement = document.getElementById('cacheMissesToday');
+        const hitRateElement = document.getElementById('cacheHitRateOverview');
+        const savingsElement = document.getElementById('cacheSavings');
+        
+        if (cacheHitsElement) cacheHitsElement.textContent = hits.toLocaleString();
+        if (cacheMissesElement) cacheMissesElement.textContent = misses.toLocaleString();
+        if (hitRateElement) hitRateElement.textContent = hitRate.toFixed(1) + '%';
+        if (savingsElement) savingsElement.textContent = `$${savings.toFixed(2)}`;
         
         // Update progress bar
         const cacheHitBar = document.getElementById('cacheHitBarOverview');
@@ -1838,25 +2023,23 @@ function updateEnhancedDashboard(stats) {
     
     // Update cost history
     if (stats.cost_history && stats.cost_history.length > 0) {
-        updateCostHistory(stats.cost_history);
-        calculateMonthlyCost(stats.cost_history);
-        calculateWeeklyCost(stats.cost_history);
-    }
-
-    safeUpdate('lastUpdate', `Last update: ${new Date().toLocaleTimeString()}`);
-
-    // Update JD Alignment stats
-    if (stats.jd_alignment_stats) {
-        safeUpdate('totalAlignments', stats.jd_alignment_stats.total_alignments || 0);
-        safeUpdate('avgImprovement', '+' + (stats.jd_alignment_stats.average_improvement || 0).toFixed(3));
-        safeUpdate('avgFinalScore', (stats.jd_alignment_stats.average_final_score || 0).toFixed(3));
-        safeUpdate('maxImprovement', '+' + (stats.jd_alignment_stats.max_improvement || 0).toFixed(3));
-        
-        if (typeof updateRecentAlignments === 'function') {
-            updateRecentAlignments(stats.jd_alignment_stats.recent_alignments || []);
+        if (typeof updateCostHistory === 'function') {
+            updateCostHistory(stats.cost_history);
+        }
+        if (typeof calculateMonthlyCost === 'function') {
+            calculateMonthlyCost(stats.cost_history);
+        }
+        if (typeof calculateWeeklyCost === 'function') {
+            calculateWeeklyCost(stats.cost_history);
         }
     }
-    
+
+    // Update last update time
+    const lastUpdateElement = document.getElementById('lastUpdate');
+    if (lastUpdateElement) {
+        lastUpdateElement.textContent = `Last update: ${new Date().toLocaleTimeString()}`;
+    }
+
     // Update user analytics
     if (stats.user_analytics && typeof updateUserAnalyticsDisplay === 'function') {
         updateUserAnalyticsDisplay(stats.user_analytics);
