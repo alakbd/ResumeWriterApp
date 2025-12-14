@@ -10,6 +10,7 @@
             font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, Oxygen, Ubuntu, sans-serif; 
             background: #0f172a; 
             color: #f1f5f9;
+            min-height: 100vh;
         }
         
         .header { 
@@ -161,6 +162,22 @@
             font-size: 12px;
         }
         
+        .btn.loading {
+            opacity: 0.7;
+            cursor: not-allowed;
+        }
+        
+        .btn.loading::after {
+            content: '';
+            width: 12px;
+            height: 12px;
+            border: 2px solid transparent;
+            border-top-color: white;
+            border-radius: 50%;
+            animation: spin 1s linear infinite;
+            margin-left: 8px;
+        }
+        
         /* Login Screen */
         .login-container { 
             background: #1e293b; 
@@ -207,6 +224,7 @@
             border-left: 4px solid;
             box-shadow: 0 4px 12px rgba(0, 0, 0, 0.2);
             animation: slideIn 0.3s ease;
+            max-width: 400px;
         }
         
         .message-success { border-left-color: #10b981; }
@@ -217,6 +235,10 @@
         @keyframes slideIn {
             from { transform: translateX(100%); opacity: 0; }
             to { transform: translateX(0); opacity: 1; }
+        }
+        
+        @keyframes spin {
+            to { transform: rotate(360deg); }
         }
         
         /* Tables */
@@ -339,10 +361,6 @@
             border-radius: 50%;
             animation: spin 1s linear infinite;
             margin-bottom: 20px;
-        }
-        
-        @keyframes spin {
-            to { transform: rotate(360deg); }
         }
         
         /* Filter Controls */
@@ -482,12 +500,19 @@
             margin-left: 8px;
         }
         
+        /* Loading State */
+        .loading {
+            opacity: 0.7;
+            cursor: wait;
+        }
+        
         /* Responsive */
         @media (max-width: 768px) {
             .container { padding: 16px; }
             .control-bar { flex-direction: column; align-items: stretch; }
             .stats-grid { grid-template-columns: 1fr; }
             .filter-controls { grid-template-columns: 1fr; }
+            .login-container { margin: 40px 16px; padding: 24px; }
         }
     </style>
 </head>
@@ -549,6 +574,9 @@
                 <div style="background: rgba(255, 255, 255, 0.1); padding: 8px 16px; border-radius: 20px; font-size: 0.85rem;">
                     Session: <span id="sessionTimer">0:00</span>
                 </div>
+                <div id="autoRefreshStatus" style="background: rgba(255, 255, 255, 0.1); padding: 8px 16px; border-radius: 20px; font-size: 0.85rem;">
+                    Auto-refresh: On
+                </div>
             </div>
         </div>
 
@@ -562,10 +590,10 @@
                     <button class="btn btn-warning" onclick="triggerBackup()" id="backupBtn">
                         <span>💾 Backup Now</span>
                     </button>
-                    <button class="btn btn-info" onclick="checkBackupStatus()">
+                    <button class="btn btn-info" onclick="checkBackupStatus()" id="backupStatusBtn">
                         <span>📊 Backup Status</span>
                     </button>
-                    <button class="btn btn-secondary" onclick="listBackupFiles()">
+                    <button class="btn btn-secondary" onclick="listBackupFiles()" id="backupFilesBtn">
                         <span>📁 List Files</span>
                     </button>
                     <button class="btn btn-danger" onclick="resetDailyStats()" id="resetBtn">
@@ -580,7 +608,7 @@
                     <div style="display: flex; align-items: center; gap: 8px;">
                         <input type="checkbox" id="autoRefreshToggle" checked onchange="toggleAutoRefresh()">
                         <label for="autoRefreshToggle" style="color: #cbd5e1; font-size: 0.85rem;">
-                            Auto-refresh (60s)
+                            Auto-refresh (45s)
                         </label>
                     </div>
                     <button class="btn btn-danger btn-small" onclick="logout()">
@@ -596,7 +624,7 @@
             <div class="stats-grid">
                 <div class="stat-card">
                     <div class="stat-label">Daily Cost</div>
-                    <div class="stat-value cost-good" id="dailyCost">$0.000000</div>
+                    <div class="stat-value" id="dailyCost">$0.000000</div>
                     <div style="color: #94a3b8; font-size: 0.85rem;">
                         OpenAI API Usage • <span id="costPerRequest">$0.000000/req</span>
                     </div>
@@ -606,7 +634,7 @@
                     <div class="stat-label">API Requests Today</div>
                     <div class="stat-value" id="dailyRequests">0</div>
                     <div style="color: #94a3b8; font-size: 0.85rem;">
-                        <span id="cacheHitRate">0%</span> Cache Hit Rate
+                        Cache Hit Rate: <span id="cacheHitRate">0%</span>
                     </div>
                 </div>
                 
@@ -630,7 +658,7 @@
                     <div class="stat-label">Total Users</div>
                     <div class="stat-value" id="totalUsers">0</div>
                     <div style="color: #94a3b8; font-size: 0.85rem;">
-                        <span id="newUsersToday">0</span> new today • <span id="verifiedUsers">0</span> verified
+                        <span id="newUsersToday">0</span> new today • <span id="emailVerifiedCount">0</span> verified
                     </div>
                 </div>
                 
@@ -639,6 +667,9 @@
                     <div class="stat-value" id="cacheEfficiency">0%</div>
                     <div class="progress-bar">
                         <div class="progress-fill" id="cacheHitBar" style="width: 0%"></div>
+                    </div>
+                    <div style="color: #94a3b8; font-size: 0.85rem; margin-top: 8px;">
+                        <span id="cacheHits">0</span> hits • <span id="cacheMisses">0</span> misses
                     </div>
                 </div>
                 
@@ -654,7 +685,7 @@
                     <div class="stat-label">Error Count</div>
                     <div class="stat-value" id="totalErrors">0</div>
                     <div style="color: #94a3b8; font-size: 0.85rem;">
-                        <span id="highErrors">0</span> High • <span id="activeStream">0</span> Active Stream
+                        <span id="highErrors">0</span> High • <span id="errorCountToday">0</span> Today
                     </div>
                 </div>
             </div>
@@ -679,8 +710,8 @@
                         <button class="btn btn-danger btn-small" onclick="stopErrorStream()" id="stopStreamBtn" style="display: none;">
                             ⏹ Stop Stream
                         </button>
-                        <button class="btn btn-warning btn-small" onclick="loadAllErrors()">
-                            🔄 Refresh
+                        <button class="btn btn-warning btn-small" onclick="loadAllErrors()" id="loadErrorsBtn">
+                            🔄 Refresh Errors
                         </button>
                         <button class="btn btn-danger btn-small" onclick="clearOldErrors()">
                             🗑️ Clear Old
@@ -819,8 +850,13 @@
                     </div>
                 </div>
                 
-                <div id="recentAlignments">
-                    <!-- Recent alignments will be loaded here -->
+                <div id="recentAlignmentsContainer">
+                    <h4 style="color: #e2e8f0; margin-bottom: 16px;">Recent Alignments</h4>
+                    <div id="recentAlignments">
+                        <div style="text-align: center; padding: 20px; color: #94a3b8;">
+                            No recent alignment data available
+                        </div>
+                    </div>
                 </div>
             </div>
 
@@ -831,6 +867,37 @@
                     <div style="text-align: center; padding: 40px; color: #94a3b8;">
                         <div style="font-size: 3rem; margin-bottom: 16px;">💸</div>
                         <p>Loading cost history data...</p>
+                    </div>
+                </div>
+            </div>
+            
+            <!-- User Analytics -->
+            <div class="section-card">
+                <h3 class="section-title">👥 User Analytics</h3>
+                <div style="display: grid; grid-template-columns: repeat(auto-fit, minmax(200px, 1fr)); gap: 16px; margin-bottom: 24px;">
+                    <div style="background: #0f172a; padding: 16px; border-radius: 8px; border: 1px solid #334155; text-align: center;">
+                        <div style="font-size: 1.5rem; font-weight: 700; color: #e2e8f0;" id="totalUsersTracked">0</div>
+                        <div style="color: #94a3b8; font-size: 0.85rem;">Total Users Tracked</div>
+                    </div>
+                    <div style="background: #0f172a; padding: 16px; border-radius: 8px; border: 1px solid #334155; text-align: center;">
+                        <div style="font-size: 1.5rem; font-weight: 700; color: #e2e8f0;" id="activeUsersToday">0</div>
+                        <div style="color: #94a3b8; font-size: 0.85rem;">Active Users Today</div>
+                    </div>
+                    <div style="background: #0f172a; padding: 16px; border-radius: 8px; border: 1px solid #334155; text-align: center;">
+                        <div style="font-size: 1.5rem; font-weight: 700; color: #e2e8f0;" id="totalUserRequests">0</div>
+                        <div style="color: #94a3b8; font-size: 0.85rem;">Total Requests Tracked</div>
+                    </div>
+                    <div style="background: #0f172a; padding: 16px; border-radius: 8px; border: 1px solid #334155; text-align: center;">
+                        <div style="font-size: 1.5rem; font-weight: 700; color: #e2e8f0;" id="topUserRequests">0</div>
+                        <div style="color: #94a3b8; font-size: 0.85rem;">Top User Requests</div>
+                    </div>
+                </div>
+                <div id="topUsersList">
+                    <h4 style="color: #e2e8f0; margin-bottom: 16px;">Top Users by Activity</h4>
+                    <div id="topUsersContent">
+                        <div style="text-align: center; padding: 20px; color: #94a3b8;">
+                            No user activity data available
+                        </div>
                     </div>
                 </div>
             </div>
@@ -999,7 +1066,6 @@
                 return;
             }
             
-            document.getElementById('loginScreen').classList.add('loading');
             showLoginMessage('🔄 Testing authentication...', 'info');
             
             try {
@@ -1007,7 +1073,6 @@
             } catch (error) {
                 console.error('Login error:', error);
                 showLoginMessage('❌ Login failed: ' + error.message, 'error');
-                document.getElementById('loginScreen').classList.remove('loading');
             }
         }
 
@@ -1099,6 +1164,9 @@
                     currentErrorData = data.errors;
                     updateErrorSummary(data.errors);
                     displayErrors(data.errors);
+                } else {
+                    currentErrorData = [];
+                    displayErrors([]);
                 }
                 
             } catch (error) {
@@ -1189,7 +1257,7 @@
                         <td style="max-width: 300px; word-break: break-word;">${shortMessage}</td>
                         <td>
                             <button class="btn btn-small" 
-                                    onclick="showErrorDetails('${error.id}')"
+                                    onclick="showErrorDetails('${error.id || 'unknown'}')"
                                     style="background: #334155; padding: 4px 8px; font-size: 12px;">
                                 🔍 View
                             </button>
@@ -1250,8 +1318,8 @@
             if (!currentSession || isStreaming) return;
             
             try {
-                const streamUrl = `${API_BASE_URL}/admin/errors/stream`;
-                errorEventSource = new EventSource(streamUrl + `?uid=${encodeURIComponent(currentSession.uid)}`);
+                const streamUrl = `${API_BASE_URL}/admin/errors/stream?uid=${encodeURIComponent(currentSession.uid)}`;
+                errorEventSource = new EventSource(streamUrl);
                 
                 errorEventSource.onopen = () => {
                     console.log('✅ Error stream connected');
@@ -1326,6 +1394,9 @@
                         if (table.children.length > 100) {
                             table.lastElementChild.remove();
                         }
+                    } else {
+                        // If no table yet, reload all errors
+                        displayErrors(currentErrorData);
                     }
                     
                     // Show notification
@@ -1448,7 +1519,10 @@
 
         async function showErrorDetails(errorId) {
             const error = currentErrorData.find(e => e.id === errorId);
-            if (!error) return;
+            if (!error) {
+                showMessage('Error details not found', 'error');
+                return;
+            }
             
             const modal = document.getElementById('errorDetailsModal');
             const content = document.getElementById('errorModalContent');
@@ -1460,14 +1534,14 @@
                 <div style="margin-bottom: 24px;">
                     <div style="display: flex; justify-content: space-between; align-items: start; margin-bottom: 20px;">
                         <div>
-                            <h3 style="color: #e2e8f0; margin-bottom: 8px;">${error.error_type}</h3>
+                            <h3 style="color: #e2e8f0; margin-bottom: 8px;">${error.error_type || 'Unknown Error'}</h3>
                             <span class="severity-badge ${severityClass}" style="font-size: 0.85rem;">
                                 ${severity.toUpperCase()}
                             </span>
                         </div>
                         <div style="text-align: right;">
                             <div style="color: #94a3b8; font-size: 0.9rem;">Error ID</div>
-                            <div style="font-family: monospace; color: #cbd5e1; font-size: 0.9rem;">${error.id}</div>
+                            <div style="font-family: monospace; color: #cbd5e1; font-size: 0.9rem;">${error.id || 'N/A'}</div>
                         </div>
                     </div>
                     
@@ -1478,12 +1552,12 @@
                     
                     <div style="background: #0f172a; border-radius: 8px; padding: 16px; border: 1px solid #334155; margin-bottom: 16px;">
                         <div style="color: #94a3b8; font-size: 0.85rem; margin-bottom: 4px;">User ID</div>
-                        <div style="color: #60a5fa; font-family: monospace;">${error.user_id}</div>
+                        <div style="color: #60a5fa; font-family: monospace;">${error.user_id || 'unknown'}</div>
                     </div>
                     
                     <div style="background: #0f172a; border-radius: 8px; padding: 16px; border: 1px solid #334155; margin-bottom: 16px;">
                         <div style="color: #94a3b8; font-size: 0.85rem; margin-bottom: 4px;">Endpoint</div>
-                        <div style="color: #a78bfa;">${error.endpoint}</div>
+                        <div style="color: #a78bfa;">${error.endpoint || 'unknown'}</div>
                     </div>
                 </div>
                 
@@ -1579,7 +1653,7 @@ ${error.extra_data ? `Extra Data: ${JSON.stringify(error.extra_data, null, 2)}` 
             const backupBtn = document.getElementById('backupBtn');
             const originalText = backupBtn.innerHTML;
             backupBtn.innerHTML = '<span>⏳ Backing up...</span>';
-            backupBtn.disabled = true;
+            backupBtn.classList.add('loading');
 
             try {
                 const response = await fetch(`${API_BASE_URL}/backup/stats`, {
@@ -1596,7 +1670,7 @@ ${error.extra_data ? `Extra Data: ${JSON.stringify(error.extra_data, null, 2)}` 
 
                 if (!response.ok) {
                     const errorText = await response.text();
-                    throw new Error(`Backup failed: ${errorText}`);
+                    throw new Error(`Backup failed: ${response.status} ${errorText}`);
                 }
 
                 const result = await response.json();
@@ -1610,12 +1684,15 @@ ${error.extra_data ? `Extra Data: ${JSON.stringify(error.extra_data, null, 2)}` 
                 showMessage('❌ Backup failed: ' + error.message, 'error');
             } finally {
                 backupBtn.innerHTML = originalText;
-                backupBtn.disabled = false;
+                backupBtn.classList.remove('loading');
             }
         }
 
         async function checkBackupStatus() {
             if (!currentSession) return;
+
+            const statusBtn = document.getElementById('backupStatusBtn');
+            statusBtn.classList.add('loading');
 
             try {
                 const response = await fetch(`${API_BASE_URL}/backup/status`, {
@@ -1631,10 +1708,13 @@ ${error.extra_data ? `Extra Data: ${JSON.stringify(error.extra_data, null, 2)}` 
 
                 const status = await response.json();
                 updateBackupStatusDisplay(status);
+                showMessage('✅ Backup status updated', 'success');
                 
             } catch (error) {
                 console.error('Status check error:', error);
-                showMessage('⚠️ Could not check backup status', 'error');
+                showMessage('⚠️ Could not check backup status: ' + error.message, 'error');
+            } finally {
+                statusBtn.classList.remove('loading');
             }
         }
 
@@ -1697,6 +1777,9 @@ ${error.extra_data ? `Extra Data: ${JSON.stringify(error.extra_data, null, 2)}` 
         async function listBackupFiles() {
             if (!currentSession) return;
 
+            const filesBtn = document.getElementById('backupFilesBtn');
+            filesBtn.classList.add('loading');
+
             try {
                 const response = await fetch(`${API_BASE_URL}/backup/files`, {
                     headers: {
@@ -1711,10 +1794,13 @@ ${error.extra_data ? `Extra Data: ${JSON.stringify(error.extra_data, null, 2)}` 
 
                 const data = await response.json();
                 displayBackupFiles(data.files || []);
+                showMessage('✅ Backup files list updated', 'success');
                 
             } catch (error) {
                 console.error('File list error:', error);
-                showMessage('❌ Could not list backup files', 'error');
+                showMessage('❌ Could not list backup files: ' + error.message, 'error');
+            } finally {
+                filesBtn.classList.remove('loading');
             }
         }
 
@@ -1752,302 +1838,7 @@ ${error.extra_data ? `Extra Data: ${JSON.stringify(error.extra_data, null, 2)}` 
         }
 
         // ========== STATS FUNCTIONS ==========
-        
-        function calculateMonthlyCost(costHistory) {
-            if (!costHistory || costHistory.length === 0) {
-                const monthlyCostElement = document.getElementById('monthlyCost');
-                if (monthlyCostElement) {
-                    monthlyCostElement.textContent = '$0';
-                }
-                return;
-            }
 
-    const monthlyTotal = costHistory.reduce((sum, day) => sum + (day.daily_cost || day.cost || 0), 0);
-    const monthlyCostElement = document.getElementById('monthlyCost');
-    if (monthlyCostElement) {
-        monthlyCostElement.textContent = `$${monthlyTotal.toFixed(2)}`;
-    }
-    
-    const now = new Date();
-    const monthName = now.toLocaleString('default', { month: 'long' });
-    const monthlyPeriodElement = document.getElementById('monthlyPeriod');
-    if (monthlyPeriodElement) {
-        monthlyPeriodElement.textContent = `${monthName} ${now.getFullYear()}`;
-    }
-    
-    if (monthlyCostElement) {
-        if (monthlyTotal > 50) {
-            monthlyCostElement.className = 'stat-value cost-warning';
-        } else if (monthlyTotal > 10) {
-            monthlyCostElement.className = 'stat-value';
-        } else {
-            monthlyCostElement.className = 'stat-value cost-good';
-        }
-    }
-}
-
-function calculateWeeklyCost(costHistory) {
-    if (!costHistory || costHistory.length === 0) {
-        const weeklyCostElement = document.getElementById('weeklyCost');
-        if (weeklyCostElement) {
-            weeklyCostElement.textContent = '$0';
-        }
-        return;
-    }
-
-    const weeklyTotal = costHistory.slice(-7).reduce((sum, day) => sum + (day.daily_cost || day.cost || 0), 0);
-    const weeklyCostElement = document.getElementById('weeklyCost');
-    if (weeklyCostElement) {
-        weeklyCostElement.textContent = `$${weeklyTotal.toFixed(2)}`;
-    }
-    
-    const now = new Date();
-    const weekAgo = new Date(now.getTime() - 7 * 24 * 60 * 60 * 1000);
-    const weeklyPeriodElement = document.getElementById('weeklyPeriod');
-    if (weeklyPeriodElement) {
-        weeklyPeriodElement.textContent = `${weekAgo.toLocaleDateString()} - ${now.toLocaleDateString()}`;
-    }
-    
-    if (weeklyCostElement) {
-        if (weeklyTotal > 10) {
-            weeklyCostElement.className = 'stat-value cost-warning';
-        } else if (weeklyTotal > 2) {
-            weeklyCostElement.className = 'stat-value';
-        } else {
-            weeklyCostElement.className = 'stat-value cost-good';
-        }
-    }
-}
-
-function updateCostHistory(history) {
-    const historyDiv = document.getElementById('costHistory');
-    if (!historyDiv) return;
-    
-    if (!history || history.length === 0) {
-        historyDiv.innerHTML = '<p>No cost history available yet.</p>';
-        return;
-    }
-
-    let html = '<table>';
-    html += '<tr><th>Date</th><th style="text-align: right;">Cost</th><th style="text-align: right;">Tokens</th><th style="text-align: right;">Requests</th></tr>';
-    
-    const recentHistory = history.slice(-30);
-    recentHistory.forEach(day => {
-        const cost = day.daily_cost || day.cost || 0;
-        const tokens = day.daily_tokens || day.tokens || 0;
-        const requests = day.daily_requests || day.requests || 0;
-        
-        const costColor = cost > 1.0 ? 'cost-warning' : (cost > 0.1 ? '' : 'cost-good');
-        html += `<tr>`;
-        html += `<td>${day.date || 'Unknown'}</td>`;
-        html += `<td style="text-align: right;" class="${costColor}">$${cost.toFixed(6)}</td>`;
-        html += `<td style="text-align: right;">${tokens.toLocaleString()}</td>`;
-        html += `<td style="text-align: right;">${requests.toLocaleString()}</td>`;
-        html += `</tr>`;
-    });
-    
-    const monthlyTotal = recentHistory.reduce((sum, day) => sum + (day.daily_cost || day.cost || 0), 0);
-    html += `<tr style="background: #f8f9fa; font-weight: bold;">`;
-    html += `<td>Monthly Total</td>`;
-    html += `<td style="text-align: right;">$${monthlyTotal.toFixed(2)}</td>`;
-    html += `<td style="text-align: right;">${recentHistory.reduce((sum, day) => sum + (day.daily_tokens || day.tokens || 0), 0).toLocaleString()}</td>`;
-    html += `<td style="text-align: right;">${recentHistory.reduce((sum, day) => sum + (day.daily_requests || day.requests || 0), 0).toLocaleString()}</td>`;
-    html += `</tr>`;
-    
-    html += '</table>';
-    historyDiv.innerHTML = html;
-}
-
-function updateRecentAlignments(alignments) {
-    const container = document.getElementById('recentAlignments');
-    if (!container) return;
-    
-    if (!alignments || alignments.length === 0) {
-        container.innerHTML = '<p>No recent alignment data available.</p>';
-        return;
-    }
-
-    let html = '<table>';
-    html += '<tr><th>Timestamp</th><th>Initial</th><th>Final</th><th>Improvement</th><th>Keywords</th></tr>';
-    
-    alignments.forEach(align => {
-        const improvementPercent = align.improvement_percentage ? align.improvement_percentage.toFixed(1) + '%' : 'N/A';
-        html += `
-            <tr>
-                <td>${new Date(align.timestamp).toLocaleTimeString()}</td>
-                <td>${align.initial_score.toFixed(3)}</td>
-                <td>${align.final_score.toFixed(3)}</td>
-                <td style="color: ${align.improvement > 0 ? '#27ae60' : '#e74c3c'}">
-                    +${align.improvement.toFixed(3)} (${improvementPercent})
-                </td>
-                <td>${align.keywords_found || 0}</td>
-            </tr>
-        `;
-    });
-    
-    html += '</table>';
-    container.innerHTML = html;
-}
-
-function updateUserAnalyticsDisplay(userAnalytics) {
-    if (!userAnalytics) return;
-    
-    // Update the user analytics cards if they exist
-    const totalUsersTrackedElement = document.getElementById('totalUsersTracked');
-    if (totalUsersTrackedElement) {
-        totalUsersTrackedElement.textContent = userAnalytics.total_users_tracked || 0;
-    }
-    
-    const activeUsersTodayElement = document.getElementById('activeUsersToday');
-    if (activeUsersTodayElement) {
-        activeUsersTodayElement.textContent = userAnalytics.active_users_today || 0;
-    }
-    
-    const totalUserRequestsElement = document.getElementById('totalUserRequests');
-    if (totalUserRequestsElement) {
-        totalUserRequestsElement.textContent = userAnalytics.total_requests_tracked || 0;
-    }
-    
-    const topUserRequestsElement = document.getElementById('topUserRequests');
-    if (topUserRequestsElement) {
-        topUserRequestsElement.textContent = userAnalytics.top_users?.[0]?.total_requests || 0;
-    }
-    
-    // Update the top users list
-    if (typeof updateTopUsersList === 'function') {
-        updateTopUsersList(userAnalytics.top_users || []);
-    }
-}
-        
-function updateEnhancedDashboard(stats) {
-    console.log('📊 Updating enhanced dashboard with:', stats);
-
-    // Helper function to safely update element
-    function safeUpdate(id, value, isHtml = false) {
-        const element = document.getElementById(id);
-        if (element) {
-            if (isHtml) {
-                element.innerHTML = value;
-            } else {
-                element.textContent = value;
-            }
-            return true;
-        }
-        // Only log warning if we expect this element to exist
-        if (['dailyCost', 'totalTokens', 'apiRequests', 'userCount', 'newUsersToday'].includes(id)) {
-            console.warn(`⚠️ Element not found: ${id}`);
-        }
-        return false;
-    }
-
-    // Update main stats grid - using IDs that exist in your HTML
-    if (stats.daily_stats) {
-        // These are the main stat cards in your Live Stats Grid
-        safeUpdate('dailyCostOverview', `$${(stats.daily_stats.daily_cost || 0).toFixed(6)}`);
-        safeUpdate('totalTokensOverview', (stats.daily_stats.daily_tokens || 0).toLocaleString());
-        safeUpdate('apiRequests', (stats.daily_stats.daily_requests || 0).toLocaleString());
-        
-        // Get user counts from daily_stats
-        const userCount = stats.daily_stats.user_count || 0;
-        const newUsersToday = stats.daily_stats.new_users_today || 0;
-        const emailVerifiedCount = stats.daily_stats.email_verified_count || 0;
-        
-        safeUpdate('userCount', userCount);
-        safeUpdate('newUsersToday', newUsersToday);
-        
-        // Update verified users display
-        const verifiedElement = document.getElementById('newUsersVerified');
-        if (verifiedElement) {
-            verifiedElement.textContent = `Email Verified: ${emailVerifiedCount}`;
-        }
-        
-        console.log('👤 User counts extracted:', {
-            total: userCount,
-            today: newUsersToday,
-            verified: emailVerifiedCount
-        });
-        
-        // Color code based on cost
-        const costElement = document.getElementById('dailyCostOverview');
-        if (costElement) {
-            if (stats.daily_stats.daily_cost > 1.0) {
-                costElement.className = 'stat-value cost-warning';
-            } else if (stats.daily_stats.daily_cost > 0.1) {
-                costElement.className = 'stat-value';
-            } else {
-                costElement.className = 'stat-value cost-good';
-            }
-        }
-    }
-    
-    // Update JD Alignment stats section
-    if (stats.jd_alignment_stats) {
-        safeUpdate('totalAlignments', stats.jd_alignment_stats.total_alignments || 0);
-        safeUpdate('avgImprovement', '+' + (stats.jd_alignment_stats.average_improvement || 0).toFixed(3));
-        safeUpdate('avgFinalScore', (stats.jd_alignment_stats.average_final_score || 0).toFixed(3));
-        safeUpdate('maxImprovement', '+' + (stats.jd_alignment_stats.max_improvement || 0).toFixed(3));
-        
-        if (typeof updateRecentAlignments === 'function') {
-            updateRecentAlignments(stats.jd_alignment_stats.recent_alignments || []);
-        }
-    }
-    
-    // Update Cache Performance section
-    if (stats.cache_performance) {
-        const hits = stats.cache_performance.hits_today || 0;
-        const misses = stats.cache_performance.misses_today || 0;
-        const hitRate = stats.cache_performance.hit_rate_today || 0;
-        
-        // Calculate estimated savings ($0.02 per cache hit)
-        const savings = hits * 0.02;
-        
-        // Update the display in Cache Performance & Savings section
-        const cacheHitsElement = document.getElementById('cacheHitsToday');
-        const cacheMissesElement = document.getElementById('cacheMissesToday');
-        const hitRateElement = document.getElementById('cacheHitRateOverview');
-        const savingsElement = document.getElementById('cacheSavings');
-        
-        if (cacheHitsElement) cacheHitsElement.textContent = hits.toLocaleString();
-        if (cacheMissesElement) cacheMissesElement.textContent = misses.toLocaleString();
-        if (hitRateElement) hitRateElement.textContent = hitRate.toFixed(1) + '%';
-        if (savingsElement) savingsElement.textContent = `$${savings.toFixed(2)}`;
-        
-        // Update progress bar
-        const cacheHitBar = document.getElementById('cacheHitBarOverview');
-        if (cacheHitBar) {
-            cacheHitBar.style.width = hitRate + '%';
-        }
-        
-        console.log('📊 Cache Stats Updated:', { hits, misses, hitRate, savings });
-    }
-    
-    // Update cost history
-    if (stats.cost_history && stats.cost_history.length > 0) {
-        if (typeof updateCostHistory === 'function') {
-            updateCostHistory(stats.cost_history);
-        }
-        if (typeof calculateMonthlyCost === 'function') {
-            calculateMonthlyCost(stats.cost_history);
-        }
-        if (typeof calculateWeeklyCost === 'function') {
-            calculateWeeklyCost(stats.cost_history);
-        }
-    }
-
-    // Update last update time
-    const lastUpdateElement = document.getElementById('lastUpdate');
-    if (lastUpdateElement) {
-        lastUpdateElement.textContent = `Last update: ${new Date().toLocaleTimeString()}`;
-    }
-
-    // Update user analytics
-    if (stats.user_analytics && typeof updateUserAnalyticsDisplay === 'function') {
-        updateUserAnalyticsDisplay(stats.user_analytics);
-    }
-    
-    console.log('✅ Dashboard update complete');
-}
-        
         let lastRefreshTime = 0;
         const MIN_REFRESH_INTERVAL = 2000; // 2 seconds between refreshes
 
@@ -2063,21 +1854,21 @@ function updateEnhancedDashboard(stats) {
             if (!currentSession) {
                 showMessage('Please log in first', 'error');
                 return;
-                }
+            }
 
-                console.log('🔄 Refreshing stats...');
+            console.log('🔄 Refreshing stats...');
     
-                // Show loading states
-                const refreshBtn = document.getElementById('refreshBtn');
-                if (refreshBtn) refreshBtn.classList.add('loading');
+            // Show loading states
+            const refreshBtn = document.getElementById('refreshBtn');
+            refreshBtn.classList.add('loading');
     
-                const serverStatus = document.getElementById('serverStatus');
-                if (serverStatus) serverStatus.textContent = '⏳ Loading...';
+            const serverStatus = document.getElementById('serverStatus');
+            serverStatus.textContent = '⏳ Loading...';
 
-                try {
-                    // Get comprehensive stats from /stats endpoint
-                    const response = await fetch(`${API_BASE_URL}/stats`, {
-                        headers: {
+            try {
+                // Get comprehensive stats from /stats endpoint
+                const response = await fetch(`${API_BASE_URL}/stats`, {
+                    headers: {
                         'X-User-ID': currentSession.uid,
                         'Content-Type': 'application/json'
                     }
@@ -2099,7 +1890,7 @@ function updateEnhancedDashboard(stats) {
                 console.log('📊 Stats data received:', data);
         
                 if (data.success) {
-                    updateEnhancedDashboard(data);
+                    updateDashboard(data);
                     showMessage('✅ Stats updated successfully', 'success');
                 } else {
                     throw new Error('Stats endpoint returned unsuccessful response');
@@ -2109,41 +1900,42 @@ function updateEnhancedDashboard(stats) {
         
                 // More specific error messages
                 if (error.message.includes('429')) {
-                showMessage('⚠️ Rate limit exceeded. Please wait 60 seconds.', 'error');
+                    showMessage('⚠️ Rate limit exceeded. Please wait 60 seconds.', 'error');
                 } else if (error.message.includes('500')) {
-                showMessage('⚠️ Server error - check server logs for details', 'error');
+                    showMessage('⚠️ Server error - check server logs for details', 'error');
                 } else if (error.message.includes('403')) {
-                showMessage('❌ Access denied - admin privileges required', 'error');
+                    showMessage('❌ Access denied - admin privileges required', 'error');
                 } else if (error.message.includes('401')) {
-                showMessage('🔐 Authentication failed - please log in again', 'error');
+                    showMessage('🔐 Authentication failed - please log in again', 'error');
                 } else {
                     showMessage('⚠️ Could not load comprehensive stats: ' + error.message, 'error');
                 }
+            } finally {
+                refreshBtn.classList.remove('loading');
+                // Check server health separately
+                checkServerHealth();
             }
-
-            // Final loading cleanup
-            setTimeout(() => {
-                if (refreshBtn) refreshBtn.classList.remove('loading');
-            }, 1000);
         }
 
         function updateDashboard(stats) {
+            console.log('📊 Updating dashboard with:', stats);
+            
             // Update main stats from daily_stats
             if (stats.daily_stats) {
                 const dailyStats = stats.daily_stats;
                 
                 // Daily cost
                 const dailyCost = parseFloat(dailyStats.daily_cost || 0);
-                document.getElementById('dailyCost').textContent = `$${dailyCost.toFixed(6)}`;
+                const dailyCostElement = document.getElementById('dailyCost');
+                dailyCostElement.textContent = `$${dailyCost.toFixed(6)}`;
                 
                 // Color code based on cost
-                const dailyCostEl = document.getElementById('dailyCost');
                 if (dailyCost > 1.0) {
-                    dailyCostEl.className = 'stat-value cost-critical';
+                    dailyCostElement.className = 'stat-value cost-critical';
                 } else if (dailyCost > 0.1) {
-                    dailyCostEl.className = 'stat-value cost-warning';
+                    dailyCostElement.className = 'stat-value cost-warning';
                 } else {
-                    dailyCostEl.className = 'stat-value cost-good';
+                    dailyCostElement.className = 'stat-value cost-good';
                 }
                 
                 // Update other stats
@@ -2162,11 +1954,13 @@ function updateEnhancedDashboard(stats) {
                 document.getElementById('cacheHitRate').textContent = `${hitRate.toFixed(1)}%`;
                 document.getElementById('cacheEfficiency').textContent = `${hitRate.toFixed(1)}%`;
                 document.getElementById('cacheHitBar').style.width = `${hitRate}%`;
+                document.getElementById('cacheHits').textContent = hits;
+                document.getElementById('cacheMisses').textContent = misses;
                 
                 // User stats
                 document.getElementById('totalUsers').textContent = dailyStats.user_count || 0;
                 document.getElementById('newUsersToday').textContent = dailyStats.new_users_today || 0;
-                document.getElementById('verifiedUsers').textContent = dailyStats.email_verified_count || 0;
+                document.getElementById('emailVerifiedCount').textContent = dailyStats.email_verified_count || 0;
             }
             
             // Update JD alignment stats
@@ -2186,12 +1980,30 @@ function updateEnhancedDashboard(stats) {
             
             // Update error stats
             if (stats.error_statistics) {
-                document.getElementById('totalErrors').textContent = stats.error_statistics.total_errors || 0;
-                document.getElementById('highErrors').textContent = stats.error_statistics.by_severity?.high || 0;
+                const totalErrors = stats.error_statistics.total_errors || 0;
+                const highErrors = stats.error_statistics.by_severity?.high || 0;
+                document.getElementById('totalErrors').textContent = totalErrors;
+                document.getElementById('highErrors').textContent = highErrors;
             }
             
-            // Check server health
-            checkServerHealth();
+            // Update user analytics
+            if (stats.user_analytics) {
+                document.getElementById('totalUsersTracked').textContent = stats.user_analytics.total_users_tracked || 0;
+                document.getElementById('activeUsersToday').textContent = stats.user_analytics.active_users_today || 0;
+                document.getElementById('totalUserRequests').textContent = stats.user_analytics.total_requests_tracked || 0;
+                
+                // Update top users
+                if (stats.user_analytics.top_users && stats.user_analytics.top_users.length > 0) {
+                    const topUser = stats.user_analytics.top_users[0];
+                    document.getElementById('topUserRequests').textContent = topUser.total_requests || 0;
+                    updateTopUsersList(stats.user_analytics.top_users);
+                }
+            }
+            
+            // Update last update time
+            document.getElementById('lastUpdate').textContent = new Date().toLocaleTimeString();
+            
+            console.log('✅ Dashboard update complete');
         }
 
         function updateRecentAlignments(alignments) {
@@ -2284,9 +2096,46 @@ function updateEnhancedDashboard(stats) {
             container.innerHTML = html;
         }
 
+        function updateTopUsersList(users) {
+            const container = document.getElementById('topUsersContent');
+            
+            if (!users || users.length === 0) {
+                container.innerHTML = '<p style="color: #94a3b8; text-align: center; padding: 20px;">No user activity data available.</p>';
+                return;
+            }
+
+            let html = '<table class="data-table">';
+            html += '<thead><tr><th>User ID</th><th>Total Requests</th><th>Last Active</th></tr></thead><tbody>';
+            
+            users.slice(0, 10).forEach(user => {
+                const shortUserId = user.user_id?.substring(0, 20) + (user.user_id?.length > 20 ? '...' : '');
+                
+                html += `
+                    <tr>
+                        <td>
+                            <div class="tooltip">
+                                <span style="font-family: monospace; color: #60a5fa;">${shortUserId}</span>
+                                <span class="tooltip-text">${user.user_id}</span>
+                            </div>
+                        </td>
+                        <td style="text-align: right; color: #cbd5e1;">${user.total_requests || 0}</td>
+                        <td style="color: #94a3b8; font-size: 0.85rem;">
+                            ${user.last_active ? new Date(user.last_active).toLocaleDateString() : 'Unknown'}
+                        </td>
+                    </tr>
+                `;
+            });
+            
+            html += '</tbody></table>';
+            container.innerHTML = html;
+        }
+
         function checkServerHealth() {
             fetch(`${API_BASE_URL}/health`)
-                .then(response => response.json())
+                .then(response => {
+                    if (!response.ok) throw new Error('Health check failed');
+                    return response.json();
+                })
                 .then(health => {
                     const statusEl = document.getElementById('serverStatus');
                     if (statusEl) {
@@ -2309,9 +2158,12 @@ function updateEnhancedDashboard(stats) {
         }
 
         async function resetDailyStats() {
-            if (!confirm('Are you sure you want to reset daily statistics? This cannot be undone.')) {
+            if (!confirm('⚠️ Are you sure you want to reset daily statistics?\n\nThis will:\n• Save current stats to backup\n• Reset all daily counters to zero\n• This action cannot be undone!')) {
                 return;
             }
+            
+            const resetBtn = document.getElementById('resetBtn');
+            resetBtn.classList.add('loading');
             
             try {
                 // Note: You need to implement this endpoint in your server
@@ -2332,7 +2184,9 @@ function updateEnhancedDashboard(stats) {
                 
             } catch (error) {
                 console.error('Reset error:', error);
-                showMessage('❌ Could not reset statistics', 'error');
+                showMessage('❌ Could not reset statistics: ' + error.message, 'error');
+            } finally {
+                resetBtn.classList.remove('loading');
             }
         }
 
@@ -2342,6 +2196,10 @@ function updateEnhancedDashboard(stats) {
         }
 
         function logout() {
+            if (!confirm('Are you sure you want to logout?')) {
+                return;
+            }
+            
             // Stop all intervals and streams
             stopErrorStream();
             stopAutoRefresh();
@@ -2352,6 +2210,9 @@ function updateEnhancedDashboard(stats) {
             currentErrorData = [];
             errorEventSource = null;
             isStreaming = false;
+            
+            // Clear stored UID
+            localStorage.removeItem('admin_uid');
             
             // Show login screen
             showLoginScreen();
@@ -2404,19 +2265,18 @@ function updateEnhancedDashboard(stats) {
             }
         }
 
-        // Update auto-refresh to be less aggressive
-        // Update auto-refresh to be less aggressive
         function startAutoRefresh() {
             if (autoRefreshEnabled) {
-                // Increase from 30s to 45s to reduce load
                 refreshInterval = setInterval(refreshStats, 45000);
-                document.getElementById('autoRefreshStatus').textContent = 'On (45s)';
+                document.getElementById('autoRefreshStatus').textContent = 'Auto-refresh: On';
+            }
         }
-    }
+
         function stopAutoRefresh() {
             if (refreshInterval) {
                 clearInterval(refreshInterval);
                 refreshInterval = null;
+                document.getElementById('autoRefreshStatus').textContent = 'Auto-refresh: Off';
             }
         }
 
