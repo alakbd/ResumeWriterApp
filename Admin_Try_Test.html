@@ -888,8 +888,8 @@
                         <div style="color: #94a3b8; font-size: 0.85rem;">Total Requests Tracked</div>
                     </div>
                     <div style="background: #0f172a; padding: 16px; border-radius: 8px; border: 1px solid #334155; text-align: center;">
-                        <div style="font-size: 1.5rem; font-weight: 700; color: #e2e8f0;" id="topUserRequests">0</div>
-                        <div style="color: #94a3b8; font-size: 0.85rem;">Top User Requests</div>
+                        <div style="font-size: 1.5rem; font-weight: 700; color: #e2e8f0;" id="cacheSavings">0</div>
+                        <div style="color: #94a3b8; font-size: 0.85rem;">Estimated Savings</div>
                     </div>
                 </div>
                 <div id="topUsersList">
@@ -1950,9 +1950,11 @@ ${error.extra_data ? `Extra Data: ${JSON.stringify(error.extra_data, null, 2)}` 
                 const misses = dailyStats.daily_cache_misses || 0;
                 const totalRequests = hits + misses;
                 const hitRate = totalRequests > 0 ? (hits / totalRequests) * 100 : 0;
+                const savings = hits * 0.02;
                 
                 document.getElementById('cacheHitRate').textContent = `${hitRate.toFixed(1)}%`;
                 document.getElementById('cacheEfficiency').textContent = `${hitRate.toFixed(1)}%`;
+                document.getElementById('cacheSavings').textContent = `$${savings.toFixed(2)}`;
                 document.getElementById('cacheHitBar').style.width = `${hitRate}%`;
                 document.getElementById('cacheHits').textContent = hits;
                 document.getElementById('cacheMisses').textContent = misses;
