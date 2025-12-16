@@ -1972,7 +1972,7 @@ ${error.extra_data ? `Extra Data: ${JSON.stringify(error.extra_data, null, 2)}` 
                 console.log("🟢 DEBUG: Updating newUsersToday. Value is:", newUsersToday);
                 // User stats
                 document.getElementById('totalUsers').textContent = dailyStats.user_count || 0;
-                document.getElementById('newUsersToday').textContent = dailyStats.new_users_today || 0;
+                document.getElementById('newUsersToday').textContent = newUsersToday;
                 document.getElementById('emailVerifiedCount').textContent = dailyStats.email_verified_count || 0;
             }
             
