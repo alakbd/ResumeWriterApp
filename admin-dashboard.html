@@ -1967,7 +1967,9 @@ ${error.extra_data ? `Extra Data: ${JSON.stringify(error.extra_data, null, 2)}` 
                 document.getElementById('cacheHitBar').style.width = `${hitRate}%`;
                 document.getElementById('cacheHits').textContent = hits;
                 document.getElementById('cacheMisses').textContent = misses;
-                
+
+                // ✅ ADD THIS DEBUG LOG:
+                console.log("🟢 DEBUG: Updating newUsersToday. Value is:", newUsersToday);
                 // User stats
                 document.getElementById('totalUsers').textContent = dailyStats.user_count || 0;
                 document.getElementById('newUsersToday').textContent = dailyStats.new_users_today || 0;
