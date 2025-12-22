@@ -1973,6 +1973,7 @@ ${error.extra_data ? `Extra Data: ${JSON.stringify(error.extra_data, null, 2)}` 
                 // User stats
                 document.getElementById('totalUsers').textContent = dailyStats.user_count || 0;
                 document.getElementById('newUsersToday').textContent = newUsersToday;
+                console.log("🟢 DOM textContent after update:", document.getElementById('newUsersToday').textContent);
                 document.getElementById('emailVerifiedCount').textContent = dailyStats.email_verified_count || 0;
             }
 
