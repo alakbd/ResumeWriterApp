@@ -903,7 +903,7 @@
             </div>
         <div class="stat-card">
     <div class="stat-label">New Users Today</div>
-    <div id="newUsersToday" class="stat-value">0</div>
+    <div id="newUsersTodayDiv" class="stat-value">0</div>
 </div>
 
 
@@ -1955,7 +1955,7 @@ ${error.extra_data ? `Extra Data: ${JSON.stringify(error.extra_data, null, 2)}` 
                 // Cache stats
                 const hits = dailyStats.daily_cache_hits || 0;
                 const misses = dailyStats.daily_cache_misses || 0;
-                const newUsersToday = stats.daily_stats.new_users_today || 0;
+                const newUsersToday = stats.daily_stats.new_users_today ?? 0;
                 const totalRequests = hits + misses;
                 const hitRate = totalRequests > 0 ? (hits / totalRequests) * 100 : 0;
                 const savings = hits * 0.02;
@@ -1972,16 +1972,17 @@ ${error.extra_data ? `Extra Data: ${JSON.stringify(error.extra_data, null, 2)}` 
                 console.log("🟢 DEBUG: Updating newUsersToday. Value is:", newUsersToday);
                 // User stats
                 document.getElementById('totalUsers').textContent = dailyStats.user_count || 0;
+                // Update span inside Total Users card
                 document.getElementById('newUsersToday').textContent = newUsersToday;
-                console.log("🟢 DOM textContent after update:", document.getElementById('newUsersToday').textContent);
+                // Update new div
+                const newDiv = document.getElementById('newUsersTodayDiv');
+                if (newDiv) {
+                    newDiv.textContent = newUsersToday;
+                }
                 document.getElementById('emailVerifiedCount').textContent = dailyStats.email_verified_count || 0;
             }
 
-            // Optional debug log
-            console.log('👤 User counts extracted:', {
-                today: newUsersToday,
-                
-            });
+        
             
             // Update JD alignment stats
             if (stats.jd_alignment_stats) {
