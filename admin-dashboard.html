@@ -916,9 +916,16 @@
                     </div>
                     <div style="background: #0f172a; padding: 16px; border-radius: 8px; border: 1px solid #334155; text-align: center;">
                         <div style="font-size: 1.5rem; font-weight: 700; color: #e2e8f0;" id="newUsersMonthDiv">1</div>
-                        <div style="color: #94a3b8; font-size: 0.85rem;">Monthly New User</div>
+                        <div style="color: #94a3b8; font-size: 0.85rem;">Monthly New Users</div>
                     </div>
-                  
+
+                    <div style="background: #0f172a; padding: 16px; border-radius: 8px; border: 1px solid #334155; text-align: center;">
+                        <div style="font-size: 1.5rem; font-weight: 700; color: #e2e8f0;" id="newUsersYearDiv">1</div>
+                        <div style="color: #94a3b8; font-size: 0.85rem;">Yearly New Users</div>
+                    </div>
+
+
+                    
                 </div>
 
             
@@ -1972,6 +1979,7 @@ ${error.extra_data ? `Extra Data: ${JSON.stringify(error.extra_data, null, 2)}` 
                 const newUsersToday = stats.daily_stats.new_users_today ?? 0;
                 const newUsersWeek = stats.daily_stats.new_users_week ?? 0;
                 const newUsersMonth = stats.daily_stats.new_users_month ?? 0;
+                const newUsersYear = stats.daily_stats.new_users_year ?? 0;
                 const totalRequests = hits + misses;
                 const hitRate = totalRequests > 0 ? (hits / totalRequests) * 100 : 0;
                 const savings = hits * 0.02;
@@ -1994,6 +2002,7 @@ ${error.extra_data ? `Extra Data: ${JSON.stringify(error.extra_data, null, 2)}` 
                 document.getElementById('newUsersTodayDiv').textContent = newUsersToday;
                 document.getElementById('newUsersWeekDiv').textContent = newUsersWeek;
                 document.getElementById('newUsersMonthDiv').textContent = newUsersMonth;
+                document.getElementById('newUsersYearDiv').textContent = newUsersYear;
                 document.getElementById('emailVerifiedCount').textContent = dailyStats.email_verified_count || 0;
             }
 
