@@ -906,6 +906,26 @@
     <div id="newUsersTodayDiv" class="stat-value">0</div>
 </div>
 
+            <div class="section-card">
+                <h3 class="section-title">👥 User Count</h3>
+                <div style="display: grid; grid-template-columns: repeat(auto-fit, minmax(200px, 1fr)); gap: 16px; margin-bottom: 24px;">
+                    <div style="background: #0f172a; padding: 16px; border-radius: 8px; border: 1px solid #334155; text-align: center;">
+                        <div style="font-size: 1.5rem; font-weight: 700; color: #e2e8f0;" id="newUsersTodayDiv">0</div>
+                        <div style="color: #94a3b8; font-size: 0.85rem;">New User Today</div>
+                    </div>
+                    <div style="background: #0f172a; padding: 16px; border-radius: 8px; border: 1px solid #334155; text-align: center;">
+                        <div style="font-size: 1.5rem; font-weight: 700; color: #e2e8f0;" id="newUsersWeekDiv">0</div>
+                        <div style="color: #94a3b8; font-size: 0.85rem;">Weekly New Users</div>
+                    </div>
+                    <div style="background: #0f172a; padding: 16px; border-radius: 8px; border: 1px solid #334155; text-align: center;">
+                        <div style="font-size: 1.5rem; font-weight: 700; color: #e2e8f0;" id="newUsersMonthDiv">1</div>
+                        <div style="color: #94a3b8; font-size: 0.85rem;">Monthly New User</div>
+                    </div>
+                  
+                </div>
+
+
+            
 
             
         </div>
@@ -1956,6 +1976,8 @@ ${error.extra_data ? `Extra Data: ${JSON.stringify(error.extra_data, null, 2)}` 
                 const hits = dailyStats.daily_cache_hits || 0;
                 const misses = dailyStats.daily_cache_misses || 0;
                 const newUsersToday = stats.daily_stats.new_users_today ?? 0;
+                const newUsersWeek = stats.daily_stats.new_users_week ?? 0;
+                const newUsersMonth = stats.daily_stats.new_users_month ?? 0;
                 const totalRequests = hits + misses;
                 const hitRate = totalRequests > 0 ? (hits / totalRequests) * 100 : 0;
                 const savings = hits * 0.02;
@@ -1975,10 +1997,9 @@ ${error.extra_data ? `Extra Data: ${JSON.stringify(error.extra_data, null, 2)}` 
                 // Update span inside Total Users card
                 document.getElementById('newUsersToday').textContent = newUsersToday;
                 // Update new div
-                const newDiv = document.getElementById('newUsersTodayDiv');
-                if (newDiv) {
-                    newDiv.textContent = newUsersToday;
-                }
+                document.getElementById('newUsersTodayDiv').textContent = newUsersToday;
+                document.getElementById('newUsersWeekDiv').textContent = newUsersWeek;
+                document.getElementById('newUsersMonthDiv').textContent = newUsersMonth;
                 document.getElementById('emailVerifiedCount').textContent = dailyStats.email_verified_count || 0;
             }
 
