@@ -2094,7 +2094,7 @@ ${error.extra_data ? `Extra Data: ${JSON.stringify(error.extra_data, null, 2)}` 
             }
 
             let html = '<table class="data-table">';
-            html += '<thead><tr><th>Date</th><th>Cost</th><th>Tokens</th><th>Requests</th><th>Alignments</th></tr></thead><tbody>';
+            html += '<thead><tr><th>Date</th><th>Cost</th><th>Tokens</th><th>Requests</th><th>Alignments</th><th>Estimated Savings</th></tr></thead><tbody>';
             
             // Sort by date (newest first)
             const sortedHistory = [...history].sort((a, b) => 
@@ -2106,6 +2106,7 @@ ${error.extra_data ? `Extra Data: ${JSON.stringify(error.extra_data, null, 2)}` 
                 const tokens = day.daily_tokens || 0;
                 const requests = day.daily_requests || 0;
                 const alignments = day.daily_alignments || 0;
+                const cacheSavings = day.daily_cacheSavings || 0;
                 const date = day.date || new Date(day.timestamp).toLocaleDateString();
                 
                 html += `
@@ -2117,6 +2118,7 @@ ${error.extra_data ? `Extra Data: ${JSON.stringify(error.extra_data, null, 2)}` 
                         <td style="text-align: right; color: #cbd5e1;">${tokens.toLocaleString()}</td>
                         <td style="text-align: right; color: #cbd5e1;">${requests}</td>
                         <td style="text-align: right; color: #a78bfa;">${alignments}</td>
+                        <td style="text-align: right; color: #a78bfa;">${cacheSavings}</td>
                     </tr>
                 `;
             });
@@ -2126,6 +2128,7 @@ ${error.extra_data ? `Extra Data: ${JSON.stringify(error.extra_data, null, 2)}` 
             const totalTokens = sortedHistory.reduce((sum, day) => sum + (day.daily_tokens || 0), 0);
             const totalRequests = sortedHistory.reduce((sum, day) => sum + (day.daily_requests || 0), 0);
             const totalAlignments = sortedHistory.reduce((sum, day) => sum + (day.daily_alignments || 0), 0);
+            const totalSavings = sortedHistory.reduce((sum, day) => sum + (day.daily_cacheSavings || 0), 0);
             
             html += `
                 <tr style="background: #0f172a;">
@@ -2134,6 +2137,7 @@ ${error.extra_data ? `Extra Data: ${JSON.stringify(error.extra_data, null, 2)}` 
                     <td style="text-align: right; font-weight: 700; color: #e2e8f0;">${totalTokens.toLocaleString()}</td>
                     <td style="text-align: right; font-weight: 700; color: #e2e8f0;">${totalRequests}</td>
                     <td style="text-align: right; font-weight: 700; color: #e2e8f0;">${totalAlignments}</td>
+                    <td style="text-align: right; font-weight: 700; color: #e2e8f0;">${totalSavings}</td>
                 </tr>
             `;
             
