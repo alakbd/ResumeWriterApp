@@ -149,39 +149,86 @@ class BillingManager(private val context: Context, private val creditManager: Cr
             purchaseCallback = null
         }
     }
+
+    private fun consumePurchase(purchase: Purchase) {
+    val consumeParams = ConsumeParams.newBuilder()
+        .setPurchaseToken(purchase.purchaseToken)
+        .build()
+
+    billingClient.consumeAsync(consumeParams) { billingResult, _ ->
+        if (billingResult.responseCode == BillingClient.BillingResponseCode.OK) {
+            Log.i(TAG, "Purchase consumed successfully")
+        } else {
+            Log.e(TAG, "Failed to consume purchase: ${billingResult.responseCode}")
+        }
+    }
+}
     
     private fun handlePurchase(purchase: Purchase) {
-        if (purchase.purchaseState == Purchase.PurchaseState.PURCHASED) {
-            if (!purchase.isAcknowledged) {
-                acknowledgePurchase(purchase)
+
+    when (purchase.purchaseState) {
+
+        Purchase.PurchaseState.PURCHASED -> {
+
+            val productId = purchase.products.firstOrNull()
+            if (productId == null) {
+                Log.e(TAG, "Purchase has no product ID")
+                return
             }
-            
-            val creditsToAdd = when (purchase.products.firstOrNull()) {
+
+            val creditsToAdd = when (productId) {
                 PRODUCT_3_CV -> 3
                 PRODUCT_8_CV -> 8
                 else -> {
-                    Log.e(TAG, "Unknown product purchased: ${purchase.products.firstOrNull()}")
+                    Log.e(TAG, "Unknown product purchased: $productId")
                     0
                 }
             }
-            
-            if (creditsToAdd > 0) {
-                // Add credits and sync with Firebase
-                creditManager.addCredits(creditsToAdd) { success ->
-                    if (success) {
-                        Log.i(TAG, "Successfully added $creditsToAdd credits")
-                        purchaseCallback?.invoke(true, "Purchase successful! $creditsToAdd credits added.")
-                    } else {
-                        Log.e(TAG, "Failed to add credits after purchase")
-                        purchaseCallback?.invoke(false, "Purchase completed but failed to add credits. Please contact support.")
-                    }
+
+            if (creditsToAdd <= 0) return
+
+            // Step 1: Grant credits
+            creditManager.addCredits(creditsToAdd) { success ->
+
+                if (!success) {
+                    Log.e(TAG, "Failed to add credits after purchase")
+                    purchaseCallback?.invoke(
+                        false,
+                        "Purchase completed but credits could not be added."
+                    )
+                    return@addCredits
                 }
+
+                Log.i(TAG, "Successfully added $creditsToAdd credits")
+
+                // Step 2: Acknowledge purchase (required)
+                if (!purchase.isAcknowledged) {
+                    acknowledgePurchase(purchase)
+                }
+
+                // Step 3: Consume purchase (CRITICAL for repeat purchases)
+                consumePurchase(purchase)
+
+                purchaseCallback?.invoke(
+                    true,
+                    "Purchase successful! $creditsToAdd credits added."
+                )
             }
-        } else if (purchase.purchaseState == Purchase.PurchaseState.PENDING) {
+        }
+
+        Purchase.PurchaseState.PENDING -> {
             Log.i(TAG, "Purchase is pending")
-            purchaseCallback?.invoke(true, "Purchase is pending. Credits will be added when completed.")
+            purchaseCallback?.invoke(
+                true,
+                "Purchase is pending. Credits will be added once payment is completed."
+            )
+        }
+
+        else -> {
+            Log.w(TAG, "Unhandled purchase state: ${purchase.purchaseState}")
         }
     }
+}
     
     private fun acknowledgePurchase(purchase: Purchase) {
         val acknowledgeParams = AcknowledgePurchaseParams.newBuilder()
