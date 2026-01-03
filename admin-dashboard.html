@@ -2341,7 +2341,7 @@ ${error.extra_data ? `Extra Data: ${JSON.stringify(error.extra_data, null, 2)}` 
             timeFilter.addEventListener("change", (e) => {
                 const value = e.target.value;
                 const days = value === "all" ? 3650 : Number(value);
-                loadAllErrors(days);
+                loadAllErrors();
             });
         }
     });
