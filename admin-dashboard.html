@@ -1169,14 +1169,16 @@
                 return;
             }
 
-            try {
-                // Use the /admin/errors/historical endpoint from your server
-                const response = await fetch(`${API_BASE_URL}/admin/errors/historical?days=7&limit=100`, {
-                    headers: {
-                        'X-User-ID': currentSession.uid,
-                        'Content-Type': 'application/json'
-                    }
-                });
+                try {
+                    const response = await fetch(
+                        `${API_BASE_URL}/admin/errors/historical?days=${days}&limit=${limit}`,
+                        {
+                             headers: {
+                                'X-User-ID': currentSession.uid,
+                                'Content-Type': 'application/json'
+                            }
+                        }
+                    );
 
                 if (response.status === 403) {
                     throw new Error('Admin privileges required');
@@ -1187,16 +1189,11 @@
                 }
 
                 const data = await response.json();
-                
-                if (data.success && data.errors) {
-                    currentErrorData = data.errors;
-                    updateErrorSummary(data.errors);
-                    displayErrors(data.errors);
-                } else {
-                    currentErrorData = [];
-                    displayErrors([]);
-                }
-                
+                currentErrorData = data.success ? data.errors : [];
+
+                updateErrorSummary(currentErrorData);
+                displayErrors(currentErrorData);  
+                    
             } catch (error) {
                 console.error('Error loading errors:', error);
                 showMessage('Could not load errors: ' + error.message, 'error');
