@@ -1296,13 +1296,12 @@
         }
 
         function filterErrors() {
-            if (currentErrorData.length === 0) return;
+            if (!currentErrorData || currentErrorData.length === 0) return;
             
             const userId = document.getElementById('errorUserIdFilter').value.toLowerCase();
             const endpoint = document.getElementById('errorEndpointFilter').value.toLowerCase();
             const severity = document.getElementById('errorSeverityFilter').value;
-            const timeFilter = document.getElementById('errorTimeFilter').value;
-            
+
             let filtered = [...currentErrorData];
             
             // Apply filters
@@ -1322,17 +1321,6 @@
                 filtered = filtered.filter(error => 
                     error.severity?.toLowerCase() === severity
                 );
-            }
-            
-            // Apply time filter
-            if (timeFilter !== 'all') {
-                const cutoffDate = new Date();
-                cutoffDate.setDate(cutoffDate.getDate() - parseInt(timeFilter));
-                
-                filtered = filtered.filter(error => {
-                    const errorDate = new Date(error.timestamp);
-                    return errorDate >= cutoffDate;
-                });
             }
             
             displayErrors(filtered);
@@ -2344,6 +2332,19 @@ ${error.extra_data ? `Extra Data: ${JSON.stringify(error.extra_data, null, 2)}` 
                 event.preventDefault();
             }
         });
+
+    document.addEventListener("DOMContentLoaded", () => {
+        loadAllErrors(7);
+
+        const timeFilter = document.getElementById("errorTimeFilter");
+        if (timeFilter) {
+            timeFilter.addEventListener("change", (e) => {
+                const value = e.target.value;
+                const days = value === "all" ? 3650 : Number(value);
+                loadAllErrors(days);
+            });
+        }
+    });
 
     </script>
 </body>
