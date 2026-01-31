@@ -13,8 +13,8 @@ android {
         minSdk 21
         targetSdk 35
 
-        versionCode 9
-        versionName "1.8"
+        versionCode 10
+        versionName "1.9"
 
         // API base URL
         buildConfigField "String", "API_BASE_URL", "\"https://resume-writer-api.onrender.com/\""
