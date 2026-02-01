@@ -25,7 +25,7 @@
         <TextView
             android:layout_width="match_parent"
             android:layout_height="wrap_content"
-            android:text="Welcome to ResumeWriter! Enhance your chances of landing a job by creating professional CVs quickly and managing your application credits efficiently."
+            android:text="Welcome to ResumeTailor! Enhance your chances of landing a job by creating professional CVs quickly and managing your application credits efficiently."
             android:textColor="#333333"
             android:textSize="16sp"
             android:gravity="center"
