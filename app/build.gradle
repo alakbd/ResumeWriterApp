@@ -74,8 +74,8 @@ dependencies {
     implementation 'androidx.webkit:webkit:1.8.0'
 
     // ---------- BILLING ----------
-    implementation 'com.android.billingclient:billing:6.2.0'
-    implementation 'com.android.billingclient:billing-ktx:6.2.0'
+    implementation 'com.android.billingclient:billing:8.0.0'
+    implementation 'com.android.billingclient:billing-ktx:8.0.0'
 
     // ---------- FIREBASE ----------
     implementation platform('com.google.firebase:firebase-bom:33.5.1')
