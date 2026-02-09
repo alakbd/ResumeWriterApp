@@ -33,8 +33,10 @@ class BillingManager(private val context: Context, private val creditManager: Cr
                 purchaseCallback?.invoke(false, "Purchase canceled")
             }
             BillingClient.BillingResponseCode.ITEM_ALREADY_OWNED -> {
-                Log.w(TAG, "Item already owned")
-                purchaseCallback?.invoke(false, "You already own this item")
+                Log.w(TAG, "Item already owned - checking for pending purchase")
+                // Query purchases to see if there's a pending one that needs processing
+                queryPurchases()
+                purchaseCallback?.invoke(false, "Please wait while we check your purchase status")
             }
             else -> {
                 Log.e(TAG, "Billing error: ${billingResult.responseCode}")
@@ -56,6 +58,8 @@ class BillingManager(private val context: Context, private val creditManager: Cr
                         Log.i(TAG, "Billing service connected")
                         isBillingReady = true
                         loadProducts()
+                        // Query existing purchases on initialization to handle any pending ones
+                        queryPurchases()
                         onComplete(true, "Billing initialized successfully")
                     }
                     BillingClient.BillingResponseCode.BILLING_UNAVAILABLE -> {
@@ -76,6 +80,32 @@ class BillingManager(private val context: Context, private val creditManager: Cr
                 // You might want to implement a retry mechanism here
             }
         })
+    }
+    
+    private fun queryPurchases() {
+        if (!isBillingReady) return
+        
+        billingClient.queryPurchasesAsync(
+            QueryPurchasesParams.newBuilder()
+                .setProductType(BillingClient.ProductType.INAPP)
+                .build()
+        ) { billingResult, purchases ->
+            when (billingResult.responseCode) {
+                BillingClient.BillingResponseCode.OK -> {
+                    Log.i(TAG, "Found ${purchases.size} existing purchases")
+                    purchases.forEach { purchase ->
+                        // Handle any purchases that haven't been processed yet
+                        if (purchase.purchaseState == Purchase.PurchaseState.PURCHASED && !purchase.isAcknowledged) {
+                            Log.i(TAG, "Found unprocessed purchase: ${purchase.products.firstOrNull()}")
+                            handlePurchase(purchase)
+                        }
+                    }
+                }
+                else -> {
+                    Log.e(TAG, "Failed to query purchases: ${billingResult.responseCode}")
+                }
+            }
+        }
     }
     
     private fun loadProducts() {
@@ -149,86 +179,69 @@ class BillingManager(private val context: Context, private val creditManager: Cr
             purchaseCallback = null
         }
     }
-
-    private fun consumePurchase(purchase: Purchase) {
-    val consumeParams = ConsumeParams.newBuilder()
-        .setPurchaseToken(purchase.purchaseToken)
-        .build()
-
-    billingClient.consumeAsync(consumeParams) { billingResult, _ ->
-        if (billingResult.responseCode == BillingClient.BillingResponseCode.OK) {
-            Log.i(TAG, "Purchase consumed successfully")
-        } else {
-            Log.e(TAG, "Failed to consume purchase: ${billingResult.responseCode}")
-        }
-    }
-}
     
     private fun handlePurchase(purchase: Purchase) {
-
-    when (purchase.purchaseState) {
-
-        Purchase.PurchaseState.PURCHASED -> {
-
-            val productId = purchase.products.firstOrNull()
-            if (productId == null) {
-                Log.e(TAG, "Purchase has no product ID")
-                return
-            }
-
-            val creditsToAdd = when (productId) {
-                PRODUCT_3_CV -> 3
-                PRODUCT_8_CV -> 8
-                else -> {
-                    Log.e(TAG, "Unknown product purchased: $productId")
-                    0
+        when (purchase.purchaseState) {
+            Purchase.PurchaseState.PURCHASED -> {
+                val productId = purchase.products.firstOrNull()
+                if (productId == null) {
+                    Log.e(TAG, "Purchase has no product ID")
+                    return
                 }
-            }
 
-            if (creditsToAdd <= 0) return
+                val creditsToAdd = when (productId) {
+                    PRODUCT_3_CV -> 3
+                    PRODUCT_8_CV -> 8
+                    else -> {
+                        Log.e(TAG, "Unknown product purchased: $productId")
+                        0
+                    }
+                }
 
-            // Step 1: Grant credits
-            creditManager.addCredits(creditsToAdd) { success ->
+                if (creditsToAdd <= 0) return
 
-                if (!success) {
-                    Log.e(TAG, "Failed to add credits after purchase")
+                // CRITICAL: For a top-up system, we need to acknowledge the purchase
+                // but NOT consume it. Consumption is only for one-time use items.
+                // Acknowledgment tells Google Play the purchase was delivered.
+                
+                // Step 1: Grant credits first
+                creditManager.addCredits(creditsToAdd) { success ->
+                    if (!success) {
+                        Log.e(TAG, "Failed to add credits after purchase")
+                        purchaseCallback?.invoke(
+                            false,
+                            "Purchase completed but credits could not be added."
+                        )
+                        return@addCredits
+                    }
+
+                    Log.i(TAG, "Successfully added $creditsToAdd credits")
+
+                    // Step 2: Acknowledge purchase (REQUIRED for all purchases)
+                    if (!purchase.isAcknowledged) {
+                        acknowledgePurchase(purchase)
+                    }
+
                     purchaseCallback?.invoke(
-                        false,
-                        "Purchase completed but credits could not be added."
+                        true,
+                        "Purchase successful! $creditsToAdd credits added to your account."
                     )
-                    return@addCredits
                 }
+            }
 
-                Log.i(TAG, "Successfully added $creditsToAdd credits")
-
-                // Step 2: Acknowledge purchase (required)
-                if (!purchase.isAcknowledged) {
-                    acknowledgePurchase(purchase)
-                }
-
-                // Step 3: Consume purchase (CRITICAL for repeat purchases)
-                consumePurchase(purchase)
-
+            Purchase.PurchaseState.PENDING -> {
+                Log.i(TAG, "Purchase is pending")
                 purchaseCallback?.invoke(
                     true,
-                    "Purchase successful! $creditsToAdd credits added."
+                    "Purchase is pending. Credits will be added once payment is completed."
                 )
             }
-        }
 
-        Purchase.PurchaseState.PENDING -> {
-            Log.i(TAG, "Purchase is pending")
-            purchaseCallback?.invoke(
-                true,
-                "Purchase is pending. Credits will be added once payment is completed."
-            )
-        }
-
-        else -> {
-            Log.w(TAG, "Unhandled purchase state: ${purchase.purchaseState}")
+            else -> {
+                Log.w(TAG, "Unhandled purchase state: ${purchase.purchaseState}")
+            }
         }
     }
-}
     
     private fun acknowledgePurchase(purchase: Purchase) {
         val acknowledgeParams = AcknowledgePurchaseParams.newBuilder()
