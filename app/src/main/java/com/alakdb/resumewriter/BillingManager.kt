@@ -183,6 +183,15 @@ class BillingManager(
         }
     }
 
+    fun getProductPrice(productId: String): String {
+        val product = productDetails.find { it.productId == productId }
+            ?: return "Not available"
+
+        return product.oneTimePurchaseOfferDetails?.formattedPrice
+            ?: "Not available"
+    }
+
+
     fun destroy() {
         if (::billingClient.isInitialized) {
             billingClient.endConnection()
