@@ -2289,7 +2289,7 @@ ${error.extra_data ? `Extra Data: ${JSON.stringify(error.extra_data, null, 2)}` 
                         </td>
                         <td style="text-align: right; color: #cbd5e1;">${user.total_requests || 0}</td>
                         <td style="color: #94a3b8; font-size: 0.85rem;">
-                            ${user.last_active ? new Date(user.last_active).toLocaleDateString() : 'Unknown'}
+                            ${user.last_active ? new Date(user.last_active).toLocaleString() : 'Unknown'}
                         </td>
                     </tr>
                 `;
