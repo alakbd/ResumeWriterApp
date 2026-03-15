@@ -2274,17 +2274,17 @@ ${error.extra_data ? `Extra Data: ${JSON.stringify(error.extra_data, null, 2)}` 
             }
 
             let html = '<table class="data-table">';
-            html += '<thead><tr><th>User ID</th><th>Total Requests</th><th>Last Active</th></tr></thead><tbody>';
+            html += '<thead><tr><th>Email</th><th>Total Requests</th><th>Last Active</th></tr></thead><tbody>';
             
             users.slice(0, 10).forEach(user => {
-                const shortUserId = user.user_id?.substring(0, 20) + (user.user_id?.length > 20 ? '...' : '');
+                const shortUserId = user.email?.substring(0, 20) + (user.email?.length > 20 ? '...' : '');
                 
                 html += `
                     <tr>
                         <td>
                             <div class="tooltip">
                                 <span style="font-family: monospace; color: #60a5fa;">${shortUserId}</span>
-                                <span class="tooltip-text">${user.user_id}</span>
+                                <span class="tooltip-text">${user.email}</span>
                             </div>
                         </td>
                         <td style="text-align: right; color: #cbd5e1;">${user.total_requests || 0}</td>
