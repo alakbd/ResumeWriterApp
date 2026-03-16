@@ -187,17 +187,19 @@ private fun showTopCVGenerators() {
     }
 
     private fun loadUsers() {
-    binding.tvUserStats.text = "Users: Loading..."
+        binding.tvUserStats.text = "Users: Loading..."
     
-    // ⭐⭐⭐ USE THE SAME QUERY FOR BOTH USERS AND STATS ⭐⭐⭐
-    db.collection("users").get(Source.SERVER)
-        .addOnSuccessListener { documents ->
-            // Process users list
-            usersList.clear()
-            for (doc in documents) {
-                val email = doc.getString("email") ?: "Unknown Email"
-                usersList.add(doc.id to email)
+        db.collection("users").get(Source.SERVER)
+            .addOnSuccessListener { documents ->
+                // Process users list
+                usersList.clear()
+                for (doc in documents) {
+                    val email = doc.getString("email") ?: "Unknown Email"
+                    usersList.add(doc.id to email)
             }
+            
+            // ⭐⭐⭐ SORT ALPHABETICALLY BY EMAIL ⭐⭐⭐
+            usersList.sortBy { it.second.lowercase(Locale.getDefault()) }
             
             val displayList = mutableListOf<String>()
             displayList.add("Select a user...")
@@ -210,15 +212,11 @@ private fun showTopCVGenerators() {
             if (usersList.isEmpty()) {
                 showMessage("No users found in database")
             } else {
-                showMessage("✅ Loaded ${usersList.size} users")
+                showMessage("✅ Loaded ${usersList.size} users (sorted alphabetically)")
             }
             
-            // ⭐⭐⭐ NOW PROCESS STATS FROM THE SAME QUERY ⭐⭐⭐
             processStatsData(documents, "server")
-            
-            // ⭐⭐⭐ SETUP AUTOCOMPLETE AFTER USERS ARE LOADED ⭐⭐⭐
             setupAutoCompleteSearch()
-               
         }
         .addOnFailureListener { e ->
             Log.e("AdminPanel", "Firestore error: ${e.message}", e)
@@ -342,21 +340,17 @@ private fun processStatsData(documents: com.google.firebase.firestore.QuerySnaps
     }
 }
 
-    private fun setupAutoCompleteSearch() {
-    val adapter = ArrayAdapter<String>(this, android.R.layout.simple_dropdown_item_1line)
+   private fun setupAutoCompleteSearch() {
+    // ⭐⭐⭐ USE SORTED EMAILS FROM usersList ⭐⭐⭐
+    val emails = usersList.map { it.second } // Already sorted from above
+    val adapter = ArrayAdapter<String>(this, android.R.layout.simple_dropdown_item_1line, emails)
     binding.etManualEmail.setAdapter(adapter)
     
-    // Use existing EditText as AutoComplete
     binding.etManualEmail.setOnItemClickListener { parent, view, position, id ->
         val selectedEmail = adapter.getItem(position) ?: return@setOnItemClickListener
         val user = usersList.find { it.second == selectedEmail }
         user?.let { (userId, email) -> selectUser(userId, email) }
     }
-    
-    // Update adapter when users load
-    val emails = usersList.map { it.second }
-    adapter.clear()
-    adapter.addAll(emails)
 }
 
 
