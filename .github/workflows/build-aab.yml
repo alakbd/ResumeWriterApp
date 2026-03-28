@@ -69,8 +69,8 @@ jobs:
           echo "🔍 Build Configuration:"
           echo "✓ Target SDK: 35 (Required for Play Store)"
           echo "✓ Min SDK: 21"
-          echo "✓ Version Code: 14"
-          echo "✓ Version Name: 1.14"
+          echo "✓ Version Code: 15"
+          echo "✓ Version Name: 1.15"
 
       # 🔟 Build Signed Release APK
       - name: Build Signed Release APK
@@ -165,7 +165,7 @@ jobs:
           body: |
             🚀 Automatic Release Build
             
-            **Version:** 1.14 (14)
+            **Version:** 1.15 (15)
             **Target SDK:** 35 (Play Store Compliant)
             
             ### 📱 Download Links:
